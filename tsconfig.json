@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "module": "NodeNext",
+    "target": "es2017",
+    "moduleResolution": "NodeNext",
+    "declaration": true
+  },
+  "files": [
+    "src/generator.ts"
+  ]
+}

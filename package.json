@@ -1,0 +1,13 @@
+{
+  "name": "sol-mutator",
+  "version": "0.1.0",
+  "author": "Haoyang Ma <haoyanghkust@gmail.com>",
+  "dependencies": {
+    "@types/node": "^20.11.16",
+    "solc-typed-ast": "^18.1.0"
+  },
+  "type": "module",
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}
