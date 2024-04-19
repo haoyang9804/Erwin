@@ -13,55 +13,134 @@ import {
   Mutability,
   ParameterList,
   LiteralKind,
-  block
+  block,
+  Literal
 } from "solc-typed-ast"
 
-abstract class Generator {
-  protected factory: ASTNodeFactory;
-  constructor() {
-    this.factory = new ASTNodeFactory();
+import { str2hex, assert, pickRandomElement } from "./utility.js";
+import { irnodes, IRNode, IRVariableDeclare, IRLiteral, IRAssignment, IRIdentifier } from "./node.js";
+import { irnode_db } from "./db.js";
+import { dag_nodes } from "./constrant.js";
+
+export abstract class Generator {
+  irnode: IRNode | undefined;
+  astnode: ASTNode | undefined;
+  constructor() {}
+  abstract generate() : void;
+  abstract lower() : void;
+}
+
+const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+const varnames = new Set<string>();
+let global_id = 0;
+let cur_scope_id = 1;
+
+function generateRandomString_fixedLength(length : number) : string {
+  let result = '';
+
+  for (let i = 0; i < length; i++) {
+    const randomIndex = Math.floor(Math.random() * characters.length);
+    result += characters.charAt(randomIndex);
   }
-  abstract generate(): ASTNode;
+
+  return result;
 }
 
-class TrivialGenerator extends Generator {
-  generate(): ASTNode {
-    const variable_node = this.factory.makeVariableDeclaration(false, false, "x", 1, false, DataLocation.Memory, StateVariableVisibility.Default, Mutability.Mutable, "uint256");
-    const parameter_list_node = this.factory.makeParameterList([variable_node]);
-    // const expression_1 = this.factory.makeIdentifier(2, "x", "uint256");
-    const x_1 = this.factory.makeIdentifier("uint256", "x", 1);
-    const literal_1 = this.factory.makeLiteral("int_const 1", LiteralKind.Number, "", "1");
-    const assignment_1 = this.factory.makeAssignment("uint256", "+=", x_1, literal_1);
-    const x_2 = this.factory.makeIdentifier("uint256", "x", 1);
-    const return_1 = this.factory.makeReturn(3, x_2);
-    const statement_node_1 = this.factory.makeExpressionStatement(assignment_1);
-    const statement_node_2 = return_1;
-    const block_1 = this.factory.makeBlock([statement_node_1, statement_node_2]);
-    const function_node = this.factory.makeFunctionDefinition(2, FunctionKind.Function, 'f', false, FunctionVisibility.Public, FunctionStateMutability.Pure, false, parameter_list_node, parameter_list_node, [], undefined, block_1);
-    const contract_node = this.factory.makeContractDefinition("C", -1, ContractKind.Contract, false, true, [], [], [], undefined, [function_node]);
-    return contract_node;
+function generateRandomString_randomLength(minLength : number, maxLength : number) : string {
+  const length = Math.floor(Math.random() * (maxLength - minLength + 1)) + minLength;
+  let result = '';
+
+  for (let i = 0; i < length; i++) {
+    const randomIndex = Math.floor(Math.random() * characters.length);
+    result += characters.charAt(randomIndex);
+  }
+
+  return result;
+}
+
+//TODO: add a config to specify whether to generate a random string of fixed length
+function generateRandomString() : string {
+  return generateRandomString_fixedLength(5);
+}
+
+function generateVarName() : string {
+  while (true) {
+    const varname = generateRandomString();
+    if (!varnames.has(varname)) {
+      varnames.add(varname);
+      return varname;
+    }
+  }
+  throw new Error("generateVarName: Unreachable code.");
+}
+
+
+function createVariableDeclare(indexed?: boolean, constant?: boolean, state?: boolean, memory ?: DataLocation, visibility ?: StateVariableVisibility, mutable ?: Mutability, type ?: string) : IRVariableDeclare {
+  return new IRVariableDeclare(global_id, cur_scope_id, generateVarName(), indexed, constant, state, memory, visibility, mutable, type);
+}
+
+async function getAvaliableIRNodes() : Promise<any[]> {
+  return await irnode_db.run("SELECT id FROM tbl WHERE scope <= " + cur_scope_id) as any[];
+}
+
+
+// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Declaration Generator
+
+export class VariableDeclareGenerator extends Generator {
+  generate() : void {
+    global_id++;
+    this.irnode = createVariableDeclare();
+    irnode_db.insert(this.irnode.id, this.irnode.scope);
+    irnodes.push(this.irnode);
+  }
+  lower() : void {
+    assert(this.irnode !== undefined, "VariableDeclareGenerator: irnode is not generated")
+    this.astnode = this.irnode!.lower()
   }
 }
 
-import { ASTWriter, PrettyFormatter, DefaultASTWriterMapping, LatestCompilerVersion } from "solc-typed-ast";
-let g = new TrivialGenerator()
-let ast_node = g.generate()
-// console.log(ast_node)
+// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Expression Generator
 
-const formatter = new PrettyFormatter(2, 0);
-const writer = new ASTWriter(
-    DefaultASTWriterMapping,
-    formatter,
-    LatestCompilerVersion
-);
-
-const contract_node = ast_node as ContractDefinition;
-const function_node = contract_node.vFunctions[0];
-const statements = function_node.vBody!.vStatements;
-for (const statement of statements) {
-    console.log('===================================================================')
-    console.log(statement)
-    console.log('>>> ', writer.write(statement))
+export class LiteralGenerator extends Generator {
+  generate() : void {
+    global_id++;
+    this.irnode = new IRLiteral(global_id, cur_scope_id);
+  }
+  lower() : void {
+    assert(this.irnode !== undefined, "LiteralGenerator: irnode is not generated")
+    this.astnode = this.irnode!.lower()
+  }
 }
 
-console.log(writer.write(ast_node));
+export class IdentifierGenerator extends Generator {
+  async generate(): Promise<void> {
+    global_id++;
+    const availableIRDecl = await getAvaliableIRNodes();
+    assert(availableIRDecl !== undefined, "IdentifierGenerator: availableIRDecl is undefined");
+    this.irnode = new IRIdentifier(global_id, cur_scope_id);
+  }
+  lower() : void {
+    assert(this.irnode !== undefined, "IdentifierGenerator: irnode is not generated")
+    this.astnode = this.irnode!.lower()
+  }
+}
+
+
+export class AssignmentGenerator extends Generator {
+
+  async generate(): Promise<void> {
+    global_id++;
+    const availableIRDecl = await getAvaliableIRNodes();
+    assert(availableIRDecl !== undefined, "AssignmentGenerator: availableIRDecl is undefined");
+    assert(availableIRDecl.length > 0, "AssignmentGenerator: no available IR irnodes");
+    const left = irnodes[pickRandomElement(availableIRDecl)];
+    //TODO: change the generation of right to a random generation
+    let literal_gen = new LiteralGenerator();
+    literal_gen.generate();
+    this.irnode = new IRAssignment(global_id, cur_scope_id, left, literal_gen.irnode as IRNode);
+  }
+  lower(): void {
+    assert(this.irnode !== undefined, "AssignmentGenerator: irnode is not generated")
+    this.astnode = this.irnode!.lower();
+  }
+}

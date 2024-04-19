@@ -5,9 +5,14 @@
     "module": "NodeNext",
     "target": "es2017",
     "moduleResolution": "NodeNext",
-    "declaration": true
+    "declaration": true,
+    "outDir": "./dist",
+    "sourceMap": true
   },
+  "include": [
+    "src/**/*"
+, "test.ts"  ],
   "files": [
-    "src/generator.ts"
+    "src/main.ts"
   ]
 }
