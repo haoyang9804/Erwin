@@ -1,15 +1,14 @@
 export class ConstaintNode {
   id: number;
-  inbound: number;
-  outbound: number;
-  in: number;
-  outs: number[];
+  inbound: number = 0;
+  outbound: number = 0;
+  ins: number[] = [];
+  outs: number[] = [];
+  depth: number = -1;
+  conflict: boolean = false;
+  resolved: boolean = false;
   constructor(id: number) {
-    this.id = id
-    this.inbound = 0;
-    this.outbound = 0;
-    this.in = -1; // -1 means no innode
-    this.outs = [];
+    this.id = id;
   }
 }
 
@@ -47,29 +46,100 @@ Hard flow means the info of S1.x will be directly copied to S2.x.
 Soft flow means the info of S1.x will be copied to S2.x after some tweak (e.g., allowable type conversion, etc.).
 */
 abstract class ForwardDependenceDAG {
-  queue: PriorityQueueNode;
+  // queue: PriorityQueueNode;
   name: string | undefined;
   dag_nodes: ConstaintNode[];
 
   constructor(name: string) {
-    this.queue = new PriorityQueueNode();
+    // this.queue = new PriorityQueueNode();
     this.name = name;
     this.dag_nodes = [];
   }
 
-  // init the DAG
-  protected init() : void {
-    // In connection, we only build up the relation from child nodes to parent nodes
-    // We need first let parents know about their children
+  // preprocess the DAG
+  preprocess() : Set<number> {
+    // get all decls (inbound = 0)
+    const decls: number[] = [];
     for (let i = 0; i < this.dag_nodes.length; i++) {
-      this.dag_nodes[this.dag_nodes[i].in].outbound++;
-      this.dag_nodes[this.dag_nodes[i].in].outs.push(this.dag_nodes[i].id);
+      if (this.dag_nodes[i].inbound === 0) {
+        decls.push(i);
+      }
     }
-    
-    // push them into a priority_queue
-    for (let i = 0; i < this.dag_nodes.length; i++) {
-      this.queue.push(this.dag_nodes[i]);
+    // nominal heads are constraint nodes that seems to be heads (constraint nodes that must be resolved first),
+    // but actually are indirectly dominated by other real heads. (which is `heads` in the following)
+    const nominal_heads = new Set<number>();
+    // heads are constraint nodes that must be resolved first
+    // The resolution of head nodes will trigger the resolution of other nodes
+    const real_heads = new Set<number>();
+    const head_map = new Map<number, number>();
+    // recursive function to set the depth of each node in the DAG
+    // head means the id of the constraint node for a decl
+    // id means the id of the current Constraint Node
+    let f = (head: number, id: number, depth: number) : void => {
+      let stop = false;
+      if (this.dag_nodes[id].depth == -1) {
+        this.dag_nodes[id].depth = depth;
+        head_map.set(id, head);
+      }
+      else if (this.dag_nodes[id].depth < depth) {
+        this.dag_nodes[id].depth = depth;
+        this.dag_nodes[id].conflict = true;
+        assert(head_map.has(id), `DAG: head_map does not have id ${id} in ${this.name}`);
+        nominal_heads.add(head_map.get(id) as number);
+        head_map.set(id, head);
+      }
+      else {
+        stop = true;
+        this.dag_nodes[id].conflict = true;
+        if (head_map.get(id) !== head) {
+          nominal_heads.add(head as number);
+        }
+      }
+      if (stop) return;
+      for (let i = 0; i < this.dag_nodes[id].outs.length; i++) {
+        f(head, this.dag_nodes[id].outs[i], depth + 1);
+      }
     }
+
+    // initialize the depths of all nodes that are directly dominated by heads
+    for (let i = 0; i < decls.length; i++) {
+      this.dag_nodes[decls[i]].depth = 0;
+      if (this.dag_nodes[decls[i]].outbound === 0) {
+      }
+      else {
+        for (let j = 0; j < this.dag_nodes[decls[i]].outs.length; j++) {
+          f(decls[i], this.dag_nodes[decls[i]].outs[j], 1);
+        }
+      }
+    }
+
+    for (let id of decls) {
+      if (!nominal_heads.has(id)) {
+        real_heads.add(id);
+      }
+    }
+
+    // broadcast the conflict resolution to nominal heads
+    let f2 = (id: number) : number => {
+      let depth = this.dag_nodes[id].depth;
+      if (this.dag_nodes[id].conflict) {
+        return depth;
+      }
+      for (let i = 0; i < this.dag_nodes[id].outs.length; i++) {
+        depth = Math.max(-1 + f2(this.dag_nodes[id].outs[i]), depth);
+      }
+      this.dag_nodes[id].conflict = true;
+      return depth;
+    }
+    for (let nominal_head of nominal_heads) {
+      this.dag_nodes[nominal_head].depth = f2(nominal_head);
+    }
+
+    assert (real_heads.size > 0, `DAG: real_heads is empty in ${this.name}`)
+    for (let node of this.dag_nodes) {
+      assert (node.depth !== -1, `DAG: node ${node.id} does not have depth in ${this.name}`)
+    }
+    return real_heads;
   }
 
   newNode(id: number) : ConstaintNode {
@@ -81,52 +151,11 @@ abstract class ForwardDependenceDAG {
     assert(node.id === this.dag_nodes.length - 1, `DAG: node id ${node.id} is not equal its id ${this.dag_nodes.length - 1} in dag_nodes`)
   }
 
-  /*
-  Q: Why only update to's in but not from's out?
-  A: Because the to's in may be updated later. This update influences
-     from's out, resulting in low-efficiency.
-     For instance, x += literal; This expression is an assignment (A) and x in it
-     is an identifier (I) expression. The construction of I happens before the construction of A
-     and it the type of both depend on the declaration of x (D).
-     D first connects to A and finally to I. If the first connection updates the out of D,
-     the second connection must first removes A from D's outs, which is redundant.
-
-  The update of from's out will be conducted
-  together in the init function.
-  */
-  connect(from: number, to: number) : void {
-    this.dag_nodes[to].in = from;
-  }
-
-  /*
-  lift the dependence flow of uses to their declarations
-  Think about the following code snippet:
-
-    declare x; // S1
-    declare y; // S2
-    x = y; // S3
-
-  The dependence DAG is as follows:
-  S1.x            S2.y
-    |              |
-   hard           hard
-    |              |
-    V              V
-  S3.x --soft-->  S3.y
-
-  The lift function is to lift the soft flow from S3.x to S3.y to a new soft flow from S1.x to S2.y.
-  Without this lift, the resolve function does not know the underlying flow between S1.x and S2.y
-  and may make a mistake by for instance, assigning uint256 to S1.x and string to S2.y. These two types
-  finally flow into S3.x and S3.y. When the type of S3.x softly flows into S3.y, uint256 meets string
-  and encounter a type mismatch.
-  */
-  lift(): void {
-    
-    for (let i = 0; i < this.dag_nodes.length; i++) {
-      if (this.dag_nodes[i].inbound === 0) {
-        this.queue.push(this.dag_nodes[i]);
-      }
-    }
+  connect(from: number, to: number, rank?: string) : void {
+    this.dag_nodes[to].ins.push(from);
+    this.dag_nodes[from].outs.push(to);
+    this.dag_nodes[to].inbound++;
+    this.dag_nodes[from].outbound++;
   }
 
   // resolve one constraint
@@ -134,26 +163,30 @@ abstract class ForwardDependenceDAG {
 }
 
 
+type Pair = [number, number];
+
 // The type dependence of the subsequent uses on the previous declacations
 export class ForwardTypeDependenceDAG extends ForwardDependenceDAG {
+  // a map records all weak type dependence from the first element to the second element
+  weak: Set<Pair> = new Set();
   constructor() {
     super("ForwardTypeDependence");
   }
 
-  resolve() : void {
-    this.init();
-    while (this.queue.size() > 0) {
-      const node = this.queue.top();
-      this.queue.pop();
-      for (let i = 0; i < node.outs.length; i++) {
-        const out = this.dag_nodes[node.outs[i]];
-        out.inbound--;
-        const out_irnode = irnodes[out.id];
-        assert('type' in out_irnode, `TypeDAG: out_irnode ${out_irnode.id} does not have type`);
-        const in_irnode = irnodes[node.id];
-        assert('type' in in_irnode, `TypeDAG: in_irnode ${in_irnode.id} does not have type`);
-        out_irnode.type = in_irnode.type;
-      }
+  connect(from: number, to: number, rank?: string) : void {
+    this.dag_nodes[to].ins.push(from);
+    this.dag_nodes[from].outs.push(to);
+    this.dag_nodes[to].inbound++;
+    this.dag_nodes[from].outbound++;
+    if (rank === "weak") {
+      this.weak.add([from, to]);
     }
+  }
+
+  resolve() : void {
+    // const heads = this.preprocess();
+    // for (let head of heads) {
+    //   this.dfs(head);
+    // }
   }
 }
