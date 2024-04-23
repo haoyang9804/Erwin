@@ -2,16 +2,17 @@
   "compilerOptions": {
     "forceConsistentCasingInFileNames": true,
     "strict": true,
-    "module": "NodeNext",
+    "module": "es2022",
     "target": "es2017",
-    "moduleResolution": "NodeNext",
+    "moduleResolution": "bundler",
     "declaration": true,
     "outDir": "./dist",
-    "sourceMap": true
+    "sourceMap": true,
+    "esModuleInterop": true
   },
   "include": [
     "src/**/*"
-, "test.ts"  ],
+  ],
   "files": [
     "src/main.ts"
   ]

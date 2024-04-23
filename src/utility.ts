@@ -35,3 +35,33 @@ export function pickRandomElement<T>(array: T[]): T | undefined {
   const randomIndex = Math.floor(Math.random() * array.length);
   return array[randomIndex];
 }
+
+const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+
+export function generateRandomString_fixedLength(length : number) : string {
+  let result = '';
+
+  for (let i = 0; i < length; i++) {
+    const randomIndex = Math.floor(Math.random() * characters.length);
+    result += characters.charAt(randomIndex);
+  }
+
+  return result;
+}
+
+export function generateRandomString_randomLength(minLength : number, maxLength : number) : string {
+  const length = Math.floor(Math.random() * (maxLength - minLength + 1)) + minLength;
+  let result = '';
+
+  for (let i = 0; i < length; i++) {
+    const randomIndex = Math.floor(Math.random() * characters.length);
+    result += characters.charAt(randomIndex);
+  }
+
+  return result;
+}
+
+//TODO: add a config to specify whether to generate a random string of fixed length
+export function generateRandomString() : string {
+  return generateRandomString_fixedLength(5);
+}

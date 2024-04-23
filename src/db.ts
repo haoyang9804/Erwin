@@ -9,27 +9,34 @@ export class DB {
       driver: sqlite3.Database
     };
     this.db = new sqlite.Database(config);
-    this.db.open();
-    this.run('CREATE TABLE tbl (id INTEGER PRIMARY KEY, scope INTEGER)')
+  }
+
+  async open() {
+    await this.db.open();
+  }
+
+  async init() {
+    await this.db.exec('CREATE TABLE tbl (id INTEGER PRIMARY KEY, scope INTEGER)')
   }
 
   async close() {
-    this.db.close();
+    await this.db.close();
   }
 
   async run(cmd: string) : Promise<void | any[]>  {
     if (cmd.startsWith("INSERT") || cmd.startsWith("UPDATE")) {
-      this.db.run(cmd);
+      await this.db.run(cmd);
     }
     else if (cmd.startsWith("SELECT")) {
-      return this.db.all(cmd) as Promise<any[]>;
+      return await this.db.all(cmd) as any[];
     }
   }
 
-  insert(id: number, scope: number) {
+  async insert(id: number, scope: number) {
     const cmd = "INSERT INTO tbl (id, scope) VALUES (" + id + ", " + scope + ")";
-    this.run(cmd);
+    await this.run(cmd);
   }
 }
 
 export let irnode_db = new DB();
+//TODO: don't forget to close the db
