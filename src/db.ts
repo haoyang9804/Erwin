@@ -2,8 +2,8 @@ import * as sqlite from 'sqlite';
 import sqlite3 from 'sqlite3'
 
 export class DB {
-  db: sqlite.Database;
-  constructor(filename: string = ":memory:") {
+  db : sqlite.Database;
+  constructor(filename : string = ":memory:") {
     const config = {
       filename: filename,
       driver: sqlite3.Database
@@ -23,7 +23,7 @@ export class DB {
     await this.db.close();
   }
 
-  async run(cmd: string) : Promise<void | any[]>  {
+  async run(cmd : string) : Promise<void | any[]> {
     if (cmd.startsWith("INSERT") || cmd.startsWith("UPDATE")) {
       await this.db.run(cmd);
     }
@@ -32,7 +32,7 @@ export class DB {
     }
   }
 
-  async insert(id: number, scope: number) {
+  async insert(id : number, scope : number) {
     const cmd = "INSERT INTO tbl (id, scope) VALUES (" + id + ", " + scope + ")";
     await this.run(cmd);
   }

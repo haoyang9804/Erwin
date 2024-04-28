@@ -28,37 +28,38 @@ export enum FieldFlag {
 
 const factory = new ASTNodeFactory();
 
+export const irnodes : IRNode[] = [];
 export abstract class IRNode {
   public id : number;
-  public scope: number;
-  public field_flag: FieldFlag;
-  constructor(id : number, scope: number, field_flag: FieldFlag) {
+  public scope : number;
+  public field_flag : FieldFlag;
+  constructor(id : number, scope : number, field_flag : FieldFlag) {
     this.id = id;
     this.scope = scope;
     this.field_flag = field_flag;
+    irnodes.push(this);
   }
   abstract lower() : ASTNode;
 }
 
-export const irnodes: IRNode[] = [];
 
 export abstract class IRDeclare extends IRNode {
-  name: string;
-  constructor(id : number, scope: number, field_flag: FieldFlag, name: string) {
+  name : string;
+  constructor(id : number, scope : number, field_flag : FieldFlag, name : string) {
     super(id, scope, field_flag);
     this.name = name;
   }
 }
 
 export class IRVariableDeclare extends IRDeclare {
-  indexed: boolean = false;
-  constant: boolean | undefined; // duplicated with attribute `mutable`. but required by solc-typed-ast.
-  state: boolean;
+  indexed : boolean = false;
+  constant : boolean | undefined; // duplicated with attribute `mutable`. but required by solc-typed-ast.
+  state : boolean;
   memory : DataLocation = DataLocation.Default;
   visibility : StateVariableVisibility = StateVariableVisibility.Default;
   mutable : Mutability = Mutability.Mutable;
   type : Type | undefined;
-  constructor(id : number, scope: number, field_flag: FieldFlag, name : string) {
+  constructor(id : number, scope : number, field_flag : FieldFlag, name : string) {
     super(id, scope, field_flag, name);
     if (field_flag === FieldFlag.CONTRACT_GLOBAL) {
       this.state = true;
@@ -75,7 +76,7 @@ export class IRVariableDeclare extends IRDeclare {
     }
     if (!this.state) this.constant = false;
   }
-  lower(): ASTNode {
+  lower() : ASTNode {
     if (this.constant === undefined) {
       if (this.id in constantLock) this.constant = false;
       else {
@@ -86,7 +87,7 @@ export class IRVariableDeclare extends IRDeclare {
     if (this.constant) this.mutable = Mutability.Constant;
     assert(this.type !== undefined, "IRVariableDeclare: type is not generated");
 
-    let typename: TypeName | undefined = undefined;
+    let typename : TypeName | undefined = undefined;
     if (this.type.kind === TypeKind.ElementaryType) {
       const type = this.type as ElementaryType;
       typename = factory.makeElementaryTypeName("", type.name);
@@ -109,19 +110,19 @@ export class IRVariableDeclare extends IRDeclare {
 }
 
 export abstract class IRExpression extends IRNode {
-  type: Type | undefined;
-  constructor(id : number, scope: number, field_flag: FieldFlag) {
+  type : Type | undefined;
+  constructor(id : number, scope : number, field_flag : FieldFlag) {
     super(id, scope, field_flag);
   }
   abstract lower() : ASTNode;
 }
 
 export class IRLiteral extends IRExpression {
-  kind: LiteralKind = LiteralKind.Number;
-  constructor(id : number, scope: number, field_flag: FieldFlag) {
+  kind : LiteralKind = LiteralKind.Number;
+  constructor(id : number, scope : number, field_flag : FieldFlag) {
     super(id, scope, field_flag);
   }
-  private generateKind(): void {
+  private generateKind() : void {
     const type = this.type as ElementaryType;
     if (type.name === "bool") {
       this.kind = LiteralKind.Bool;
@@ -133,7 +134,7 @@ export class IRLiteral extends IRExpression {
     //TODO: add support for HexString and UnicodeString
     else this.kind = LiteralKind.String;
   }
-  private generateVal(): string {
+  private generateVal() : string {
     //TODO: add support for strange value, such as huge number and overlong string, etc.
     this.generateKind();
     if (this.kind === LiteralKind.Bool) {
@@ -149,7 +150,7 @@ export class IRLiteral extends IRExpression {
     //TODO: add support for HexString and UnicodeString
     throw new Error("IRLiteral: Unreachable code.");
   }
-  lower(): ASTNode {
+  lower() : ASTNode {
     assert(this.type !== undefined, "IRLiteral: type is not generated");
     assert(this.type.kind === TypeKind.ElementaryType, "IRLiteral: type is not ElementaryType")
     const value = this.generateVal();
@@ -158,15 +159,15 @@ export class IRLiteral extends IRExpression {
 }
 
 export class IRIdentifier extends IRExpression {
-  name: string | undefined;
+  name : string | undefined;
   // The id of the referenced IRNode
-  reference: number | undefined;
-  constructor(id: number, scope: number, field_flag: FieldFlag, name?: string, reference?: number) {
+  reference : number | undefined;
+  constructor(id : number, scope : number, field_flag : FieldFlag, name ?: string, reference ?: number) {
     super(id, scope, field_flag);
     this.name = name;
     this.reference = reference;
   }
-  lower(): ASTNode {
+  lower() : ASTNode {
     assert(this.type !== undefined, "IRIdentifier: type is not generated");
     assert(this.name !== undefined, "IRIdentifier: name is not generated");
     assert(this.reference !== undefined, "IRIdentifier: reference is not generated");
@@ -177,15 +178,15 @@ export class IRIdentifier extends IRExpression {
 export class IRAssignment extends IRExpression {
   left : IRExpression;
   right : IRExpression;
-  type: Type | undefined;;
-  operator: string | undefined;
-  constructor(id : number, scope: number, field_flag: FieldFlag, left : IRExpression, right : IRExpression, operator?: string) {
+  type : Type | undefined;;
+  operator : string | undefined;
+  constructor(id : number, scope : number, field_flag : FieldFlag, left : IRExpression, right : IRExpression, operator ?: string) {
     super(id, scope, field_flag);
     this.left = left;
     this.right = right;
     this.operator = operator;
   }
-  lower(): ASTNode {
+  lower() : ASTNode {
     assert(this.type !== undefined, "IRAssignment: type is undefined");
     assert(this.operator !== undefined, "IRAssignment: operator is undefined");
     return factory.makeAssignment("", this.operator, this.left.lower() as Expression, this.right.lower() as Expression);
