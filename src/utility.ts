@@ -37,7 +37,7 @@ export function pickRandomElement<T>(array : T[]) : T | undefined {
 }
 
 export function lazyPickRandomElement<T>(array : T[]) : T | undefined {
-  if (Math.random() < 0.5) {
+  if (Math.random() < 0.1) {
     return undefined;
   }
   return pickRandomElement(array);

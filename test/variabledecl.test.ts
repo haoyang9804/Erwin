@@ -14,7 +14,7 @@ const writer = new ASTWriter(
     LatestCompilerVersion
 );
 
-test("test a simple vardecl generation",
+test("test a simple vardecl generation 1",
 async () => {
   await db.irnode_db.open();
   await db.irnode_db.init();

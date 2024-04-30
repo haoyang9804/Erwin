@@ -15,7 +15,7 @@ export class ConstaintNode {
 import { irnodes } from "./node";
 import { assert } from "./utility";
 import { PriorityQueue } from "./dataStructor";
-import { varID2Types, Type, ElementaryType, FunctionType  } from "./type"
+import { varID2Types, Type, ElementaryType, FunctionType, ArrayType } from "./type"
 import { pickRandomElement, extendArrayofMap } from "./utility";
 
 // a set of IRNode ids that have backward constrants that cannot be constant
@@ -160,7 +160,7 @@ abstract class ForwardDependenceDAG<T> {
     this.dag_nodes[from].outbound++;
   }
 
-  abstract init_resolution(): void;
+  abstract init_resolution() : void;
 
   // Resolve one constraint given some constraints have been resolved
   // For instance, given that the type of heads (nodes whose inbound == 0), the type of all nodes in the DAG will be resolved
@@ -171,10 +171,10 @@ abstract class ForwardDependenceDAG<T> {
 
   // Verify that all constraints have been successfully resolved
   // and all resolutions are consistent.
-  abstract verify(): void;
+  abstract verify() : void;
 
   // print info for debugging
-  abstract print(): void;
+  abstract print() : void;
 }
 
 // The type dependence of the subsequent uses on the previous declacations
@@ -203,9 +203,9 @@ export class ForwardTypeDependenceDAG extends ForwardDependenceDAG<Type> {
   private resolve_weak(id : number, direction : "from" | "to") : Type {
     assert(this.resolved_types.has(id), `ForwardTypeDependenceDAG: node ${id} is not resolved`);
     let available_types = direction === "from" ?
-        this.resolved_types.get(id)!.subtype()
-          :
-            this.resolved_types.get(id)!.supertype();
+      this.resolved_types.get(id)!.subtype()
+      :
+      this.resolved_types.get(id)!.supertype();
     assert(available_types.length > 0, `ForwardTypeDependenceDAG: node ${id} has no available types`)
     return pickRandomElement(available_types)!;
   }
@@ -213,7 +213,7 @@ export class ForwardTypeDependenceDAG extends ForwardDependenceDAG<Type> {
   resolve() : void {
     // broadcast the type of a real head to its reachable descendants
     let depths : number[] = new Array(this.dag_nodes.length).fill(0x7f7f7f7f);
-    let type_broadcast = (node : number, depth: number) : void => {
+    let type_broadcast = (node : number, depth : number) : void => {
       assert(this.resolved_types.has(node), `ForwardTypeDependenceDAG: node ${node} is not resolved`);
       depths[node] = depth;
       for (let i = 0; i < this.dag_nodes[node].outs.length; i++) {
@@ -286,14 +286,14 @@ export class ForwardTypeDependenceDAG extends ForwardDependenceDAG<Type> {
     return heads2type;
   }
 
-  init_resolution(): void {
+  init_resolution() : void {
     for (let node of this.dag_nodes) {
       node.resolved = false;
     }
     this.resolved_types.clear();
   }
 
-  verify(): void {
+  verify() : void {
     for (let node of this.dag_nodes) {
       assert(node.resolved, `ForwardTypeDependenceDAG: node ${node.id} is not resolved`);
       for (let child of node.outs) {
@@ -304,37 +304,19 @@ export class ForwardTypeDependenceDAG extends ForwardDependenceDAG<Type> {
           let match = false;
           for (let subtype of subttypes) {
             if (subtype.kind !== typeofchild.kind) continue;
-            //TODO support more types
-            if (subtype instanceof ElementaryType) {
-              if ((subtype as ElementaryType).name === "address" && (typeofchild as ElementaryType).name === "address") {
-                if ((subtype as ElementaryType).stateMutability === (typeofchild as ElementaryType).stateMutability) {
-                  match = true;
-                  break;
-                }
-              }
-              else if ((subtype as ElementaryType).name === (typeofchild as ElementaryType).name) {
-                match = true;
-                break;
-              }
-            }
-            else if (subtype instanceof FunctionType) {
-              if ((subtype as FunctionType).stateMutability === (typeofchild as FunctionType).stateMutability
-              && (subtype as FunctionType).visibility === (typeofchild as FunctionType).visibility
-              && (subtype as FunctionType).returnTypes.length === (typeofchild as FunctionType).returnTypes.length
-              && (subtype as FunctionType).parameterTypes.length === (typeofchild as FunctionType).parameterTypes.length
-              && (subtype as FunctionType).parameterTypes_str() === (typeofchild as FunctionType).parameterTypes_str()
-              && (subtype as FunctionType).returnTypes_str() === (typeofchild as FunctionType).returnTypes_str()){
-                match = true;
-                break;
-              }
+            if (typeofchild.same(subtype)) {
+              match = true;
+              break;
             }
           }
           assert(match,
-          `ForwardTypeDependenceDAG: weak type constraint is not satisfied: ${node.id} of ${this.resolved_types.get(node.id)!.str()} --> ${child} of ${this.resolved_types.get(child)!.str()}`);
+            `ForwardTypeDependenceDAG: weak type constraint is not satisfied:
+            ${node.id} of ${this.resolved_types.get(node.id)!.str()} --> ${child} of ${this.resolved_types.get(child)!.str()}.
+            Maybe you forget to add a weak type constraint in constraint.ts: ForwardTypeDependenceDAG: verify.`);
         }
         else {
           assert(this.resolved_types.get(node.id)!.str() === this.resolved_types.get(child)!.str(),
-          `ForwardTypeDependenceDAG: strong type constraint is not satisfied: ${node.id} of ${this.resolved_types.get(node.id)!.str()} --> ${child} of ${this.resolved_types.get(child)!.str()}`);
+            `ForwardTypeDependenceDAG: strong type constraint is not satisfied: ${node.id} of ${this.resolved_types.get(node.id)!.str()} --> ${child} of ${this.resolved_types.get(child)!.str()}`);
         }
       }
     }
