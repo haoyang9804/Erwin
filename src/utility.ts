@@ -36,6 +36,13 @@ export function pickRandomElement<T>(array : T[]) : T | undefined {
   return array[randomIndex];
 }
 
+export function lazyPickRandomElement<T>(array : T[]) : T | undefined {
+  if (Math.random() < 0.5) {
+    return undefined;
+  }
+  return pickRandomElement(array);
+}
+
 const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
 export function generateRandomString_fixedLength(length : number) : string {

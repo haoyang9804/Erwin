@@ -15,7 +15,7 @@ export class ConstaintNode {
 import { irnodes } from "./node";
 import { assert } from "./utility";
 import { PriorityQueue } from "./dataStructor";
-import { varID2Types, Type, ElementaryType } from "./type"
+import { varID2Types, Type, ElementaryType, FunctionType  } from "./type"
 import { pickRandomElement, extendArrayofMap } from "./utility";
 
 // a set of IRNode ids that have backward constrants that cannot be constant
@@ -172,6 +172,9 @@ abstract class ForwardDependenceDAG<T> {
   // Verify that all constraints have been successfully resolved
   // and all resolutions are consistent.
   abstract verify(): void;
+
+  // print info for debugging
+  abstract print(): void;
 }
 
 // The type dependence of the subsequent uses on the previous declacations
@@ -180,25 +183,6 @@ export class ForwardTypeDependenceDAG extends ForwardDependenceDAG<Type> {
   weak : Set<string> = new Set();
   // a map records all resolved types
   resolved_types : Map<number, Type> = new Map();
-
-  // subtyping relation
-  subtype_from : Map<string, Set<string>> = new Map([
-    ["uint256 nonpayable", new Set(["uint256 nonpayable", "uint128 nonpayable", "uint64 nonpayable", "uint32 nonpayable", "uint16 nonpayable", "uint8 nonpayable"])],
-    ["uint128 nonpayable", new Set(["uint128 nonpayable", "uint64 nonpayable", "uint32 nonpayable", "uint16 nonpayable", "uint8 nonpayable"])],
-    ["uint64 nonpayable", new Set(["uint64 nonpayable", "uint32 nonpayable", "uint16 nonpayable", "uint8 nonpayable"])],
-    ["uint32 nonpayable", new Set(["uint32 nonpayable", "uint16 nonpayable", "uint8 nonpayable"])],
-    ["uint16 nonpayable", new Set(["uint16 nonpayable", "uint8 nonpayable"])],
-    ["uint8 nonpayable", new Set(["uint8 nonpayable"])]
-  ]);
-
-  subtype_to : Map<string, Set<string>> = new Map([
-    ["uint8 nonpayable", new Set(["uint8 nonpayable", "uint16 nonpayable", "uint32 nonpayable", "uint64 nonpayable", "uint128 nonpayable", "uint256 nonpayable"])],
-    ["uint16 nonpayable", new Set(["uint16 nonpayable", "uint32 nonpayable", "uint64 nonpayable", "uint128 nonpayable", "uint256 nonpayable"])],
-    ["uint32 nonpayable", new Set(["uint32 nonpayable", "uint64 nonpayable", "uint128 nonpayable", "uint256 nonpayable"])],
-    ["uint64 nonpayable", new Set(["uint64 nonpayable", "uint128 nonpayable", "uint256 nonpayable"])],
-    ["uint128 nonpayable", new Set(["uint128 nonpayable", "uint256 nonpayable"])],
-    ["uint256 nonpayable", new Set(["uint256 nonpayable"])]
-  ]);
 
   constructor() {
     super("ForwardTypeDependence");
@@ -218,21 +202,10 @@ export class ForwardTypeDependenceDAG extends ForwardDependenceDAG<Type> {
   // if a node is the child of node whose id is id, then resolve the type of the child node
   private resolve_weak(id : number, direction : "from" | "to") : Type {
     assert(this.resolved_types.has(id), `ForwardTypeDependenceDAG: node ${id} is not resolved`);
-    if (direction === "from")
-      assert(this.subtype_from.has(this.resolved_types.get(id)!.str()),
-      `ForwardTypeDependenceDAG: type ${this.resolved_types.get(id)!.str()} is not in subtype_from`);
-    else
-      assert(this.subtype_to.has(this.resolved_types.get(id)!.str()),
-      `ForwardTypeDependenceDAG: type ${this.resolved_types.get(id)!.str()} is not in subtype_to`);
-    let available_types_str = direction === "from" ?
-      this.subtype_from.get(this.resolved_types.get(id)!.str()) as Set<string>
-        :
-          this.subtype_to.get(this.resolved_types.get(id)!.str()) as Set<string>;
-    assert(available_types_str !== undefined, `ForwardTypeDependenceDAG: available_types_str is undefined`);
-    let available_types : Type[] = new Array();
-    for (let type_str of available_types_str) {
-      available_types.push(new ElementaryType().from_str(type_str));
-    }
+    let available_types = direction === "from" ?
+        this.resolved_types.get(id)!.subtype()
+          :
+            this.resolved_types.get(id)!.supertype();
     assert(available_types.length > 0, `ForwardTypeDependenceDAG: node ${id} has no available types`)
     return pickRandomElement(available_types)!;
   }
@@ -242,10 +215,14 @@ export class ForwardTypeDependenceDAG extends ForwardDependenceDAG<Type> {
     let depths : number[] = new Array(this.dag_nodes.length).fill(0x7f7f7f7f);
     let type_broadcast = (node : number, depth: number) : void => {
       assert(this.resolved_types.has(node), `ForwardTypeDependenceDAG: node ${node} is not resolved`);
-      if (depths[node] <= depth) return;
       depths[node] = depth;
       for (let i = 0; i < this.dag_nodes[node].outs.length; i++) {
         let next = this.dag_nodes[node].outs[i];
+        if (depth + 1 !== this.dag_nodes[next].depth) {
+          assert(depth + 1 < this.dag_nodes[next].depth, `ForwardTypeDependenceDAG: depth ${depth + 1} is not less than ${this.dag_nodes[next].depth}`)
+          this.weak.add(`${node} ${next}`);
+          continue;
+        }
         if (this.weak.has(`${node} ${next}`)) {
           this.resolved_types.set(next, this.resolve_weak(node, "from"));
         }
@@ -313,7 +290,6 @@ export class ForwardTypeDependenceDAG extends ForwardDependenceDAG<Type> {
     for (let node of this.dag_nodes) {
       node.resolved = false;
     }
-    this.weak.clear();
     this.resolved_types.clear();
   }
 
@@ -321,15 +297,57 @@ export class ForwardTypeDependenceDAG extends ForwardDependenceDAG<Type> {
     for (let node of this.dag_nodes) {
       assert(node.resolved, `ForwardTypeDependenceDAG: node ${node.id} is not resolved`);
       for (let child of node.outs) {
+        assert(this.resolved_types.get(child))
         if (this.weak.has(`${node.id} ${child}`)) {
-          assert(this.subtype_from.get(this.resolved_types.get(child)!.str())!.has(this.resolved_types.get(child)!.str()),
-          `ForwardTypeDependenceDAG: weak type dependence is not satisfied: ${node.id} of ${this.resolved_types.get(child)!.str()} --> ${child} of ${this.resolved_types.get(child)!.str()}`);
+          const subttypes = this.resolved_types.get(child)!.subtype();
+          let typeofchild = this.resolved_types.get(child)!;
+          let match = false;
+          for (let subtype of subttypes) {
+            if (subtype.kind !== typeofchild.kind) continue;
+            //TODO support more types
+            if (subtype instanceof ElementaryType) {
+              if ((subtype as ElementaryType).name === "address" && (typeofchild as ElementaryType).name === "address") {
+                if ((subtype as ElementaryType).stateMutability === (typeofchild as ElementaryType).stateMutability) {
+                  match = true;
+                  break;
+                }
+              }
+              else if ((subtype as ElementaryType).name === (typeofchild as ElementaryType).name) {
+                match = true;
+                break;
+              }
+            }
+            else if (subtype instanceof FunctionType) {
+              if ((subtype as FunctionType).stateMutability === (typeofchild as FunctionType).stateMutability
+              && (subtype as FunctionType).visibility === (typeofchild as FunctionType).visibility
+              && (subtype as FunctionType).returnTypes.length === (typeofchild as FunctionType).returnTypes.length
+              && (subtype as FunctionType).parameterTypes.length === (typeofchild as FunctionType).parameterTypes.length
+              && (subtype as FunctionType).parameterTypes_str() === (typeofchild as FunctionType).parameterTypes_str()
+              && (subtype as FunctionType).returnTypes_str() === (typeofchild as FunctionType).returnTypes_str()){
+                match = true;
+                break;
+              }
+            }
+          }
+          assert(match,
+          `ForwardTypeDependenceDAG: weak type constraint is not satisfied: ${node.id} of ${this.resolved_types.get(node.id)!.str()} --> ${child} of ${this.resolved_types.get(child)!.str()}`);
         }
         else {
           assert(this.resolved_types.get(node.id)!.str() === this.resolved_types.get(child)!.str(),
-          `ForwardTypeDependenceDAG: weak type dependence is not satisfied: ${node.id} of ${this.resolved_types.get(child)!.str()} --> ${child} of ${this.resolved_types.get(child)!.str()}`);
+          `ForwardTypeDependenceDAG: strong type constraint is not satisfied: ${node.id} of ${this.resolved_types.get(node.id)!.str()} --> ${child} of ${this.resolved_types.get(child)!.str()}`);
         }
       }
+    }
+  }
+
+  print() {
+    console.log('===print===')
+    for (let node of this.dag_nodes) {
+      // console.log(`node ${node.id}: inbound ${node.inbound}, outbound ${node.outbound}, depth ${node.depth}, resolved ${node.resolved}`);
+      // console.log(`  ins: ${node.ins}`);
+      // console.log(`  outs: ${node.outs}`);
+      // console.log(`  conflict: ${node.conflict}`);
+      console.log(`node ${node.id}, resolved type: ${this.resolved_types.get(node.id)!.str()}`);
     }
   }
 
