@@ -19,6 +19,10 @@ export abstract class IRDeclare extends IRNode {
   }
 }
 
+// export class IRTypeDeclare extends IRNode {
+
+// }
+
 export class IRVariableDeclare extends IRDeclare {
   indexed : boolean = false;
   constant : boolean | undefined; // duplicated with attribute `mutable`. but required by solc-typed-ast.

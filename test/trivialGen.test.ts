@@ -54,7 +54,7 @@ test('test a trivial Solidity program generation',
 }
 )
 
-test("test a more complicated Solidity program generation",
+test("test function generation",
 () => {
   const var_function_def1 = factory.makeVariableDeclaration(
     false,
@@ -83,5 +83,14 @@ test("test a more complicated Solidity program generation",
       )
     ));
   expect(writer.write(var_function_def1)).toBe("function(uint256 x) external pure returns (uint256) f");
+}
+)
+
+test("test type alias generation",
+() => {
+  const user_defined_type = factory.makeUserDefinedTypeName("", "x", 1);
+  expect(writer.write(user_defined_type)).toBe("x");
+  const user_defined_type_definiiton = factory.makeUserDefinedValueTypeDefinition("x", factory.makeElementaryTypeName("", "uint256"));
+  expect(writer.write(user_defined_type_definiiton)).toBe("type x is uint256;");
 }
 )

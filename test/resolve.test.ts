@@ -214,7 +214,6 @@ test('test dependence DAG 4',
     }
     dag.resolve();
     dag.verify();
-    dag.print();
   }
 })
 test('test dependence DAG 4',
