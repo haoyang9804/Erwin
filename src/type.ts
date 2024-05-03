@@ -15,10 +15,9 @@ export abstract class Type {
     this.kind = kind;
   }
   abstract str() : string;
-  // abstract from_str(str: string): Type;
   abstract subtype() : Type[];
   abstract supertype() : Type[];
-  abstract same(t: Type): boolean
+  abstract same(t : Type) : boolean
 }
 
 type elementary_type_name = "uint256" | "uint128" | "uint64" | "uint32" | "uint16" | "uint8" | "address" | "bool" | "string" | "bytes" | "int256" | "int128" | "int64" | "int32" | "int16" | "int8";
@@ -41,13 +40,7 @@ export class ElementaryType extends Type {
   str() : string {
     return this.name + " " + this.stateMutability;
   }
-  // from_str(str: string): Type {
-  //   let segs = str.split(" ");
-  //   assert(segs.length === 2, "ElementaryType: from_str: invalid str: " + str);
-  //   this.name = segs[0] as "uint256" | "uint128" | "uint64" | "uint32" | "uint16" | "uint8" | "address" | "bool" | "string" | "bytes";
-  //   this.stateMutability = segs[1] as "nonpayable" | "payable";
-  //   return this;
-  // }
+
   subtype() : Type[] {
     switch (this.name) {
       case "uint256":
@@ -138,7 +131,7 @@ export class ElementaryType extends Type {
     }
   }
 
-  same(t: Type): boolean {
+  same(t : Type) : boolean {
     if (t.kind !== TypeKind.ElementaryType) return false;
     if ((t as ElementaryType).name === "address" && this.name === "address") {
       if ((t as ElementaryType).stateMutability === this.stateMutability) {
@@ -208,7 +201,7 @@ export class FunctionType extends Type {
     }
   }
 
-  same(t: Type): boolean {
+  same(t : Type) : boolean {
     if (t.kind !== TypeKind.FunctionType) return false;
     if ((t as FunctionType).stateMutability === this.stateMutability
       && (t as FunctionType).visibility === this.visibility
@@ -223,26 +216,26 @@ export class FunctionType extends Type {
 }
 
 export class ArrayType extends Type {
-  base: Type;
-  length: number = 1
-  constructor(base: Type, length: number = 1) {
+  base : Type;
+  length : number = 1
+  constructor(base : Type, length : number = 1) {
     super(TypeKind.ArrayType);
     this.base = base;
     this.length = length;
   }
-  myself(): Type {
+  myself() : Type {
     return new ArrayType(this.base, this.length);
   }
-  str(): string {
+  str() : string {
     return `${this.base.str()}[${this.length}]`;
   }
-  supertype(): Type[] {
+  supertype() : Type[] {
     return [this.myself()];
   }
-  subtype(): Type[] {
+  subtype() : Type[] {
     return [this.myself()];
   }
-  same(t: Type): boolean {
+  same(t : Type) : boolean {
     if (t.kind !== TypeKind.ArrayType) return false;
     if ((t as ArrayType).base.same(this.base) && (t as ArrayType).length === this.length) {
       return true;
@@ -252,30 +245,30 @@ export class ArrayType extends Type {
 }
 
 export class MappingType extends Type {
-  kType: Type;
-  vType: Type;
-  constructor(kType: Type, vType: Type) {
+  kType : Type;
+  vType : Type;
+  constructor(kType : Type, vType : Type) {
     super(TypeKind.MappingType);
     this.kType = kType;
     this.vType = vType;
   }
-  str(): string {
+  str() : string {
     return `mapping(${this.kType.str()} => ${this.vType.str()})`;
   }
-  same(t: Type): boolean {
+  same(t : Type) : boolean {
     if (t.kind !== TypeKind.MappingType) return false;
     if ((t as MappingType).kType.same(this.kType) && (t as MappingType).vType.same(this.vType)) {
       return true;
     }
     return false;
   }
-  myself(): Type {
+  myself() : Type {
     return new MappingType(this.kType, this.vType);
   }
-  subtype(): Type[] {
+  subtype() : Type[] {
     return [this.myself()];
   }
-  supertype(): Type[] {
+  supertype() : Type[] {
     return [this.myself()];
   }
 }
@@ -311,19 +304,19 @@ export const all_integer_types : Type[] = [
   new ElementaryType("uint8", "nonpayable"),
 ]
 
-export let all_mapping_types: Type[] = [];
-export let all_function_types: Type[] = [];
-export let all_array_types: Type[] = [];
-export let all_user_defined_types: Type[] = [];
+export let all_mapping_types : Type[] = [];
+export let all_function_types : Type[] = [];
+export let all_array_types : Type[] = [];
+export let all_user_defined_types : Type[] = [];
 
 //TODO: need to be updated later
-function generate_all_mapping_types(): Type[] {
+function generate_all_mapping_types() : Type[] {
   const all_types_for_k = all_elementary_types;
   const all_types_for_v = all_elementary_types.concat(all_function_types)
-                                              .concat(all_array_types)
-                                              .concat(all_mapping_types)
-                                              .concat(all_user_defined_types);
-  const collection: Type[] = new Array(all_types_for_k.length * all_types_for_v.length);
+    .concat(all_array_types)
+    .concat(all_mapping_types)
+    .concat(all_user_defined_types);
+  const collection : Type[] = new Array(all_types_for_k.length * all_types_for_v.length);
   all_types_for_k.forEach((k, i) => {
     all_types_for_v.forEach((v, j) => {
       collection[i * all_types_for_v.length + j] = new MappingType(k, v);
@@ -337,9 +330,9 @@ function generate_all_function_types() : Type[] {
   let all_visibility : ("public" | "internal" | "external" | "private")[] = ["public", "internal", "external", "private"];
   let all_stateMutability : ("pure" | "view" | "payable" | "nonpayable")[] = ["pure", "view", "payable", "nonpayable"];
   const all_available_types = all_elementary_types.concat(all_function_types)
-                                                  .concat(all_array_types)
-                                                  .concat(all_mapping_types)
-                                                  .concat(all_user_defined_types);
+    .concat(all_array_types)
+    .concat(all_mapping_types)
+    .concat(all_user_defined_types);
   for (let visibility of all_visibility) {
     for (let stateMutability of all_stateMutability) {
       const parameterTypes = lazyPickRandomElement(all_available_types);
@@ -353,14 +346,14 @@ function generate_all_function_types() : Type[] {
 }
 
 //TODO: need to be updated later
-function generate_all_array_types(): Type[] {
+function generate_all_array_types() : Type[] {
   const all_available_types = all_elementary_types.concat(all_function_types)
-                                                  .concat(all_array_types)
-                                                  .concat(all_mapping_types)
-                                                  .concat(all_user_defined_types);
+    .concat(all_array_types)
+    .concat(all_mapping_types)
+    .concat(all_user_defined_types);
   //TODO: allow super big length
   const available_length = [1, 2, 3, 4, 5];
-  const collection: Type[] = new Array(all_available_types.length);
+  const collection : Type[] = new Array(all_available_types.length);
   all_available_types.forEach((v, i) => {
     collection[i] = new ArrayType(v, pickRandomElement(available_length));
   });

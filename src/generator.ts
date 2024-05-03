@@ -18,7 +18,9 @@ import {
 } from "solc-typed-ast"
 
 import { str2hex, assert, pickRandomElement, generateRandomString } from "./utility";
-import { FieldFlag, IRNode, IRVariableDeclare, IRLiteral, IRAssignment, IRIdentifier, IRExpression } from "./node";
+import { FieldFlag, IRNode } from "./node";
+import { IRLiteral, IRAssignment, IRIdentifier, IRExpression } from "./expression";
+import { IRVariableDeclare } from "./declare";
 import { irnode_db } from "./db";
 import { ConstaintNode, ForwardTypeDependenceDAG } from "./constrant";
 import { Type, ElementaryType, all_elementary_types, all_integer_types, varID2Types } from "./type";
