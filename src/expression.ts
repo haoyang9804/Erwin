@@ -91,3 +91,15 @@ export class IRAssignment extends IRExpression {
     return factory.makeAssignment("", this.operator, this.left.lower() as Expression, this.right.lower() as Expression);
   }
 }
+
+export class IREnumValue extends IRExpression {
+  name : string;
+  constructor(id : number, scope : number, field_flag : FieldFlag, name: string) {
+    super(id, scope, field_flag);
+    this.name = name;
+  }
+  lower() : ASTNode {
+    assert(this.name !== undefined, "IREnumValue: name is not generated");
+    return factory.makeEnumValue(this.name);
+  }
+}

@@ -31,9 +31,12 @@ const varnames = new Set<string>();
 let global_id = 0;
 let cur_scope_id = -1;
 let field_flag = FieldFlag.GLOBAL;
+export const scope2userDefinedTypes = new Map<number, number>();
 const type_dag = new ForwardTypeDependenceDAG();
 // a set of IRNode ids that have backward type constrants
 const backward_type_constrant = new Set<number>();
+
+// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Generator
 
 export abstract class Generator {
   irnode : IRNode | undefined;

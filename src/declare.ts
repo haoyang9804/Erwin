@@ -3,13 +3,16 @@ import {
   StateVariableVisibility,
   Mutability,
   ASTNode,
-  TypeName
+  TypeName,
+  EnumValue
 } from "solc-typed-ast"
 
 import { assert } from "./utility";
 import { TypeKind, Type, ElementaryType } from "./type";
 import { constantLock } from "./constrant";
 import { IRNode, FieldFlag, factory } from "./node";
+import { IREnumValue } from "./expression";
+import { scope2userDefinedTypes } from "./generator";
 
 export abstract class IRDeclare extends IRNode {
   name : string;
@@ -82,10 +85,31 @@ export class IRVariableDeclare extends IRDeclare {
     //TODO: add support for memory
     //TODO: add support for visibility
     //TODO: add support for mutability
-
-
     //TODO: add support for other types, firstly function type
     assert(typename !== undefined, "IRVariableDeclare: typename is not generated")
     return factory.makeVariableDeclaration(this.constant, this.indexed, this.name, this.scope, this.state, this.memory, this.visibility, this.mutable, "", undefined, typename);
+  }
+}
+
+export class IREnumDefinition extends IRDeclare {
+  values : IREnumValue[] = [];
+  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, values : IREnumValue[]) {
+    super(id, scope, field_flag, name);
+    assert(values.length > 0, "IREnumDefinition: values is empty");
+    this.values = values;
+  }
+  lower() : ASTNode {
+    return factory.makeEnumDefinition(this.name, this.values.map((value) => value.lower() as EnumValue));
+  }
+}
+
+export class IRUserDefinedTypeDefinition extends IRDeclare {
+  type_name : string;
+  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, type_name : string) {
+    super(id, scope, field_flag, name);
+    this.type_name = type_name;
+  }
+  lower() : ASTNode {
+    return factory.makeUserDefinedValueTypeDefinition(this.name, factory.makeElementaryTypeName("", this.type_name));
   }
 }

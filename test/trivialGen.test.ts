@@ -94,3 +94,13 @@ test("test type alias generation",
   expect(writer.write(user_defined_type_definiiton)).toBe("type x is uint256;");
 }
 )
+
+test("test enum generation",
+() => {
+  const enumvalue1 = factory.makeEnumValue("x");
+  const enumvalue2 = factory.makeEnumValue("y");
+  const enumvalue3 = factory.makeEnumValue("z");
+  const enum_definition = factory.makeEnumDefinition("E", [enumvalue1, enumvalue2, enumvalue3]);
+  expect(writer.write(enum_definition)).toBe("enum E {\n  x,\n  y,\n  z\n}");
+}
+)
