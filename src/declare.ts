@@ -22,19 +22,6 @@ export abstract class IRDeclare extends IRNode {
   }
 }
 
-export class IRTypeDeclare extends IRNode {
-  name : string;
-  type_name : string;
-  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, type_name : string) {
-    super(id, scope, field_flag);
-    this.name = name;
-    this.type_name = type_name;
-  }
-  lower() : ASTNode {
-    return factory.makeUserDefinedValueTypeDefinition(this.name, factory.makeElementaryTypeName("", this.type_name));
-  }
-}
-
 export class IRVariableDeclare extends IRDeclare {
   indexed : boolean = false;
   constant : boolean | undefined; // duplicated with attribute `mutable`. but required by solc-typed-ast.
