@@ -6,6 +6,9 @@ import {
   TypeName,
   EnumValue,
   VariableDeclaration,
+  FunctionKind,
+  FunctionVisibility,
+  FunctionStateMutability
 } from "solc-typed-ast"
 
 import { assert } from "./utility";
@@ -126,3 +129,51 @@ export class IREventDefinition extends IRDeclare {
     return factory.makeEventDefinition(this.anonymous, this.name, factory.makeParameterList(this.parameters.map((parameter) => parameter.lower() as VariableDeclaration)));
   }
 }
+
+export class IRStructDefinition extends IRDeclare {
+  visibility: string = "public";
+  members: IRVariableDeclare[];
+  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, members : IRVariableDeclare[]) {
+    super(id, scope, field_flag, name);
+    assert(members.length > 0, "IRStructDefinition: members is empty")
+    this.members = members;
+  }
+  lower() : ASTNode {
+    return factory.makeStructDefinition(this.name, this.scope, this.visibility, this.members.map((member) => member.lower() as VariableDeclaration));
+  }
+}
+
+// export class IRModifier extends IRDeclare {
+//   virtual: boolean;
+//   visibility: string;
+//   parameters : IRVariableDeclare[];
+//   returns: IRVariableDeclare[];
+//   body:
+//   constructor(id : number, scope : number, field_flag : FieldFlag, name : string, virtual: boolean, visibility: string) {
+//     super(id, scope, field_flag, name);
+//     this.virtual = virtual;
+//     this.visibility = visibility;
+//   }
+//   lower() : ASTNode {
+//     return factory.makeModifierDefinition(this.name);
+//   }
+// }
+
+// export class IRFunctionDefinition extends IRDeclare {
+//   kind: FunctionKind | undefined;
+//   virtual: boolean = false;
+//   visibility: FunctionVisibility | undefined;
+//   stateMutability: FunctionStateMutability | undefined;
+//   parameters : IRVariableDeclare[];
+//   returns: IRVariableDeclare[];
+//   modifiers: 
+//   // return_type : Type[];
+//   constructor(id : number, scope : number, field_flag : FieldFlag, name : string, parameters : IRVariableDeclare[], returns : IRVariableDeclare[]) {
+//     super(id, scope, field_flag, name);
+//     this.parameters = parameters;
+//     this.returns = returns;
+//   }
+//   lower() : ASTNode {
+//     return factory.makeFunctionDefinition(this.name, this.parameters.map((parameter) => parameter.lower() as VariableDeclaration), this.return_type);
+//   }
+// }

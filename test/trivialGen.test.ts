@@ -138,3 +138,14 @@ test("test event generation",
   expect(writer.write(event2)).toBe("event E(uint256 x, uint128 y) anonymous;");
 }
 )
+
+test("test struct generation",
+() => {
+  const variable_type = factory.makeElementaryTypeName("??", "uint256")
+  const variable_node = factory.makeVariableDeclaration(false, false, "x", 1, false, DataLocation.Default, StateVariableVisibility.Default, Mutability.Mutable, "any type", undefined, variable_type);
+  const variable_type2 = factory.makeElementaryTypeName("??", "uint128")
+  const variable_node2 = factory.makeVariableDeclaration(false, false, "y", 1, false, DataLocation.Default, StateVariableVisibility.Default, Mutability.Mutable, "any type", undefined, variable_type2);
+  const struct_node = factory.makeStructDefinition("S", 0, "??", [variable_node, variable_node2]);
+  expect(writer.write(struct_node)).toBe("struct S {\n  uint256 x;\n  uint128 y;\n}");
+}
+)
