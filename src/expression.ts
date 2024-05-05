@@ -7,6 +7,7 @@ import {
 import { assert, generateRandomString, str2hex } from "./utility";
 import { TypeKind, Type, ElementaryType } from "./type";
 import { IRNode, FieldFlag, factory } from "./node";
+import { IRVariableDeclare } from "./declare";
 
 export abstract class IRExpression extends IRNode {
   type : Type | undefined;
@@ -66,6 +67,12 @@ export class IRIdentifier extends IRExpression {
     this.name = name;
     this.reference = reference;
   }
+  from(node: IRVariableDeclare) {
+    this.name = node.name;
+    this.reference = node.id;
+    this.type = node.type;
+    return this;
+  }
   lower() : ASTNode {
     assert(this.type !== undefined, "IRIdentifier: type is not generated");
     assert(this.name !== undefined, "IRIdentifier: name is not generated");
@@ -77,12 +84,13 @@ export class IRIdentifier extends IRExpression {
 export class IRAssignment extends IRExpression {
   left : IRExpression;
   right : IRExpression;
-  type : Type | undefined;;
-  operator : string | undefined;
-  constructor(id : number, scope : number, field_flag : FieldFlag, left : IRExpression, right : IRExpression, operator ?: string) {
+  type : Type | undefined;
+  operator : string;
+  constructor(id : number, scope : number, field_flag : FieldFlag, left : IRExpression, right : IRExpression, operator: string) {
     super(id, scope, field_flag);
     this.left = left;
     this.right = right;
+    assert(operator in ["=", "+=", "-=", "*=", "/=", "%="], "IRAssignment: operator is not supported")
     this.operator = operator;
   }
   lower() : ASTNode {
@@ -101,5 +109,22 @@ export class IREnumValue extends IRExpression {
   lower() : ASTNode {
     assert(this.name !== undefined, "IREnumValue: name is not generated");
     return factory.makeEnumValue(this.name);
+  }
+}
+
+export class IRBinaryOp extends IRExpression {
+  left : IRExpression;
+  right : IRExpression;
+  operator : string;
+  constructor(id : number, scope : number, field_flag : FieldFlag, left : IRExpression, right : IRExpression, operator : string) {
+    super(id, scope, field_flag);
+    this.left = left;
+    this.right = right;
+    assert(operator in ["+", "-", "*", "/", "%", "<<", ">>", "<", ">", "<=", ">=", "==", "!=", "&", "^", "|", "&&", "||"], "IRBinaryOp: operator is not supported")
+    this.operator = operator;
+  }
+  lower() : ASTNode {
+    assert(this.type !== undefined, "IRBinaryOp: type is not generated");
+    return factory.makeBinaryOperation("", this.operator, this.left.lower() as Expression, this.right.lower() as Expression);
   }
 }

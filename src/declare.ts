@@ -166,7 +166,7 @@ export class IRStructDefinition extends IRDeclare {
 //   stateMutability: FunctionStateMutability | undefined;
 //   parameters : IRVariableDeclare[];
 //   returns: IRVariableDeclare[];
-//   modifiers: 
+//   modifiers:
 //   // return_type : Type[];
 //   constructor(id : number, scope : number, field_flag : FieldFlag, name : string, parameters : IRVariableDeclare[], returns : IRVariableDeclare[]) {
 //     super(id, scope, field_flag, name);
@@ -177,3 +177,5 @@ export class IRStructDefinition extends IRDeclare {
 //     return factory.makeFunctionDefinition(this.name, this.parameters.map((parameter) => parameter.lower() as VariableDeclaration), this.return_type);
 //   }
 // }
+
+// export class IRContractDefinition extends IRDeclare {
