@@ -104,3 +104,23 @@ test("test enum generation",
   expect(writer.write(enum_definition)).toBe("enum E {\n  x,\n  y,\n  z\n}");
 }
 )
+
+test("test error generation",
+() => {
+  const variable_type = factory.makeElementaryTypeName("??", "uint256")
+  const variable_node = factory.makeVariableDeclaration(false, false, "x", 1, false, DataLocation.Default, StateVariableVisibility.Default, Mutability.Mutable, "any type", undefined, variable_type);
+  const error_node = factory.makeErrorDefinition("E", factory.makeParameterList([variable_node]));
+  expect(writer.write(error_node)).toBe("error E(uint256 x);");
+}
+)
+
+test("test parameter list generation",
+() => {
+  const variable_type = factory.makeElementaryTypeName("??", "uint256")
+  const variable_node = factory.makeVariableDeclaration(false, false, "x", 1, false, DataLocation.Default, StateVariableVisibility.Default, Mutability.Mutable, "any type", undefined, variable_type);
+  const variable_type2 = factory.makeElementaryTypeName("??", "uint128")
+  const variable_node2 = factory.makeVariableDeclaration(false, false, "y", 1, false, DataLocation.Default, StateVariableVisibility.Default, Mutability.Mutable, "any type", undefined, variable_type2);
+  const parameter_list = factory.makeParameterList([variable_node, variable_node2]);
+  expect(writer.write(parameter_list)).toBe("(uint256 x, uint128 y)");
+}
+)

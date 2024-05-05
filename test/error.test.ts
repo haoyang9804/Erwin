@@ -1,0 +1,28 @@
+import { ElementaryType } from "../src/type"
+import { IRErrorDefinition, IRVariableDeclare } from "../src/declare";
+import {
+  PrettyFormatter,
+  ASTWriter,
+  DefaultASTWriterMapping,
+  LatestCompilerVersion,
+  VariableDeclaration,
+} from "solc-typed-ast"
+
+const formatter = new PrettyFormatter(2, 0);
+const writer = new ASTWriter(
+    DefaultASTWriterMapping,
+    formatter,
+    LatestCompilerVersion
+);
+
+test("test identifier",
+() => {
+  const variable1 = new IRVariableDeclare(0, 0, 0, "x")
+  variable1.type = new ElementaryType("uint256", "nonpayable");
+  const error = new IRErrorDefinition(1, 0, 0, "E", [variable1]);
+  const result = writer.write(error.lower());
+  expect(result).toEqual(
+    "error E(uint256 x);"
+  );
+}
+)

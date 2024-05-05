@@ -4,7 +4,8 @@ import {
   Mutability,
   ASTNode,
   TypeName,
-  EnumValue
+  EnumValue,
+  VariableDeclaration,
 } from "solc-typed-ast"
 
 import { assert } from "./utility";
@@ -98,5 +99,17 @@ export class IRUserDefinedTypeDefinition extends IRDeclare {
   }
   lower() : ASTNode {
     return factory.makeUserDefinedValueTypeDefinition(this.name, factory.makeElementaryTypeName("", this.type_name));
+  }
+}
+
+
+export class IRErrorDefinition extends IRDeclare {
+  parameters : IRVariableDeclare[];
+  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, parameters : IRVariableDeclare[]) {
+    super(id, scope, field_flag, name);
+    this.parameters = parameters;
+  }
+  lower() : ASTNode {
+    return factory.makeErrorDefinition(this.name, factory.makeParameterList(this.parameters.map((parameter) => parameter.lower() as VariableDeclaration)));
   }
 }
