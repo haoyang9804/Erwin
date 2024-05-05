@@ -124,3 +124,17 @@ test("test parameter list generation",
   expect(writer.write(parameter_list)).toBe("(uint256 x, uint128 y)");
 }
 )
+
+test("test event generation",
+() => {
+  const variable_type = factory.makeElementaryTypeName("??", "uint256")
+  const variable_node = factory.makeVariableDeclaration(false, false, "x", 1, false, DataLocation.Default, StateVariableVisibility.Default, Mutability.Mutable, "any type", undefined, variable_type);
+  const variable_type2 = factory.makeElementaryTypeName("??", "uint128")
+  const variable_node2 = factory.makeVariableDeclaration(false, false, "y", 1, false, DataLocation.Default, StateVariableVisibility.Default, Mutability.Mutable, "any type", undefined, variable_type2);
+  const parameter_list = factory.makeParameterList([variable_node, variable_node2]);
+  const event = factory.makeEventDefinition(false, "E", parameter_list);
+  expect(writer.write(event)).toBe("event E(uint256 x, uint128 y);");
+  const event2 = factory.makeEventDefinition(true, "E", parameter_list);
+  expect(writer.write(event2)).toBe("event E(uint256 x, uint128 y) anonymous;");
+}
+)

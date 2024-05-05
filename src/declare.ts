@@ -113,3 +113,16 @@ export class IRErrorDefinition extends IRDeclare {
     return factory.makeErrorDefinition(this.name, factory.makeParameterList(this.parameters.map((parameter) => parameter.lower() as VariableDeclaration)));
   }
 }
+
+export class IREventDefinition extends IRDeclare {
+  anonymous: boolean;
+  parameters : IRVariableDeclare[];
+  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, anonymous : boolean, parameters : IRVariableDeclare[]) {
+    super(id, scope, field_flag, name);
+    this.anonymous = anonymous;
+    this.parameters = parameters;
+  }
+  lower(): ASTNode {
+    return factory.makeEventDefinition(this.anonymous, this.name, factory.makeParameterList(this.parameters.map((parameter) => parameter.lower() as VariableDeclaration)));
+  }
+}

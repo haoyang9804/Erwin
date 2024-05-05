@@ -1,5 +1,5 @@
 import { ElementaryType } from "../src/type"
-import { IRErrorDefinition, IRVariableDeclare } from "../src/declare";
+import { IREventDefinition, IRVariableDeclare } from "../src/declare";
 import {
   PrettyFormatter,
   ASTWriter,
@@ -15,14 +15,19 @@ const writer = new ASTWriter(
     LatestCompilerVersion
 );
 
-test("test error",
+test("test event",
 () => {
   const variable1 = new IRVariableDeclare(0, 0, 0, "x")
   variable1.type = new ElementaryType("uint256", "nonpayable");
-  const error = new IRErrorDefinition(1, 0, 0, "E", [variable1]);
+  const error = new IREventDefinition(1, 0, 0, "E", false, [variable1]);
   const result = writer.write(error.lower());
   expect(result).toEqual(
-    "error E(uint256 x);"
+    "event E(uint256 x);"
+  );
+  const error2 = new IREventDefinition(1, 0, 0, "E", true, [variable1]);
+  const result2 = writer.write(error2.lower());
+  expect(result2).toEqual(
+    "event E(uint256 x) anonymous;"
   );
 }
 )
