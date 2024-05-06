@@ -17,7 +17,7 @@ export abstract class Type {
   abstract str() : string;
   abstract subtype() : Type[];
   abstract supertype() : Type[];
-  abstract same(t : Type) : boolean
+  abstract same(t : Type) : boolean;
 }
 
 type elementary_type_name = "uint256" | "uint128" | "uint64" | "uint32" | "uint16" | "uint8" | "address" | "bool" | "string" | "bytes" | "int256" | "int128" | "int64" | "int32" | "int16" | "int8";
@@ -364,4 +364,13 @@ for (let i = 0; i < 3; i++) {
   all_mapping_types = all_mapping_types.concat(generate_all_mapping_types());
   all_function_types = all_function_types.concat(generate_all_function_types());
   all_array_types = all_array_types.concat(generate_all_array_types());
+}
+
+export function includesType(arr: Type[], item: Type): boolean {
+  for (const element of arr) {
+    if (element.kind === item.kind && element.same(item)) {
+      return true;
+    }
+  }
+  return false;
 }

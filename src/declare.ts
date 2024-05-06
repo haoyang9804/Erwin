@@ -16,7 +16,7 @@ import { TypeKind, Type, ElementaryType } from "./type";
 import { constantLock } from "./constrant";
 import { IRNode, FieldFlag, factory } from "./node";
 import { IREnumValue } from "./expression";
-import { scope2userDefinedTypes } from "./generator";
+import { IRStatement } from "./statement";
 
 export abstract class IRDeclare extends IRNode {
   name : string;
@@ -148,7 +148,7 @@ export class IRStructDefinition extends IRDeclare {
 //   visibility: string;
 //   parameters : IRVariableDeclare[];
 //   returns: IRVariableDeclare[];
-//   body:
+//   body: (IRStatement | )
 //   constructor(id : number, scope : number, field_flag : FieldFlag, name : string, virtual: boolean, visibility: string) {
 //     super(id, scope, field_flag, name);
 //     this.virtual = virtual;

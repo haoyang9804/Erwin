@@ -6,7 +6,7 @@ import {
 } from "solc-typed-ast"
 
 import { assert, generateRandomString, str2hex } from "./utility";
-import { TypeKind, Type, ElementaryType } from "./type";
+import { includesType, TypeKind, Type, ElementaryType } from "./type";
 import { IRNode, FieldFlag, factory } from "./node";
 import { IRVariableDeclare } from "./declare";
 
@@ -147,6 +147,9 @@ export class IRConditional extends IRExpression {
   }
   lower(): ASTNode {
     assert(this.type !== undefined, "IRConditional: type is not generated");
+    assert(includesType(this.true_expression!.type!.subtype(), this.false_expression!.type!)
+      || includesType(this.true_expression!.type!.supertype(), this.false_expression!.type!),
+      `IRConditional: true_expression and false_expression have incompatible types: ${this.true_expression!.type!.str()} and ${this.false_expression!.type!.str()}`)
     return factory.makeConditional("", this.condition.lower() as Expression, this.true_expression.lower() as Expression, this.false_expression.lower() as Expression);
   }
 }
@@ -165,5 +168,18 @@ export class IRFunctionCall extends IRExpression {
   lower() {
     assert(this.type !== undefined, "IRFunctionCall: type is not generated");
     return factory.makeFunctionCall("", this.kind, this.function_expression.lower() as Expression, this.arguments.map((arg) => arg.lower() as Expression));
+  }
+}
+
+export class IRTuple extends IRExpression {
+  isInlineArray: boolean = false;
+  components: IRExpression[];
+  constructor(id: number, scope: number, field_flag: FieldFlag, components: IRExpression[]) {
+    super(id, scope, field_flag);
+    this.components = components;
+  }
+  lower() {
+    assert(this.type !== undefined, "IRTuple: type is not generated");
+    return factory.makeTupleExpression("", this.isInlineArray, this.components.map((component) => component?.lower() as Expression));
   }
 }

@@ -19,13 +19,13 @@ test("test event",
 () => {
   const variable1 = new IRVariableDeclare(0, 0, 0, "x")
   variable1.type = new ElementaryType("uint256", "nonpayable");
-  const error = new IREventDefinition(1, 0, 0, "E", false, [variable1]);
-  const result = writer.write(error.lower());
+  const event = new IREventDefinition(1, 0, 0, "E", false, [variable1]);
+  const result = writer.write(event.lower());
   expect(result).toEqual(
     "event E(uint256 x);"
   );
-  const error2 = new IREventDefinition(1, 0, 0, "E", true, [variable1]);
-  const result2 = writer.write(error2.lower());
+  const event2 = new IREventDefinition(1, 0, 0, "E", true, [variable1]);
+  const result2 = writer.write(event2.lower());
   expect(result2).toEqual(
     "event E(uint256 x) anonymous;"
   );
