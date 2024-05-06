@@ -2,6 +2,7 @@ import {
   LiteralKind,
   ASTNode,
   Expression,
+  FunctionCallKind
 } from "solc-typed-ast"
 
 import { assert, generateRandomString, str2hex } from "./utility";
@@ -147,5 +148,22 @@ export class IRConditional extends IRExpression {
   lower(): ASTNode {
     assert(this.type !== undefined, "IRConditional: type is not generated");
     return factory.makeConditional("", this.condition.lower() as Expression, this.true_expression.lower() as Expression, this.false_expression.lower() as Expression);
+  }
+}
+
+//WARNING: UNTESTED!!
+//TODO: test it after implementing IRFunctionDefinition
+export class IRFunctionCall extends IRExpression {
+  kind: FunctionCallKind = FunctionCallKind.FunctionCall;
+  function_expression: IRExpression;
+  arguments: IRExpression[];
+  constructor(id: number, scope: number, field_flag: FieldFlag, function_expression: IRExpression, arguments_: IRExpression[]) {
+    super(id, scope, field_flag);
+    this.function_expression = function_expression;
+    this.arguments = arguments_;
+  }
+  lower() {
+    assert(this.type !== undefined, "IRFunctionCall: type is not generated");
+    return factory.makeFunctionCall("", this.kind, this.function_expression.lower() as Expression, this.arguments.map((arg) => arg.lower() as Expression));
   }
 }
