@@ -85,13 +85,15 @@ export class IRAssignment extends IRExpression {
   left : IRExpression;
   right : IRExpression;
   type : Type | undefined;
-  operator : string;
-  constructor(id : number, scope : number, field_flag : FieldFlag, left : IRExpression, right : IRExpression, operator: string) {
+  operator : string | undefined;
+  constructor(id : number, scope : number, field_flag : FieldFlag, left : IRExpression, right : IRExpression, operator?: string) {
     super(id, scope, field_flag);
     this.left = left;
     this.right = right;
-    assert(operator in ["=", "+=", "-=", "*=", "/=", "%="], "IRAssignment: operator is not supported")
-    this.operator = operator;
+    if (operator !== undefined) {
+      assert(["=", "+=", "-=", "*=", "/=", "%="].includes(operator), "IRAssignment: operator is not supported")
+    }
+      this.operator = operator;
   }
   lower() : ASTNode {
     assert(this.type !== undefined, "IRAssignment: type is undefined");
@@ -115,16 +117,35 @@ export class IREnumValue extends IRExpression {
 export class IRBinaryOp extends IRExpression {
   left : IRExpression;
   right : IRExpression;
-  operator : string;
-  constructor(id : number, scope : number, field_flag : FieldFlag, left : IRExpression, right : IRExpression, operator : string) {
+  operator : string | undefined;
+  constructor(id : number, scope : number, field_flag : FieldFlag, left : IRExpression, right : IRExpression, operator? : string) {
     super(id, scope, field_flag);
     this.left = left;
     this.right = right;
-    assert(operator in ["+", "-", "*", "/", "%", "<<", ">>", "<", ">", "<=", ">=", "==", "!=", "&", "^", "|", "&&", "||"], "IRBinaryOp: operator is not supported")
+    if (operator !== undefined) {
+      assert(["+", "-", "*", "/", "%", "<<", ">>", "<", ">", "<=", ">=", "==", "!=", "&", "^", "|", "&&", "||"].includes(operator), `IRBinaryOp: operator ${operator} is not supported`)
+    }
     this.operator = operator;
   }
   lower() : ASTNode {
     assert(this.type !== undefined, "IRBinaryOp: type is not generated");
+    assert(this.operator !== undefined, "IRBinaryOp: operator is not generated")
     return factory.makeBinaryOperation("", this.operator, this.left.lower() as Expression, this.right.lower() as Expression);
+  }
+}
+
+export class IRConditional extends IRExpression {
+  condition: IRExpression;
+  true_expression: IRExpression;
+  false_expression: IRExpression;
+  constructor(id: number, scope: number, field_flag: FieldFlag, condition: IRExpression, true_expression: IRExpression, false_expression: IRExpression) {
+    super(id, scope, field_flag);
+    this.condition = condition;
+    this.true_expression = true_expression;
+    this.false_expression = false_expression;
+  }
+  lower(): ASTNode {
+    assert(this.type !== undefined, "IRConditional: type is not generated");
+    return factory.makeConditional("", this.condition.lower() as Expression, this.true_expression.lower() as Expression, this.false_expression.lower() as Expression);
   }
 }
