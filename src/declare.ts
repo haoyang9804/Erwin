@@ -8,14 +8,15 @@ import {
   VariableDeclaration,
   FunctionKind,
   FunctionVisibility,
-  FunctionStateMutability
+  FunctionStateMutability,
+  Expression
 } from "solc-typed-ast"
 
 import { assert } from "./utility";
 import { TypeKind, Type, ElementaryType } from "./type";
 import { constantLock } from "./constrant";
 import { IRNode, FieldFlag, factory } from "./node";
-import { IREnumValue } from "./expression";
+import { IRExpression } from "./expression";
 import { IRStatement } from "./statement";
 
 export abstract class IRDeclare extends IRNode {
@@ -83,14 +84,14 @@ export class IRVariableDeclare extends IRDeclare {
 }
 
 export class IREnumDefinition extends IRDeclare {
-  values : IREnumValue[] = [];
-  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, values : IREnumValue[]) {
+  values : string[] = [];
+  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, values : string[]) {
     super(id, scope, field_flag, name);
     assert(values.length > 0, "IREnumDefinition: values is empty");
     this.values = values;
   }
   lower() : ASTNode {
-    return factory.makeEnumDefinition(this.name, this.values.map((value) => value.lower() as EnumValue));
+    return factory.makeEnumDefinition(this.name, this.values.map((value) => factory.makeEnumValue(value)));
   }
 }
 
@@ -143,21 +144,36 @@ export class IRStructDefinition extends IRDeclare {
   }
 }
 
-// export class IRModifier extends IRDeclare {
-//   virtual: boolean;
-//   visibility: string;
-//   parameters : IRVariableDeclare[];
-//   returns: IRVariableDeclare[];
-//   body: (IRStatement | )
-//   constructor(id : number, scope : number, field_flag : FieldFlag, name : string, virtual: boolean, visibility: string) {
-//     super(id, scope, field_flag, name);
-//     this.virtual = virtual;
-//     this.visibility = visibility;
-//   }
-//   lower() : ASTNode {
-//     return factory.makeModifierDefinition(this.name);
-//   }
-// }
+export class IRModifier extends IRDeclare {
+  virtual: boolean;
+  override: boolean;
+  visibility: string;
+  parameters : IRVariableDeclare[];
+  body: (IRStatement | IRExpression)[];
+  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, virtual: boolean, override: boolean, visibility: string, parameters: IRVariableDeclare[], body: (IRStatement | IRExpression)[]) {
+    super(id, scope, field_flag, name);
+    this.virtual = virtual;
+    this.override = override;
+    this.visibility = visibility;
+    this.parameters = parameters;
+    this.body = body;
+  }
+  lower() : ASTNode {
+    const lowered_body = this.body.map(function (stmt) {
+      const lowered_stmt = stmt.lower();
+      if (stmt instanceof IRStatement) return lowered_stmt;
+      else if (stmt instanceof IRExpression) {
+        assert(lowered_stmt instanceof Expression, "IRModifier: lowered_stmt is not Expression");
+        return factory.makeExpressionStatement(lowered_stmt);
+      }
+      assert(false, "IRModifier: stmt is not IRStatement or IRExpression");
+    });
+    return factory.makeModifierDefinition(this.name, this.virtual, this.visibility,
+      factory.makeParameterList(this.parameters.map((parameter) => parameter.lower() as VariableDeclaration)),
+      this.override ? factory.makeOverrideSpecifier([]) : undefined,
+      factory.makeBlock(lowered_body));
+  }
+}
 
 // export class IRFunctionDefinition extends IRDeclare {
 //   kind: FunctionKind | undefined;

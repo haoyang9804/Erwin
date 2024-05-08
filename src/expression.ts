@@ -15,7 +15,7 @@ export abstract class IRExpression extends IRNode {
   constructor(id : number, scope : number, field_flag : FieldFlag) {
     super(id, scope, field_flag);
   }
-  abstract lower() : ASTNode;
+  abstract lower() : Expression;
 }
 
 export class IRLiteral extends IRExpression {
@@ -51,7 +51,7 @@ export class IRLiteral extends IRExpression {
     //TODO: add support for HexString and UnicodeString
     throw new Error("IRLiteral: Unreachable code.");
   }
-  lower() : ASTNode {
+  lower() : Expression {
     assert(this.type !== undefined, "IRLiteral: type is not generated");
     assert(this.type.kind === TypeKind.ElementaryType, "IRLiteral: type is not ElementaryType")
     const value = this.generateVal();
@@ -74,7 +74,7 @@ export class IRIdentifier extends IRExpression {
     this.type = node.type;
     return this;
   }
-  lower() : ASTNode {
+  lower() : Expression {
     assert(this.type !== undefined, "IRIdentifier: type is not generated");
     assert(this.name !== undefined, "IRIdentifier: name is not generated");
     assert(this.reference !== undefined, "IRIdentifier: reference is not generated");
@@ -96,22 +96,10 @@ export class IRAssignment extends IRExpression {
     }
       this.operator = operator;
   }
-  lower() : ASTNode {
+  lower() : Expression {
     assert(this.type !== undefined, "IRAssignment: type is undefined");
     assert(this.operator !== undefined, "IRAssignment: operator is undefined");
     return factory.makeAssignment("", this.operator, this.left.lower() as Expression, this.right.lower() as Expression);
-  }
-}
-
-export class IREnumValue extends IRExpression {
-  name : string;
-  constructor(id : number, scope : number, field_flag : FieldFlag, name: string) {
-    super(id, scope, field_flag);
-    this.name = name;
-  }
-  lower() : ASTNode {
-    assert(this.name !== undefined, "IREnumValue: name is not generated");
-    return factory.makeEnumValue(this.name);
   }
 }
 
@@ -128,7 +116,7 @@ export class IRBinaryOp extends IRExpression {
     }
     this.operator = operator;
   }
-  lower() : ASTNode {
+  lower() : Expression {
     assert(this.type !== undefined, "IRBinaryOp: type is not generated");
     assert(this.operator !== undefined, "IRBinaryOp: operator is not generated")
     return factory.makeBinaryOperation("", this.operator, this.left.lower() as Expression, this.right.lower() as Expression);
@@ -145,7 +133,7 @@ export class IRConditional extends IRExpression {
     this.true_expression = true_expression;
     this.false_expression = false_expression;
   }
-  lower(): ASTNode {
+  lower(): Expression {
     assert(this.type !== undefined, "IRConditional: type is not generated");
     assert(includesType(this.true_expression!.type!.subtype(), this.false_expression!.type!)
       || includesType(this.true_expression!.type!.supertype(), this.false_expression!.type!),
@@ -165,7 +153,7 @@ export class IRFunctionCall extends IRExpression {
     this.function_expression = function_expression;
     this.arguments = arguments_;
   }
-  lower() {
+  lower(): Expression {
     assert(this.type !== undefined, "IRFunctionCall: type is not generated");
     return factory.makeFunctionCall("", this.kind, this.function_expression.lower() as Expression, this.arguments.map((arg) => arg.lower() as Expression));
   }
@@ -178,7 +166,7 @@ export class IRTuple extends IRExpression {
     super(id, scope, field_flag);
     this.components = components;
   }
-  lower() {
+  lower() : Expression {
     assert(this.type !== undefined, "IRTuple: type is not generated");
     return factory.makeTupleExpression("", this.isInlineArray, this.components.map((component) => component?.lower() as Expression));
   }

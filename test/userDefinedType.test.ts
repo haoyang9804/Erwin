@@ -1,5 +1,4 @@
 import { IRUserDefinedTypeDefinition, IREnumDefinition } from "../src/declare";
-import { IREnumValue } from "../src/expression";
 import {
   PrettyFormatter,
   ASTWriter,
@@ -26,8 +25,8 @@ test("test user defined type",
 test("test enum",
 () => {
   const ir = new IREnumDefinition(0, 0, 0, "E", [
-    new IREnumValue(1, 0, 0, "A"),
-    new IREnumValue(2, 0, 0, "B")
+    "A",
+    "B"
   ]);
   const result = writer.write(ir.lower());
   expect(result).toEqual(
