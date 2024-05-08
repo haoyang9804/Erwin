@@ -1,5 +1,7 @@
 import {
   ASTNode,
+  Statement,
+  PlaceholderStatement,
 } from "solc-typed-ast"
 
 import { assert, generateRandomString, str2hex } from "./utility";
@@ -12,7 +14,16 @@ export abstract class IRStatement extends IRNode {
   constructor(id : number, scope : number, field_flag : FieldFlag) {
     super(id, scope, field_flag);
   }
-  abstract lower() : ASTNode;
+  abstract lower() : Statement;
+}
+
+export class IRPlaceholderStatement extends IRStatement {
+  constructor(id : number, scope : number, field_flag : FieldFlag) {
+    super(id, scope, field_flag);
+  }
+  lower(): Statement {
+    return factory.makePlaceholderStatement();
+  }
 }
 
 // export class IRVariableDeclareStatement extends IRStatement {

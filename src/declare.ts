@@ -9,7 +9,8 @@ import {
   FunctionKind,
   FunctionVisibility,
   FunctionStateMutability,
-  Expression
+  Expression,
+  ModifierInvocation
 } from "solc-typed-ast"
 
 import { assert } from "./utility";
@@ -17,13 +18,16 @@ import { TypeKind, Type, ElementaryType } from "./type";
 import { constantLock } from "./constrant";
 import { IRNode, FieldFlag, factory } from "./node";
 import { IRExpression } from "./expression";
-import { IRStatement } from "./statement";
+import { IRStatement, IRPlaceholderStatement } from "./statement";
+
+const name2declare = new Map<string, IRDeclare>();
 
 export abstract class IRDeclare extends IRNode {
   name : string;
   constructor(id : number, scope : number, field_flag : FieldFlag, name : string) {
     super(id, scope, field_flag);
     this.name = name;
+    name2declare.set(name, this);
   }
 }
 
@@ -159,6 +163,70 @@ export class IRModifier extends IRDeclare {
     this.body = body;
   }
   lower() : ASTNode {
+    let has_placeholder = false;
+    const lowered_body = this.body.map(function (stmt) {
+      if (stmt instanceof IRPlaceholderStatement) {
+        has_placeholder = true;
+      }
+      const lowered_stmt = stmt.lower();
+      if (stmt instanceof IRStatement) return lowered_stmt;
+      else if (stmt instanceof IRExpression) {
+        assert(lowered_stmt instanceof Expression, "IRModifier: lowered_stmt is not Expression");
+        return factory.makeExpressionStatement(lowered_stmt);
+      }
+      assert(false, "IRModifier: stmt is not IRStatement or IRExpression");
+    });
+    assert(has_placeholder, "IRModifier: body does not contain placeholder");
+    return factory.makeModifierDefinition(this.name, this.virtual, this.visibility,
+      factory.makeParameterList(this.parameters.map((parameter) => parameter.lower() as VariableDeclaration)),
+      this.override ? factory.makeOverrideSpecifier([]) : undefined,
+      factory.makeBlock(lowered_body));
+  }
+}
+
+export type Modifier = {
+  name: string;
+  arg_names: string[];
+};
+
+export class IRFunctionDefinition extends IRDeclare {
+  kind: FunctionKind;
+  virtual: boolean;
+  override: boolean;
+  visibility: FunctionVisibility;
+  stateMutability: FunctionStateMutability;
+  parameters : IRVariableDeclare[];
+  returns: IRVariableDeclare[];
+  modifier: Modifier[];
+  body: (IRStatement | IRExpression)[];
+  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, kind: FunctionKind,
+    virtual: boolean, override: boolean, visibility: FunctionVisibility, stateMutability: FunctionStateMutability,
+    parameters : IRVariableDeclare[], returns : IRVariableDeclare[], body: (IRStatement | IRExpression)[],
+    modifier : Modifier[]) {
+    super(id, scope, field_flag, name);
+    this.virtual = virtual;
+    this.override = override;
+    this.kind = kind;
+    this.visibility = visibility;
+    this.stateMutability = stateMutability;
+    this.parameters = parameters;
+    this.returns = returns;
+    this.modifier = modifier;
+    this.body = body;
+  }
+  lower() : ASTNode {
+    assert(this.visibility !== FunctionVisibility.Default, "IRFunctionDefinition: visibility is not set");
+    const modifier_invocation: ModifierInvocation[] = [];
+    for (const modifier of this.modifier) {
+      assert(name2declare.has(modifier.name), `IRFunctionDefinition: modifier ${modifier} is not declared`);
+      const modifier_identifier = factory.makeIdentifier("", modifier.name, name2declare.get(modifier.name)!.id);
+      for (const arg_name of modifier.arg_names) {
+        assert(name2declare.has(arg_name), `IRFunctionDefinition: arg_name ${arg_name} is not declared`);
+      }
+      modifier_invocation.push(factory.makeModifierInvocation(modifier_identifier, modifier.arg_names.map((arg_name) => factory.makeIdentifier("", arg_name, name2declare.get(arg_name)!.id))));
+    };
+    const parameterList = factory.makeParameterList(this.parameters.map((parameter) => parameter.lower() as VariableDeclaration));
+    const returnParameterList = factory.makeParameterList(this.returns.map((ret) => ret.lower() as VariableDeclaration));
     const lowered_body = this.body.map(function (stmt) {
       const lowered_stmt = stmt.lower();
       if (stmt instanceof IRStatement) return lowered_stmt;
@@ -168,30 +236,10 @@ export class IRModifier extends IRDeclare {
       }
       assert(false, "IRModifier: stmt is not IRStatement or IRExpression");
     });
-    return factory.makeModifierDefinition(this.name, this.virtual, this.visibility,
-      factory.makeParameterList(this.parameters.map((parameter) => parameter.lower() as VariableDeclaration)),
-      this.override ? factory.makeOverrideSpecifier([]) : undefined,
-      factory.makeBlock(lowered_body));
+    return factory.makeFunctionDefinition(this.scope, this.kind, this.name, this.virtual, this.visibility, this.stateMutability,
+      this.kind == FunctionKind.Constructor, parameterList, returnParameterList, modifier_invocation,
+      this.override ? factory.makeOverrideSpecifier([]) : undefined, factory.makeBlock(lowered_body));
   }
 }
-
-// export class IRFunctionDefinition extends IRDeclare {
-//   kind: FunctionKind | undefined;
-//   virtual: boolean = false;
-//   visibility: FunctionVisibility | undefined;
-//   stateMutability: FunctionStateMutability | undefined;
-//   parameters : IRVariableDeclare[];
-//   returns: IRVariableDeclare[];
-//   modifiers:
-//   // return_type : Type[];
-//   constructor(id : number, scope : number, field_flag : FieldFlag, name : string, parameters : IRVariableDeclare[], returns : IRVariableDeclare[]) {
-//     super(id, scope, field_flag, name);
-//     this.parameters = parameters;
-//     this.returns = returns;
-//   }
-//   lower() : ASTNode {
-//     return factory.makeFunctionDefinition(this.name, this.parameters.map((parameter) => parameter.lower() as VariableDeclaration), this.return_type);
-//   }
-// }
 
 // export class IRContractDefinition extends IRDeclare {
