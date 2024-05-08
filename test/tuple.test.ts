@@ -21,9 +21,11 @@ test("test tuple",
   const variable1 = new IRVariableDeclare(0, 0, 0, "x")
   variable1.type = new ElementaryType("uint256", "nonpayable");
   const v1id = new IRIdentifier(1, 0, 0).from(variable1);
+  v1id.type = new ElementaryType("uint256", "nonpayable");
   const variable2 = new IRVariableDeclare(2, 0, 0, "y")
   variable2.type = new ElementaryType("uint128", "nonpayable");
   const v2id = new IRIdentifier(3, 0, 0).from(variable2);
+  v2id.type = new ElementaryType("uint128", "nonpayable");
   const tuple1 = new IRTuple(4, 0, 0, [v1id]);
   expect(async() => {writer.write(tuple1.lower())}).rejects.toThrow("IRTuple: type is not generated");
   tuple1.type = new ElementaryType("uint256", "nonpayable");

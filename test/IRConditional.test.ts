@@ -24,7 +24,9 @@ test("test conditional",
   const variable2 = new IRVariableDeclare(1, 0, 0, "y")
   variable2.type = new ElementaryType("uint256", "nonpayable");
   const v1id = new IRIdentifier(2, 0, 0).from(variable1);
+  v1id.type = new ElementaryType("uint256", "nonpayable");
   const v2id = new IRIdentifier(3, 0, 0).from(variable2);
+  v2id.type = new ElementaryType("uint256", "nonpayable");
   const op = new IRBinaryOp(4, 0, 0, v1id, v2id, ">");
   expect(async() => { op.lower() }).rejects.toThrow("IRBinaryOp: type is not generated");
   op.type = new ElementaryType("uint256", "nonpayable");
@@ -41,6 +43,7 @@ test("test conditional",
   const variable3 = new IRVariableDeclare(8, 0, 0, "z");
   variable3.type = new ElementaryType("address", "nonpayable");
   const v3id = new IRIdentifier(9, 0, 0).from(variable3);
+  v3id.type = new ElementaryType("address", "nonpayable");
   const cond2 = new IRConditional(10, 0, 0, op, op2, v3id);
   // whatever type it is
   cond2.type = new ElementaryType("address", "nonpayable");

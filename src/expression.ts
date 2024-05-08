@@ -71,7 +71,6 @@ export class IRIdentifier extends IRExpression {
   from(node: IRVariableDeclare) {
     this.name = node.name;
     this.reference = node.id;
-    this.type = node.type;
     return this;
   }
   lower() : Expression {

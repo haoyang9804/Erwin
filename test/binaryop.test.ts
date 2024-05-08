@@ -24,7 +24,9 @@ test("test binary op",
   const variable2 = new IRVariableDeclare(1, 0, 0, "y")
   variable2.type = new ElementaryType("uint256", "nonpayable");
   const v1id = new IRIdentifier(2, 0, 0).from(variable1);
+  v1id.type = new ElementaryType("uint256", "nonpayable");
   const v2id = new IRIdentifier(3, 0, 0).from(variable2);
+  v2id.type = new ElementaryType("uint256", "nonpayable");
   const op = new IRBinaryOp(2, 0, 0, v1id, v2id, "+");
   expect(async() => { op.lower() }).rejects.toThrow("IRBinaryOp: type is not generated");
   op.type = new ElementaryType("uint256", "nonpayable");
