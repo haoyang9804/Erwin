@@ -19,7 +19,8 @@ export abstract class IRExpression extends IRNode {
 }
 
 export class IRLiteral extends IRExpression {
-  kind : LiteralKind = LiteralKind.Number;
+  kind : LiteralKind | undefined;
+  value: string | undefined;
   constructor(id : number, scope : number, field_flag : FieldFlag) {
     super(id, scope, field_flag);
   }
@@ -35,27 +36,28 @@ export class IRLiteral extends IRExpression {
     //TODO: add support for HexString and UnicodeString
     else this.kind = LiteralKind.String;
   }
-  private generateVal() : string {
+  private generateVal() : void {
     //TODO: add support for strange value, such as huge number and overlong string, etc.
     this.generateKind();
-    if (this.kind === LiteralKind.Bool) {
-      if (Math.random() > 0.5) return "true";
-      return "false";
+    switch (this.kind) {
+      case LiteralKind.Bool:
+        this.value = Math.random() > 0.5 ? "true" : "false";
+        break;
+      case LiteralKind.Number:
+        this.value = Math.floor(Math.random() * 100).toString();
+        break;
+      case LiteralKind.String:
+        this.value = generateRandomString();
+        break;
+      default:
+        assert(false, "IRLiteral: kind is not generated");
     }
-    if (this.kind === LiteralKind.Number) {
-      return Math.floor(Math.random() * 100).toString();
-    }
-    if (this.kind === LiteralKind.String) {
-      return generateRandomString();
-    }
-    //TODO: add support for HexString and UnicodeString
-    throw new Error("IRLiteral: Unreachable code.");
   }
   lower() : Expression {
     assert(this.type !== undefined, "IRLiteral: type is not generated");
     assert(this.type.kind === TypeKind.ElementaryType, "IRLiteral: type is not ElementaryType")
-    const value = this.generateVal();
-    return factory.makeLiteral("", this.kind, str2hex(value), value);
+    this.generateVal();
+    return factory.makeLiteral("", this.kind!, str2hex(this.value!), this.value!);
   }
 }
 
@@ -145,6 +147,7 @@ export class IRConditional extends IRExpression {
 //TODO: test it after implementing IRFunctionDefinition
 export class IRFunctionCall extends IRExpression {
   kind: FunctionCallKind = FunctionCallKind.FunctionCall;
+  //TODO: I think the type of function_expression can be further narrowed down
   function_expression: IRExpression;
   arguments: IRExpression[];
   constructor(id: number, scope: number, field_flag: FieldFlag, function_expression: IRExpression, arguments_: IRExpression[]) {
@@ -159,14 +162,14 @@ export class IRFunctionCall extends IRExpression {
 }
 
 export class IRTuple extends IRExpression {
-  isInlineArray: boolean = false;
+  isInlineArray: boolean | undefined;
   components: IRExpression[];
-  constructor(id: number, scope: number, field_flag: FieldFlag, components: IRExpression[]) {
+  constructor(id: number, scope: number, field_flag: FieldFlag, components: IRExpression[], isInlineArray?: boolean) {
     super(id, scope, field_flag);
     this.components = components;
+    this.isInlineArray = isInlineArray;
   }
   lower() : Expression {
-    assert(this.type !== undefined, "IRTuple: type is not generated");
-    return factory.makeTupleExpression("", this.isInlineArray, this.components.map((component) => component?.lower() as Expression));
+    return factory.makeTupleExpression("", this.isInlineArray === undefined ? false : true, this.components.map((component) => component?.lower() as Expression));
   }
 }

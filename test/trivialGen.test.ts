@@ -13,7 +13,8 @@ import {
   ASTWriter,
   DefaultASTWriterMapping,
   LatestCompilerVersion,
-  ParameterList
+  ParameterList,
+  VariableDeclarationStatement
 } from "solc-typed-ast"
 
 const factory = new ASTNodeFactory();
@@ -147,5 +148,19 @@ test("test struct generation",
   const variable_node2 = factory.makeVariableDeclaration(false, false, "y", 1, false, DataLocation.Default, StateVariableVisibility.Default, Mutability.Mutable, "any type", undefined, variable_type2);
   const struct_node = factory.makeStructDefinition("S", 0, "??", [variable_node, variable_node2]);
   expect(writer.write(struct_node)).toBe("struct S {\n  uint256 x;\n  uint128 y;\n}");
+}
+)
+
+test("test variable declaration statement",
+() => {
+  const variable_type = factory.makeElementaryTypeName("??", "uint256")
+  const variable_node = factory.makeVariableDeclaration(false, false, "x", 1, false, DataLocation.Default, StateVariableVisibility.Default, Mutability.Mutable, "any type", undefined, variable_type);
+  const variable_type2 = factory.makeElementaryTypeName("??", "uint128")
+  const variable_node2 = factory.makeVariableDeclaration(false, false, "y", 1, false, DataLocation.Default, StateVariableVisibility.Default, Mutability.Mutable, "any type", undefined, variable_type2);
+  const literal_1 = factory.makeLiteral("Uh? No idea..", LiteralKind.Number, "", "333");
+  const literal_2 = factory.makeLiteral("Uh? No idea..", LiteralKind.Number, "", "222");
+  const tuple = factory.makeTupleExpression("", false, [literal_1, literal_2]);
+  const variable_statement = factory.makeVariableDeclarationStatement([variable_node.id, variable_node2.id], [variable_node, variable_node2], tuple);
+  expect(writer.write(variable_statement)).toBe("(uint256 x, uint128 y) = (333, 222);");
 }
 )
