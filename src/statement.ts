@@ -22,20 +22,20 @@ export class IRPlaceholderStatement extends IRStatement {
   constructor(id : number, scope : number, field_flag : FieldFlag) {
     super(id, scope, field_flag);
   }
-  lower(): Statement {
+  lower() : Statement {
     return factory.makePlaceholderStatement();
   }
 }
 
 export class IRVariableDeclareStatement extends IRStatement {
-  variable_declares: IRVariableDeclare[];
-  value: IRExpression;
-  constructor(id : number, scope : number, field_flag : FieldFlag, variable_declares: IRVariableDeclare[], value: IRExpression) {
+  variable_declares : IRVariableDeclare[];
+  value : IRExpression;
+  constructor(id : number, scope : number, field_flag : FieldFlag, variable_declares : IRVariableDeclare[], value : IRExpression) {
     super(id, scope, field_flag);
     this.variable_declares = variable_declares;
     this.value = value;
   }
-  lower(): Statement {
+  lower() : Statement {
     assert(this.variable_declares.length > 0, "IRVariableDeclareStatement: variable_declares is empty");
     if (this.variable_declares.length > 1) {
       assert(this.value instanceof IRTuple, "IRVariableDeclareStatement: value is not IRTuple when there are more than one variable_declares");

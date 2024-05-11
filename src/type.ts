@@ -43,7 +43,7 @@ export class ElementaryType extends Type {
     return this.name + " " + this.stateMutability;
   }
 
-  copy(): Type {
+  copy() : Type {
     return new ElementaryType(this.name, this.stateMutability);
   }
 
@@ -160,7 +160,7 @@ export class UnionType extends Type {
   str() : string {
     return this.types.map(x => x.str()).join(" | ");
   }
-  copy(): Type {
+  copy() : Type {
     return new UnionType(this.types.map(x => x.copy()));
   }
   subtype() : Type[] {
@@ -198,7 +198,7 @@ export class FunctionType extends Type {
   str() : string {
     return `function (${this.parameterTypes.types.map(x => x.str()).join(", ")}) ${this.stateMutability} ${this.visibility} returns (${this.returnTypes.types.map(x => x.str()).join(", ")})`;
   }
-  copy(): Type {
+  copy() : Type {
     return new FunctionType(this.visibility, this.stateMutability, this.parameterTypes, this.returnTypes);
   }
   parameterTypes_str() : string {
@@ -268,7 +268,7 @@ export class ArrayType extends Type {
   str() : string {
     return `${this.base.str()}[${this.length}]`;
   }
-  copy(): Type {
+  copy() : Type {
     return new ArrayType(this.base.copy(), this.length);
   }
   supertype() : Type[] {
@@ -297,7 +297,7 @@ export class MappingType extends Type {
   str() : string {
     return `mapping(${this.kType.str()} => ${this.vType.str()})`;
   }
-  copy(): Type {
+  copy() : Type {
     return new MappingType(this.kType.copy(), this.vType.copy());
   }
   same(t : Type) : boolean {
@@ -412,7 +412,7 @@ for (let i = 0; i < 3; i++) {
   all_array_types = all_array_types.concat(generate_all_array_types());
 }
 
-export function includesType(arr: Type[], item: Type): boolean {
+export function includesType(arr : Type[], item : Type) : boolean {
   for (const element of arr) {
     if (element.kind === item.kind && element.same(item)) {
       return true;

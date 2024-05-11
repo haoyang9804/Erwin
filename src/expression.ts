@@ -20,7 +20,7 @@ export abstract class IRExpression extends IRNode {
 
 export class IRLiteral extends IRExpression {
   kind : LiteralKind | undefined;
-  value: string | undefined;
+  value : string | undefined;
   constructor(id : number, scope : number, field_flag : FieldFlag) {
     super(id, scope, field_flag);
   }
@@ -70,7 +70,7 @@ export class IRIdentifier extends IRExpression {
     this.name = name;
     this.reference = reference;
   }
-  from(node: IRVariableDeclare) {
+  from(node : IRVariableDeclare) {
     this.name = node.name;
     this.reference = node.id;
     return this;
@@ -88,14 +88,14 @@ export class IRAssignment extends IRExpression {
   right : IRExpression;
   type : Type | undefined;
   operator : string | undefined;
-  constructor(id : number, scope : number, field_flag : FieldFlag, left : IRExpression, right : IRExpression, operator?: string) {
+  constructor(id : number, scope : number, field_flag : FieldFlag, left : IRExpression, right : IRExpression, operator ?: string) {
     super(id, scope, field_flag);
     this.left = left;
     this.right = right;
     if (operator !== undefined) {
       assert(["=", "+=", "-=", "*=", "/=", "%="].includes(operator), "IRAssignment: operator is not supported")
     }
-      this.operator = operator;
+    this.operator = operator;
   }
   lower() : Expression {
     assert(this.type !== undefined, "IRAssignment: type is undefined");
@@ -108,7 +108,7 @@ export class IRBinaryOp extends IRExpression {
   left : IRExpression;
   right : IRExpression;
   operator : string | undefined;
-  constructor(id : number, scope : number, field_flag : FieldFlag, left : IRExpression, right : IRExpression, operator? : string) {
+  constructor(id : number, scope : number, field_flag : FieldFlag, left : IRExpression, right : IRExpression, operator ?: string) {
     super(id, scope, field_flag);
     this.left = left;
     this.right = right;
@@ -125,16 +125,16 @@ export class IRBinaryOp extends IRExpression {
 }
 
 export class IRConditional extends IRExpression {
-  condition: IRExpression;
-  true_expression: IRExpression;
-  false_expression: IRExpression;
-  constructor(id: number, scope: number, field_flag: FieldFlag, condition: IRExpression, true_expression: IRExpression, false_expression: IRExpression) {
+  condition : IRExpression;
+  true_expression : IRExpression;
+  false_expression : IRExpression;
+  constructor(id : number, scope : number, field_flag : FieldFlag, condition : IRExpression, true_expression : IRExpression, false_expression : IRExpression) {
     super(id, scope, field_flag);
     this.condition = condition;
     this.true_expression = true_expression;
     this.false_expression = false_expression;
   }
-  lower(): Expression {
+  lower() : Expression {
     assert(this.type !== undefined, "IRConditional: type is not generated");
     assert(includesType(this.true_expression!.type!.subtype(), this.false_expression!.type!)
       || includesType(this.true_expression!.type!.supertype(), this.false_expression!.type!),
@@ -146,26 +146,26 @@ export class IRConditional extends IRExpression {
 //WARNING: UNTESTED!!
 //TODO: test it after implementing IRFunctionDefinition
 export class IRFunctionCall extends IRExpression {
-  kind: FunctionCallKind;
+  kind : FunctionCallKind;
   //TODO: I think the type of function_expression can be further narrowed down
-  function_expression: IRExpression;
-  arguments: IRExpression[];
-  constructor(id: number, scope: number, field_flag: FieldFlag, kind: FunctionCallKind, function_expression: IRExpression, arguments_: IRExpression[]) {
+  function_expression : IRExpression;
+  arguments : IRExpression[];
+  constructor(id : number, scope : number, field_flag : FieldFlag, kind : FunctionCallKind, function_expression : IRExpression, arguments_ : IRExpression[]) {
     super(id, scope, field_flag);
     this.kind = kind;
     this.function_expression = function_expression;
     this.arguments = arguments_;
   }
-  lower(): Expression {
+  lower() : Expression {
     assert(this.type !== undefined, "IRFunctionCall: type is not generated");
     return factory.makeFunctionCall("", this.kind, this.function_expression.lower() as Expression, this.arguments.map((arg) => arg.lower() as Expression));
   }
 }
 
 export class IRTuple extends IRExpression {
-  isInlineArray: boolean | undefined;
-  components: IRExpression[];
-  constructor(id: number, scope: number, field_flag: FieldFlag, components: IRExpression[], isInlineArray?: boolean) {
+  isInlineArray : boolean | undefined;
+  components : IRExpression[];
+  constructor(id : number, scope : number, field_flag : FieldFlag, components : IRExpression[], isInlineArray ?: boolean) {
     super(id, scope, field_flag);
     this.components = components;
     this.isInlineArray = isInlineArray;
