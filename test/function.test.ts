@@ -1,7 +1,7 @@
 import { ElementaryType } from "../src/type"
 import { IRModifier, IRVariableDeclare, IRFunctionDefinition, Modifier } from "../src/declare";
-import { IRIdentifier, IRBinaryOp } from "../src/expression";
-import { IRPlaceholderStatement } from "../src/statement";
+import { IRIdentifier, IRBinaryOp, IRLiteral, IRTuple } from "../src/expression";
+import { IRPlaceholderStatement, IRVariableDeclareStatement } from "../src/statement";
 import {
   PrettyFormatter,
   ASTWriter,
@@ -20,6 +20,17 @@ const writer = new ASTWriter(
     formatter,
     LatestCompilerVersion
 );
+
+
+const variable1 = new IRVariableDeclare(0, 0, 0, "x");
+variable1.type = new ElementaryType("uint256", "nonpayable");
+const variable2 = new IRVariableDeclare(1, 0, 0, "y");
+variable2.type = new ElementaryType("uint128", "nonpayable");
+const literal1 = new IRLiteral(2, 0, 0);
+literal1.type = new ElementaryType("uint256", "nonpayable");
+const literal2 = new IRLiteral(3, 0, 0);
+literal2.type = new ElementaryType("uint128", "nonpayable");
+const variable_declare_stmt = new IRVariableDeclareStatement(4, 0, 0, [variable1, variable2], new IRTuple(5, 0, 0, [literal1, literal2]));
 
 const v1 = new IRVariableDeclare(1, 0, 0, "x");
 v1.type = new ElementaryType("uint256", "nonpayable");
@@ -56,11 +67,11 @@ v3.type = new ElementaryType("uint256", "nonpayable");
 
 const f_correct = new IRFunctionDefinition(7, 0, 0, "F", FunctionKind.Function,
 true, true, FunctionVisibility.Private, FunctionStateMutability.View,
-[v2], [v3], [], [{name: "M", arg_names: ["x"]}]);
+[v2], [v3], [variable_declare_stmt], [{name: "M", arg_names: ["x"]}]);
 
 test("test function 1",
 () => {
-  expect(writer.write(f_correct.lower())).toBe("function F(uint256 y) virtual override private view M(x) returns (uint256 z) {}");
+  expect(writer.write(f_correct.lower())).toBe("function F(uint256 y) virtual override private view M(x) returns (uint256 z) {\n  (uint256 x, uint128 y) = (" + literal1.value + ", " + literal2.value + ");\n}")
 }
 )
 
