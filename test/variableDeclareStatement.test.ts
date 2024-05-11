@@ -1,4 +1,4 @@
-import { ElementaryType } from "../src/type"
+import { ElementaryType, UnionType } from "../src/type"
 import { IRErrorDefinition, IRVariableDeclare } from "../src/declare";
 import { IRLiteral, IRTuple } from "../src/expression";
 import { IRVariableDeclareStatement } from "../src/statement";
@@ -27,7 +27,9 @@ test("test variableDeclareStatement",
   literal1.type = new ElementaryType("uint256", "nonpayable");
   const literal2 = new IRLiteral(3, 0, 0);
   literal2.type = new ElementaryType("uint128", "nonpayable");
-  const statement = new IRVariableDeclareStatement(4, 0, 0, [variable1, variable2], new IRTuple(5, 0, 0, [literal1, literal2]));
+  const tuple = new IRTuple(5, 0, 0, [literal1, literal2]);
+  tuple.type = new UnionType([new ElementaryType("uint256", "nonpayable"), new ElementaryType("uint128", "nonpayable")]);
+  const statement = new IRVariableDeclareStatement(4, 0, 0, [variable1, variable2], tuple);
   const result = writer.write(statement.lower());
   expect(result).toBe("(uint256 x, uint128 y) = (" + literal1.value + ", " + literal2.value + ");");
 }

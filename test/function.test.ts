@@ -1,6 +1,6 @@
-import { ElementaryType } from "../src/type"
+import { ElementaryType, UnionType } from "../src/type"
 import { IRModifier, IRVariableDeclare, IRFunctionDefinition, Modifier } from "../src/declare";
-import { IRIdentifier, IRBinaryOp, IRLiteral, IRTuple } from "../src/expression";
+import { IRIdentifier, IRBinaryOp, IRLiteral, IRTuple, IRFunctionCall } from "../src/expression";
 import { IRPlaceholderStatement, IRVariableDeclareStatement } from "../src/statement";
 import {
   PrettyFormatter,
@@ -11,7 +11,8 @@ import {
   Identifier,
   FunctionKind,
   FunctionVisibility,
-  FunctionStateMutability
+  FunctionStateMutability,
+  FunctionCallKind
 } from "solc-typed-ast"
 
 const formatter = new PrettyFormatter(2, 0);
@@ -30,7 +31,9 @@ const literal1 = new IRLiteral(2, 0, 0);
 literal1.type = new ElementaryType("uint256", "nonpayable");
 const literal2 = new IRLiteral(3, 0, 0);
 literal2.type = new ElementaryType("uint128", "nonpayable");
-const variable_declare_stmt = new IRVariableDeclareStatement(4, 0, 0, [variable1, variable2], new IRTuple(5, 0, 0, [literal1, literal2]));
+const tuple = new IRTuple(5, 0, 0, [literal1, literal2]);
+tuple.type = new UnionType([literal1.type.copy(), literal2.type.copy()]);
+const variable_declare_stmt = new IRVariableDeclareStatement(4, 0, 0, [variable1, variable2], tuple);
 
 const v1 = new IRVariableDeclare(1, 0, 0, "x");
 v1.type = new ElementaryType("uint256", "nonpayable");
@@ -87,3 +90,18 @@ test("test function 2",
     "IRFunctionDefinition: visibility is not set");
 }
 )
+
+// const v4 = new IRVariableDeclare(8, 0, 0, "x");
+// v4.type = new ElementaryType("uint256", "nonpayable");
+// const id4 = new IRIdentifier(9,0,0).from(v4);
+// id4.type = new ElementaryType("uint256", "nonpayable");
+
+// const functioncall = new IRFunctionCall(10, 0, 0, FunctionCallKind.FunctionCall,
+//   new IRIdentifier(11, 0, 0, f_correct.name, f_correct.id), [id4]);
+// functioncall.type = f_correct.returnType
+
+// test("test function call",
+// () => {
+//   expect(writer.write(functioncall.lower())).toBe("F(x)");
+// }
+// )

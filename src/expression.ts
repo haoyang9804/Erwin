@@ -146,12 +146,13 @@ export class IRConditional extends IRExpression {
 //WARNING: UNTESTED!!
 //TODO: test it after implementing IRFunctionDefinition
 export class IRFunctionCall extends IRExpression {
-  kind: FunctionCallKind = FunctionCallKind.FunctionCall;
+  kind: FunctionCallKind;
   //TODO: I think the type of function_expression can be further narrowed down
   function_expression: IRExpression;
   arguments: IRExpression[];
-  constructor(id: number, scope: number, field_flag: FieldFlag, function_expression: IRExpression, arguments_: IRExpression[]) {
+  constructor(id: number, scope: number, field_flag: FieldFlag, kind: FunctionCallKind, function_expression: IRExpression, arguments_: IRExpression[]) {
     super(id, scope, field_flag);
+    this.kind = kind;
     this.function_expression = function_expression;
     this.arguments = arguments_;
   }
@@ -170,6 +171,8 @@ export class IRTuple extends IRExpression {
     this.isInlineArray = isInlineArray;
   }
   lower() : Expression {
+    assert(this.type !== undefined, "IRTuple: type is not generated");
+    assert(this.type.kind === TypeKind.UnionType, "IRTuple: type is not UnionType");
     return factory.makeTupleExpression("", this.isInlineArray === undefined ? false : true, this.components.map((component) => component?.lower() as Expression));
   }
 }

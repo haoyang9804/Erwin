@@ -6,7 +6,8 @@ export enum TypeKind {
   FunctionType, // function (uint256) pure external returns (uint256)
   ArrayType, // uint256[2], address[2], boolean[2]
   MappingType, // mapping(uint256 => address), mapping(uint256 => boolean)
-  UserDefinedType // contract, struct, enum, library
+  UserDefinedType, // contract, struct, enum, library
+  UnionType
 }
 
 export abstract class Type {
@@ -18,6 +19,7 @@ export abstract class Type {
   abstract subtype() : Type[];
   abstract supertype() : Type[];
   abstract same(t : Type) : boolean;
+  abstract copy() : Type;
 }
 
 type elementary_type_name = "uint256" | "uint128" | "uint64" | "uint32" | "uint16" | "uint8" | "address" | "bool" | "string" | "bytes" | "int256" | "int128" | "int64" | "int32" | "int16" | "int8";
@@ -39,6 +41,10 @@ export class ElementaryType extends Type {
   }
   str() : string {
     return this.name + " " + this.stateMutability;
+  }
+
+  copy(): Type {
+    return new ElementaryType(this.name, this.stateMutability);
   }
 
   subtype() : Type[] {
@@ -143,16 +149,44 @@ export class ElementaryType extends Type {
     }
     return false;
   }
+}
+
+export class UnionType extends Type {
+  types : Type[];
+  constructor(types : Type[]) {
+    super(TypeKind.UnionType);
+    this.types = types;
+  }
+  str() : string {
+    return this.types.map(x => x.str()).join(" | ");
+  }
+  copy(): Type {
+    return new UnionType(this.types.map(x => x.copy()));
+  }
+  subtype() : Type[] {
+    return this.types;
+  }
+  supertype() : Type[] {
+    return this.types;
+  }
+  same(t : Type) : boolean {
+    if (t.kind !== TypeKind.UnionType) return false;
+    if ((t as UnionType).types.length !== this.types.length) return false;
+    for (let i = 0; i < this.types.length; i++) {
+      if (!this.types[i].same((t as UnionType).types[i])) return false;
+    }
+    return true;
+  }
 
 }
 
 export class FunctionType extends Type {
   visibility : "public" | "internal" | "external" | "private" = "public";
   stateMutability : "pure" | "view" | "payable" | "nonpayable" = "nonpayable";
-  parameterTypes : Type[] = [];
-  returnTypes : Type[] = [];
+  parameterTypes : UnionType;
+  returnTypes : UnionType;
   constructor(visibility : "public" | "internal" | "external" | "private" = "public", stateMutability : "pure" | "view" | "payable" | "nonpayable" = "nonpayable",
-    parameterTypes : Type[] = [], returnTypes : Type[] = []) {
+    parameterTypes : UnionType, returnTypes : UnionType) {
     super(TypeKind.FunctionType);
     this.visibility = visibility;
     this.stateMutability = stateMutability;
@@ -160,13 +194,16 @@ export class FunctionType extends Type {
     this.returnTypes = returnTypes;
   }
   str() : string {
-    return `function (${this.parameterTypes.map(x => x.str()).join(", ")}) ${this.stateMutability} ${this.visibility} returns (${this.returnTypes.map(x => x.str()).join(", ")})`;
+    return `function (${this.parameterTypes.types.map(x => x.str()).join(", ")}) ${this.stateMutability} ${this.visibility} returns (${this.returnTypes.types.map(x => x.str()).join(", ")})`;
+  }
+  copy(): Type {
+    return new FunctionType(this.visibility, this.stateMutability, this.parameterTypes, this.returnTypes);
   }
   parameterTypes_str() : string {
-    return this.parameterTypes.map(x => x.str()).join(", ");
+    return this.parameterTypes.types.map(x => x.str()).join(", ");
   }
   returnTypes_str() : string {
-    return this.returnTypes.map(x => x.str()).join(", ");
+    return this.returnTypes.types.map(x => x.str()).join(", ");
   }
   subtype() : Type[] {
     switch (this.stateMutability) {
@@ -205,8 +242,8 @@ export class FunctionType extends Type {
     if (t.kind !== TypeKind.FunctionType) return false;
     if ((t as FunctionType).stateMutability === this.stateMutability
       && (t as FunctionType).visibility === this.visibility
-      && (t as FunctionType).returnTypes.length === this.returnTypes.length
-      && (t as FunctionType).parameterTypes.length === this.parameterTypes.length
+      && (t as FunctionType).returnTypes.types.length === this.returnTypes.types.length
+      && (t as FunctionType).parameterTypes.types.length === this.parameterTypes.types.length
       && (t as FunctionType).parameterTypes_str() === this.parameterTypes_str()
       && (t as FunctionType).returnTypes_str() === this.returnTypes_str()) {
       return true;
@@ -228,6 +265,9 @@ export class ArrayType extends Type {
   }
   str() : string {
     return `${this.base.str()}[${this.length}]`;
+  }
+  copy(): Type {
+    return new ArrayType(this.base.copy(), this.length);
   }
   supertype() : Type[] {
     return [this.myself()];
@@ -255,6 +295,9 @@ export class MappingType extends Type {
   str() : string {
     return `mapping(${this.kType.str()} => ${this.vType.str()})`;
   }
+  copy(): Type {
+    return new MappingType(this.kType.copy(), this.vType.copy());
+  }
   same(t : Type) : boolean {
     if (t.kind !== TypeKind.MappingType) return false;
     if ((t as MappingType).kType.same(this.kType) && (t as MappingType).vType.same(this.vType)) {
@@ -272,6 +315,7 @@ export class MappingType extends Type {
     return [this.myself()];
   }
 }
+
 
 export const varID2Types = new Map<number, Type[]>();
 
@@ -338,8 +382,8 @@ function generate_all_function_types() : Type[] {
       const parameterTypes = lazyPickRandomElement(all_available_types);
       const returnTypes = lazyPickRandomElement(all_available_types);
       collection.push(new FunctionType(visibility, stateMutability,
-        parameterTypes === undefined ? [] : [parameterTypes],
-        returnTypes === undefined ? [] : [returnTypes]));
+        new UnionType(parameterTypes === undefined ? [] : [parameterTypes]),
+        new UnionType(returnTypes === undefined ? [] : [returnTypes])));
     }
   }
   return collection;
