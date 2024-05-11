@@ -14,7 +14,7 @@ import {
 } from "solc-typed-ast"
 
 import { assert } from "./utility";
-import { TypeKind, Type, ElementaryType } from "./type";
+import { TypeKind, Type, ElementaryType, UnionType, FunctionType } from "./type";
 import { constantLock } from "./constrant";
 import { IRNode, FieldFlag, factory } from "./node";
 import { IRExpression } from "./expression";
@@ -199,10 +199,16 @@ export class IRFunctionDefinition extends IRDeclare {
   returns: IRVariableDeclare[];
   modifier: Modifier[];
   body: (IRStatement | IRExpression)[];
+  return_type: UnionType | undefined;
+  parameter_type: UnionType | undefined;
+  function_type: FunctionType | undefined;
   constructor(id : number, scope : number, field_flag : FieldFlag, name : string, kind: FunctionKind,
     virtual: boolean, override: boolean, visibility: FunctionVisibility, stateMutability: FunctionStateMutability,
     parameters : IRVariableDeclare[], returns : IRVariableDeclare[], body: (IRStatement | IRExpression)[],
     modifier : Modifier[]) {
+    //WARNING: currently, we don't support visibility = default or stateMutability = constant
+    assert(visibility !== FunctionVisibility.Default, "IRFunctionDefinition: visibility is default");
+    assert(stateMutability !== FunctionStateMutability.Constant, "IRFunctionDefinition: stateMutability is constant");
     super(id, scope, field_flag, name);
     this.virtual = virtual;
     this.override = override;
@@ -214,8 +220,45 @@ export class IRFunctionDefinition extends IRDeclare {
     this.modifier = modifier;
     this.body = body;
   }
+
+  returnType() : UnionType {
+    if (this.return_type !== undefined) return this.return_type.copy() as UnionType;
+    this.returns.map(function(ret) {
+      assert(ret.type !== undefined, "IRFunctionDefinition: return type is not generated");
+    });
+    return this.return_type = new UnionType(this.returns.map((ret) => ret.type!.copy()));
+  }
+
+  parameterType() : UnionType {
+    if (this.parameter_type !== undefined) return this.parameter_type.copy() as UnionType;
+    this.parameters.map(function(param) {
+      assert(param.type !== undefined, "IRFunctionDefinition: parameter type is not generated");
+    });
+    return this.parameter_type = new UnionType(this.parameters.map((param) => param.type!.copy()));
+  }
+
+  functionType() : FunctionType {
+    if (this.function_type !== undefined) return this.function_type.copy() as FunctionType;
+    let t_visibility: "public" | "internal" | "external" | "private";
+    switch (this.visibility) {
+      case FunctionVisibility.Public: t_visibility = "public"; break;
+      case FunctionVisibility.Internal: t_visibility = "internal"; break;
+      case FunctionVisibility.External: t_visibility = "external"; break;
+      case FunctionVisibility.Private: t_visibility = "private"; break;
+      default: assert(false, "IRFunctionDefinition: visibility is not set");
+    }
+    let t_stateMutability : "pure" | "view" | "payable" | "nonpayable";
+    switch (this.stateMutability) {
+      case FunctionStateMutability.Pure: t_stateMutability = "pure"; break;
+      case FunctionStateMutability.View: t_stateMutability = "view"; break;
+      case FunctionStateMutability.Payable: t_stateMutability = "payable"; break;
+      case FunctionStateMutability.NonPayable: t_stateMutability = "nonpayable"; break;
+      default: assert(false, "IRFunctionDefinition: stateMutability is not set");
+    }
+    return this.function_type = new FunctionType(t_visibility, t_stateMutability, this.parameterType(), this.returnType());
+  }
+
   lower() : ASTNode {
-    assert(this.visibility !== FunctionVisibility.Default, "IRFunctionDefinition: visibility is not set");
     const modifier_invocation: ModifierInvocation[] = [];
     for (const modifier of this.modifier) {
       assert(name2declare.has(modifier.name), `IRFunctionDefinition: modifier ${modifier} is not declared`);

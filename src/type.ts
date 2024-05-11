@@ -185,7 +185,9 @@ export class FunctionType extends Type {
   stateMutability : "pure" | "view" | "payable" | "nonpayable" = "nonpayable";
   parameterTypes : UnionType;
   returnTypes : UnionType;
-  constructor(visibility : "public" | "internal" | "external" | "private" = "public", stateMutability : "pure" | "view" | "payable" | "nonpayable" = "nonpayable",
+  constructor(
+    visibility : "public" | "internal" | "external" | "private" = "public",
+    stateMutability : "pure" | "view" | "payable" | "nonpayable" = "nonpayable",
     parameterTypes : UnionType, returnTypes : UnionType) {
     super(TypeKind.FunctionType);
     this.visibility = visibility;

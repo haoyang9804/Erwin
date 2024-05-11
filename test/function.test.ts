@@ -79,29 +79,33 @@ test("test function 1",
 )
 
 
-const f_error = new IRFunctionDefinition(7, 0, 0, "F", FunctionKind.Function,
-true, true, FunctionVisibility.Default, FunctionStateMutability.View,
-[v2], [v3], [], [{name: "M", arg_names: ["x"]}]);
-
-
 test("test function 2",
 () => {
-  expect(async() => { writer.write(f_error.lower()) }).rejects.toThrow(
-    "IRFunctionDefinition: visibility is not set");
+  expect(async() => { new IRFunctionDefinition(7, 0, 0, "F", FunctionKind.Function,
+  true, true, FunctionVisibility.Default, FunctionStateMutability.View,
+  [v2], [v3], [], [{name: "M", arg_names: ["x"]}]) }).rejects.toThrow(
+    "IRFunctionDefinition: visibility is default");
 }
 )
 
-// const v4 = new IRVariableDeclare(8, 0, 0, "x");
-// v4.type = new ElementaryType("uint256", "nonpayable");
-// const id4 = new IRIdentifier(9,0,0).from(v4);
-// id4.type = new ElementaryType("uint256", "nonpayable");
+const v4 = new IRVariableDeclare(8, 0, 0, "x");
+v4.type = new ElementaryType("uint256", "nonpayable");
+const id4 = new IRIdentifier(9,0,0).from(v4);
+id4.type = new ElementaryType("uint256", "nonpayable");
+const f_id = new IRIdentifier(11, 0, 0, f_correct.name, f_correct.id);
+f_id.type = (f_correct as IRFunctionDefinition).functionType();
 
-// const functioncall = new IRFunctionCall(10, 0, 0, FunctionCallKind.FunctionCall,
-//   new IRIdentifier(11, 0, 0, f_correct.name, f_correct.id), [id4]);
-// functioncall.type = f_correct.returnType
+test("test function identifier's type",
+() => {
+  expect(f_id.type!.str()).toBe("function (uint256 nonpayable) view private returns (uint256 nonpayable)");
+}
+)
 
-// test("test function call",
-// () => {
-//   expect(writer.write(functioncall.lower())).toBe("F(x)");
-// }
-// )
+const functioncall = new IRFunctionCall(10, 0, 0, FunctionCallKind.FunctionCall, f_id, [id4]);
+functioncall.type = (f_correct as IRFunctionDefinition).returnType();
+
+test("test function call",
+() => {
+  expect(writer.write(functioncall.lower())).toBe("F(x)");
+}
+)
