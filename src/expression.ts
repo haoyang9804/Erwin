@@ -200,3 +200,17 @@ export class IRTuple extends IRExpression {
     return factory.makeTupleExpression("", this.isInlineArray === undefined ? false : true, this.components.map((component) => component?.lower() as Expression));
   }
 }
+
+export class IRIndexedAccess extends IRExpression {
+  base: IRExpression;
+  indexed: IRExpression | undefined;
+  constructor(id : number, scope : number, field_flag : FieldFlag, base : IRExpression, indexed ?: IRExpression) {
+    super(id, scope, field_flag);
+    this.base = base;
+    this.indexed = indexed;
+  }
+  lower() {
+    assert(this.type !== undefined, "IRIndexedAccess: type is not generated");
+    return factory.makeIndexAccess("", this.base.lower() as Expression, this.indexed?.lower() as Expression);
+  }
+}
