@@ -6,8 +6,6 @@ import {
   ASTWriter,
   DefaultASTWriterMapping,
   LatestCompilerVersion,
-  VariableDeclaration,
-  TupleType,
 } from "solc-typed-ast"
 
 const formatter = new PrettyFormatter(2, 0);

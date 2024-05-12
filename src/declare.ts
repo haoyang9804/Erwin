@@ -20,7 +20,8 @@ import { IRNode, FieldFlag, factory } from "./node";
 import { IRExpression } from "./expression";
 import { IRStatement, IRPlaceholderStatement } from "./statement";
 
-const name2declare = new Map<string, IRDeclare>();
+export const name2declare = new Map<string, IRDeclare>();
+export const name2Event = new Map<string, IREventDefinition>();
 
 export abstract class IRDeclare extends IRNode {
   name : string;

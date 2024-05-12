@@ -7,8 +7,6 @@ import {
   ASTWriter,
   DefaultASTWriterMapping,
   LatestCompilerVersion,
-  VariableDeclaration,
-  Identifier,
   FunctionKind,
   FunctionVisibility,
   FunctionStateMutability,

@@ -1,5 +1,5 @@
 import * as ct from "../src/constrant"
-import { varID2Types, ElementaryType, all_integer_types, all_elementary_types, all_function_types, all_array_types } from "../src/type"
+import { varID2Types, all_integer_types, all_elementary_types, all_function_types, all_array_types } from "../src/type"
 
 test('test dependence DAG 1',
 () => {
