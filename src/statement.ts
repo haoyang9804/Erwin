@@ -98,3 +98,20 @@ export class IREmitStatement extends IRStatement {
     return factory.makeEmitStatement(event_call);
   }
 }
+
+export class IRIf extends IRStatement {
+  condition : IRExpression;
+  true_expression : IRStatement | IRExpression;
+  false_expression : IRStatement | IRExpression;
+  constructor(id : number, scope : number, field_flag : FieldFlag, condition : IRExpression, true_expression : IRStatement | IRExpression, false_expression : IRStatement | IRExpression) {
+    super(id, scope, field_flag);
+    this.condition = condition;
+    this.true_expression = true_expression;
+    this.false_expression = false_expression;
+  }
+  lower() : Statement {
+    const lowered_true_expression = this.true_expression instanceof IRStatement ? this.true_expression.lower() : factory.makeExpressionStatement(this.true_expression.lower());
+    const lowered_false_expression = this.false_expression instanceof IRStatement ? this.false_expression.lower() : factory.makeExpressionStatement(this.false_expression.lower());
+    return factory.makeIfStatement(this.condition.lower(), lowered_true_expression, lowered_false_expression);
+  }
+}
