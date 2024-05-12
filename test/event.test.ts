@@ -1,5 +1,7 @@
-import { ElementaryType } from "../src/type"
+import { ElementaryType, EventType } from "../src/type"
 import { IREventDefinition, IRVariableDeclare } from "../src/declare";
+import { IRIdentifier } from "../src/expression";
+import { IREmitStatement } from "../src/statement";
 import {
   PrettyFormatter,
   ASTWriter,
@@ -14,7 +16,7 @@ const writer = new ASTWriter(
     LatestCompilerVersion
 );
 
-test("test event",
+test("test event and emit",
 () => {
   const variable1 = new IRVariableDeclare(0, 0, 0, "x")
   variable1.type = new ElementaryType("uint256", "nonpayable");
@@ -28,5 +30,13 @@ test("test event",
   expect(result2).toEqual(
     "event E(uint256 x) anonymous;"
   );
+  const variable2 = new IRVariableDeclare(0, 0, 0, "y");
+  variable2.type = variable1.type.copy();
+  const variable2_id = new IRIdentifier(0, 0, 0, variable2.name, variable2.id);
+  variable2_id.type = variable2.type.copy();
+  const event_id = new IRIdentifier(0, 0, 0, event.name, event.id);
+  event_id.type = new EventType();
+  const emit = new IREmitStatement(0, 0, 0, event_id, [variable2_id]);
+  expect(writer.write(emit.lower())).toBe("emit E(y);")
 }
 )

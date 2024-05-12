@@ -7,7 +7,8 @@ export enum TypeKind {
   ArrayType, // uint256[2], address[2], boolean[2]
   MappingType, // mapping(uint256 => address), mapping(uint256 => boolean)
   UserDefinedType, // contract, struct, enum, library
-  UnionType
+  UnionType,
+  EventType,
 }
 
 export abstract class Type {
@@ -20,6 +21,27 @@ export abstract class Type {
   abstract supertype() : Type[];
   abstract same(t : Type) : boolean;
   abstract copy() : Type;
+}
+
+export class EventType extends Type {
+  constructor() {
+    super(TypeKind.EventType);
+  }
+  str() : string {
+    return "event";
+  }
+  subtype() : Type[] {
+    throw new Error("No subtype for EventType");
+  }
+  supertype() : Type[] {
+    throw new Error("No supertype for EventType");
+  }
+  copy() : Type {
+    return new EventType();
+  }
+  same(t : Type) : boolean {
+    return t.kind === TypeKind.EventType;
+  }
 }
 
 type elementary_type_name = "uint256" | "uint128" | "uint64" | "uint32" | "uint16" | "uint8" | "address" | "bool" | "string" | "bytes" | "int256" | "int128" | "int64" | "int32" | "int16" | "int8";

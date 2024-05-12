@@ -1,10 +1,8 @@
 import {
-  ASTNode,
   Statement,
-  PlaceholderStatement,
   VariableDeclaration,
-  FunctionCall,
-  FunctionCallKind
+  FunctionCallKind,
+  Expression
 } from "solc-typed-ast"
 
 import { assert, generateRandomString, str2hex } from "./utility";
@@ -84,5 +82,19 @@ export class IRReturnStatement extends IRStatement {
   lower() : Statement {
     assert(this.value !== undefined, "IRReturnStatement: value is not generated");
     return factory.makeReturn(-1, this.value.lower());
+  }
+}
+
+export class IREmitStatement extends IRStatement {
+  event_call : IRExpression;
+  arguments : IRExpression[];
+  constructor(id : number, scope : number, field_flag : FieldFlag, event_call : IRExpression, arguments_ : IRExpression[]) {
+    super(id, scope, field_flag);
+    this.event_call = event_call;
+    this.arguments = arguments_;
+  }
+  lower() : Statement {
+    const event_call = factory.makeFunctionCall("", FunctionCallKind.FunctionCall, this.event_call.lower(), this.arguments.map(a => a.lower() as Expression));
+    return factory.makeEmitStatement(event_call);
   }
 }
