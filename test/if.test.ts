@@ -1,16 +1,12 @@
-import { ElementaryType, UnionType } from "../src/type"
-import { IRModifier, IRVariableDeclare, IRFunctionDefinition, Modifier } from "../src/declare";
-import { IRIdentifier, IRBinaryOp, IRLiteral, IRTuple, IRFunctionCall } from "../src/expression";
-import { IRPlaceholderStatement, IRVariableDeclareStatement, IRIf } from "../src/statement";
+import { ElementaryType} from "../src/type"
+import { IRVariableDeclare } from "../src/declare";
+import { IRIdentifier, IRBinaryOp } from "../src/expression";
+import { IRIf } from "../src/statement";
 import {
   PrettyFormatter,
   ASTWriter,
   DefaultASTWriterMapping,
   LatestCompilerVersion,
-  FunctionKind,
-  FunctionVisibility,
-  FunctionStateMutability,
-  FunctionCallKind
 } from "solc-typed-ast"
 
 const formatter = new PrettyFormatter(2, 0);

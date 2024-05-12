@@ -21,8 +21,9 @@ export abstract class IRExpression extends IRNode {
 export class IRLiteral extends IRExpression {
   kind : LiteralKind | undefined;
   value : string | undefined;
-  constructor(id : number, scope : number, field_flag : FieldFlag) {
+  constructor(id : number, scope : number, field_flag : FieldFlag, value?: string) {
     super(id, scope, field_flag);
+    this.value = value;
   }
   private generateKind() : void {
     const type = this.type as ElementaryType;
@@ -38,7 +39,6 @@ export class IRLiteral extends IRExpression {
   }
   private generateVal() : void {
     //TODO: add support for strange value, such as huge number and overlong string, etc.
-    this.generateKind();
     switch (this.kind) {
       case LiteralKind.Bool:
         this.value = Math.random() > 0.5 ? "true" : "false";
@@ -56,7 +56,8 @@ export class IRLiteral extends IRExpression {
   lower() : Expression {
     assert(this.type !== undefined, "IRLiteral: type is not generated");
     assert(this.type.kind === TypeKind.ElementaryType, "IRLiteral: type is not ElementaryType")
-    this.generateVal();
+    this.generateKind();
+    if (this.value === undefined) this.generateVal();
     return factory.makeLiteral("", this.kind!, str2hex(this.value!), this.value!);
   }
 }
