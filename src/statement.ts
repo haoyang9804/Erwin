@@ -2,7 +2,8 @@ import {
   Statement,
   VariableDeclaration,
   FunctionCallKind,
-  Expression
+  Expression,
+  VariableDeclarationStatement
 } from "solc-typed-ast"
 
 import { assert, generateRandomString, str2hex } from "./utility";
@@ -113,5 +114,25 @@ export class IRIf extends IRStatement {
     const lowered_true_expression = this.true_expression instanceof IRStatement ? this.true_expression.lower() : factory.makeExpressionStatement(this.true_expression.lower());
     const lowered_false_expression = this.false_expression instanceof IRStatement ? this.false_expression.lower() : factory.makeExpressionStatement(this.false_expression.lower());
     return factory.makeIfStatement(this.condition.lower(), lowered_true_expression, lowered_false_expression);
+  }
+}
+
+export class IRFor extends IRStatement {
+  initial_stmt: IRVariableDeclareStatement | IRExpression | undefined;
+  condition: IRExpression | undefined;
+  loop: IRExpression | undefined;
+  body: IRStatement;
+  constructor(id: number, scope: number, field_flag: FieldFlag, initial_stmt: IRVariableDeclareStatement | IRExpression | undefined, condition: IRExpression | undefined, loop: IRExpression | undefined, body: IRStatement) {
+    super(id, scope, field_flag);
+    this.initial_stmt = initial_stmt;
+    this.condition = condition;
+    this.loop = loop;
+    this.body = body;
+  }
+  lower(): Statement {
+    const lowered_initial_stmt = this.initial_stmt === undefined ? undefined : this.initial_stmt instanceof IRVariableDeclareStatement ? this.initial_stmt.lower() as VariableDeclarationStatement : factory.makeExpressionStatement(this.initial_stmt.lower());
+    const lowered_condition = this.condition === undefined ? undefined : this.condition.lower();
+    const lowered_loop = this.loop === undefined ? undefined : factory.makeExpressionStatement(this.loop.lower());
+    return factory.makeForStatement(this.body.lower(), lowered_initial_stmt, lowered_condition, lowered_loop);
   }
 }

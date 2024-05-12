@@ -124,6 +124,29 @@ export class IRBinaryOp extends IRExpression {
   }
 }
 
+export class IRUnaryOp extends IRExpression {
+  prefix: boolean;
+  expression : IRExpression;
+  operator : string;
+  //TODO: support useFunction
+  useFunction : number | undefined;
+  constructor(id : number, scope : number, field_flag : FieldFlag, prefix: boolean, expression : IRExpression, operator: string, useFunction?: number) {
+    super(id, scope, field_flag);
+    this.prefix = prefix;
+    this.expression = expression;
+    if (operator !== undefined) {
+      assert(["!", "-", "~", "++", "--", "delete"].includes(operator), `IRUnaryOp: operator ${operator} is not supported`)
+    }
+    this.operator = operator;
+    this.useFunction = useFunction;
+  }
+  lower() : Expression {
+    assert(this.type !== undefined, "IRUnaryOp: type is not generated");
+    assert(this.operator !== undefined, "IRUnaryOp: operator is not generated")
+    return factory.makeUnaryOperation("", this.prefix, this.operator, this.expression.lower() as Expression);
+  }
+}
+
 export class IRConditional extends IRExpression {
   condition : IRExpression;
   true_expression : IRExpression;
