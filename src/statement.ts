@@ -164,15 +164,23 @@ export class IRFor extends IRStatement {
 
 export class IRDoWhile extends IRStatement {
   condition: IRExpression;
-  body: IRStatement | IRExpression;
-  constructor(id: number, scope: number, field_flag: FieldFlag, condition: IRExpression, body: IRStatement | IRExpression) {
+  body: (IRStatement | IRExpression)[];
+  constructor(id: number, scope: number, field_flag: FieldFlag, condition: IRExpression, body: (IRStatement | IRExpression)[]) {
     super(id, scope, field_flag);
     this.condition = condition;
     this.body = body;
   }
   lower(): Statement {
-    return factory.makeDoWhileStatement(this.condition.lower(),
-      this.body instanceof IRStatement? this.body.lower(): factory.makeExpressionStatement(this.body.lower()));
+    const lowered_body = factory.makeBlock(this.body.map(function(stmt) {
+      const lowered_stmt = stmt.lower();
+      if (stmt instanceof IRStatement) return lowered_stmt;
+      else if (stmt instanceof IRExpression) {
+        assert(lowered_stmt instanceof Expression, "IRModifier: lowered_stmt is not Expression");
+        return factory.makeExpressionStatement(lowered_stmt);
+      }
+      assert(false, "IRModifier: stmt is not IRStatement or IRExpression");
+    }));
+    return factory.makeDoWhileStatement(this.condition.lower(), lowered_body);
   }
 }
 

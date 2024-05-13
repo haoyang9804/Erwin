@@ -30,10 +30,10 @@ test("test do while",
   const cond = new IRBinaryOp(7, 0, 0, v2id, l2, "<");
   cond.type = new ElementaryType("bool", "nonpayable");
   const body = new IRBreakStatement(8, 0, 0);
-  const doWhile = new IRDoWhile(9, 0, 0, cond, body);
+  const doWhile = new IRDoWhile(9, 0, 0, cond, [body]);
   const result = writer.write(doWhile.lower());
   expect(result).toEqual(
-    `do break; while(x < 100);`
+    `do {\n  break;\n} while(x < 100);`
   );
 }
 )
