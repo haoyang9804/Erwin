@@ -227,7 +227,8 @@ export class IRFunctionDefinition extends IRDeclare {
     this.returns.map(function(ret) {
       assert(ret.type !== undefined, "IRFunctionDefinition: return type is not generated");
     });
-    return this.return_type = new UnionType(this.returns.map((ret) => ret.type!.copy()));
+    this.return_type = new UnionType(this.returns.map((ret) => ret.type!.copy()));
+    return this.return_type.copy() as UnionType;
   }
 
   parameterType() : UnionType {
@@ -235,7 +236,8 @@ export class IRFunctionDefinition extends IRDeclare {
     this.parameters.map(function(param) {
       assert(param.type !== undefined, "IRFunctionDefinition: parameter type is not generated");
     });
-    return this.parameter_type = new UnionType(this.parameters.map((param) => param.type!.copy()));
+    this.parameter_type = new UnionType(this.parameters.map((param) => param.type!.copy()));
+    return this.parameter_type.copy() as UnionType;
   }
 
   functionType() : FunctionType {

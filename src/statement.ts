@@ -3,14 +3,16 @@ import {
   VariableDeclaration,
   FunctionCallKind,
   Expression,
-  VariableDeclarationStatement
+  VariableDeclarationStatement,
+  TryCatchClause,
+  FunctionCall
 } from "solc-typed-ast"
 
 import { assert, generateRandomString, str2hex } from "./utility";
 import { TypeKind, Type, ElementaryType } from "./type";
 import { IRNode, FieldFlag, factory } from "./node";
 import { IRVariableDeclare } from "./declare";
-import { IRExpression, IRTuple } from "./expression";
+import { IRExpression, IRFunctionCall, IRTuple } from "./expression";
 
 export abstract class IRStatement extends IRNode {
   constructor(id : number, scope : number, field_flag : FieldFlag) {
@@ -212,19 +214,41 @@ export class IRRevertStatement extends IRStatement {
   }
 }
 
-// export class IRTryCatchClause extends IRStatement {
-//   error_name: string;
-//   parameters: IRVariableDeclare[];
-//   body: IRStatement | IRExpression;
-//   constructor(id: number, scope: number, field_flag: FieldFlag, error_name: string, parameters: IRVariableDeclare[], body: IRStatement | IRExpression) {
-//     super(id, scope, field_flag);
-//     this.error_name = error_name;
-//     this.parameters = parameters;
-//     this.body = body;
-//   }
-//   lower(): Statement {
-//     // const 
-//     return factory.makeTryCatchClause(this.error_name,
-//       this.body instanceof IRStatement? this.body.lower(): factory.makeExpressionStatement(this.body.lower()));
-//   }
-// }
+export class IRTryCatchClause extends IRStatement {
+  error_name: string;
+  parameters: IRVariableDeclare[];
+  body: (IRStatement | IRExpression)[];
+  constructor(id: number, scope: number, field_flag: FieldFlag, error_name: string, parameters: IRVariableDeclare[], body: (IRStatement | IRExpression)[]) {
+    super(id, scope, field_flag);
+    this.error_name = error_name;
+    this.parameters = parameters;
+    this.body = body;
+  }
+  lower(): Statement {
+    const lowered_body = factory.makeBlock(this.body.map(function(stmt) {
+      const lowered_stmt = stmt.lower();
+      if (stmt instanceof IRStatement) return lowered_stmt;
+      else if (stmt instanceof IRExpression) {
+        assert(lowered_stmt instanceof Expression, "IRModifier: lowered_stmt is not Expression");
+        return factory.makeExpressionStatement(lowered_stmt);
+      }
+      assert(false, "IRModifier: stmt is not IRStatement or IRExpression");
+    }));
+    const lowered_parameters = this.parameters.length === 0 ? undefined : factory.makeParameterList(this.parameters.map(p => p.lower() as VariableDeclaration));
+    return factory.makeTryCatchClause(this.error_name, lowered_body, lowered_parameters);
+  }
+}
+
+export class IRTry extends IRStatement {
+  call: IRFunctionCall;
+  clauses: IRTryCatchClause[];
+  constructor(id: number, scope: number, field_flag: FieldFlag, call: IRFunctionCall, clauses: IRTryCatchClause[]) {
+    super(id, scope, field_flag);
+    this.call = call;
+    this.clauses = clauses;
+  }
+  lower() {
+    const lowered_clauses = this.clauses.map(c => c.lower() as TryCatchClause);
+    return factory.makeTryStatement(this.call.lower() as FunctionCall, lowered_clauses);
+  }
+}
