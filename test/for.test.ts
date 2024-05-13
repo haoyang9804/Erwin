@@ -35,10 +35,10 @@ test("test if",
   const cond = new IRBinaryOp(7, 0, 0, v2id, l2, "<");
   cond.type = new ElementaryType("bool", "nonpayable");
   const body = new IRBreakStatement(8, 0, 0);
-  const forloop = new IRFor(9, 0, 0, initial, cond, loop, body);
+  const forloop = new IRFor(9, 0, 0, initial, cond, loop, [body, body]);
   const result = writer.write(forloop.lower());
   expect(result).toEqual(
-    `for (uint256 x = ${l1.value}; x < ${l2.value}; ++x) break;`
+    `for (uint256 x = ${l1.value}; x < ${l2.value}; ++x) {\n  break;\n  break;\n}`
   );
 }
 )
