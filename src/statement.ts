@@ -136,3 +136,16 @@ export class IRFor extends IRStatement {
     return factory.makeForStatement(this.body.lower(), lowered_initial_stmt, lowered_condition, lowered_loop);
   }
 }
+
+export class IRDoWhile extends IRStatement {
+  condition: IRExpression;
+  body: IRStatement;
+  constructor(id: number, scope: number, field_flag: FieldFlag, condition: IRExpression, body: IRStatement) {
+    super(id, scope, field_flag);
+    this.condition = condition;
+    this.body = body;
+  }
+  lower(): Statement {
+    return factory.makeDoWhileStatement(this.condition.lower(), this.body.lower());
+  }
+}

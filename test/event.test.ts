@@ -35,7 +35,7 @@ test("test event and emit",
   const variable2_id = new IRIdentifier(0, 0, 0, variable2.name, variable2.id);
   variable2_id.type = variable2.type.copy();
   const event_id = new IRIdentifier(0, 0, 0, event.name, event.id);
-  event_id.type = new EventType();
+  event_id.type = new EventType(event_id.name!);
   const emit = new IREmitStatement(0, 0, 0, event_id, [variable2_id]);
   expect(writer.write(emit.lower())).toBe("emit E(y);")
 }

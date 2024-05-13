@@ -10,6 +10,7 @@ export enum TypeKind {
   UnionType,
   EventType,
   StructType,
+  ContractType
 }
 
 export abstract class Type {
@@ -25,8 +26,10 @@ export abstract class Type {
 }
 
 export class EventType extends Type {
-  constructor() {
+  name: string;
+  constructor(name: string) {
     super(TypeKind.EventType);
+    this.name = name;
   }
   str() : string {
     return "event";
@@ -38,7 +41,7 @@ export class EventType extends Type {
     throw new Error("No supertype for EventType");
   }
   copy() : Type {
-    return new EventType();
+    return new EventType(this.name);
   }
   same(t : Type) : boolean {
     return t.kind === TypeKind.EventType;
@@ -46,8 +49,10 @@ export class EventType extends Type {
 }
 
 export class StructType extends Type {
-  constructor() {
+  name: string;
+  constructor(name: string) {
     super(TypeKind.StructType);
+    this.name = name;
   }
   str() : string {
     return "struct";
@@ -59,10 +64,33 @@ export class StructType extends Type {
     throw new Error("No supertype for StructType");
   }
   copy() : Type {
-    return new StructType();
+    return new StructType(this.name);
   }
   same(t : Type) : boolean {
     return t.kind === TypeKind.StructType;
+  }
+}
+
+export class ContractType extends Type {
+  name: string;
+  constructor(name: string) {
+    super(TypeKind.ContractType);
+    this.name = name;
+  }
+  str() : string {
+    return "contract";
+  }
+  subtype() : Type[] {
+    throw new Error("No subtype for ContractType");
+  }
+  supertype() : Type[] {
+    throw new Error("No supertype for ContractType");
+  }
+  copy() : Type {
+    return new ContractType(this.name);
+  }
+  same(t : Type) : boolean {
+    return t.kind === TypeKind.ContractType;
   }
 }
 

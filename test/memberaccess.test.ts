@@ -23,7 +23,7 @@ test("test struct",
   v2.type = new ElementaryType("uint256", "nonpayable");
   const S = new IRStructDefinition(2, 0, 0, "S", [v1]);
   const Sid = new IRIdentifier(3, 0, 0, "S", S.id);
-  Sid.type = new StructType();
+  Sid.type = new StructType(Sid.name!);
   const member_access = new IRMemberAccess(3, 0, 0, "x", S.id, Sid);
   member_access.type = v1.type.copy();
   expect(writer.write(member_access.lower())).toBe("S.x");

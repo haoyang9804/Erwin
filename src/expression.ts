@@ -6,7 +6,7 @@ import {
 } from "solc-typed-ast"
 
 import { assert, generateRandomString, str2hex } from "./utility";
-import { includesType, TypeKind, Type, ElementaryType } from "./type";
+import { includesType, TypeKind, Type, ElementaryType, ContractType } from "./type";
 import { IRNode, FieldFlag, factory } from "./node";
 import { IRVariableDeclare } from "./declare";
 
@@ -236,3 +236,16 @@ export class IRMemberAccess extends IRExpression {
     return factory.makeMemberAccess("", this.expression.lower() as Expression, this.member_name, this.referenced_id);
   }
 }
+
+// //TODO: test it after supporting IRContractDefinition
+// export class IRNew extends IRExpression {
+//   type_name : string;
+//   constructor(id : number, scope : number, field_flag : FieldFlag, type_name : string) {
+//     super(id, scope, field_flag);
+//     this.type_name = type_name;
+//   }
+//   lower() {
+//     assert(this.type !== undefined, "IRNew: type is not generated");
+//     return factory.makeNewExpression("", factory.makeUserDefinedTypeName(this.type_name));
+//   }
+// }
