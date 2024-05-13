@@ -102,17 +102,33 @@ export class IREmitStatement extends IRStatement {
 
 export class IRIf extends IRStatement {
   condition : IRExpression;
-  true_expression : IRStatement | IRExpression;
-  false_expression : IRStatement | IRExpression;
-  constructor(id : number, scope : number, field_flag : FieldFlag, condition : IRExpression, true_expression : IRStatement | IRExpression, false_expression : IRStatement | IRExpression) {
+  true_expression : (IRStatement | IRExpression)[];
+  false_expression : (IRStatement | IRExpression)[];
+  constructor(id : number, scope : number, field_flag : FieldFlag, condition : IRExpression, true_expression : (IRStatement | IRExpression)[], false_expression : (IRStatement | IRExpression)[]) {
     super(id, scope, field_flag);
     this.condition = condition;
     this.true_expression = true_expression;
     this.false_expression = false_expression;
   }
   lower() : Statement {
-    const lowered_true_expression = this.true_expression instanceof IRStatement ? this.true_expression.lower() : factory.makeExpressionStatement(this.true_expression.lower());
-    const lowered_false_expression = this.false_expression instanceof IRStatement ? this.false_expression.lower() : factory.makeExpressionStatement(this.false_expression.lower());
+    const lowered_true_expression = factory.makeBlock(this.true_expression.map(function(stmt) {
+      const lowered_stmt = stmt.lower();
+      if (stmt instanceof IRStatement) return lowered_stmt;
+      else if (stmt instanceof IRExpression) {
+        assert(lowered_stmt instanceof Expression, "IRModifier: lowered_stmt is not Expression");
+        return factory.makeExpressionStatement(lowered_stmt);
+      }
+      assert(false, "IRModifier: stmt is not IRStatement or IRExpression");
+    }));
+    const lowered_false_expression = factory.makeBlock(this.false_expression.map(function(stmt) {
+      const lowered_stmt = stmt.lower();
+      if (stmt instanceof IRStatement) return lowered_stmt;
+      else if (stmt instanceof IRExpression) {
+        assert(lowered_stmt instanceof Expression, "IRModifier: lowered_stmt is not Expression");
+        return factory.makeExpressionStatement(lowered_stmt);
+      }
+      assert(false, "IRModifier: stmt is not IRStatement or IRExpression");
+    }));
     return factory.makeIfStatement(this.condition.lower(), lowered_true_expression, lowered_false_expression);
   }
 }
@@ -121,8 +137,8 @@ export class IRFor extends IRStatement {
   initial_stmt: IRVariableDeclareStatement | IRExpression | undefined;
   condition: IRExpression | undefined;
   loop: IRExpression | undefined;
-  body: IRStatement;
-  constructor(id: number, scope: number, field_flag: FieldFlag, initial_stmt: IRVariableDeclareStatement | IRExpression | undefined, condition: IRExpression | undefined, loop: IRExpression | undefined, body: IRStatement) {
+  body: IRStatement | IRExpression;
+  constructor(id: number, scope: number, field_flag: FieldFlag, initial_stmt: IRVariableDeclareStatement | IRExpression | undefined, condition: IRExpression | undefined, loop: IRExpression | undefined, body: IRStatement | IRExpression) {
     super(id, scope, field_flag);
     this.initial_stmt = initial_stmt;
     this.condition = condition;
@@ -133,33 +149,36 @@ export class IRFor extends IRStatement {
     const lowered_initial_stmt = this.initial_stmt === undefined ? undefined : this.initial_stmt instanceof IRVariableDeclareStatement ? this.initial_stmt.lower() as VariableDeclarationStatement : factory.makeExpressionStatement(this.initial_stmt.lower());
     const lowered_condition = this.condition === undefined ? undefined : this.condition.lower();
     const lowered_loop = this.loop === undefined ? undefined : factory.makeExpressionStatement(this.loop.lower());
-    return factory.makeForStatement(this.body.lower(), lowered_initial_stmt, lowered_condition, lowered_loop);
+    return factory.makeForStatement(this.body instanceof IRStatement? this.body.lower(): factory.makeExpressionStatement(this.body.lower()),
+      lowered_initial_stmt, lowered_condition, lowered_loop);
   }
 }
 
 export class IRDoWhile extends IRStatement {
   condition: IRExpression;
-  body: IRStatement;
-  constructor(id: number, scope: number, field_flag: FieldFlag, condition: IRExpression, body: IRStatement) {
+  body: IRStatement | IRExpression;
+  constructor(id: number, scope: number, field_flag: FieldFlag, condition: IRExpression, body: IRStatement | IRExpression) {
     super(id, scope, field_flag);
     this.condition = condition;
     this.body = body;
   }
   lower(): Statement {
-    return factory.makeDoWhileStatement(this.condition.lower(), this.body.lower());
+    return factory.makeDoWhileStatement(this.condition.lower(),
+      this.body instanceof IRStatement? this.body.lower(): factory.makeExpressionStatement(this.body.lower()));
   }
 }
 
 export class IRWhile extends IRStatement {
   condition: IRExpression;
-  body: IRStatement;
-  constructor(id: number, scope: number, field_flag: FieldFlag, condition: IRExpression, body: IRStatement) {
+  body: IRStatement | IRExpression;
+  constructor(id: number, scope: number, field_flag: FieldFlag, condition: IRExpression, body: IRStatement | IRExpression) {
     super(id, scope, field_flag);
     this.condition = condition;
     this.body = body;
   }
   lower(): Statement {
-    return factory.makeWhileStatement(this.condition.lower(), this.body.lower());
+    return factory.makeWhileStatement(this.condition.lower(),
+      this.body instanceof IRStatement? this.body.lower(): factory.makeExpressionStatement(this.body.lower()));
   }
 }
 
@@ -176,3 +195,20 @@ export class IRRevertStatement extends IRStatement {
     return factory.makeRevertStatement(event_call);
   }
 }
+
+// export class IRTryCatchClause extends IRStatement {
+//   error_name: string;
+//   parameters: IRVariableDeclare[];
+//   body: IRStatement | IRExpression;
+//   constructor(id: number, scope: number, field_flag: FieldFlag, error_name: string, parameters: IRVariableDeclare[], body: IRStatement | IRExpression) {
+//     super(id, scope, field_flag);
+//     this.error_name = error_name;
+//     this.parameters = parameters;
+//     this.body = body;
+//   }
+//   lower(): Statement {
+//     // const 
+//     return factory.makeTryCatchClause(this.error_name,
+//       this.body instanceof IRStatement? this.body.lower(): factory.makeExpressionStatement(this.body.lower()));
+//   }
+// }
