@@ -162,3 +162,17 @@ export class IRWhile extends IRStatement {
     return factory.makeWhileStatement(this.condition.lower(), this.body.lower());
   }
 }
+
+export class IRRevertStatement extends IRStatement {
+  error_call : IRExpression;
+  arguments : IRExpression[];
+  constructor(id : number, scope : number, field_flag : FieldFlag, error_call : IRExpression, arguments_ : IRExpression[]) {
+    super(id, scope, field_flag);
+    this.error_call = error_call;
+    this.arguments = arguments_;
+  }
+  lower() : Statement {
+    const event_call = factory.makeFunctionCall("", FunctionCallKind.FunctionCall, this.error_call.lower(), this.arguments.map(a => a.lower() as Expression));
+    return factory.makeRevertStatement(event_call);
+  }
+}

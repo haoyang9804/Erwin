@@ -6,11 +6,11 @@ export enum TypeKind {
   FunctionType, // function (uint256) pure external returns (uint256)
   ArrayType, // uint256[2], address[2], boolean[2]
   MappingType, // mapping(uint256 => address), mapping(uint256 => boolean)
-  UserDefinedType, // contract, struct, enum, library
   UnionType,
   EventType,
   StructType,
-  ContractType
+  ContractType,
+  ErrorType
 }
 
 export abstract class Type {
@@ -45,6 +45,29 @@ export class EventType extends Type {
   }
   same(t : Type) : boolean {
     return t.kind === TypeKind.EventType;
+  }
+}
+
+export class ErrorType extends Type {
+  name: string;
+  constructor(name: string) {
+    super(TypeKind.ErrorType);
+    this.name = name;
+  }
+  str() : string {
+    return "error";
+  }
+  subtype() : Type[] {
+    throw new Error("No subtype for ErrorType");
+  }
+  supertype() : Type[] {
+    throw new Error("No supertype for ErrorType");
+  }
+  copy() : Type {
+    return new EventType(this.name);
+  }
+  same(t : Type) : boolean {
+    return t.kind === TypeKind.ErrorType;
   }
 }
 
