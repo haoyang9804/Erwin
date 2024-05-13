@@ -149,3 +149,16 @@ export class IRDoWhile extends IRStatement {
     return factory.makeDoWhileStatement(this.condition.lower(), this.body.lower());
   }
 }
+
+export class IRWhile extends IRStatement {
+  condition: IRExpression;
+  body: IRStatement;
+  constructor(id: number, scope: number, field_flag: FieldFlag, condition: IRExpression, body: IRStatement) {
+    super(id, scope, field_flag);
+    this.condition = condition;
+    this.body = body;
+  }
+  lower(): Statement {
+    return factory.makeWhileStatement(this.condition.lower(), this.body.lower());
+  }
+}

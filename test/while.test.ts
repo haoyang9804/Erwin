@@ -1,7 +1,7 @@
 import { ElementaryType} from "../src/type"
 import { IRVariableDeclare } from "../src/declare";
 import { IRIdentifier, IRBinaryOp, IRLiteral } from "../src/expression";
-import { IRDoWhile, IRBreakStatement } from "../src/statement";
+import { IRWhile, IRBreakStatement } from "../src/statement";
 import {
   PrettyFormatter,
   ASTWriter,
@@ -17,7 +17,7 @@ const writer = new ASTWriter(
     LatestCompilerVersion
 );
 
-test("test do while",
+test("test while",
 () => {
   const v1 = new IRVariableDeclare(0, 0, 0, "x")
   v1.type = new ElementaryType("uint256", "nonpayable");
@@ -30,10 +30,10 @@ test("test do while",
   const cond = new IRBinaryOp(7, 0, 0, v2id, l2, "<");
   cond.type = new ElementaryType("bool", "nonpayable");
   const body = new IRBreakStatement(8, 0, 0);
-  const doWhile = new IRDoWhile(9, 0, 0, cond, body);
+  const doWhile = new IRWhile(9, 0, 0, cond, body);
   const result = writer.write(doWhile.lower());
   expect(result).toEqual(
-    `do break; while(x < 100);`
+    `while (x < 100) break;`
   );
 }
 )
