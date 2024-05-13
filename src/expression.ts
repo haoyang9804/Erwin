@@ -237,15 +237,14 @@ export class IRMemberAccess extends IRExpression {
   }
 }
 
-// //TODO: test it after supporting IRContractDefinition
-// export class IRNew extends IRExpression {
-//   type_name : string;
-//   constructor(id : number, scope : number, field_flag : FieldFlag, type_name : string) {
-//     super(id, scope, field_flag);
-//     this.type_name = type_name;
-//   }
-//   lower() {
-//     assert(this.type !== undefined, "IRNew: type is not generated");
-//     return factory.makeNewExpression("", factory.makeUserDefinedTypeName(this.type_name));
-//   }
-// }
+export class IRNew extends IRExpression {
+  type_name : string;
+  constructor(id : number, scope : number, field_flag : FieldFlag, type_name : string) {
+    super(id, scope, field_flag);
+    this.type_name = type_name;
+  }
+  lower() {
+    assert(this.type !== undefined, "IRNew: type is not generated");
+    return factory.makeNewExpression("", factory.makeUserDefinedTypeName("", this.type_name, -1));
+  }
+}

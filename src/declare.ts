@@ -10,7 +10,8 @@ import {
   FunctionVisibility,
   FunctionStateMutability,
   Expression,
-  ModifierInvocation
+  ModifierInvocation,
+  ContractKind
 } from "solc-typed-ast"
 
 import { assert } from "./utility";
@@ -288,4 +289,28 @@ export class IRFunctionDefinition extends IRDeclare {
   }
 }
 
-// export class IRContractDefinition extends IRDeclare {
+export class IRContractDefinition extends IRDeclare {
+  kind: ContractKind;
+  abstract: boolean;
+  fullyImplemented: boolean;
+  body: (IRDeclare | IRStatement | IRExpression)[];
+  linearizedBaseContracts: number[];
+  usedErrors: number[];
+  usedEvent: number[];
+  constructor(id: number, scope: number, field_flag: FieldFlag, name: string, kind: ContractKind, abstract: boolean, fullyImplemented: boolean, body: (IRDeclare | IRStatement | IRExpression)[], linearizedBaseContracts: number[], usedErrors: number[], usedEvent: number[]) {
+    super(id, scope, field_flag, name);
+    this.kind = kind;
+    this.abstract = abstract;
+    this.fullyImplemented = fullyImplemented;
+    this.body = body;
+    this.linearizedBaseContracts = linearizedBaseContracts;
+    this.usedErrors = usedErrors;
+    this.usedEvent = usedEvent;
+  }
+  lower() {
+    const lowerecd_body = this.body.map(function (stmt) {
+      return stmt.lower() as ASTNode;
+    });
+    return factory.makeContractDefinition(this.name, this.scope, this.kind, this.abstract, this.fullyImplemented, this.linearizedBaseContracts, this.usedErrors, this.usedEvent, undefined, lowerecd_body);
+  }
+}

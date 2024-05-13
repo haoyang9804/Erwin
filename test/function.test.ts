@@ -1,5 +1,5 @@
 import { ElementaryType, UnionType } from "../src/type"
-import { IRModifier, IRVariableDeclare, IRFunctionDefinition, Modifier } from "../src/declare";
+import { IRModifier, IRVariableDeclare, IRFunctionDefinition } from "../src/declare";
 import { IRIdentifier, IRBinaryOp, IRLiteral, IRTuple, IRFunctionCall } from "../src/expression";
 import { IRPlaceholderStatement, IRVariableDeclareStatement } from "../src/statement";
 import {

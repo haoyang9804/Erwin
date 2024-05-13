@@ -7,7 +7,6 @@ import {
   ASTWriter,
   DefaultASTWriterMapping,
   LatestCompilerVersion,
-  VariableDeclaration,
 } from "solc-typed-ast"
 
 const formatter = new PrettyFormatter(2, 0);
