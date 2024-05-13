@@ -15,7 +15,7 @@ const writer = new ASTWriter(
     LatestCompilerVersion
 );
 
-test("test member access",
+test("test indexed access",
 () => {
   const v1 = new IRVariableDeclare(0, 0, 0, "x")
   v1.type = new ArrayType(new ElementaryType("uint256", "nonpayable"), 10);

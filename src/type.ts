@@ -9,6 +9,7 @@ export enum TypeKind {
   UserDefinedType, // contract, struct, enum, library
   UnionType,
   EventType,
+  StructType,
 }
 
 export abstract class Type {
@@ -41,6 +42,27 @@ export class EventType extends Type {
   }
   same(t : Type) : boolean {
     return t.kind === TypeKind.EventType;
+  }
+}
+
+export class StructType extends Type {
+  constructor() {
+    super(TypeKind.StructType);
+  }
+  str() : string {
+    return "struct";
+  }
+  subtype() : Type[] {
+    throw new Error("No subtype for StructType");
+  }
+  supertype() : Type[] {
+    throw new Error("No supertype for StructType");
+  }
+  copy() : Type {
+    return new StructType();
+  }
+  same(t : Type) : boolean {
+    return t.kind === TypeKind.StructType;
   }
 }
 

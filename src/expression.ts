@@ -203,6 +203,12 @@ export class IRTuple extends IRExpression {
 
 export class IRIndexedAccess extends IRExpression {
   base: IRExpression;
+  /**
+   * Access the index of an expression, e.g. `index` in `someArray[index]`.
+   *
+   * May be `undefined` if used with `abi.decode()`,
+   * for example `abi.decode(data, uint[]);`.
+   */
   indexed: IRExpression | undefined;
   constructor(id : number, scope : number, field_flag : FieldFlag, base : IRExpression, indexed ?: IRExpression) {
     super(id, scope, field_flag);
@@ -212,5 +218,21 @@ export class IRIndexedAccess extends IRExpression {
   lower() {
     assert(this.type !== undefined, "IRIndexedAccess: type is not generated");
     return factory.makeIndexAccess("", this.base.lower() as Expression, this.indexed?.lower() as Expression);
+  }
+}
+
+export class IRMemberAccess extends IRExpression {
+  member_name : string;
+  referenced_id: number;
+  expression : IRExpression;
+  constructor(id : number, scope : number, field_flag : FieldFlag, member_name : string, referenced_id: number, expression : IRExpression) {
+    super(id, scope, field_flag);
+    this.expression = expression;
+    this.referenced_id = referenced_id;
+    this.member_name = member_name;
+  }
+  lower() {
+    assert(this.type !== undefined, "IRMemberAccess: type is not generated");
+    return factory.makeMemberAccess("", this.expression.lower() as Expression, this.member_name, this.referenced_id);
   }
 }
