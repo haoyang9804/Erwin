@@ -8,8 +8,7 @@ import {
   FunctionCall
 } from "solc-typed-ast"
 
-import { assert, generateRandomString, str2hex } from "./utility";
-import { TypeKind, Type, ElementaryType } from "./type";
+import { assert, } from "./utility";
 import { IRNode, FieldFlag, factory } from "./node";
 import { IRVariableDeclare } from "./declare";
 import { IRExpression, IRFunctionCall, IRTuple } from "./expression";

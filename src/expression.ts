@@ -1,12 +1,11 @@
 import {
   LiteralKind,
-  ASTNode,
   Expression,
   FunctionCallKind
 } from "solc-typed-ast"
 
 import { assert, generateRandomString, str2hex } from "./utility";
-import { includesType, TypeKind, Type, ElementaryType, ContractType } from "./type";
+import { includesType, TypeKind, Type, ElementaryType } from "./type";
 import { IRNode, FieldFlag, factory } from "./node";
 import { IRVariableDeclare } from "./declare";
 

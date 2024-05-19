@@ -1,29 +1,16 @@
 import {
-  ASTNodeFactory,
   ASTNode,
-  ContractDefinition,
-  ContractKind,
-  FunctionDefinition,
-  FunctionKind,
-  FunctionVisibility,
-  FunctionStateMutability,
-  VariableDeclaration,
-  DataLocation,
-  StateVariableVisibility,
-  Mutability,
-  ParameterList,
-  LiteralKind,
-  block,
-  Literal
 } from "solc-typed-ast"
 
-import { str2hex, assert, pickRandomElement, generateRandomString } from "./utility";
+import { assert, pickRandomElement, generateRandomString } from "./utility";
 import { FieldFlag, IRNode } from "./node";
 import { IRLiteral, IRAssignment, IRIdentifier, IRExpression } from "./expression";
 import { IRVariableDeclare } from "./declare";
 import { irnode_db } from "./db";
-import { ConstaintNode, ForwardTypeDependenceDAG } from "./constrant";
-import { Type, ElementaryType, all_elementary_types, all_integer_types, varID2Types } from "./type";
+import { ForwardTypeDependenceDAG } from "./constrant";
+import { all_integer_types, varID2Types } from "./type";
+import { type_focus_kind } from "./index";
+import { all_array_types, all_elementary_types, all_function_types, all_mapping_types } from "./type";
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Global Variables
 
@@ -70,13 +57,22 @@ async function getAvaliableIRNodes() : Promise<any[]> {
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Declaration Generator
 
 export class VariableDeclareGenerator extends Generator {
-  generate() : void {
+  async generate() : Promise<void> {
     this.irnode = createVariableDeclare();
     global_id++;
-    irnode_db.insert(this.irnode.id, this.irnode.scope);
+    await irnode_db.insert(this.irnode.id, this.irnode.scope);
     type_dag.insert(type_dag.newNode(this.irnode.id));
     //TODO: support for other types
-    varID2Types.set(this.irnode.id, all_elementary_types);
+    switch (type_focus_kind) {
+      case 1:
+        varID2Types.set(this.irnode.id, all_elementary_types);
+      case 2:
+        varID2Types.set(this.irnode.id, all_mapping_types);
+      case 3:
+        varID2Types.set(this.irnode.id, all_function_types);
+      case 4:
+        varID2Types.set(this.irnode.id, all_array_types);
+    }
   }
   lower() : void {
     assert(this.irnode !== undefined, "VariableDeclareGenerator: irnode is not generated")

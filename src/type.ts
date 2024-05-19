@@ -1,5 +1,5 @@
-import { stat } from "fs";
 import { assert, pickRandomElement, lazyPickRandomElement } from "./utility";
+import { type_complex_level } from "./index";
 
 export enum TypeKind {
   ElementaryType, // uint256, address, boolean,
@@ -448,15 +448,13 @@ export const all_integer_types : Type[] = [
 export let all_mapping_types : Type[] = [];
 export let all_function_types : Type[] = [];
 export let all_array_types : Type[] = [];
-export let all_user_defined_types : Type[] = [];
 
 //TODO: need to be updated later
 function generate_all_mapping_types() : Type[] {
   const all_types_for_k = all_elementary_types;
   const all_types_for_v = all_elementary_types.concat(all_function_types)
     .concat(all_array_types)
-    .concat(all_mapping_types)
-    .concat(all_user_defined_types);
+    .concat(all_mapping_types);
   const collection : Type[] = new Array(all_types_for_k.length * all_types_for_v.length);
   all_types_for_k.forEach((k, i) => {
     all_types_for_v.forEach((v, j) => {
@@ -472,8 +470,7 @@ function generate_all_function_types() : Type[] {
   let all_stateMutability : ("pure" | "view" | "payable" | "nonpayable")[] = ["pure", "view", "payable", "nonpayable"];
   const all_available_types = all_elementary_types.concat(all_function_types)
     .concat(all_array_types)
-    .concat(all_mapping_types)
-    .concat(all_user_defined_types);
+    .concat(all_mapping_types);
   for (let visibility of all_visibility) {
     for (let stateMutability of all_stateMutability) {
       const parameterTypes = lazyPickRandomElement(all_available_types);
@@ -490,8 +487,7 @@ function generate_all_function_types() : Type[] {
 function generate_all_array_types() : Type[] {
   const all_available_types = all_elementary_types.concat(all_function_types)
     .concat(all_array_types)
-    .concat(all_mapping_types)
-    .concat(all_user_defined_types);
+    .concat(all_mapping_types);
   //TODO: allow super big length
   const available_length = [1, 2, 3, 4, 5];
   const collection : Type[] = new Array(all_available_types.length);
@@ -501,7 +497,7 @@ function generate_all_array_types() : Type[] {
   return collection;
 }
 
-for (let i = 0; i < 3; i++) {
+for (let i = 0; i < type_complex_level; i++) {
   all_mapping_types = all_mapping_types.concat(generate_all_mapping_types());
   all_function_types = all_function_types.concat(generate_all_function_types());
   all_array_types = all_array_types.concat(generate_all_array_types());
@@ -515,3 +511,4 @@ export function includesType(arr : Type[], item : Type) : boolean {
   }
   return false;
 }
+

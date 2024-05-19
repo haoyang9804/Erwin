@@ -4,7 +4,6 @@ import {
   Mutability,
   ASTNode,
   TypeName,
-  EnumValue,
   VariableDeclaration,
   FunctionKind,
   FunctionVisibility,

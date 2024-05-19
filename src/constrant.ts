@@ -12,24 +12,22 @@ export class ConstaintNode {
   }
 }
 
-import { irnodes } from "./node";
 import { assert } from "./utility";
-import { PriorityQueue } from "./dataStructor";
-import { varID2Types, Type, ElementaryType, FunctionType, ArrayType } from "./type"
+import { varID2Types, Type } from "./type"
 import { pickRandomElement, extendArrayofMap } from "./utility";
 
 // a set of IRNode ids that have backward constrants that cannot be constant
 export const constantLock = new Set<number>();
 
-class PriorityQueueNode extends PriorityQueue<ConstaintNode> {
-  constructor() {
-    super(
-      function(a, b) {
-        return a.inbound - b.inbound;
-      }
-    );
-  }
-}
+// class PriorityQueueNode extends PriorityQueue<ConstaintNode> {
+//   constructor() {
+//     super(
+//       function(a, b) {
+//         return a.inbound - b.inbound;
+//       }
+//     );
+//   }
+// }
 
 
 /*
