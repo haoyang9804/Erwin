@@ -8,7 +8,6 @@ import {
   FunctionKind,
   FunctionVisibility,
   FunctionStateMutability,
-  Expression,
   ModifierInvocation,
   ContractKind
 } from "solc-typed-ast"
@@ -17,7 +16,6 @@ import { assert } from "./utility";
 import { TypeKind, Type, ElementaryType, UnionType, FunctionType } from "./type";
 import { constantLock } from "./constraint";
 import { IRNode, FieldFlag, factory } from "./node";
-import { IRExpression } from "./expression";
 import { IRStatement, IRPlaceholderStatement } from "./statement";
 
 export const name2declare = new Map<string, IRDeclare>();
@@ -154,8 +152,8 @@ export class IRModifier extends IRDeclare {
   override : boolean;
   visibility : string;
   parameters : IRVariableDeclare[];
-  body : (IRStatement | IRExpression)[];
-  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, virtual : boolean, override : boolean, visibility : string, parameters : IRVariableDeclare[], body : (IRStatement | IRExpression)[]) {
+  body : IRStatement[];
+  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, virtual : boolean, override : boolean, visibility : string, parameters : IRVariableDeclare[], body : IRStatement[]) {
     super(id, scope, field_flag, name);
     this.virtual = virtual;
     this.override = override;
@@ -169,13 +167,7 @@ export class IRModifier extends IRDeclare {
       if (stmt instanceof IRPlaceholderStatement) {
         has_placeholder = true;
       }
-      const lowered_stmt = stmt.lower();
-      if (stmt instanceof IRStatement) return lowered_stmt;
-      else if (stmt instanceof IRExpression) {
-        assert(lowered_stmt instanceof Expression, "IRModifier: lowered_stmt is not Expression");
-        return factory.makeExpressionStatement(lowered_stmt);
-      }
-      assert(false, "IRModifier: stmt is not IRStatement or IRExpression");
+      return stmt.lower();
     });
     assert(has_placeholder, "IRModifier: body does not contain placeholder");
     return factory.makeModifierDefinition(this.name, this.virtual, this.visibility,
@@ -199,13 +191,13 @@ export class IRFunctionDefinition extends IRDeclare {
   parameters : IRVariableDeclare[];
   returns : IRVariableDeclare[];
   modifier : Modifier[];
-  body : (IRStatement | IRExpression)[];
+  body : IRStatement[];
   return_type : UnionType | undefined;
   parameter_type : UnionType | undefined;
   function_type : FunctionType | undefined;
   constructor(id : number, scope : number, field_flag : FieldFlag, name : string, kind : FunctionKind,
     virtual : boolean, override : boolean, visibility : FunctionVisibility, stateMutability : FunctionStateMutability,
-    parameters : IRVariableDeclare[], returns : IRVariableDeclare[], body : (IRStatement | IRExpression)[],
+    parameters : IRVariableDeclare[], returns : IRVariableDeclare[], body : IRStatement[],
     modifier : Modifier[]) {
     //WARNING: currently, we don't support visibility = default or stateMutability = constant
     assert(visibility !== FunctionVisibility.Default, "IRFunctionDefinition: visibility is default");
@@ -274,13 +266,7 @@ export class IRFunctionDefinition extends IRDeclare {
     const parameterList = factory.makeParameterList(this.parameters.map((parameter) => parameter.lower() as VariableDeclaration));
     const returnParameterList = factory.makeParameterList(this.returns.map((ret) => ret.lower() as VariableDeclaration));
     const lowered_body = this.body.map(function(stmt) {
-      const lowered_stmt = stmt.lower();
-      if (stmt instanceof IRStatement) return lowered_stmt;
-      else if (stmt instanceof IRExpression) {
-        assert(lowered_stmt instanceof Expression, "IRModifier: lowered_stmt is not Expression");
-        return factory.makeExpressionStatement(lowered_stmt);
-      }
-      assert(false, "IRModifier: stmt is not IRStatement or IRExpression");
+      return stmt.lower();
     });
     return factory.makeFunctionDefinition(this.scope, this.kind, this.name, this.virtual, this.visibility, this.stateMutability,
       this.kind == FunctionKind.Constructor, parameterList, returnParameterList, modifier_invocation,
@@ -292,11 +278,11 @@ export class IRContractDefinition extends IRDeclare {
   kind : ContractKind;
   abstract : boolean;
   fullyImplemented : boolean;
-  body : (IRDeclare | IRStatement | IRExpression)[];
+  body : IRStatement[];
   linearizedBaseContracts : number[];
   usedErrors : number[];
   usedEvent : number[];
-  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, kind : ContractKind, abstract : boolean, fullyImplemented : boolean, body : (IRDeclare | IRStatement | IRExpression)[], linearizedBaseContracts : number[], usedErrors : number[], usedEvent : number[]) {
+  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, kind : ContractKind, abstract : boolean, fullyImplemented : boolean, body : IRStatement[], linearizedBaseContracts : number[], usedErrors : number[], usedEvent : number[]) {
     super(id, scope, field_flag, name);
     this.kind = kind;
     this.abstract = abstract;

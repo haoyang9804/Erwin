@@ -1,7 +1,3 @@
-import {
-  ASTNode,
-} from "solc-typed-ast"
-
 import { assert, pickRandomElement, generateRandomString } from "./utility";
 import { FieldFlag, IRNode } from "./node";
 import { IRLiteral, IRAssignment, IRIdentifier, IRExpression } from "./expression";
@@ -9,7 +5,7 @@ import { IRVariableDeclare } from "./declare";
 import { irnode_db } from "./db";
 import { ForwardTypeDependenceDAG } from "./constraint";
 import { all_integer_types, varID2Types } from "./type";
-import { type_focus_kind } from "./index";
+import { type_focus_kind, expression_complex_level } from "./index";
 import { all_types, all_array_types, all_elementary_types, all_function_types, all_mapping_types } from "./type";
 import { irnodes } from "./node";
 
@@ -30,10 +26,7 @@ export const type_dag = new ForwardTypeDependenceDAG();
 
 export abstract class Generator {
   irnode : IRNode | undefined;
-  astnode : ASTNode | undefined;
-  constructor() { }
-  // If component is false, the generator will generate a complete statement and update scope_stmt.
-  abstract generate(component: boolean) : void;
+  constructor() {}
 }
 
 function generateVarName() : string {
@@ -75,12 +68,15 @@ export async function getIRNodesByID(id : number) : Promise<IRNode[]> {
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Declaration Generator
 
-export class VariableDeclareGenerator extends Generator {
-  async generate(component: boolean) : Promise<void> {
+export abstract class DeclarationGenerator extends Generator {
+  abstract generate() : void;
+}
+
+export class VariableDeclareGenerator extends DeclarationGenerator {
+  async generate() : Promise<void> {
     this.irnode = createVariableDeclare();
     global_id++;
-    if (!component)
-      scope_stmt.set(cur_scope_id, scope_stmt.has(cur_scope_id)? scope_stmt.get(cur_scope_id)!.concat(this.irnode!) : [this.irnode!]);
+    scope_stmt.set(cur_scope_id, scope_stmt.has(cur_scope_id)? scope_stmt.get(cur_scope_id)!.concat(this.irnode!) : [this.irnode!]);
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "VariableDeclare");
     type_dag.insert(type_dag.newNode(this.irnode.id));
     //TODO: support for other types
@@ -108,32 +104,38 @@ export class VariableDeclareGenerator extends Generator {
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Expression Generator
 
-export class LiteralGenerator extends Generator {
-  async generate(component: boolean) : Promise<void> {
+export abstract class ExpressionGenerator extends Generator {
+  // If component is 0, the generator will generate a complete statement and update scope_stmt.
+  // Otherwise, the generator will generate a component of a statement.
+  // The positive number of the component indicates the complex level of the component.
+  // For instance, x = a + b contains a binary operation component with complex level 1,
+  // while x = a + (b += c) contains a binary operation component with complex level 1 and an assignment component with complex level 2.
+  // If the complex level reaches the maximum, the generator will generate a terminal expression such as an identifier expression.
+  abstract generate(component: number) : void;
+}
+
+export class LiteralGenerator extends ExpressionGenerator {
+  async generate(component: number) : Promise<void> {
     this.irnode = new IRLiteral(global_id, cur_scope_id, field_flag);
-    if (!component)
+    if (component === 0)
       scope_stmt.set(cur_scope_id, scope_stmt.has(cur_scope_id)? scope_stmt.get(cur_scope_id)!.concat(this.irnode!) : [this.irnode!]);
     global_id++;
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "Literal");
     type_dag.insert(type_dag.newNode(this.irnode.id));
   }
-  lower() : void {
-    assert(this.irnode !== undefined, "LiteralGenerator: irnode is not generated")
-    this.astnode = this.irnode!.lower()
-  }
 }
 
-export class IdentifierGenerator extends Generator {
+export class IdentifierGenerator extends ExpressionGenerator {
   id : number | undefined;
   constructor(id ?: number) {
     super();
     this.id = id;
   }
-  async generate(component: boolean) : Promise<void> {
+  async generate(component: number) : Promise<void> {
     // Generate a variable decl if there is no variable decl available.
     if (this.id === undefined && !(await hasAvailableIRVariableDeclare(cur_scope_id))) {
       const variable_gen = new VariableDeclareGenerator();
-      await variable_gen.generate(false);
+      await variable_gen.generate();
     }
     // generate an identifier
     let irdecl : IRVariableDeclare;
@@ -148,7 +150,7 @@ export class IdentifierGenerator extends Generator {
       irdecl = irnodes[this.id!] as IRVariableDeclare;
       this.irnode = new IRIdentifier(global_id, cur_scope_id, field_flag, irdecl.name, irdecl.id);
     }
-    if (!component)
+    if (component === 0)
       scope_stmt.set(cur_scope_id, scope_stmt.has(cur_scope_id)? scope_stmt.get(cur_scope_id)!.concat(this.irnode!) : [this.irnode!]);
     global_id++;
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "Identifier");
@@ -158,7 +160,7 @@ export class IdentifierGenerator extends Generator {
 }
 
 
-export class AssignmentGenerator extends Generator {
+export class AssignmentGenerator extends ExpressionGenerator {
 
   op : "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | "&=" | "^=" | "|=" | undefined;
 
@@ -174,33 +176,27 @@ export class AssignmentGenerator extends Generator {
     }
   }
 
-  async generate() : Promise<void> {
-    // left-hand-side identifier
+  async generate(component: number) : Promise<void> {
     const identifier_gen = new IdentifierGenerator();
-    await identifier_gen.generate(true);
-    // specify both the left-hand side and right-hand side of the assignment
-    let left_expression : IRExpression = identifier_gen.irnode as IRExpression
+    await identifier_gen.generate(component + 1);
+    let left_expression : IRExpression = identifier_gen.irnode as IRExpression;
     let right_expression : IRExpression;
-    // Generate a literal on the righ-hand side with probability 0.8 if there is only one available variable.
-    // Otherwise, generate an identifier on the right-hand side with probability 0.2.
-    if ((await getAvailableIRVariableDeclare(cur_scope_id)).length === 1 && Math.random() < 0.8 ||
-      (await getAvailableIRVariableDeclare(cur_scope_id)).length >= 2 && Math.random() < 0.2) {
-      const literal_gen = new LiteralGenerator();
-      await literal_gen.generate(true);
-      this.irnode = new IRAssignment(global_id, cur_scope_id, field_flag, identifier_gen.irnode as IRExpression, literal_gen.irnode as IRExpression, this.op!);
-      right_expression = literal_gen.irnode as IRExpression;
+    if (component >= expression_complex_level) {
+      const right_expression_gen_prototype = pickRandomElement(terminal_expression_generators)!;
+      const right_expression_gen = new right_expression_gen_prototype();
+      await right_expression_gen.generate(component + 1);
+      right_expression = right_expression_gen.irnode as IRExpression;
     }
-    // Generate a variable declaration otherwise, and place its identifier on the right-hand side.
-    // left_identifier op right_identifier
     else {
-      const variable_gen = new VariableDeclareGenerator();
-      await variable_gen.generate(false);
-      // This identifier_gen generates an identifier for the variable declaration generated above.
-      const right_identifier_gen = new IdentifierGenerator(global_id - 1);
-      await right_identifier_gen.generate(true);
-      this.irnode = new IRAssignment(global_id, cur_scope_id, field_flag, identifier_gen.irnode as IRExpression, right_identifier_gen.irnode as IRExpression, this.op!);
-      right_expression = right_identifier_gen.irnode as IRExpression;
+      const right_expression_gen_prototype = pickRandomElement(all_expression_generators)!;
+      const right_expression_gen = new right_expression_gen_prototype();
+      await right_expression_gen.generate(component + 1);
+      right_expression = right_expression_gen.irnode as IRExpression;
     }
+    this.irnode = new IRAssignment(global_id, cur_scope_id, field_flag, left_expression, right_expression, this.op!);
+    // Post-Generation
+    if (component === 0)
+      scope_stmt.set(cur_scope_id, scope_stmt.has(cur_scope_id)? scope_stmt.get(cur_scope_id)!.concat(this.irnode!) : [this.irnode!]);
     global_id++;
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "Assignment");
     type_dag.insert(type_dag.newNode(this.irnode.id));
@@ -217,5 +213,20 @@ export class AssignmentGenerator extends Generator {
       varID2Types.set(v_id, all_integer_types);
     }
   }
-
 }
+
+// export class BinaryOpGenerator extends Generator {
+//   async generate(component: number) : Promise<void> {
+//   }
+// }
+
+const terminal_expression_generators = [
+  LiteralGenerator,
+  IdentifierGenerator
+]
+
+const all_expression_generators = [
+  LiteralGenerator,
+  IdentifierGenerator,
+  AssignmentGenerator
+]

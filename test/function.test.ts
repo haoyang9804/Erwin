@@ -1,7 +1,7 @@
 import { ElementaryType, UnionType } from "../src/type"
 import { IRModifier, IRVariableDeclare, IRFunctionDefinition } from "../src/declare";
 import { IRIdentifier, IRBinaryOp, IRLiteral, IRTuple, IRFunctionCall } from "../src/expression";
-import { IRPlaceholderStatement, IRVariableDeclareStatement } from "../src/statement";
+import { IRPlaceholderStatement, IRVariableDeclareStatement, IRExpressionStatement } from "../src/statement";
 import {
   PrettyFormatter,
   ASTWriter,
@@ -41,8 +41,9 @@ const id2 = new IRIdentifier(3,0,0).from(v1);
 id2.type = new ElementaryType("uint256", "nonpayable");
 const op = new IRBinaryOp(4,0,0,id1,id2,"+");
 op.type = new ElementaryType("uint256", "nonpayable");
+const op_stmt = new IRExpressionStatement(5,0,0,op);
 
-const modifier_error = new IRModifier(0, 0, 0, "M", true, true, "internal", [v1], [op]);
+const modifier_error = new IRModifier(0, 0, 0, "M", true, true, "internal", [v1], [op_stmt]);
 test("test modifier 1",
 () => {
   expect(async() => {
@@ -51,7 +52,7 @@ test("test modifier 1",
 }
 )
 
-const modifier_correct = new IRModifier(0, 0, 0, "M", true, false, "intrnal", [v1], [op, new IRPlaceholderStatement(5,0,0)]);
+const modifier_correct = new IRModifier(0, 0, 0, "M", true, false, "intrnal", [v1], [op_stmt, new IRPlaceholderStatement(5,0,0)]);
 test("test modifier 2",
 () => {
   expect(writer.write(modifier_correct.lower())).toBe("modifier M(uint256 x) virtual {\n  x + x;\n  _;\n}");

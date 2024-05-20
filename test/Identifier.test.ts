@@ -1,5 +1,3 @@
-import * as gen from "../src/generator"
-import * as db from "../src/db"
 import { IRIdentifier } from "../src/expression"
 import { ElementaryType } from "../src/type"
 import {
@@ -27,12 +25,3 @@ test("test identifier",
   );
 }
 )
-
-test("test a simple identifier generation",
-async () => {
-  await db.irnode_db.open();
-  await db.irnode_db.init();
-  const igen = new gen.IdentifierGenerator();
-  expect(async() => {await igen.generate(false)}).rejects.toThrow("IdentifierGenerator: no available IR irnodes");
-
-})
