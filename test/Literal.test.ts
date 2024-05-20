@@ -6,7 +6,7 @@ async () => {
   await db.irnode_db.open();
   await db.irnode_db.init();
   const lgen = new gen.LiteralGenerator();
-  lgen.generate();
+  lgen.generate(false);
   expect(lgen.irnode).toBeDefined();
   expect(lgen.irnode!.id).toBe(0);
   db.irnode_db.run("SELECT * FROM tbl").then((result) => {

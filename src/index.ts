@@ -52,10 +52,13 @@ function error(message : string) : never {
     .option("-t --type_focus_kind <number>", "The type kind Erwin will focus in generation.\n0: no focus.\n1: elementary types.\n2: mapping types\n3: function types\n4: array types\n", `${type_focus_kind}`)
     .option("-ts --type_complex_level <number>", "The complex level of the type Erwin will generate.\nRange over [1,2,3], the bigger, the more complex.", `${type_complex_level}`)
   program.parse(process.argv);
+  // open and init DB
   await db.irnode_db.open();
   await db.irnode_db.init();
-  const variable = new gen.VariableDeclareGenerator();
-  await variable.generate();
+  // generation
+  const a1 = new gen.AssignmentGenerator();
+  await a1.generate();
+  // resolve constraints
   gen.type_dag.get_heads();
   let heads_typemap_array = gen.type_dag.resolve_heads();
   for (let typemap of heads_typemap_array) {
@@ -71,9 +74,13 @@ function error(message : string) : never {
       assert(irnodes[key] instanceof IRExpression || irnodes[key] instanceof IRVariableDeclare, "Type resolution failed");
       (irnodes[key] as IRExpression | IRVariableDeclare).type = value;
     }
-    variable.lower();
-    console.log(writer.write(variable.astnode!))
+    console.log('==========\n');
+    assert(gen.scope_stmt.has(0) && gen.scope_stmt.get(0)!.length > 0, "No statements in the global scope");
+    for (let stmt of gen.scope_stmt.get(0)!) {
+      console.log(writer.write(stmt.lower()));
+    }
   }
+  await db.irnode_db.close();
   // const args = program.args;
   // const options = program.opts();
 })().catch((e) => {

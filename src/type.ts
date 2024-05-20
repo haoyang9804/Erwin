@@ -443,6 +443,12 @@ export const all_integer_types : Type[] = [
   new ElementaryType("uint32", "nonpayable"),
   new ElementaryType("uint16", "nonpayable"),
   new ElementaryType("uint8", "nonpayable"),
+  new ElementaryType("int256", "nonpayable"),
+  new ElementaryType("int128", "nonpayable"),
+  new ElementaryType("int64", "nonpayable"),
+  new ElementaryType("int32", "nonpayable"),
+  new ElementaryType("int16", "nonpayable"),
+  new ElementaryType("int8", "nonpayable"),
 ]
 
 export let all_mapping_types : Type[] = [];

@@ -148,7 +148,8 @@ abstract class ForwardDependenceDAG<T> {
 
   insert(node : ConstaintNode) : void {
     this.dag_nodes.push(node);
-    assert(node.id === this.dag_nodes.length - 1, `DAG: node id ${node.id} is not equal its id ${this.dag_nodes.length - 1} in dag_nodes`)
+    console.log(`node.id = ${node.id}, this.dag_nodes.length = ${this.dag_nodes.length}`)
+    assert(node.id === this.dag_nodes.length - 1, `DAG: node id ${node.id} is not equal to its id ${this.dag_nodes.length - 1} in dag_nodes`)
   }
 
   connect(from : number, to : number, rank ?: string) : void {

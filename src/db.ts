@@ -1,5 +1,5 @@
 import * as sqlite from 'sqlite';
-import sqlite3 from 'sqlite3'
+import * as sqlite3 from 'sqlite3'
 
 export class DB {
   db : sqlite.Database;

@@ -33,6 +33,6 @@ async () => {
   await db.irnode_db.open();
   await db.irnode_db.init();
   const igen = new gen.IdentifierGenerator();
-  expect(async() => {await igen.generate()}).rejects.toThrow("IdentifierGenerator: no available IR irnodes");
+  expect(async() => {await igen.generate(false)}).rejects.toThrow("IdentifierGenerator: no available IR irnodes");
 
 })

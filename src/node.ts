@@ -17,8 +17,8 @@ export enum FieldFlag {
 }
 
 export const factory = new ASTNodeFactory();
-
 export const irnodes : IRNode[] = [];
+
 export abstract class IRNode {
   public id : number;
   public scope : number;

@@ -86,20 +86,16 @@ export class IRIdentifier extends IRExpression {
 export class IRAssignment extends IRExpression {
   left : IRExpression;
   right : IRExpression;
+  operator : "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | "&=" | "^=" | "|=";
   type : Type | undefined;
-  operator : string | undefined;
-  constructor(id : number, scope : number, field_flag : FieldFlag, left : IRExpression, right : IRExpression, operator ?: string) {
+  constructor(id : number, scope : number, field_flag : FieldFlag, left : IRExpression, right : IRExpression, operator : "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | "&=" | "^=" | "|=") {
     super(id, scope, field_flag);
     this.left = left;
     this.right = right;
-    if (operator !== undefined) {
-      assert(["=", "+=", "-=", "*=", "/=", "%="].includes(operator), "IRAssignment: operator is not supported")
-    }
     this.operator = operator;
   }
   lower() : Expression {
     assert(this.type !== undefined, "IRAssignment: type is undefined");
-    assert(this.operator !== undefined, "IRAssignment: operator is undefined");
     return factory.makeAssignment("", this.operator, this.left.lower() as Expression, this.right.lower() as Expression);
   }
 }
