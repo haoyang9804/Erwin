@@ -135,18 +135,18 @@ export class IRIf extends IRStatement {
 }
 
 export class IRFor extends IRStatement {
-  initial_stmt: IRVariableDeclareStatement | IRExpression | undefined;
-  condition: IRExpression | undefined;
-  loop: IRExpression | undefined;
-  body: (IRStatement | IRExpression)[];
-  constructor(id: number, scope: number, field_flag: FieldFlag, initial_stmt: IRVariableDeclareStatement | IRExpression | undefined, condition: IRExpression | undefined, loop: IRExpression | undefined, body: (IRStatement | IRExpression)[]) {
+  initial_stmt : IRVariableDeclareStatement | IRExpression | undefined;
+  condition : IRExpression | undefined;
+  loop : IRExpression | undefined;
+  body : (IRStatement | IRExpression)[];
+  constructor(id : number, scope : number, field_flag : FieldFlag, initial_stmt : IRVariableDeclareStatement | IRExpression | undefined, condition : IRExpression | undefined, loop : IRExpression | undefined, body : (IRStatement | IRExpression)[]) {
     super(id, scope, field_flag);
     this.initial_stmt = initial_stmt;
     this.condition = condition;
     this.loop = loop;
     this.body = body;
   }
-  lower(): Statement {
+  lower() : Statement {
     const lowered_initial_stmt = this.initial_stmt === undefined ? undefined : this.initial_stmt instanceof IRVariableDeclareStatement ? this.initial_stmt.lower() as VariableDeclarationStatement : factory.makeExpressionStatement(this.initial_stmt.lower());
     const lowered_condition = this.condition === undefined ? undefined : this.condition.lower();
     const lowered_loop = this.loop === undefined ? undefined : factory.makeExpressionStatement(this.loop.lower());
@@ -164,14 +164,14 @@ export class IRFor extends IRStatement {
 }
 
 export class IRDoWhile extends IRStatement {
-  condition: IRExpression;
-  body: (IRStatement | IRExpression)[];
-  constructor(id: number, scope: number, field_flag: FieldFlag, condition: IRExpression, body: (IRStatement | IRExpression)[]) {
+  condition : IRExpression;
+  body : (IRStatement | IRExpression)[];
+  constructor(id : number, scope : number, field_flag : FieldFlag, condition : IRExpression, body : (IRStatement | IRExpression)[]) {
     super(id, scope, field_flag);
     this.condition = condition;
     this.body = body;
   }
-  lower(): Statement {
+  lower() : Statement {
     const lowered_body = factory.makeBlock(this.body.map(function(stmt) {
       const lowered_stmt = stmt.lower();
       if (stmt instanceof IRStatement) return lowered_stmt;
@@ -186,16 +186,16 @@ export class IRDoWhile extends IRStatement {
 }
 
 export class IRWhile extends IRStatement {
-  condition: IRExpression;
-  body: IRStatement | IRExpression;
-  constructor(id: number, scope: number, field_flag: FieldFlag, condition: IRExpression, body: IRStatement | IRExpression) {
+  condition : IRExpression;
+  body : IRStatement | IRExpression;
+  constructor(id : number, scope : number, field_flag : FieldFlag, condition : IRExpression, body : IRStatement | IRExpression) {
     super(id, scope, field_flag);
     this.condition = condition;
     this.body = body;
   }
-  lower(): Statement {
+  lower() : Statement {
     return factory.makeWhileStatement(this.condition.lower(),
-      this.body instanceof IRStatement? this.body.lower(): factory.makeExpressionStatement(this.body.lower()));
+      this.body instanceof IRStatement ? this.body.lower() : factory.makeExpressionStatement(this.body.lower()));
   }
 }
 
@@ -214,16 +214,16 @@ export class IRRevertStatement extends IRStatement {
 }
 
 export class IRTryCatchClause extends IRStatement {
-  error_name: string;
-  parameters: IRVariableDeclare[];
-  body: (IRStatement | IRExpression)[];
-  constructor(id: number, scope: number, field_flag: FieldFlag, error_name: string, parameters: IRVariableDeclare[], body: (IRStatement | IRExpression)[]) {
+  error_name : string;
+  parameters : IRVariableDeclare[];
+  body : (IRStatement | IRExpression)[];
+  constructor(id : number, scope : number, field_flag : FieldFlag, error_name : string, parameters : IRVariableDeclare[], body : (IRStatement | IRExpression)[]) {
     super(id, scope, field_flag);
     this.error_name = error_name;
     this.parameters = parameters;
     this.body = body;
   }
-  lower(): Statement {
+  lower() : Statement {
     const lowered_body = factory.makeBlock(this.body.map(function(stmt) {
       const lowered_stmt = stmt.lower();
       if (stmt instanceof IRStatement) return lowered_stmt;
@@ -239,9 +239,9 @@ export class IRTryCatchClause extends IRStatement {
 }
 
 export class IRTry extends IRStatement {
-  call: IRFunctionCall;
-  clauses: IRTryCatchClause[];
-  constructor(id: number, scope: number, field_flag: FieldFlag, call: IRFunctionCall, clauses: IRTryCatchClause[]) {
+  call : IRFunctionCall;
+  clauses : IRTryCatchClause[];
+  constructor(id : number, scope : number, field_flag : FieldFlag, call : IRFunctionCall, clauses : IRTryCatchClause[]) {
     super(id, scope, field_flag);
     this.call = call;
     this.clauses = clauses;

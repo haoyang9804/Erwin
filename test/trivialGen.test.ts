@@ -1,6 +1,5 @@
 import {
   ASTNodeFactory,
-  ASTNode,
   ContractKind,
   FunctionKind,
   FunctionVisibility,
@@ -13,8 +12,6 @@ import {
   ASTWriter,
   DefaultASTWriterMapping,
   LatestCompilerVersion,
-  ParameterList,
-  VariableDeclarationStatement
 } from "solc-typed-ast"
 
 const factory = new ASTNodeFactory();
@@ -167,9 +164,6 @@ test("test variable declaration statement",
 
 test("test return statement",
 () => {
-  const x_type = factory.makeElementaryTypeName("", "uint256")
-  const x_node = factory.makeVariableDeclaration(false, false, "x", 1, false, DataLocation.Default, StateVariableVisibility.Default, Mutability.Mutable, "", undefined, x_type);
-  const parameter_list_node = factory.makeParameterList([x_node]);
   const x_id = factory.makeIdentifier("", "x", 1);
   const return_statement = factory.makeReturn(-1, x_id);
   expect(writer.write(return_statement)).toBe("return x;");

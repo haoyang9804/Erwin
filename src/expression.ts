@@ -20,7 +20,7 @@ export abstract class IRExpression extends IRNode {
 export class IRLiteral extends IRExpression {
   kind : LiteralKind | undefined;
   value : string | undefined;
-  constructor(id : number, scope : number, field_flag : FieldFlag, value?: string) {
+  constructor(id : number, scope : number, field_flag : FieldFlag, value ?: string) {
     super(id, scope, field_flag);
     this.value = value;
   }
@@ -125,12 +125,12 @@ export class IRBinaryOp extends IRExpression {
 }
 
 export class IRUnaryOp extends IRExpression {
-  prefix: boolean;
+  prefix : boolean;
   expression : IRExpression;
   operator : string;
   //TODO: support useFunction
   useFunction : number | undefined;
-  constructor(id : number, scope : number, field_flag : FieldFlag, prefix: boolean, expression : IRExpression, operator: string, useFunction?: number) {
+  constructor(id : number, scope : number, field_flag : FieldFlag, prefix : boolean, expression : IRExpression, operator : string, useFunction ?: number) {
     super(id, scope, field_flag);
     this.prefix = prefix;
     this.expression = expression;
@@ -201,14 +201,14 @@ export class IRTuple extends IRExpression {
 }
 
 export class IRIndexedAccess extends IRExpression {
-  base: IRExpression;
+  base : IRExpression;
   /**
    * Access the index of an expression, e.g. `index` in `someArray[index]`.
    *
    * May be `undefined` if used with `abi.decode()`,
    * for example `abi.decode(data, uint[]);`.
    */
-  indexed: IRExpression | undefined;
+  indexed : IRExpression | undefined;
   constructor(id : number, scope : number, field_flag : FieldFlag, base : IRExpression, indexed ?: IRExpression) {
     super(id, scope, field_flag);
     this.base = base;
@@ -222,9 +222,9 @@ export class IRIndexedAccess extends IRExpression {
 
 export class IRMemberAccess extends IRExpression {
   member_name : string;
-  referenced_id: number;
+  referenced_id : number;
   expression : IRExpression;
-  constructor(id : number, scope : number, field_flag : FieldFlag, member_name : string, referenced_id: number, expression : IRExpression) {
+  constructor(id : number, scope : number, field_flag : FieldFlag, member_name : string, referenced_id : number, expression : IRExpression) {
     super(id, scope, field_flag);
     this.expression = expression;
     this.referenced_id = referenced_id;

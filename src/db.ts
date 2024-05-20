@@ -16,7 +16,7 @@ export class DB {
   }
 
   async init() {
-    await this.db.exec('CREATE TABLE tbl (id INTEGER PRIMARY KEY, scope INTEGER)')
+    await this.db.exec('CREATE TABLE tbl (id INTEGER PRIMARY KEY, scope INTEGER, kind TEXT)')
   }
 
   async close() {
@@ -32,8 +32,9 @@ export class DB {
     }
   }
 
-  async insert(id : number, scope : number) {
-    const cmd = "INSERT INTO tbl (id, scope) VALUES (" + id + ", " + scope + ")";
+  async insert(id : number, scope : number, kind : string) {
+    const cmd = `INSERT INTO tbl (id, scope, kind) VALUES (${id}, ${scope}, "${kind}")`;
+    console.log(cmd)
     await this.run(cmd);
   }
 }

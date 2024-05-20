@@ -25,7 +25,6 @@ test("test try catch",
   const variable1 = new IRVariableDeclare(0, 0, 0, "x")
   variable1.type = new ElementaryType("uint256", "nonpayable");
   const event = new IREventDefinition(1, 0, 0, "E", false, [variable1]);
-  const event2 = new IREventDefinition(2, 0, 0, "E", true, [variable1]);
   const variable2 = new IRVariableDeclare(3, 0, 0, "y");
   variable2.type = variable1.type.copy();
   const variable2_id = new IRIdentifier(4, 0, 0, variable2.name, variable2.id);

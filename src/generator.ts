@@ -7,10 +7,10 @@ import { FieldFlag, IRNode } from "./node";
 import { IRLiteral, IRAssignment, IRIdentifier, IRExpression } from "./expression";
 import { IRVariableDeclare } from "./declare";
 import { irnode_db } from "./db";
-import { ForwardTypeDependenceDAG } from "./constrant";
+import { ForwardTypeDependenceDAG } from "./constraint";
 import { all_integer_types, varID2Types } from "./type";
 import { type_focus_kind } from "./index";
-import { all_array_types, all_elementary_types, all_function_types, all_mapping_types } from "./type";
+import { all_types, all_array_types, all_elementary_types, all_function_types, all_mapping_types } from "./type";
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Global Variables
 
@@ -19,7 +19,7 @@ let global_id = 0;
 let cur_scope_id = -1;
 let field_flag = FieldFlag.GLOBAL;
 export const scope2userDefinedTypes = new Map<number, number>();
-const type_dag = new ForwardTypeDependenceDAG();
+export const type_dag = new ForwardTypeDependenceDAG();
 // a set of IRNode ids that have backward type constrants
 const backward_type_constrant = new Set<number>();
 
@@ -49,8 +49,12 @@ function createVariableDeclare() : IRVariableDeclare {
   return new IRVariableDeclare(global_id, cur_scope_id, field_flag, generateVarName());
 }
 
-async function getAvaliableIRNodes() : Promise<any[]> {
-  return await irnode_db.run("SELECT id FROM tbl WHERE scope <= " + cur_scope_id) as any[];
+async function getAvaliableIRVariableDeclare(scope : number, kind : string) : Promise<IRVariableDeclare[]> {
+  return await irnode_db.run(`SELECT id FROM tbl WHERE scope <= ${scope} AND kind = "${kind}"`) as IRVariableDeclare[];
+}
+
+export async function getIRNodesByID(id : number) : Promise<IRNode[]> {
+  return await irnode_db.run("SELECT * FROM tbl WHERE id = " + id) as IRNode[];
 }
 
 
@@ -60,18 +64,29 @@ export class VariableDeclareGenerator extends Generator {
   async generate() : Promise<void> {
     this.irnode = createVariableDeclare();
     global_id++;
-    await irnode_db.insert(this.irnode.id, this.irnode.scope);
+    console.log('VariableDeclareGenerator1')
+    await irnode_db.insert(this.irnode.id, this.irnode.scope, "VariableDeclare");
+    console.log('VariableDeclareGenerator2')
     type_dag.insert(type_dag.newNode(this.irnode.id));
     //TODO: support for other types
     switch (type_focus_kind) {
+      case 0:
+        varID2Types.set(this.irnode.id, all_types);
+        break;
       case 1:
         varID2Types.set(this.irnode.id, all_elementary_types);
+        break;
       case 2:
         varID2Types.set(this.irnode.id, all_mapping_types);
+        break;
       case 3:
         varID2Types.set(this.irnode.id, all_function_types);
+        break;
       case 4:
         varID2Types.set(this.irnode.id, all_array_types);
+        break;
+      default:
+        throw new Error(`VariableDeclareGenerator: type_focus_kind ${type_focus_kind} is invalid`);
     }
   }
   lower() : void {
@@ -86,7 +101,7 @@ export class LiteralGenerator extends Generator {
   async generate() : Promise<void> {
     this.irnode = new IRLiteral(global_id, cur_scope_id, field_flag);
     global_id++;
-    await irnode_db.insert(this.irnode.id, this.irnode.scope);
+    await irnode_db.insert(this.irnode.id, this.irnode.scope, "Literal");
     type_dag.insert(type_dag.newNode(this.irnode.id));
   }
   lower() : void {
@@ -97,13 +112,13 @@ export class LiteralGenerator extends Generator {
 
 export class IdentifierGenerator extends Generator {
   async generate() : Promise<void> {
-    const availableIRDecl = await getAvaliableIRNodes();
+    const availableIRDecl = await getAvaliableIRVariableDeclare(cur_scope_id, "VariableDeclare");
     assert(availableIRDecl !== undefined, "IdentifierGenerator: availableIRDecl is undefined");
     assert(availableIRDecl.length > 0, "IdentifierGenerator: no available IR irnodes");
-    const irdecl = pickRandomElement(availableIRDecl);
+    const irdecl = pickRandomElement(availableIRDecl)!;
     this.irnode = new IRIdentifier(global_id, cur_scope_id, field_flag, irdecl.name, irdecl.id);
     global_id++;
-    await irnode_db.insert(this.irnode.id, this.irnode.scope);
+    await irnode_db.insert(this.irnode.id, this.irnode.scope, "Identifier");
     type_dag.insert(type_dag.newNode(this.irnode.id));
     type_dag.connect(irdecl.id, this.irnode.id);
   }
@@ -137,7 +152,7 @@ export class AssignmentGenerator extends Generator {
     literal_gen.generate();
     this.irnode = new IRAssignment(global_id, cur_scope_id, field_flag, identifier_gen.irnode as IRExpression, literal_gen.irnode as IRExpression);
     global_id++;
-    await irnode_db.insert(this.irnode.id, this.irnode.scope);
+    await irnode_db.insert(this.irnode.id, this.irnode.scope, "Literal");
     type_dag.insert(type_dag.newNode(this.irnode.id));
     type_dag.connect(this.irnode.id, identifier_gen.irnode!.id);
     type_dag.connect(identifier_gen.irnode!.id, literal_gen.irnode!.id);

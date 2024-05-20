@@ -1,4 +1,4 @@
-import * as ct from "../src/constrant"
+import * as ct from "../src/constraint"
 import { varID2Types, all_integer_types, all_elementary_types, all_function_types, all_array_types } from "../src/type"
 
 test('test dependence DAG 1',

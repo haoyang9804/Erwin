@@ -1,18 +1,5 @@
 import * as gen from "../src/generator"
 import * as db from "../src/db"
-import {
-  PrettyFormatter,
-  ASTWriter,
-  DefaultASTWriterMapping,
-  LatestCompilerVersion,
-} from "solc-typed-ast"
-
-const formatter = new PrettyFormatter(2, 0);
-const writer = new ASTWriter(
-    DefaultASTWriterMapping,
-    formatter,
-    LatestCompilerVersion
-);
 
 test("test a simple vardecl generation 1",
 async () => {

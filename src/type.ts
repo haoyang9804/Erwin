@@ -26,8 +26,8 @@ export abstract class Type {
 }
 
 export class EventType extends Type {
-  name: string;
-  constructor(name: string) {
+  name : string;
+  constructor(name : string) {
     super(TypeKind.EventType);
     this.name = name;
   }
@@ -49,8 +49,8 @@ export class EventType extends Type {
 }
 
 export class ErrorType extends Type {
-  name: string;
-  constructor(name: string) {
+  name : string;
+  constructor(name : string) {
     super(TypeKind.ErrorType);
     this.name = name;
   }
@@ -72,8 +72,8 @@ export class ErrorType extends Type {
 }
 
 export class StructType extends Type {
-  name: string;
-  constructor(name: string) {
+  name : string;
+  constructor(name : string) {
     super(TypeKind.StructType);
     this.name = name;
   }
@@ -95,8 +95,8 @@ export class StructType extends Type {
 }
 
 export class ContractType extends Type {
-  name: string;
-  constructor(name: string) {
+  name : string;
+  constructor(name : string) {
     super(TypeKind.ContractType);
     this.name = name;
   }
@@ -512,3 +512,4 @@ export function includesType(arr : Type[], item : Type) : boolean {
   return false;
 }
 
+export const all_types = all_elementary_types.concat(all_mapping_types).concat(all_function_types).concat(all_array_types);
