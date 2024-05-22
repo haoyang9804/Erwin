@@ -1,10 +1,11 @@
 import { assert, pickRandomElement, generateRandomString } from "./utility";
 import { FieldFlag, IRNode } from "./node";
-import { IRLiteral, IRAssignment, IRIdentifier, IRExpression } from "./expression";
-import { IRVariableDeclare } from "./declare";
+import * as exp from "./expression";
+import * as decl from "./declare";
+import * as stmt from "./statement";
+import * as type from "./type";
 import { irnode_db } from "./db";
 import { ForwardTypeDependenceDAG } from "./constraint";
-import { all_integer_types, varID2Types } from "./type";
 import { type_focus_kind, expression_complex_level } from "./index";
 import { all_types, all_array_types, all_elementary_types, all_function_types, all_mapping_types } from "./type";
 import { irnodes } from "./node";
@@ -41,17 +42,17 @@ function generateVarName() : string {
 }
 
 
-function createVariableDeclare() : IRVariableDeclare {
-  return new IRVariableDeclare(global_id, cur_scope_id, field_flag, generateVarName());
+function createVariableDeclare() : decl.IRVariableDeclare {
+  return new decl.IRVariableDeclare(global_id, cur_scope_id, field_flag, generateVarName());
 }
 
-async function getAvailableIRVariableDeclare(scope : number) : Promise<IRVariableDeclare[]> {
-  const collection: IRVariableDeclare[] = [];
+async function getAvailableIRVariableDeclare(scope : number) : Promise<decl.IRVariableDeclare[]> {
+  const collection: decl.IRVariableDeclare[] = [];
   do {
     const results = await irnode_db.run(`SELECT id FROM tbl WHERE scope = ${scope} AND kind = "VariableDeclare"`);
     assert(results !== undefined, "getAvailableIRVariableDeclare: results is undefined")
     for (let result of results) {
-      collection.push(irnodes[result.id] as IRVariableDeclare);
+      collection.push(irnodes[result.id] as decl.IRVariableDeclare);
     }
   } while (scope_parent.has(scope) && (scope = scope_parent.get(scope)!) !== undefined);
   return collection;
@@ -76,25 +77,24 @@ export class VariableDeclareGenerator extends DeclarationGenerator {
   async generate() : Promise<void> {
     this.irnode = createVariableDeclare();
     global_id++;
-    scope_stmt.set(cur_scope_id, scope_stmt.has(cur_scope_id)? scope_stmt.get(cur_scope_id)!.concat(this.irnode!) : [this.irnode!]);
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "VariableDeclare");
     type_dag.insert(type_dag.newNode(this.irnode.id));
     //TODO: support for other types
     switch (type_focus_kind) {
       case 0:
-        varID2Types.set(this.irnode.id, all_types);
+        type.varID2Types.set(this.irnode.id, all_types);
         break;
       case 1:
-        varID2Types.set(this.irnode.id, all_elementary_types);
+        type.varID2Types.set(this.irnode.id, all_elementary_types);
         break;
       case 2:
-        varID2Types.set(this.irnode.id, all_mapping_types);
+        type.varID2Types.set(this.irnode.id, all_mapping_types);
         break;
       case 3:
-        varID2Types.set(this.irnode.id, all_function_types);
+        type.varID2Types.set(this.irnode.id, all_function_types);
         break;
       case 4:
-        varID2Types.set(this.irnode.id, all_array_types);
+        type.varID2Types.set(this.irnode.id, all_array_types);
         break;
       default:
         throw new Error(`VariableDeclareGenerator: type_focus_kind ${type_focus_kind} is invalid`);
@@ -116,9 +116,7 @@ export abstract class ExpressionGenerator extends Generator {
 
 export class LiteralGenerator extends ExpressionGenerator {
   async generate(component: number) : Promise<void> {
-    this.irnode = new IRLiteral(global_id, cur_scope_id, field_flag);
-    if (component === 0)
-      scope_stmt.set(cur_scope_id, scope_stmt.has(cur_scope_id)? scope_stmt.get(cur_scope_id)!.concat(this.irnode!) : [this.irnode!]);
+    this.irnode = new exp.IRLiteral(global_id, cur_scope_id, field_flag);
     global_id++;
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "Literal");
     type_dag.insert(type_dag.newNode(this.irnode.id));
@@ -138,20 +136,18 @@ export class IdentifierGenerator extends ExpressionGenerator {
       await variable_gen.generate();
     }
     // generate an identifier
-    let irdecl : IRVariableDeclare;
+    let irdecl : decl.IRVariableDeclare;
     if (this.id === undefined) {
       const availableIRDecl = await getAvailableIRVariableDeclare(cur_scope_id);
       assert(availableIRDecl !== undefined, "IdentifierGenerator: availableIRDecl is undefined");
       assert(availableIRDecl.length > 0, "IdentifierGenerator: no available IR irnodes");
       irdecl = pickRandomElement(availableIRDecl)!;
-      this.irnode = new IRIdentifier(global_id, cur_scope_id, field_flag, irdecl.name, irdecl.id);
+      this.irnode = new exp.IRIdentifier(global_id, cur_scope_id, field_flag, irdecl.name, irdecl.id);
     }
     else {
-      irdecl = irnodes[this.id!] as IRVariableDeclare;
-      this.irnode = new IRIdentifier(global_id, cur_scope_id, field_flag, irdecl.name, irdecl.id);
+      irdecl = irnodes[this.id!] as decl.IRVariableDeclare;
+      this.irnode = new exp.IRIdentifier(global_id, cur_scope_id, field_flag, irdecl.name, irdecl.id);
     }
-    if (component === 0)
-      scope_stmt.set(cur_scope_id, scope_stmt.has(cur_scope_id)? scope_stmt.get(cur_scope_id)!.concat(this.irnode!) : [this.irnode!]);
     global_id++;
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "Identifier");
     type_dag.insert(type_dag.newNode(this.irnode.id));
@@ -177,26 +173,25 @@ export class AssignmentGenerator extends ExpressionGenerator {
   }
 
   async generate(component: number) : Promise<void> {
+
     const identifier_gen = new IdentifierGenerator();
     await identifier_gen.generate(component + 1);
-    let left_expression : IRExpression = identifier_gen.irnode as IRExpression;
-    let right_expression : IRExpression;
+    let left_expression : exp.IRExpression = identifier_gen.irnode as exp.IRExpression;
+    let right_expression : exp.IRExpression;
     if (component >= expression_complex_level) {
       const right_expression_gen_prototype = pickRandomElement(terminal_expression_generators)!;
       const right_expression_gen = new right_expression_gen_prototype();
       await right_expression_gen.generate(component + 1);
-      right_expression = right_expression_gen.irnode as IRExpression;
+      right_expression = right_expression_gen.irnode as exp.IRExpression;
     }
     else {
       const right_expression_gen_prototype = pickRandomElement(all_expression_generators)!;
       const right_expression_gen = new right_expression_gen_prototype();
       await right_expression_gen.generate(component + 1);
-      right_expression = right_expression_gen.irnode as IRExpression;
+      right_expression = right_expression_gen.irnode as exp.IRExpression;
     }
-    this.irnode = new IRAssignment(global_id, cur_scope_id, field_flag, left_expression, right_expression, this.op!);
+    this.irnode = new exp.IRAssignment(global_id, cur_scope_id, field_flag, left_expression, right_expression, this.op!);
     // Post-Generation
-    if (component === 0)
-      scope_stmt.set(cur_scope_id, scope_stmt.has(cur_scope_id)? scope_stmt.get(cur_scope_id)!.concat(this.irnode!) : [this.irnode!]);
     global_id++;
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "Assignment");
     type_dag.insert(type_dag.newNode(this.irnode.id));
@@ -207,10 +202,10 @@ export class AssignmentGenerator extends ExpressionGenerator {
     If the operator is not "=", then the type of v should be integer type.
     */
     if (this.op !== "=") {
-      const v_id = (left_expression as IRIdentifier).reference;
+      const v_id = (left_expression as exp.IRIdentifier).reference;
       assert(v_id !== undefined, `AssignmentGenerator: v_id ${v_id} is undefined`);
-      assert(varID2Types.has(v_id), `AssignmentGenerator: v_id ${v_id} is not in varID2Types`);
-      varID2Types.set(v_id, all_integer_types);
+      assert(type.varID2Types.has(v_id), `AssignmentGenerator: v_id ${v_id} is not in type.varID2Types`);
+      type.varID2Types.set(v_id, type.all_integer_types);
     }
   }
 }
@@ -230,3 +225,48 @@ const all_expression_generators = [
   IdentifierGenerator,
   AssignmentGenerator
 ]
+
+// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Statement Generator
+
+export abstract class StatementGenerator extends Generator {
+  abstract generate() : void;
+}
+
+export class VariableDeclareStatementGenerator extends StatementGenerator {
+  async generate() : Promise<void> {
+    const expression_gen_prototype = pickRandomElement(all_expression_generators)!;
+    const expression_gen = new expression_gen_prototype();
+    await expression_gen.generate(0);
+    const variable_gen = new VariableDeclareGenerator();
+    await variable_gen.generate();
+    this.irnode = new stmt.IRVariableDeclareStatement(global_id, cur_scope_id, field_flag, [variable_gen.irnode! as decl.IRVariableDeclare], expression_gen.irnode! as exp.IRExpression);
+    global_id++;
+    scope_stmt.set(cur_scope_id, scope_stmt.has(cur_scope_id)? scope_stmt.get(cur_scope_id)!.concat(this.irnode!) : [this.irnode!]);
+    await irnode_db.insert(this.irnode.id, this.irnode.scope, "VariableDeclareStatement");
+    type_dag.insert(type_dag.newNode(this.irnode.id));
+    type_dag.connect(variable_gen.irnode!.id, expression_gen.irnode!.id);
+  }
+}
+
+export class ExpressionStatementGenerator extends StatementGenerator {
+  async generate() : Promise<void> {
+    const expression_gen_prototype = pickRandomElement(all_expression_generators)!;
+    const expression_gen = new expression_gen_prototype();
+    await expression_gen.generate(0);
+    this.irnode = new stmt.IRExpressionStatement(global_id, cur_scope_id, field_flag, expression_gen.irnode! as exp.IRExpression);
+    global_id++;
+    scope_stmt.set(cur_scope_id, scope_stmt.has(cur_scope_id)? scope_stmt.get(cur_scope_id)!.concat(this.irnode!) : [this.irnode!]);
+    await irnode_db.insert(this.irnode.id, this.irnode.scope, "ExpressionStatement");
+  }
+}
+
+export class AssignmentStatementGenerator extends StatementGenerator {
+  async generate() : Promise<void> {
+    const assignment_gen = new AssignmentGenerator();
+    await assignment_gen.generate(0);
+    this.irnode = new stmt.IRExpressionStatement(global_id, cur_scope_id, field_flag, assignment_gen.irnode! as exp.IRAssignment);
+    global_id++;
+    scope_stmt.set(cur_scope_id, scope_stmt.has(cur_scope_id)? scope_stmt.get(cur_scope_id)!.concat(this.irnode!) : [this.irnode!]);
+    await irnode_db.insert(this.irnode.id, this.irnode.scope, "AssignmentStatement");
+  }
+}
