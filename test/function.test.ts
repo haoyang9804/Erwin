@@ -96,7 +96,7 @@ f_id.type = (f_correct as IRFunctionDefinition).functionType();
 
 test("test function identifier's type",
 () => {
-  expect(f_id.type!.str()).toBe("function (uint256 nonpayable) view private returns (uint256 nonpayable)");
+  expect(f_id.type!.str()).toBe("function (uint256) view private returns (uint256)");
 }
 )
 

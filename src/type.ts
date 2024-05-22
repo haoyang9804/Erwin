@@ -135,6 +135,7 @@ export class ElementaryType extends Type {
     this.stateMutability = stateMutability;
   }
   str() : string {
+    if (this.stateMutability === "nonpayable") return this.name;
     return this.name + " " + this.stateMutability;
   }
 
@@ -414,7 +415,7 @@ export class MappingType extends Type {
 }
 
 
-export const varID2Types = new Map<number, Type[]>();
+export const irnode2types = new Map<number, Type[]>();
 
 export const all_elementary_types : Type[] = [
   new ElementaryType("uint256", "nonpayable"),
@@ -434,6 +435,24 @@ export const all_elementary_types : Type[] = [
   new ElementaryType("bool", "nonpayable"),
   new ElementaryType("string", "nonpayable"),
   new ElementaryType("bytes", "nonpayable"),
+]
+
+export const all_literal_types : Type[] = [
+  new ElementaryType("uint256", "nonpayable"),
+  new ElementaryType("uint128", "nonpayable"),
+  new ElementaryType("uint64", "nonpayable"),
+  new ElementaryType("uint32", "nonpayable"),
+  new ElementaryType("uint16", "nonpayable"),
+  new ElementaryType("uint8", "nonpayable"),
+  new ElementaryType("int256", "nonpayable"),
+  new ElementaryType("int128", "nonpayable"),
+  new ElementaryType("int64", "nonpayable"),
+  new ElementaryType("int32", "nonpayable"),
+  new ElementaryType("int16", "nonpayable"),
+  new ElementaryType("int8", "nonpayable"),
+  new ElementaryType("address", "payable"),
+  new ElementaryType("address", "nonpayable"),
+  new ElementaryType("bool", "nonpayable"),
 ]
 
 export const all_integer_types : Type[] = [

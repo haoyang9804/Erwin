@@ -69,8 +69,8 @@ export class IRVariableDeclare extends IRDeclare {
     let typename : TypeName | undefined = undefined;
     if (this.type.kind === TypeKind.ElementaryType) {
       const type = this.type as ElementaryType;
-      typename = factory.makeElementaryTypeName("", type.name);
-      if (type.name !== "string" && type.name !== "bytes") {
+      typename = factory.makeElementaryTypeName("", type.str());
+      if (type.str() !== "string" && type.str() !== "bytes") {
         this.memory = DataLocation.Default;
       }
     }

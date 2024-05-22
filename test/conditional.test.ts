@@ -45,6 +45,6 @@ test("test conditional",
   const cond2 = new IRConditional(10, 0, 0, op, op2, v3id);
   // whatever type it is
   cond2.type = new ElementaryType("address", "nonpayable");
-  expect(async() => { writer.write(cond2.lower()) }).rejects.toThrow("IRConditional: true_expression and false_expression have incompatible types: uint256 nonpayable and address nonpayable");
+  expect(async() => { writer.write(cond2.lower()) }).rejects.toThrow("IRConditional: true_expression and false_expression have incompatible types: uint256 and address");
 }
 )

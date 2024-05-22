@@ -12,9 +12,12 @@
   },
   "dependencies": {
     "@types/figlet": "^1.5.8",
+    "@types/keccak": "^3.0.4",
     "@types/node": "^20.11.16",
     "commander": "^12.1.0",
+    "console-log-colors": "^0.5.0",
     "figlet": "^1.7.0",
+    "keccak": "^3.0.4",
     "solc-typed-ast": "^18.1.0",
     "sqlite3": "^5.1.7",
     "typescript": "^5.4.5"
@@ -30,7 +33,7 @@
   },
   "scripts": {
     "clean": "tsc --build --clean && rm -rf dist",
-    "build": "tsc --build --pretty && chmod u+x dist/index.js",
+    "build": "tsc --build --pretty && npm run format && chmod u+x dist/index.js",
     "test": "jest --coverage",
     "format": "tsfmt -r"
   },

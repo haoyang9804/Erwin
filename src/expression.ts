@@ -26,14 +26,13 @@ export class IRLiteral extends IRExpression {
   }
   private generateKind() : void {
     const type = this.type as ElementaryType;
-    if (type.name === "bool") {
+    if (type.str() === "bool") {
       this.kind = LiteralKind.Bool;
     }
-
-    else if (type.name !== "bytes" && type.name !== "string") {
+    else if (type.str() !== "bytes" && type.str() !== "string") {
       this.kind = LiteralKind.Number;
     }
-    //TODO: add support for HexString and UnicodeString
+    //TODO: add support for UnicodeString and HexString
     else this.kind = LiteralKind.String;
   }
   private generateVal() : void {
@@ -43,7 +42,50 @@ export class IRLiteral extends IRExpression {
         this.value = Math.random() > 0.5 ? "true" : "false";
         break;
       case LiteralKind.Number:
-        this.value = Math.floor(Math.random() * 100).toString();
+        if ((this.type! as ElementaryType).name !== "address") {
+          this.value = Math.floor(Math.random() * 100).toString();
+        }
+        else {
+          function checksum_encode(hex_addr : string) : string {
+            const createKeccakHash = require('keccak')
+            const keccak256 = createKeccakHash("keccak256")
+            let checksummed_buffer = ""
+            // Treat the hex address as ascii/utf-8 for keccak256 hashing
+            const hashed_address = keccak256.update(hex_addr).digest().toString("hex")
+            // Iterate over each character in the hex address
+            for (let nibble_index = 0; nibble_index < hex_addr.length; nibble_index++) {
+              const character = hex_addr[nibble_index]
+              if ("0123456789".includes(character)) {
+                // We can't upper-case the decimal digits
+                checksummed_buffer += character
+              } else if ("abcdef".includes(character)) {
+                // Check if the corresponding hex digit (nibble) in the hash is 8 or higher
+                const hashed_address_nibble = parseInt(hashed_address[nibble_index], 16)
+                // console.log(hashed_address_nibble, hashed_address[nibble_index])
+                if (hashed_address_nibble > 7) {
+                  checksummed_buffer += character.toUpperCase()
+                } else {
+                  checksummed_buffer += character
+                }
+              } else {
+                throw new Error(
+                  `Unrecognized hex character ${character} at position ${nibble_index}`
+                )
+              }
+            }
+            return "0x" + checksummed_buffer
+          }
+          function create_random_address() : string {
+            const characters = "0123456789abcdef";
+            let addr = "";
+            for (let i = 0; i < 40; i++) {
+              addr += characters[Math.floor(Math.random() * 16)];
+            }
+            return addr;
+          }
+          this.value = checksum_encode(create_random_address());
+
+        }
         break;
       case LiteralKind.String:
         this.value = generateRandomString();
@@ -87,7 +129,6 @@ export class IRAssignment extends IRExpression {
   left : IRExpression;
   right : IRExpression;
   operator : "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | "&=" | "^=" | "|=";
-  type : Type | undefined;
   constructor(id : number, scope : number, field_flag : FieldFlag, left : IRExpression, right : IRExpression, operator : "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | "&=" | "^=" | "|=") {
     super(id, scope, field_flag);
     this.left = left;

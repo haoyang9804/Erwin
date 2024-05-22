@@ -1,5 +1,8 @@
 import * as sqlite from 'sqlite';
 import * as sqlite3 from 'sqlite3'
+// debug
+import { color } from 'console-log-colors';
+
 
 export class DB {
   db : sqlite.Database;
@@ -28,13 +31,15 @@ export class DB {
       await this.db.run(cmd);
     }
     else if (cmd.startsWith("SELECT")) {
-      return await this.db.all(cmd) as any[];
+      const result = await this.db.all(cmd) as any[];
+      return result;
     }
   }
 
   async insert(id : number, scope : number, kind : string) {
     const cmd = `INSERT INTO tbl (id, scope, kind) VALUES (${id}, ${scope}, "${kind}")`;
-    console.log(cmd)
+    // debug
+    console.log(color.red(cmd))
     await this.run(cmd);
   }
 }
