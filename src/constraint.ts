@@ -167,34 +167,7 @@ abstract class ForwardDependenceDAG<T> {
 
   // Draw a graphviz graph
   // Must be called after calling get_heads
-  async draw() : Promise<void> {
-    if (this.real_heads.size === 0) {
-      this.get_heads();
-    }
-    const G = new dot.Digraph();
-    const visited : Set<number> = new Set<number>();
-    let dfs = (pre_gnode : dot.Node | undefined, node : number) : void => {
-      if (visited.has(node)) return;
-      visited.add(node);
-      const gnode = new dot.Node(node.toString(), { [dot.attribute.color]: 'blue' });
-      G.addNode(gnode);
-      if (pre_gnode !== undefined) {
-        const edge = new dot.Edge([pre_gnode, gnode]);
-        G.addEdge(edge);
-      }
-      for (let child of this.dag_nodes.get(node)!.outs) {
-        dfs(gnode, child);
-      }
-    }
-    for (let head of this.real_heads) {
-      dfs(undefined, head);
-    }
-    for (let nominal_head of this.nominal_heads) {
-      dfs(undefined, nominal_head);
-    }
-    const dot_lang = dot.toDot(G);
-    await toFile(dot_lang, './constraint.svg', { format: 'svg' });
-  }
+  abstract draw() : void;
 
   abstract init_resolution() : void;
 
@@ -376,6 +349,53 @@ export class ForwardTypeDependenceDAG extends ForwardDependenceDAG<Type> {
       // console.log(`  conflict: ${node.conflict}`);
       console.log(`node ${node.id}, resolved type: ${this.resolved_types.get(node.id)!.str()}`);
     }
+  }
+
+  async draw() : Promise<void> {
+    if (this.real_heads.size === 0) {
+      this.get_heads();
+    }
+    const G = new dot.Digraph();
+    const visited : Map<number, dot.Node> = new Map<number, dot.Node>();
+    let dfs = (pre_gnode : dot.Node | undefined, node : number, weak : boolean) : void => {
+      if (visited.has(node)) {
+        if (pre_gnode !== undefined) {
+          if (weak) {
+            const edge = new dot.Edge([pre_gnode, visited.get(node)!], { [dot.attribute.label]: 'weak' });
+            G.addEdge(edge);
+          }
+          else {
+            const edge = new dot.Edge([pre_gnode, visited.get(node)!]);
+            G.addEdge(edge);
+          }
+        }
+        return;
+      }
+      const gnode = new dot.Node(node.toString(), { [dot.attribute.color]: 'blue' });
+      visited.set(node, gnode);
+      if (pre_gnode !== undefined) {
+        if (weak) {
+          const edge = new dot.Edge([pre_gnode, gnode], { [dot.attribute.label]: 'weak' });
+          G.addEdge(edge);
+        }
+        else {
+          const edge = new dot.Edge([pre_gnode, visited.get(node)!]);
+          G.addEdge(edge);
+        }
+      }
+      G.addNode(gnode);
+      for (let child of this.dag_nodes.get(node)!.outs) {
+        dfs(gnode, child, this.weak.has(`${node} ${child}`));
+      }
+    }
+    for (let head of this.real_heads) {
+      dfs(undefined, head, false);
+    }
+    for (let nominal_head of this.nominal_heads) {
+      dfs(undefined, nominal_head, false);
+    }
+    const dot_lang = dot.toDot(G);
+    await toFile(dot_lang, './constraint.svg', { format: 'svg' });
   }
 
 }

@@ -307,7 +307,7 @@ export class BinaryOpGenerator extends RValueGenerator {
     type_dag.insert(type_dag.newNode(this.irnode.id));
     type.irnode2types.set(this.irnode.id, type.all_integer_types);
     type_dag.connect(this.irnode.id, left_expression.id);
-    type_dag.connect(left_expression.id, this.irnode.id);
+    type_dag.connect(left_expression.id, right_expression.id, "weak");
   }
 }
 
@@ -374,7 +374,7 @@ export class VariableDeclareStatementGenerator extends StatementGenerator {
     global_id++;
     scope_stmt.set(cur_scope_id, scope_stmt.has(cur_scope_id) ? scope_stmt.get(cur_scope_id)!.concat(this.irnode!) : [this.irnode!]);
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "VariableDeclareStatement");
-    type_dag.connect(expression_gen.irnode!.id, variable_gen.irnode!.id);
+    type_dag.connect(variable_gen.irnode!.id, expression_gen.irnode!.id, "weak");
   }
 }
 
