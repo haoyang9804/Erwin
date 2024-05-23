@@ -11,6 +11,7 @@
     "erwin": "dist/index.js"
   },
   "dependencies": {
+    "@ts-graphviz/adapter": "^2.0.3",
     "@types/figlet": "^1.5.8",
     "@types/keccak": "^3.0.4",
     "@types/node": "^20.11.16",
@@ -20,6 +21,7 @@
     "keccak": "^3.0.4",
     "solc-typed-ast": "^18.1.0",
     "sqlite3": "^5.1.7",
+    "ts-graphviz": "^2.1.2",
     "typescript": "^5.4.5"
   },
   "devDependencies": {

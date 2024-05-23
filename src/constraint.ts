@@ -17,8 +17,10 @@ export class ConstaintNode {
 import { assert } from "./utility";
 import { irnode2types, Type } from "./type"
 import { pickRandomElement, extendArrayofMap } from "./utility";
+import * as dot from 'ts-graphviz';
 // debug
 import { color } from 'console-log-colors';
+import { toFile } from "@ts-graphviz/adapter";
 
 // a set of IRNode ids that have backward constrants that cannot be constant
 export const constantLock = new Set<number>();
@@ -161,6 +163,37 @@ abstract class ForwardDependenceDAG<T> {
     this.dag_nodes.get(from)!.outs.push(to);
     this.dag_nodes.get(to)!.inbound++;
     this.dag_nodes.get(from)!.outbound++;
+  }
+
+  // Draw a graphviz graph
+  // Must be called after calling get_heads
+  async draw() : Promise<void> {
+    if (this.real_heads.size === 0) {
+      this.get_heads();
+    }
+    const G = new dot.Digraph();
+    const visited : Set<number> = new Set<number>();
+    let dfs = (pre_gnode : dot.Node | undefined, node : number) : void => {
+      if (visited.has(node)) return;
+      visited.add(node);
+      const gnode = new dot.Node(node.toString(), { [dot.attribute.color]: 'blue' });
+      G.addNode(gnode);
+      if (pre_gnode !== undefined) {
+        const edge = new dot.Edge([pre_gnode, gnode]);
+        G.addEdge(edge);
+      }
+      for (let child of this.dag_nodes.get(node)!.outs) {
+        dfs(gnode, child);
+      }
+    }
+    for (let head of this.real_heads) {
+      dfs(undefined, head);
+    }
+    for (let nominal_head of this.nominal_heads) {
+      dfs(undefined, nominal_head);
+    }
+    const dot_lang = dot.toDot(G);
+    await toFile(dot_lang, './constraint.svg', { format: 'svg' });
   }
 
   abstract init_resolution() : void;

@@ -59,13 +59,14 @@ function error(message : string) : never {
   await db.irnode_db.init();
   // generation
   const v1 = new gen.VariableDeclareStatementGenerator();
-  // const v2 = new gen.VariableDeclareStatementGenerator();
+  const v2 = new gen.VariableDeclareStatementGenerator();
   // const v3 = new gen.VariableDeclareStatementGenerator();
   await v1.generate();
-  // await v2.generate();
+  await v2.generate();
   // await v3.generate();
   // resolve constraints
   gen.type_dag.get_heads();
+  gen.type_dag.draw();
   let heads_typemap_array = gen.type_dag.resolve_heads();
   for (let typemap of heads_typemap_array) {
     gen.type_dag.init_resolution();
