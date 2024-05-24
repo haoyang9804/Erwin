@@ -5,3 +5,4 @@ test.ts
 *.sol
 dist
 coverage
+constraint.svg

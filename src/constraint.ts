@@ -21,6 +21,7 @@ import * as dot from 'ts-graphviz';
 // debug
 import { color } from 'console-log-colors';
 import { toFile } from "@ts-graphviz/adapter";
+import { debug } from "./index";
 
 // a set of IRNode ids that have backward constrants that cannot be constant
 export const constantLock = new Set<number>();
@@ -55,6 +56,8 @@ abstract class ForwardDependenceDAG<T> {
   // queue: PriorityQueueNode;
   name : string | undefined;
   dag_nodes : Map<number, ConstaintNode>;
+  // this.head_map records the head of each node in the DAG
+  head_map = new Map<number, number>();
   // heads are constraint nodes that must be resolved first
   // The resolution of head nodes will trigger the resolution of other nodes
   real_heads = new Set<number>();
@@ -63,6 +66,8 @@ abstract class ForwardDependenceDAG<T> {
   nominal_heads = new Set<number>();
   // an array of map from node id to the resolved info
   head_resolved : Map<number, T>[] = [];
+  // multiple_dominance records all pairs of (node1, node2) where there are more than one path from node1 to node2
+  multiple_dominance : Set<string> = new Set();
 
   constructor(name : string) {
     // this.queue = new PriorityQueueNode();
@@ -76,30 +81,38 @@ abstract class ForwardDependenceDAG<T> {
     for (let [i, node] of this.dag_nodes) {
       if (node.inbound === 0) {
         decls.push(i);
+        this.head_map.set(i, i);
       }
     }
-    const head_map = new Map<number, number>();
-    // recursive function to set the depth of each node in the DAG
+    // Recursive function to set the depth of each node in the DAG
     // head means the id of the constraint node for a decl
     // id means the id of the current Constraint Node
     let f = (head : number, id : number, depth : number) : void => {
       let stop = false;
       if (this.dag_nodes.get(id)!.depth == -1) {
         this.dag_nodes.get(id)!.depth = depth;
-        head_map.set(id, head);
+        this.head_map.set(id, head);
       }
       else if (this.dag_nodes.get(id)!.depth < depth) {
         this.dag_nodes.get(id)!.depth = depth;
         this.dag_nodes.get(id)!.conflict = true;
-        assert(head_map.has(id), `DAG: head_map does not have id ${id} in ${this.name}`);
-        this.nominal_heads.add(head_map.get(id) as number);
-        head_map.set(id, head);
+        assert(this.head_map.has(id), `DAG: this.head_map does not have id ${id} in ${this.name}`);
+        if (this.head_map.get(id) !== head) {
+          this.nominal_heads.add(this.head_map.get(id) as number);
+          this.head_map.set(id, head);
+        }
+        else {
+          this.multiple_dominance.add(`${head} ${id}`);
+        }
       }
       else {
         stop = true;
         this.dag_nodes.get(id)!.conflict = true;
-        if (head_map.get(id) !== head) {
+        if (this.head_map.get(id) !== head) {
           this.nominal_heads.add(head as number);
+        }
+        else {
+          this.multiple_dominance.add(`${head} ${id}`);
         }
       }
       if (stop) return;
@@ -146,6 +159,11 @@ abstract class ForwardDependenceDAG<T> {
     for (let [_, node] of this.dag_nodes) {
       assert(node.depth !== -1, `DAG: node ${node.id} does not have depth in ${this.name}`)
     }
+    for (let [_, node] of this.dag_nodes) {
+      if (debug) {
+        console.log(color.blue(`constraint node: id = ${node.id}, inbound = ${node.inbound}, outbound = ${node.outbound}, head = ${this.head_map.get(node.id)}`))
+      }
+    }
   }
 
   newNode(id : number) : ConstaintNode {
@@ -154,8 +172,8 @@ abstract class ForwardDependenceDAG<T> {
 
   insert(node : ConstaintNode) : void {
     this.dag_nodes.set(node.id, node);
-    // debug
-    console.log(color.green(`node.id = ${node.id}, this.dag_nodes.length = ${this.dag_nodes.size}`))
+    if (debug)
+      console.log(color.green(`node.id = ${node.id}, this.dag_nodes.length = ${this.dag_nodes.size}`))
   }
 
   connect(from : number, to : number, rank ?: string) : void {
@@ -181,15 +199,13 @@ abstract class ForwardDependenceDAG<T> {
   // Verify that all constraints have been successfully resolved
   // and all resolutions are consistent.
   abstract verify() : void;
-
-  // print info for debugging
-  abstract print() : void;
 }
 
 // The type dependence of the subsequent uses on the previous declacations
 export class ForwardTypeDependenceDAG extends ForwardDependenceDAG<Type> {
   // a map records all weak type dependence from the first element to the second element
   weak : Set<string> = new Set();
+  reverse : Set<string> = new Set();
   // a map records all resolved types
   resolved_types : Map<number, Type> = new Map();
 
@@ -197,6 +213,10 @@ export class ForwardTypeDependenceDAG extends ForwardDependenceDAG<Type> {
     super("ForwardTypeDependence");
   }
 
+  /*
+  1. If node1 weakly dominates node2 in type, then the type of node2 is a subtype of the type of node1.
+  2. If node1 weakly and reversely dominates node2 in type, then the type of node2 is a supertype of the type of node1.
+  */
   connect(from : number, to : number, rank ?: string) : void {
     assert(this.dag_nodes.get(from)! !== undefined, `ForwardTypeDependenceDAG::connect: node ${from} is not in the DAG`)
     assert(this.dag_nodes.get(to)! !== undefined, `ForwardTypeDependenceDAG::connect: node ${to} is not in the DAG`)
@@ -204,9 +224,13 @@ export class ForwardTypeDependenceDAG extends ForwardDependenceDAG<Type> {
     this.dag_nodes.get(from)!.outs.push(to);
     this.dag_nodes.get(to)!.inbound++;
     this.dag_nodes.get(from)!.outbound++;
-    assert(rank === undefined || rank === "weak", `ForwardTypeDependenceDAG: rank ${rank} is not supported`)
-    if (rank === "weak") {
+    assert(rank === undefined || rank === "weak" || rank === "weak && reverse" || rank === "reverse", `ForwardTypeDependenceDAG: rank ${rank} is not supported`)
+    if (rank === "weak" || rank === "weak && reverse") {
       this.weak.add(`${from} ${to}`);
+    }
+    // haoyang
+    if (rank === "weak && reverse" || rank === "reverse") {
+      this.reverse.add(`${from} ${to}`);
     }
   }
 
@@ -223,22 +247,21 @@ export class ForwardTypeDependenceDAG extends ForwardDependenceDAG<Type> {
 
   resolve() : void {
     // broadcast the type of a real head to its reachable descendants
-    // const depths : Map<number, number> = new Map<number, number>();
-    // for (let [id, _] of this.dag_nodes) {
-    //   depths.set(id, 0x7f7f7f7f);
-    // }
     let type_broadcast = (node : number, depth : number) : void => {
       assert(this.resolved_types.has(node), `ForwardTypeDependenceDAG::resolve_0: node ${node} is not resolved`);
-      // depths.set(node, depth);
       for (let i = 0; i < this.dag_nodes.get(node)!.outs.length; i++) {
         let next = this.dag_nodes.get(node)!.outs[i];
         if (depth + 1 !== this.dag_nodes.get(next)!.depth) {
           assert(depth + 1 < this.dag_nodes.get(next)!.depth, `ForwardTypeDependenceDAG::resolve: depth ${depth + 1} is not less than ${this.dag_nodes.get(next)!.depth}`)
-          this.weak.add(`${node} ${next}`);
           continue;
         }
         if (this.weak.has(`${node} ${next}`)) {
-          this.resolved_types.set(next, this.resolve_weak(node, "from"));
+          if (this.reverse.has(`${node} ${next}`)) {
+            this.resolved_types.set(next, this.resolve_weak(node, "to"));
+          }
+          else {
+            this.resolved_types.set(next, this.resolve_weak(node, "from"));
+          }
         }
         else {
           assert(this.resolved_types.has(node), `ForwardTypeDependenceDAG::resolve_1: node ${node} is not resolved`);
@@ -253,17 +276,17 @@ export class ForwardTypeDependenceDAG extends ForwardDependenceDAG<Type> {
       type_broadcast(head, 0);
     }
     // now back-broadcast from resolved nodes to their ancestors until all nominal heads are type-resolved
-    // const visited : Map<number, boolean> = new Map<number, boolean>();
-    // for (let [id, _] of this.dag_nodes) {
-    //   visited.set(id, false);
-    // }
     let back_type_broadcast = (node : number) : void => {
       for (let i = 0; i < this.dag_nodes.get(node)!.ins.length; i++) {
         let prev = this.dag_nodes.get(node)!.ins[i];
-        // if (visited.get(prev)!) continue;
         if (this.dag_nodes.get(prev)!.resolved) continue;
         if (this.weak.has(`${prev} ${node}`)) {
-          this.resolved_types.set(prev, this.resolve_weak(node, "to"));
+          if (this.reverse.has(`${prev} ${node}`)) {
+            this.resolved_types.set(prev, this.resolve_weak(node, "from"));
+          }
+          else {
+            this.resolved_types.set(prev, this.resolve_weak(node, "to"));
+          }
         }
         else {
           assert(this.resolved_types.has(node), `ForwardTypeDependenceDAG::resolve_3: node ${node} is not resolved`);
@@ -275,6 +298,48 @@ export class ForwardTypeDependenceDAG extends ForwardDependenceDAG<Type> {
     }
     for (let [id, _] of this.dag_nodes) {
       back_type_broadcast(id);
+    }
+    /*
+      Consider this example:
+      0
+      |
+      |
+      v
+      1 <-- 3 --> 4
+
+      0 is the head and 3 is the nominal head.
+      0 is resolved first in function resolve_heads.
+      1 is resolved later by type_broadcast.
+      3 is then resolved by back_type_broadcast.
+      However, 4 is not resolved.
+      So, after resolving nominal heads, we need to check if there exists
+      any nodes whose head in the head_map is nominal_head.
+      If yes, resolve them.
+    */
+    let resolve_remaining = (nominal_head : number, cur_node : number) : void => {
+      assert(this.nominal_heads.has(nominal_head), `resolve_remaining: the nominal_head ${nominal_head} is not in nominal_heads`);
+      assert(this.resolved_types.has(cur_node), `resolve_remaining: ${cur_node} is not type-resolved`);
+      for (let i = 0; i < this.dag_nodes.get(cur_node)!.outs.length; i++) {
+        if (this.head_map.get(cur_node) !== nominal_head) continue;
+        let next = this.dag_nodes.get(cur_node)!.outs[i];
+        if (this.weak.has(`${cur_node} ${next}`)) {
+          if (this.reverse.has(`${cur_node} ${next}`)) {
+            this.resolved_types.set(next, this.resolve_weak(cur_node, "to"));
+          }
+          else {
+            this.resolved_types.set(next, this.resolve_weak(cur_node, "from"));
+          }
+        }
+        else {
+          assert(this.resolved_types.has(cur_node), `resolve_remaining: the cur_node ${cur_node} is not type-resolved`);
+          this.resolved_types.set(next, this.resolved_types.get(cur_node) as Type);
+        }
+        this.dag_nodes.get(next)!.resolved = true;
+        resolve_remaining(nominal_head, next);
+      }
+    };
+    for (let nominal_head of this.nominal_heads) {
+      resolve_remaining(nominal_head, nominal_head);
     }
     // verify that all dag_nodes have been type-resolved
     for (let [_, node] of this.dag_nodes) {
@@ -340,27 +405,20 @@ export class ForwardTypeDependenceDAG extends ForwardDependenceDAG<Type> {
     }
   }
 
-  print() {
-    console.log('===print===')
-    for (let [_, node] of this.dag_nodes) {
-      // console.log(`node ${node.id}: inbound ${node.inbound}, outbound ${node.outbound}, depth ${node.depth}, resolved ${node.resolved}`);
-      // console.log(`  ins: ${node.ins}`);
-      // console.log(`  outs: ${node.outs}`);
-      // console.log(`  conflict: ${node.conflict}`);
-      console.log(`node ${node.id}, resolved type: ${this.resolved_types.get(node.id)!.str()}`);
-    }
-  }
-
   async draw() : Promise<void> {
     if (this.real_heads.size === 0) {
       this.get_heads();
     }
     const G = new dot.Digraph();
     const visited : Map<number, dot.Node> = new Map<number, dot.Node>();
-    let dfs = (pre_gnode : dot.Node | undefined, node : number, weak : boolean) : void => {
+    let dfs = (pre_gnode : dot.Node | undefined, node : number, weak : boolean, reverse : boolean) : void => {
       if (visited.has(node)) {
         if (pre_gnode !== undefined) {
-          if (weak) {
+          if (weak && reverse) {
+            const edge = new dot.Edge([pre_gnode, visited.get(node)!], { [dot.attribute.label]: 'weak && reverse' });
+            G.addEdge(edge);
+          }
+          else if (weak) {
             const edge = new dot.Edge([pre_gnode, visited.get(node)!], { [dot.attribute.label]: 'weak' });
             G.addEdge(edge);
           }
@@ -371,7 +429,10 @@ export class ForwardTypeDependenceDAG extends ForwardDependenceDAG<Type> {
         }
         return;
       }
-      const gnode = new dot.Node(node.toString(), { [dot.attribute.color]: 'blue' });
+      const gnode = new dot.Node(node.toString(), {
+        [dot.attribute.color]:
+          this.real_heads.has(node) ? 'red' : this.nominal_heads.has(node) ? 'pink' : 'blue'
+      });
       visited.set(node, gnode);
       if (pre_gnode !== undefined) {
         if (weak) {
@@ -385,17 +446,16 @@ export class ForwardTypeDependenceDAG extends ForwardDependenceDAG<Type> {
       }
       G.addNode(gnode);
       for (let child of this.dag_nodes.get(node)!.outs) {
-        dfs(gnode, child, this.weak.has(`${node} ${child}`));
+        dfs(gnode, child, this.weak.has(`${node} ${child}`), this.reverse.has(`${node} ${child}`));
       }
     }
     for (let head of this.real_heads) {
-      dfs(undefined, head, false);
+      dfs(undefined, head, false, false);
     }
     for (let nominal_head of this.nominal_heads) {
-      dfs(undefined, nominal_head, false);
+      dfs(undefined, nominal_head, false, false);
     }
     const dot_lang = dot.toDot(G);
     await toFile(dot_lang, './constraint.svg', { format: 'svg' });
   }
-
 }

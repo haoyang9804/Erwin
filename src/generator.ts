@@ -84,7 +84,7 @@ export class VariableDeclareGenerator extends DeclarationGenerator {
     type_dag.insert(type_dag.newNode(this.irnode.id));
     //TODO: support for other types
     switch (type_focus_kind) {
-      case 0:
+      case -1: case 0:
         type.irnode2types.set(this.irnode.id, type.all_types);
         break;
       case 1:
@@ -176,7 +176,7 @@ export class IdentifierGenerator extends LRValueGenerator {
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "Identifier");
     type_dag.insert(type_dag.newNode(this.irnode.id));
     switch (type_focus_kind) {
-      case 0:
+      case -1: case 0:
         type.irnode2types.set(this.irnode.id, type.all_types);
         break;
       case 1:
@@ -239,7 +239,7 @@ export class AssignmentGenerator extends RValueGenerator {
     type_dag.insert(type_dag.newNode(this.irnode.id));
     if (this.op === "=") {
       switch (type_focus_kind) {
-        case 0:
+        case -1: case 0:
           type.irnode2types.set(this.irnode.id, type.all_types);
           break;
         case 1:
@@ -262,7 +262,12 @@ export class AssignmentGenerator extends RValueGenerator {
       type.irnode2types.set(this.irnode.id, type.all_integer_types);
     }
     type_dag.connect(this.irnode.id, left_expression.id);
-    type_dag.connect(left_expression.id, right_expression.id);
+    if (type_focus_kind === -1) {
+      type_dag.connect(left_expression.id, right_expression.id);
+    }
+    else {
+      type_dag.connect(left_expression.id, right_expression.id, "weak");
+    }
     /*
     Suppose the assignment is "x op y", where x is the identifier of variable v.
     If the operator is not "=", then the type of v should be integer type.
@@ -307,7 +312,12 @@ export class BinaryOpGenerator extends RValueGenerator {
     type_dag.insert(type_dag.newNode(this.irnode.id));
     type.irnode2types.set(this.irnode.id, type.all_integer_types);
     type_dag.connect(this.irnode.id, left_expression.id);
-    type_dag.connect(left_expression.id, right_expression.id, "weak");
+    if (type_focus_kind === -1) {
+      type_dag.connect(left_expression.id, right_expression.id);
+    }
+    else {
+      type_dag.connect(left_expression.id, right_expression.id, "weak");
+    }
   }
 }
 
@@ -374,7 +384,12 @@ export class VariableDeclareStatementGenerator extends StatementGenerator {
     global_id++;
     scope_stmt.set(cur_scope_id, scope_stmt.has(cur_scope_id) ? scope_stmt.get(cur_scope_id)!.concat(this.irnode!) : [this.irnode!]);
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "VariableDeclareStatement");
-    type_dag.connect(variable_gen.irnode!.id, expression_gen.irnode!.id, "weak");
+    if (type_focus_kind === -1) {
+      type_dag.connect(expression_gen.irnode!.id, variable_gen.irnode!.id);
+    }
+    else {
+      type_dag.connect(expression_gen.irnode!.id, variable_gen.irnode!.id, "weak && reverse");
+    }
   }
 }
 
