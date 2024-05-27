@@ -100,3 +100,23 @@ export function deepCopy_ArrayofMap<K, V>(array : Map<K, V>[]) : Map<K, V>[] {
   }
   return res;
 }
+
+export function cartesianProduct(arrays : any[][]) : any[][] {
+  if (arrays.length === 0) {
+    return [[]];
+  }
+
+  const results : any[][] = [];
+  const currentArray = arrays[0];
+  const remainingArrays = arrays.slice(1);
+
+  const remainingCombinations = cartesianProduct(remainingArrays);
+
+  for (const value of currentArray) {
+    for (const combination of remainingCombinations) {
+      results.push([value, ...combination]);
+    }
+  }
+
+  return results;
+}
