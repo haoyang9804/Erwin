@@ -99,3 +99,54 @@ test('test dependence DAG 2',
   dag.resolve();
   dag.verify();
 })
+
+
+test('test dependence DAG 3',
+() => {
+  const nd0 = new ct.ConstaintNode(0);
+  const nd1 = new ct.ConstaintNode(1);
+  const nd3 = new ct.ConstaintNode(3);
+  const nd4 = new ct.ConstaintNode(4);
+  const nd5 = new ct.ConstaintNode(5);
+  const nd6 = new ct.ConstaintNode(6);
+  const nd7 = new ct.ConstaintNode(7);
+  const nd8 = new ct.ConstaintNode(8);
+  const nd9 = new ct.ConstaintNode(9);
+  const nd10 = new ct.ConstaintNode(10);
+  const dag = new ct.TypeDominanceDAG();
+  dag.insert(nd0);
+  dag.insert(nd1);
+  dag.insert(nd3);
+  dag.insert(nd4);
+  dag.insert(nd5);
+  dag.insert(nd6);
+  dag.insert(nd7);
+  dag.insert(nd8);
+  dag.insert(nd9);
+  dag.insert(nd10);
+  dag.connect(0, 1, "supertype");
+  dag.connect(6, 1);
+  dag.connect(7, 1);
+  dag.connect(6, 7, "subtype");
+  dag.connect(8, 6);
+  dag.connect(5, 8, "subtype");
+  dag.connect(5, 3);
+  dag.connect(3, 4, "subtype");
+  dag.connect(9, 5);
+  dag.connect(9, 10, "supertype");
+
+  type.irnode2types.set(0, type.all_literal_types);
+  type.irnode2types.set(1, type.all_literal_types);
+  type.irnode2types.set(2, type.all_literal_types);
+  type.irnode2types.set(3, type.all_literal_types);
+  type.irnode2types.set(4, type.all_literal_types);
+  type.irnode2types.set(5, type.all_literal_types);
+  type.irnode2types.set(6, type.all_literal_types);
+  type.irnode2types.set(7, type.all_literal_types);
+  type.irnode2types.set(8, type.all_literal_types);
+  type.irnode2types.set(9, type.all_integer_types);
+  type.irnode2types.set(10, type.all_literal_types);
+
+  dag.resolve();
+  dag.verify();
+})

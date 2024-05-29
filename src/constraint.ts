@@ -241,11 +241,13 @@ export class TypeDominanceDAG {
         cnt++;
       }
     }
+    heads2type = shuffle(heads2type);
     // 6. Get type candidates for tails
     let get_type_candidates_for_tails = (head_resolve : Map<number, Type>) : Map<number, Type[]> => {
       const tail2types = new Map<number, Type[]>();
       let types4tail : Type[] = [];
       for (let [head, type_of_head] of head_resolve) {
+        assert(node2tail.has(head), `TypeDominanceDAG::resolve::get_type_candidates_for_tails node2tail does not have ${head}`);
         for (const { tail_id, subtype, supertype } of node2tail.get(head)!) {
           if (subtype) {
             types4tail = type_of_head.subtype();
@@ -305,39 +307,52 @@ export class TypeDominanceDAG {
       for (let child of this.dag_nodes.get(node)!.outs) {
         const edge = `${node} ${child}`;
         for (const tail_id of edge2tail.get(edge)!) {
-          const tail_info = [...node2tail.get(node)!].find(t => t.tail_id === tail_id);
-          if (this.subtype.has(edge)) {
-            if (tail_info!.subtype) {
-              let type_candidates = resolved_types.get(node)!.subtype_with_lowerbound(resolved_types.get(tail_id)!)!;
+          if (node2tail.has(child)) { // child is not tail
+            const tail_info = [...node2tail.get(child)!].find(t => t.tail_id === tail_id);
+            if (this.subtype.has(edge)) {
+              if (tail_info!.subtype) {
+                let type_candidates = resolved_types.get(node)!.subtype_with_lowerbound(resolved_types.get(tail_id)!)!;
+                if (resolved_types.has(child)) {
+                  type_candidates = type_candidates.filter(t => t.same(resolved_types.get(child)!));
+                }
+                assert(type_candidates.length > 0, `TypeDominanceDAG::resolve::resolve:>1 type_candidates is empty`);
+                resolved_types.set(child, pickRandomElement(type_candidates)!);
+              }
+              else if (tail_info!.supertype) {
+                throw new Error(`TypeDominanceDAG::resolve::resolve: ${node} should not be the supertype of ${child}`);
+              }
+              else {
+                assert(resolved_types.get(tail_id)!.issubtypeof(resolved_types.get(node)!), `TypeDominanceDAG::resolve::resolve: the type of ${node}: ${resolved_types.get(node)!.str()} is not the supertype of the type of ${tail_id}: ${resolved_types.get(tail_id)!.str()}`);
+                resolved_types.set(child, resolved_types.get(tail_id)!);
+              }
+            }
+            else if (this.supertype.has(edge)) {
+              // child is a tail
+              throw new Error(`TypeDominanceDAG::resolve::resolve: ${node} should not be the supertype of ${child}`);
+            }
+            else {
+              let type_candidates = [resolved_types.get(node)!];
               if (resolved_types.has(child)) {
                 type_candidates = type_candidates.filter(t => t.same(resolved_types.get(child)!));
               }
-              assert(type_candidates.length > 0, `TypeDominanceDAG::resolve::resolve: type_candidates is empty`);
+              // if (type_candidates.length === 0) {
+              //   for (let [node, type] of resolved_types) {
+              //     console.log('>', node, type.str());
+              //   }
+              //   for (let [id, tail_info] of node2tail) {
+              //     console.log('?', id, [...tail_info]);
+              //   }
+              //   for (let [edge, tails] of edge2tail) {
+              //     console.log('!', edge, [...tails]);
+              //   }
+              //   console.log('=====subtype=====');
+              //   for (let edge of this.subtype) {
+              //     console.log(edge);
+              //   }
+              // }
+              assert(type_candidates.length > 0, `TypeDominanceDAG::resolve::resolve:>3 type_candidates is empty`);
               resolved_types.set(child, pickRandomElement(type_candidates)!);
             }
-            else if (tail_info!.supertype) {
-              throw new Error(`TypeDominanceDAG::resolve::resolve: ${node} should not be the subtype of ${child}`);
-            }
-            else {
-              throw new Error(`TypeDominanceDAG::resolve::resolve: the type of ${node} should not be the equal of the type of ${child}`);
-            }
-          }
-          else if (this.supertype.has(edge)) {
-            // child is a tail
-            let type_candidates = resolved_types.get(node)!.supertype()!;
-            if (resolved_types.has(child)) {
-              type_candidates = type_candidates.filter(t => t.same(resolved_types.get(child)!));
-            }
-            assert(type_candidates.length > 0, `TypeDominanceDAG::resolve::resolve: type_candidates is empty`);
-            resolved_types.set(child, pickRandomElement(type_candidates)!);
-          }
-          else {
-            let type_candidates = [resolved_types.get(node)!];
-            if (resolved_types.has(child)) {
-              type_candidates = type_candidates.filter(t => t.same(resolved_types.get(child)!));
-            }
-            assert(type_candidates.length > 0, `TypeDominanceDAG::resolve::resolve: type_candidates is empty`);
-            resolved_types.set(child, pickRandomElement(type_candidates)!);
           }
         }
         resolve(child);
@@ -456,13 +471,6 @@ export class TypeDominanceDAG {
         }
         if (compatible_with_resolved_tails) {
           resolved_types.set(head, type_of_head);
-          // const new_knowledge_about_tails = new Map<number, "subtype"|"supertype"|"equal">();
-          // for (const tail_info of node2tail.get(head)!) {
-          //   if (tail_info.subtype) new_knowledge_about_tails.set(tail_info.tail_id, "subtype");
-          //   else if (tail_info.supertype) new_knowledge_about_tails.set(tail_info.tail_id, "supertype");
-          //   else new_knowledge_about_tails.set(tail_info.tail_id, "equal");
-          // }
-          // dfs4resolve_from_heads_to_tails(head, new_knowledge_about_tails);
           resolve(head);
         }
         else {
