@@ -302,7 +302,7 @@ export class TypeDominanceDAG {
     }
     const resolved_types = new Map<number, Type>();
 
-    // 9. Resolve types from heads to tails
+    // 9. Resolve types from heads to tails.
     let resolve = (node : number) => {
       for (let child of this.dag_nodes.get(node)!.outs) {
         const edge = `${node} ${child}`;

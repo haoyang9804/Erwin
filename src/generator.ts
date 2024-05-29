@@ -296,11 +296,15 @@ export class BinaryOpGenerator extends RValueGenerator {
       await right_expression_gen.generate(component + 1);
       right_expression = right_expression_gen.irnode as exp.IRExpression;
     }
-    this.irnode = new exp.IRBinaryOp(global_id, cur_scope_id, field_flag, left_expression, right_expression, pickRandomElement(["+", "-", "*", "/", "%", "<<", ">>", "<", ">", "<=", ">=", "==", "!=", "&", "^", "|", "&&", "||"])!);
+    const op = pickRandomElement(["+", "-", "*", "/", "%", "<<", ">>", "<", ">", "<=", ">=", "==", "!=", "&", "^", "|", "&&", "||"])!;
+    this.irnode = new exp.IRBinaryOp(global_id, cur_scope_id, field_flag, left_expression, right_expression, op);
     global_id++;
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "BinaryOp");
     type_dag.insert(type_dag.newNode(this.irnode.id));
-    type.irnode2types.set(this.irnode.id, type.all_integer_types);
+    if (op === "&&" || op === "||") {
+      type.irnode2types.set(this.irnode.id, [new type.ElementaryType("bool", "nonpayable")]);
+    }
+    else type.irnode2types.set(this.irnode.id, type.all_integer_types);
     type_dag.connect(this.irnode.id, left_expression.id);
     if (type_focus_kind === -1) {
       type_dag.connect(left_expression.id, right_expression.id);
@@ -318,13 +322,15 @@ export class UnaryOpGenerator extends RValueGenerator {
     const identifier_gen = new IdentifierGenerator();
     await identifier_gen.generate(component + 1);
     let expression : exp.IRExpression = identifier_gen.irnode! as exp.IRExpression;
-    this.irnode = new exp.IRUnaryOp(global_id, cur_scope_id, field_flag, pickRandomElement([true, false])!, expression, pickRandomElement(["!", "-", "~", "++", "--"])!);
+    let op = pickRandomElement(["!", "-", "~", "++", "--"])!;
+    this.irnode = new exp.IRUnaryOp(global_id, cur_scope_id, field_flag, pickRandomElement([true, false])!, expression, op)!);
     global_id++;
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "UnaryOp");
     assert(expression instanceof exp.IRIdentifier, "UnaryOpGenerator: expression is not IRIdentifier");
     assert((expression as exp.IRIdentifier).reference !== undefined, "UnaryOpGenerator: expression.reference is undefined");
     type_dag.insert(type_dag.newNode(this.irnode.id));
-    type.irnode2types.set(this.irnode.id, type.all_integer_types);
+    if (op === "!") type.irnode2types.set(this.irnode.id, [new type.ElementaryType("bool", "nonpayable")]);
+    else type.irnode2types.set(this.irnode.id, type.all_integer_types);
     type_dag.connect(this.irnode.id, expression.id);
   }
 }
