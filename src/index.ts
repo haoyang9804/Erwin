@@ -66,10 +66,10 @@ function error(message : string) : never {
   // generation
   const v1 = new gen.VariableDeclareStatementGenerator();
   const v2 = new gen.VariableDeclareStatementGenerator();
-  // const v3 = new gen.VariableDeclareStatementGenerator();
+  const v3 = new gen.VariableDeclareStatementGenerator();
   await v1.generate();
   await v2.generate();
-  // await v3.generate();
+  await v3.generate();
   // resolve constraints
   if (debug) gen.type_dag.draw();
   try {

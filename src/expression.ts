@@ -176,6 +176,9 @@ export class IRUnaryOp extends IRExpression {
     }
     this.operator = operator;
     this.useFunction = useFunction;
+    if (this.operator === "!" || this.operator === "~" || this.operator === "-" || this.operator === "delete") {
+      this.prefix = true;
+    }
   }
   lower() : Expression {
     assert(this.type !== undefined, "IRUnaryOp: type is not generated");
