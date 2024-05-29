@@ -5,7 +5,7 @@ import * as decl from "./declare";
 import * as stmt from "./statement";
 import * as type from "./type";
 import { irnode_db } from "./db";
-import { ForwardTypeDependenceDAG } from "./constraint";
+import { TypeDominanceDAG } from "./constraint";
 import { type_focus_kind, expression_complex_level } from "./index";
 import { irnodes } from "./node";
 
@@ -20,7 +20,7 @@ export const scope_stmt = new Map<number, IRNode[]>();
 const scope_parent = new Map<number, number>();
 let field_flag = FieldFlag.GLOBAL;
 export const scope2userDefinedTypes = new Map<number, number>();
-export const type_dag = new ForwardTypeDependenceDAG();
+export const type_dag = new TypeDominanceDAG();
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Generator
 
@@ -266,17 +266,7 @@ export class AssignmentGenerator extends RValueGenerator {
       type_dag.connect(left_expression.id, right_expression.id);
     }
     else {
-      type_dag.connect(left_expression.id, right_expression.id, "weak");
-    }
-    /*
-    Suppose the assignment is "x op y", where x is the identifier of variable v.
-    If the operator is not "=", then the type of v should be integer type.
-    */
-    if (this.op !== "=") {
-      const v_id = (left_expression as exp.IRIdentifier).reference;
-      assert(v_id !== undefined, `AssignmentGenerator: v_id ${v_id} is undefined`);
-      assert(type.irnode2types.has(v_id), `AssignmentGenerator: v_id ${v_id} is not in type.irnode2types`);
-      type.irnode2types.set(v_id, type.all_integer_types);
+      type_dag.connect(left_expression.id, right_expression.id, "subtype");
     }
   }
 }
@@ -316,7 +306,7 @@ export class BinaryOpGenerator extends RValueGenerator {
       type_dag.connect(left_expression.id, right_expression.id);
     }
     else {
-      type_dag.connect(left_expression.id, right_expression.id, "weak");
+      type_dag.connect(left_expression.id, right_expression.id, "subtype");
     }
   }
 }
@@ -333,7 +323,6 @@ export class UnaryOpGenerator extends RValueGenerator {
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "UnaryOp");
     assert(expression instanceof exp.IRIdentifier, "UnaryOpGenerator: expression is not IRIdentifier");
     assert((expression as exp.IRIdentifier).reference !== undefined, "UnaryOpGenerator: expression.reference is undefined");
-    type.irnode2types.set((expression as exp.IRIdentifier).reference!, type.all_integer_types);
     type_dag.insert(type_dag.newNode(this.irnode.id));
     type.irnode2types.set(this.irnode.id, type.all_integer_types);
     type_dag.connect(this.irnode.id, expression.id);
@@ -388,7 +377,7 @@ export class VariableDeclareStatementGenerator extends StatementGenerator {
       type_dag.connect(expression_gen.irnode!.id, variable_gen.irnode!.id);
     }
     else {
-      type_dag.connect(expression_gen.irnode!.id, variable_gen.irnode!.id, "weak && reverse");
+      type_dag.connect(expression_gen.irnode!.id, variable_gen.irnode!.id, "supertype");
     }
   }
 }

@@ -13,6 +13,19 @@ export enum TypeKind {
   ErrorType
 }
 
+export function upperType(t1 : Type, t2 : Type) {
+  assert(t1.kind === t2.kind, `upperType: t1.kind !== t2.kind`);
+  assert(t1.issubtypeof(t2) || t2.issubtypeof(t1), `upperType: t1 is not subtypeof t2 and t2 is not subtypeof t1`);
+  return t1.issubtypeof(t2) ? t2 : t1;
+}
+
+export function lowerType(t1 : Type, t2 : Type) {
+  assert(t1.kind === t2.kind, `upperType: t1.kind !== t2.kind`);
+  assert(t1.issubtypeof(t2) || t2.issubtypeof(t1), `upperType: t1 is not subtypeof t2 and t2 is not subtypeof t1`);
+  return t1.issupertypeof(t2) ? t2 : t1;
+}
+
+
 export abstract class Type {
   kind : TypeKind;
   constructor(kind : TypeKind) {
@@ -241,8 +254,6 @@ export class ElementaryType extends Type {
   }
 
   subtype_with_lowerbound(lower_bound : Type) : Type[] {
-    console.log('!!!!!!!!!!!!!!!!');
-    console.log(this.subtype().map(x => x.str()));
     return this.subtype().filter(x => x.issupertypeof(lower_bound));
   }
 
@@ -311,7 +322,6 @@ export class ElementaryType extends Type {
   issupertypeof(t : Type) : boolean {
     if (t.kind !== TypeKind.ElementaryType) return false;
     const et : ElementaryType = t as ElementaryType;
-    console.log('et.name = ', et.name);
     switch (et.name) {
       case "uint256":
         if (this.name === "uint256") return true;
@@ -326,7 +336,6 @@ export class ElementaryType extends Type {
         if (this.name.startsWith('u') && !this.name.endsWith('t8') && !this.name.endsWith('16')) return true;
         return false;
       case "uint16":
-        console.log(this.name);
         if (this.name.startsWith('u') && !this.name.endsWith('t8')) return true;
         return false;
       case "uint8":
