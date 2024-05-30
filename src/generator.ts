@@ -6,7 +6,7 @@ import * as stmt from "./statement";
 import * as type from "./type";
 import { irnode_db } from "./db";
 import { TypeDominanceDAG } from "./constraint";
-import { type_focus_kind, expression_complex_level } from "./index";
+import { expression_complex_level } from "./index";
 import { irnodes } from "./node";
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Global Variables
@@ -21,7 +21,8 @@ const scope_parent = new Map<number, number>();
 let field_flag = FieldFlag.GLOBAL;
 export const scope2userDefinedTypes = new Map<number, number>();
 export const type_dag = new TypeDominanceDAG();
-
+// global_type_context is used to control the selection of ops in the process of op-involved expression generations.
+let global_type_context : string = "";
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Generator
 
 export abstract class Generator {
@@ -82,26 +83,7 @@ export class VariableDeclareGenerator extends DeclarationGenerator {
     global_id++;
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "VariableDeclare");
     type_dag.insert(type_dag.newNode(this.irnode.id));
-    //TODO: support for other types
-    switch (type_focus_kind) {
-      case -1: case 0:
-        type.irnode2types.set(this.irnode.id, type.all_types);
-        break;
-      case 1:
-        type.irnode2types.set(this.irnode.id, type.all_elementary_types);
-        break;
-      case 2:
-        type.irnode2types.set(this.irnode.id, type.all_mapping_types);
-        break;
-      case 3:
-        type.irnode2types.set(this.irnode.id, type.all_function_types);
-        break;
-      case 4:
-        type.irnode2types.set(this.irnode.id, type.all_array_types);
-        break;
-      default:
-        throw new Error(`VariableDeclareGenerator: type_focus_kind ${type_focus_kind} is invalid`);
-    }
+    type.irnode2types.set(this.irnode.id, type.all_elementary_types);
   }
 }
 
@@ -175,47 +157,39 @@ export class IdentifierGenerator extends LRValueGenerator {
     global_id++;
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "Identifier");
     type_dag.insert(type_dag.newNode(this.irnode.id));
-    switch (type_focus_kind) {
-      case -1: case 0:
-        type.irnode2types.set(this.irnode.id, type.all_types);
-        break;
-      case 1:
-        type.irnode2types.set(this.irnode.id, type.all_elementary_types);
-        break;
-      case 2:
-        type.irnode2types.set(this.irnode.id, type.all_mapping_types);
-        break;
-      case 3:
-        type.irnode2types.set(this.irnode.id, type.all_function_types);
-        break;
-      case 4:
-        type.irnode2types.set(this.irnode.id, type.all_array_types);
-        break;
-      default:
-        throw new Error(`VariableDeclareGenerator: type_focus_kind ${type_focus_kind} is invalid`);
-    }
+    type.irnode2types.set(this.irnode.id, type.all_elementary_types);
     type_dag.connect(this.irnode.id, irdecl.id);
   }
 }
-
 
 export class AssignmentGenerator extends RValueGenerator {
 
   op : "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | "&=" | "^=" | "|=" | undefined;
 
-  constructor(op ?: "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | "&=" | "^=" | "|=") {
+  constructor() {
     super();
-    if (op === undefined) {
-      this.op = pickRandomElement(
-        ["=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|="]
-      ) as "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | "&=" | "^=" | "|=";
-    }
-    else {
-      this.op = op;
+    switch (global_type_context) {
+      case "bool":
+        this.op = "=";
+        break;
+      case "integer": case "":
+        this.op = pickRandomElement(
+          ["=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|="]
+        ) as "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | "&=" | "^=" | "|=";
+        break;
+      default:
+        throw new Error(`AssignmentGenerator constructor: global_type_context ${global_type_context} is invalid`);
     }
   }
 
   async generate(component : number) : Promise<void> {
+    let new_type_context = false;
+    if (global_type_context === "") {
+      if (this.op !== "=") {
+        new_type_context = true;
+        global_type_context = "integer";
+      }
+    }
     const identifier_gen = new IdentifierGenerator();
     await identifier_gen.generate(component + 1);
     let left_expression : exp.IRExpression = identifier_gen.irnode as exp.IRExpression;
@@ -237,43 +211,57 @@ export class AssignmentGenerator extends RValueGenerator {
     global_id++;
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "Assignment");
     type_dag.insert(type_dag.newNode(this.irnode.id));
-    if (this.op === "=") {
-      switch (type_focus_kind) {
-        case -1: case 0:
-          type.irnode2types.set(this.irnode.id, type.all_types);
-          break;
-        case 1:
-          type.irnode2types.set(this.irnode.id, type.all_elementary_types);
-          break;
-        case 2:
-          type.irnode2types.set(this.irnode.id, type.all_mapping_types);
-          break;
-        case 3:
-          type.irnode2types.set(this.irnode.id, type.all_function_types);
-          break;
-        case 4:
-          type.irnode2types.set(this.irnode.id, type.all_array_types);
-          break;
-        default:
-          throw new Error(`VariableDeclareGenerator: type_focus_kind ${type_focus_kind} is invalid`);
-      }
+    if (global_type_context === "") {
+      type.irnode2types.set(this.irnode.id, type.all_elementary_types);
     }
-    else {
+    else if (global_type_context === "bool") {
+      assert(new_type_context === false, "AssignmentGenerator: new_type_context is true");
+      type.irnode2types.set(this.irnode.id, [new type.ElementaryType("bool", "nonpayable")]);
+    }
+    else if (global_type_context === "integer") {
       type.irnode2types.set(this.irnode.id, type.all_integer_types);
     }
-    type_dag.connect(this.irnode.id, left_expression.id);
-    if (type_focus_kind === -1) {
-      type_dag.connect(left_expression.id, right_expression.id);
-    }
     else {
-      type_dag.connect(left_expression.id, right_expression.id, "subtype");
+      throw new Error(`AssignmentGenerator generator: global_type_context ${global_type_context} is invalid`);
+    }
+    type_dag.connect(this.irnode.id, left_expression.id);
+    type_dag.connect(left_expression.id, right_expression.id, "subtype");
+    if (new_type_context) {
+      global_type_context = "";
     }
   }
 }
 
 export class BinaryOpGenerator extends RValueGenerator {
-  constructor() { super(); }
+  op : "+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "<" | ">" | "<=" | ">=" | "==" | "!=" | "&" | "^" | "|" | "&&" | "||";
+  constructor() {
+    super();
+    switch (global_type_context) {
+      case "bool":
+        this.op = pickRandomElement(["&&", "||"])!;
+        break;
+      case "integer":
+        this.op = pickRandomElement(
+          ["+", "-", "*", "/", "%", "<<", ">>", "<", ">", "<=", ">=", "==", "!=", "&", "^", "|"])!;
+        break;
+      case "":
+        this.op = pickRandomElement(["+", "-", "*", "/", "%", "<<", ">>", "<", ">", "<=", ">=", "==", "!=", "&", "^", "|", "&&", "||"])!;
+        break;
+      default:
+        throw new Error(`BinaryOpGenerator constructor: global_type_context ${global_type_context} is invalid`);
+    }
+  }
   async generate(component : number) : Promise<void> {
+    let new_type_context = false;
+    if (global_type_context === "") {
+      new_type_context = true;
+      if (this.op === "||" || this.op === "&&") {
+        global_type_context = "bool";
+      }
+      else {
+        global_type_context = "integer";
+      }
+    }
     let left_expression : exp.IRExpression;
     let right_expression : exp.IRExpression;
     if (component >= expression_complex_level) {
@@ -296,42 +284,73 @@ export class BinaryOpGenerator extends RValueGenerator {
       await right_expression_gen.generate(component + 1);
       right_expression = right_expression_gen.irnode as exp.IRExpression;
     }
-    const op = pickRandomElement(["+", "-", "*", "/", "%", "<<", ">>", "<", ">", "<=", ">=", "==", "!=", "&", "^", "|", "&&", "||"])!;
-    this.irnode = new exp.IRBinaryOp(global_id, cur_scope_id, field_flag, left_expression, right_expression, op);
+    this.irnode = new exp.IRBinaryOp(global_id, cur_scope_id, field_flag, left_expression, right_expression, this.op);
     global_id++;
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "BinaryOp");
     type_dag.insert(type_dag.newNode(this.irnode.id));
-    if (op === "&&" || op === "||") {
+    if (global_type_context === "bool") {
       type.irnode2types.set(this.irnode.id, [new type.ElementaryType("bool", "nonpayable")]);
     }
-    else type.irnode2types.set(this.irnode.id, type.all_integer_types);
-    type_dag.connect(this.irnode.id, left_expression.id);
-    if (type_focus_kind === -1) {
-      type_dag.connect(left_expression.id, right_expression.id);
+    else if (global_type_context === "integer") {
+      type.irnode2types.set(this.irnode.id, type.all_integer_types);
     }
     else {
-      type_dag.connect(left_expression.id, right_expression.id, "subtype");
+      throw new Error(`BinaryOpGenerator generator: global_type_context ${global_type_context} is invalid`);
+    }
+    type_dag.connect(this.irnode.id, left_expression.id);
+    type_dag.connect(left_expression.id, right_expression.id, "subtype");
+    if (new_type_context) {
+      global_type_context = "";
     }
   }
 }
 
 //TODO: create a delete Statement Generator
 export class UnaryOpGenerator extends RValueGenerator {
-  constructor() { super(); }
+  op : "!" | "-" | "~" | "++" | "--";
+  constructor() {
+    super();
+    switch (global_type_context) {
+      case "":
+        this.op = pickRandomElement(["!", "-", "~", "++", "--"])!;
+        break;
+      case "bool":
+        this.op = "!";
+        break;
+      case "integer":
+        this.op = pickRandomElement(["-", "~", "++", "--"])!;
+        break;
+      default:
+        throw new Error(`UnaryOpGenerator constructor: global_type_context ${global_type_context} is invalid`);
+    }
+  }
   async generate(component : number) : Promise<void> {
+    let new_type_context = false;
+    if (global_type_context === "") {
+      new_type_context = true;
+      if (this.op === "!") {
+        global_type_context = "bool";
+      }
+      else {
+        global_type_context = "integer";
+      }
+    }
     const identifier_gen = new IdentifierGenerator();
     await identifier_gen.generate(component + 1);
     let expression : exp.IRExpression = identifier_gen.irnode! as exp.IRExpression;
-    let op = pickRandomElement(["!", "-", "~", "++", "--"])!;
-    this.irnode = new exp.IRUnaryOp(global_id, cur_scope_id, field_flag, pickRandomElement([true, false])!, expression, op)!;
+    this.irnode = new exp.IRUnaryOp(global_id, cur_scope_id, field_flag, pickRandomElement([true, false])!, expression, this.op)!;
     global_id++;
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "UnaryOp");
     assert(expression instanceof exp.IRIdentifier, "UnaryOpGenerator: expression is not IRIdentifier");
     assert((expression as exp.IRIdentifier).reference !== undefined, "UnaryOpGenerator: expression.reference is undefined");
     type_dag.insert(type_dag.newNode(this.irnode.id));
-    if (op === "!") type.irnode2types.set(this.irnode.id, [new type.ElementaryType("bool", "nonpayable")]);
-    else type.irnode2types.set(this.irnode.id, type.all_integer_types);
+    if (global_type_context === "bool") type.irnode2types.set(this.irnode.id, [new type.ElementaryType("bool", "nonpayable")]);
+    else if (global_type_context === "integer") type.irnode2types.set(this.irnode.id, type.all_integer_types);
+    else throw new Error(`UnaryOpGenerator generator: global_type_context ${global_type_context} is invalid`);
     type_dag.connect(this.irnode.id, expression.id);
+    if (new_type_context) {
+      global_type_context = "";
+    }
   }
 }
 
@@ -379,12 +398,7 @@ export class VariableDeclareStatementGenerator extends StatementGenerator {
     global_id++;
     scope_stmt.set(cur_scope_id, scope_stmt.has(cur_scope_id) ? scope_stmt.get(cur_scope_id)!.concat(this.irnode!) : [this.irnode!]);
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "VariableDeclareStatement");
-    if (type_focus_kind === -1) {
-      type_dag.connect(expression_gen.irnode!.id, variable_gen.irnode!.id);
-    }
-    else {
-      type_dag.connect(expression_gen.irnode!.id, variable_gen.irnode!.id, "supertype");
-    }
+    type_dag.connect(expression_gen.irnode!.id, variable_gen.irnode!.id, "supertype");
   }
 }
 

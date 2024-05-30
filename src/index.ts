@@ -21,7 +21,6 @@ const writer = new ASTWriter(
 );
 import * as figlet from "figlet"
 console.log(figlet.textSync('Erwin'));
-export let type_focus_kind = 0;
 export let type_complex_level = 1;
 export let expression_complex_level = 1;
 export let debug = false;
@@ -51,12 +50,10 @@ function error(message : string) : never {
     .version(version, "-v, --version", "Print package version.")
     .helpOption("-h, --help", "Print help message.");
   program
-    .option("-t --type_focus_kind <number>", `The type kind Erwin will focus in generation.\n${' '.repeat(41)}-1: disable type focus.\n${' '.repeat(41)}0: all types.\n${' '.repeat(41)}1: elementary types.\n${' '.repeat(41)}2: mapping types\n${' '.repeat(41)}3: function types\n${' '.repeat(41)}4: array types\n`, `${type_focus_kind}`)
     .option("-tc --type_complex_level <number>", "The complex level of the type Erwin will generate.\nThe suggested range is [1,2,3]. The bigger, the more complex.", `${type_complex_level}`)
     .option("-ec --expression_complex_level <number>", "The complex level of the expression Erwin will generate.\nThe suggedted range is [1,2,3,4,5]. The bigger, the more complex.", `${expression_complex_level}`)
     .option("-d --debug", "Enable the debug mode.", `${debug}`);
   program.parse(process.argv);
-  type_focus_kind = parseInt(program.opts().type_focus_kind);
   type_complex_level = parseInt(program.opts().type_complex_level);
   expression_complex_level = parseInt(program.opts().expression_complex_level);
   debug = program.opts().debug;
