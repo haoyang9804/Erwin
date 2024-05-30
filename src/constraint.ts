@@ -95,8 +95,8 @@ export class TypeDominanceDAG {
   2. If node1 weakly and reversely dominates node2 in type, then the type of node2 is a supertype of the type of node1.
   */
   connect(from : number, to : number, rank ?: string) : void {
-    assert(this.dag_nodes.get(from)! !== undefined, `TypeDominanceDAG::connect: node ${from} is not in the DAG`)
-    assert(this.dag_nodes.get(to)! !== undefined, `TypeDominanceDAG::connect: node ${to} is not in the DAG`)
+    assert(this.dag_nodes.get(from)! !== undefined, `TypeDominanceDAG::connect: node (from) ${from} is not in the DAG`)
+    assert(this.dag_nodes.get(to)! !== undefined, `TypeDominanceDAG::connect: node (to) ${to} is not in the DAG`)
     this.dag_nodes.get(to)!.ins.push(from);
     this.dag_nodes.get(from)!.outs.push(to);
     this.dag_nodes.get(to)!.inbound++;

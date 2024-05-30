@@ -5,7 +5,7 @@ import {
 } from "solc-typed-ast"
 
 import { assert, generateRandomString, str2hex } from "./utility";
-import { includesType, TypeKind, Type, ElementaryType } from "./type";
+import { includesType, TypeKind, Type, ElementaryType, UnionType } from "./type";
 import { IRNode, FieldFlag, factory } from "./node";
 import { IRVariableDeclare } from "./declare";
 
@@ -234,9 +234,14 @@ export class IRTuple extends IRExpression {
     this.isInlineArray = isInlineArray;
   }
   lower() : Expression {
-    assert(this.type !== undefined, "IRTuple: type is not generated");
-    assert(this.type.kind === TypeKind.UnionType, "IRTuple: type is not UnionType");
-    return factory.makeTupleExpression("", this.isInlineArray === undefined ? false : true, this.components.map((component) => component?.lower() as Expression));
+    const lowered_components = this.components.map((component) => component?.lower() as Expression);
+    const type_array : Type[] = [];
+    for (let component of this.components) {
+      assert(component.type !== undefined, "IRTuple: type cannot be generated");
+      type_array.push(component.type!);
+    }
+    this.type = new UnionType(type_array);
+    return factory.makeTupleExpression("", this.isInlineArray === undefined ? false : true, lowered_components);
   }
 }
 

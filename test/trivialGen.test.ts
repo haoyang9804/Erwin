@@ -169,3 +169,15 @@ test("test return statement",
   expect(writer.write(return_statement)).toBe("return x;");
 }
 )
+
+test("test binary op of two assignment ops",
+() => {
+  const x_1 = factory.makeIdentifier("any type", "x", 1);
+  const x_2 = factory.makeIdentifier("any type", "x", 1);
+  const x_3 = factory.makeIdentifier("any type", "x", 1);
+  const x_4 = factory.makeIdentifier("any type", "x", 1);
+  const bop1 = factory.makeAssignment("any type", "+=", x_1, x_2);
+  const bop2 = factory.makeAssignment("any type", "+=", x_3, x_4);
+  const bop3 = factory.makeBinaryOperation("any type", "+", bop1, bop2);
+  expect(writer.write(bop3)).toBe("x += x + x += x");
+})

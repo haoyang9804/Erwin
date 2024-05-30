@@ -700,7 +700,7 @@ export class MappingType extends Type {
 
 export const irnode2types = new Map<number, Type[]>();
 
-export const all_elementary_types : Type[] = [
+export const elementary_types : Type[] = [
   new ElementaryType("uint256", "nonpayable"),
   new ElementaryType("uint128", "nonpayable"),
   new ElementaryType("uint64", "nonpayable"),
@@ -720,7 +720,7 @@ export const all_elementary_types : Type[] = [
   new ElementaryType("bytes", "nonpayable"),
 ]
 
-export const all_literal_types : Type[] = [
+export const literal_types : Type[] = [
   new ElementaryType("uint256", "nonpayable"),
   new ElementaryType("uint128", "nonpayable"),
   new ElementaryType("uint64", "nonpayable"),
@@ -738,6 +738,24 @@ export const all_literal_types : Type[] = [
   new ElementaryType("bool", "nonpayable"),
 ]
 
+export const integer_types : Type[] = [
+  new ElementaryType("int256", "nonpayable"),
+  new ElementaryType("int128", "nonpayable"),
+  new ElementaryType("int64", "nonpayable"),
+  new ElementaryType("int32", "nonpayable"),
+  new ElementaryType("int16", "nonpayable"),
+  new ElementaryType("int8", "nonpayable"),
+]
+
+export const uinteger_types : Type[] = [
+  new ElementaryType("uint256", "nonpayable"),
+  new ElementaryType("uint128", "nonpayable"),
+  new ElementaryType("uint64", "nonpayable"),
+  new ElementaryType("uint32", "nonpayable"),
+  new ElementaryType("uint16", "nonpayable"),
+  new ElementaryType("uint8", "nonpayable"),
+]
+
 export const all_integer_types : Type[] = [
   new ElementaryType("uint256", "nonpayable"),
   new ElementaryType("uint128", "nonpayable"),
@@ -750,19 +768,19 @@ export const all_integer_types : Type[] = [
   new ElementaryType("int64", "nonpayable"),
   new ElementaryType("int32", "nonpayable"),
   new ElementaryType("int16", "nonpayable"),
-  new ElementaryType("int8", "nonpayable"),
+  new ElementaryType("int8", "nonpayable")
 ]
 
-export let all_mapping_types : Type[] = [];
-export let all_function_types : Type[] = [];
-export let all_array_types : Type[] = [];
+export let mapping_types : Type[] = [];
+export let function_types : Type[] = [];
+export let array_types : Type[] = [];
 
 //TODO: need to be updated later
 function generate_all_mapping_types() : Type[] {
-  const all_types_for_k = all_elementary_types;
-  const all_types_for_v = all_elementary_types.concat(all_function_types)
-    .concat(all_array_types)
-    .concat(all_mapping_types);
+  const all_types_for_k = elementary_types;
+  const all_types_for_v = elementary_types.concat(function_types)
+    .concat(array_types)
+    .concat(mapping_types);
   const collection : Type[] = new Array(all_types_for_k.length * all_types_for_v.length);
   all_types_for_k.forEach((k, i) => {
     all_types_for_v.forEach((v, j) => {
@@ -776,9 +794,9 @@ function generate_all_function_types() : Type[] {
   let collection : Type[] = [];
   let all_visibility : ("public" | "internal" | "external" | "private")[] = ["public", "internal", "external", "private"];
   let all_stateMutability : ("pure" | "view" | "payable" | "nonpayable")[] = ["pure", "view", "payable", "nonpayable"];
-  const all_available_types = all_elementary_types.concat(all_function_types)
-    .concat(all_array_types)
-    .concat(all_mapping_types);
+  const all_available_types = elementary_types.concat(function_types)
+    .concat(array_types)
+    .concat(mapping_types);
   for (let visibility of all_visibility) {
     for (let stateMutability of all_stateMutability) {
       const parameterTypes = lazyPickRandomElement(all_available_types);
@@ -793,9 +811,9 @@ function generate_all_function_types() : Type[] {
 
 //TODO: need to be updated later
 function generate_all_array_types() : Type[] {
-  const all_available_types = all_elementary_types.concat(all_function_types)
-    .concat(all_array_types)
-    .concat(all_mapping_types);
+  const all_available_types = elementary_types.concat(function_types)
+    .concat(array_types)
+    .concat(mapping_types);
   //TODO: allow super big length
   const available_length = [1, 2, 3, 4, 5];
   const collection : Type[] = new Array(all_available_types.length);
@@ -806,9 +824,9 @@ function generate_all_array_types() : Type[] {
 }
 
 for (let i = 0; i < type_complex_level; i++) {
-  all_mapping_types = all_mapping_types.concat(generate_all_mapping_types());
-  all_function_types = all_function_types.concat(generate_all_function_types());
-  all_array_types = all_array_types.concat(generate_all_array_types());
+  mapping_types = mapping_types.concat(generate_all_mapping_types());
+  function_types = function_types.concat(generate_all_function_types());
+  array_types = array_types.concat(generate_all_array_types());
 }
 
 export function includesType(arr : Type[], item : Type) : boolean {
@@ -820,4 +838,4 @@ export function includesType(arr : Type[], item : Type) : boolean {
   return false;
 }
 
-export const all_types = all_elementary_types.concat(all_mapping_types).concat(all_function_types).concat(all_array_types);
+export const all_types = elementary_types.concat(mapping_types).concat(function_types).concat(array_types);

@@ -56,10 +56,10 @@ test('test dependence DAG 1',
   dag.connect(12, 13);
   dag.connect(13, 14, "subtype");
 
-  type.irnode2types.set(2, type.all_literal_types); // 15
-  type.irnode2types.set(4, type.all_literal_types); // 15
-  type.irnode2types.set(5, type.all_integer_types); // 12
-  type.irnode2types.set(10, type.all_integer_types); // 12
+  type.irnode2types.set(2, type.literal_types); // 15
+  type.irnode2types.set(4, type.literal_types); // 15
+  type.irnode2types.set(5, type.integer_types); // 12
+  type.irnode2types.set(10, type.integer_types); // 12
 
   dag.resolve();
   dag.verify();
@@ -94,8 +94,8 @@ test('test dependence DAG 2',
   dag.connect(5, 6);
   dag.connect(6, 7, "subtype");
   dag.connect(7, 1);
-  type.irnode2types.set(3, type.all_elementary_types);
-  type.irnode2types.set(2, type.all_literal_types);
+  type.irnode2types.set(3, type.elementary_types);
+  type.irnode2types.set(2, type.literal_types);
   dag.resolve();
   dag.verify();
 })
@@ -135,18 +135,63 @@ test('test dependence DAG 3',
   dag.connect(9, 5);
   dag.connect(9, 10, "supertype");
 
-  type.irnode2types.set(0, type.all_literal_types);
-  type.irnode2types.set(1, type.all_literal_types);
-  type.irnode2types.set(2, type.all_literal_types);
-  type.irnode2types.set(3, type.all_literal_types);
-  type.irnode2types.set(4, type.all_literal_types);
-  type.irnode2types.set(5, type.all_literal_types);
-  type.irnode2types.set(6, type.all_literal_types);
-  type.irnode2types.set(7, type.all_literal_types);
-  type.irnode2types.set(8, type.all_literal_types);
-  type.irnode2types.set(9, type.all_integer_types);
-  type.irnode2types.set(10, type.all_literal_types);
+  type.irnode2types.set(0, type.literal_types);
+  type.irnode2types.set(1, type.literal_types);
+  type.irnode2types.set(2, type.literal_types);
+  type.irnode2types.set(3, type.literal_types);
+  type.irnode2types.set(4, type.literal_types);
+  type.irnode2types.set(5, type.literal_types);
+  type.irnode2types.set(6, type.literal_types);
+  type.irnode2types.set(7, type.literal_types);
+  type.irnode2types.set(8, type.literal_types);
+  type.irnode2types.set(9, type.integer_types);
+  type.irnode2types.set(10, type.literal_types);
 
   dag.resolve();
   dag.verify();
 })
+
+// test('test dependence DAG 4',
+// () => {
+//   const nd0 = new ct.ConstaintNode(0);
+//   const nd1 = new ct.ConstaintNode(1);
+//   const nd3 = new ct.ConstaintNode(3);
+//   const nd4 = new ct.ConstaintNode(4);
+//   const nd5 = new ct.ConstaintNode(5);
+//   const nd6 = new ct.ConstaintNode(6);
+//   const nd7 = new ct.ConstaintNode(7);
+//   const nd8 = new ct.ConstaintNode(8);
+//   const nd9 = new ct.ConstaintNode(9);
+//   const dag = new ct.TypeDominanceDAG();
+//   dag.insert(nd0);
+//   dag.insert(nd1);
+//   dag.insert(nd3);
+//   dag.insert(nd4);
+//   dag.insert(nd5);
+//   dag.insert(nd6);
+//   dag.insert(nd7);
+//   dag.insert(nd8);
+//   dag.insert(nd9);
+//   dag.connect(0, 1, "supertype");
+//   dag.connect(3, 1);
+//   dag.connect(4, 3);
+//   dag.connect(4, 5, "supertype");
+//   dag.connect(7, 5);
+//   dag.connect(8, 7);
+//   dag.connect(8, 9, "supertype");
+
+//   type.irnode2types.set(0, type.literal_types);
+//   type.irnode2types.set(1, type.literal_types);
+//   type.irnode2types.set(2, type.literal_types);
+//   type.irnode2types.set(3, type.literal_types);
+//   type.irnode2types.set(4, type.literal_types);
+//   type.irnode2types.set(5, type.literal_types);
+//   type.irnode2types.set(6, type.literal_types);
+//   type.irnode2types.set(7, type.literal_types);
+//   type.irnode2types.set(8, type.literal_types);
+//   type.irnode2types.set(9, type.integer_types);
+//   type.irnode2types.set(10, type.literal_types);
+
+//   dag.resolve();
+//   dag.verify();
+// })

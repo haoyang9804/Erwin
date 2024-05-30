@@ -5,6 +5,7 @@ import * as db from "./db"
 import { irnodes } from "./node";
 import * as exp from "./expression";
 import * as decl from "./declare";
+import * as type from "./type";
 import { pickRandomElement } from "./utility";
 import {
   PrettyFormatter,
@@ -24,6 +25,7 @@ console.log(figlet.textSync('Erwin'));
 export let type_complex_level = 1;
 export let expression_complex_level = 1;
 export let debug = false;
+export let tuple_prob = 0.3;
 const version = "0.1.0";
 
 function terminate(message ?: string, exitCode = 0) : never {
@@ -50,6 +52,7 @@ function error(message : string) : never {
     .version(version, "-v, --version", "Print package version.")
     .helpOption("-h, --help", "Print help message.");
   program
+    .option("-tp --tuple_prob <float>", "The probability of generating a tuple type.", `${tuple_prob}`)
     .option("-tc --type_complex_level <number>", "The complex level of the type Erwin will generate.\nThe suggested range is [1,2,3]. The bigger, the more complex.", `${type_complex_level}`)
     .option("-ec --expression_complex_level <number>", "The complex level of the expression Erwin will generate.\nThe suggedted range is [1,2,3,4,5]. The bigger, the more complex.", `${expression_complex_level}`)
     .option("-d --debug", "Enable the debug mode.", `${debug}`);
@@ -73,6 +76,11 @@ function error(message : string) : never {
     gen.type_dag.resolve();
     if (debug) gen.type_dag.verify();
     console.log(`>> In total, there are ${gen.type_dag.resolved_types_collection.length} resolutions`);
+    if (gen.type_dag.resolved_types_collection.length === 0) {
+      for (let [key, value] of type.irnode2types) {
+        console.log(`${key} -> ${value.forEach((x) => x.str())}`);
+      }
+    }
     let resolved_types = pickRandomElement(gen.type_dag.resolved_types_collection)!;
     for (let [key, value] of resolved_types) {
       (irnodes[key] as exp.IRExpression | decl.IRVariableDeclare).type = value;
