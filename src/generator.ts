@@ -323,7 +323,7 @@ export class UnaryOpGenerator extends RValueGenerator {
     await identifier_gen.generate(component + 1);
     let expression : exp.IRExpression = identifier_gen.irnode! as exp.IRExpression;
     let op = pickRandomElement(["!", "-", "~", "++", "--"])!;
-    this.irnode = new exp.IRUnaryOp(global_id, cur_scope_id, field_flag, pickRandomElement([true, false])!, expression, op)!);
+    this.irnode = new exp.IRUnaryOp(global_id, cur_scope_id, field_flag, pickRandomElement([true, false])!, expression, op)!;
     global_id++;
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "UnaryOp");
     assert(expression instanceof exp.IRIdentifier, "UnaryOpGenerator: expression is not IRIdentifier");
