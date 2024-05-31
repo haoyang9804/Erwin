@@ -99,6 +99,9 @@ export class IRLiteral extends IRExpression {
     assert(this.type.kind === TypeKind.ElementaryType, "IRLiteral: type is not ElementaryType")
     this.generateKind();
     if (this.value === undefined) this.generateVal();
+    if (this.type.str() === "address payable") {
+      return factory.makeFunctionCall("", FunctionCallKind.TypeConversion, factory.makeElementaryTypeNameExpression("", factory.makeElementaryTypeName("", "address", "payable")), [factory.makeLiteral("", this.kind!, str2hex(this.value!), this.value!)]);
+    }
     return factory.makeLiteral("", this.kind!, str2hex(this.value!), this.value!);
   }
 }
