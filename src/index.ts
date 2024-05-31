@@ -6,7 +6,7 @@ import { irnodes } from "./node";
 import * as exp from "./expression";
 import * as decl from "./declare";
 import * as type from "./type";
-import { pickRandomElement } from "./utility";
+// import { pickRandomElement } from "./utility";
 import {
   PrettyFormatter,
   ASTWriter,
@@ -81,17 +81,21 @@ function error(message : string) : never {
         console.log(`${key} -> ${value.forEach((x) => x.str())}`);
       }
     }
-    let resolved_types = pickRandomElement(gen.type_dag.resolved_types_collection)!;
-    for (let [key, value] of resolved_types) {
-      (irnodes[key] as exp.IRExpression | decl.IRVariableDeclare).type = value;
-    }
-    for (let stmt of gen.scope_stmt.get(0)!) {
-      console.log(writer.write(stmt.lower()));
-    }
-    for (let irnode of irnodes) {
-      if (irnode instanceof exp.IRLiteral) {
-        (irnode as exp.IRLiteral).kind = undefined;
-        (irnode as exp.IRLiteral).value = undefined;
+    // let resolved_types = pickRandomElement(gen.type_dag.resolved_types_collection)!;
+    let cnt = 0;
+    for (let resolved_types of gen.type_dag.resolved_types_collection) {
+      console.log(`>>>>>>>>>> Resolution ${cnt++} <<<<<<<<<<`);
+      for (let [key, value] of resolved_types) {
+        (irnodes[key] as exp.IRExpression | decl.IRVariableDeclare).type = value;
+      }
+      for (let stmt of gen.scope_stmt.get(0)!) {
+        console.log(writer.write(stmt.lower()));
+      }
+      for (let irnode of irnodes) {
+        if (irnode instanceof exp.IRLiteral) {
+          (irnode as exp.IRLiteral).kind = undefined;
+          (irnode as exp.IRLiteral).value = undefined;
+        }
       }
     }
   }

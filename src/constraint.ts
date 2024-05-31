@@ -223,20 +223,15 @@ export class TypeDominanceDAG {
     }
 
     // 5. Assign types to heads
-    let heads2type : Map<number, Type>[] = []
+    let heads2type : Map<number, Type>[] = [new Map<number, Type>()];
     for (let head of heads) {
       const heads2type_length = heads2type.length;
       assert(irnode2types.has(head), `TypeDominanceDAG::resolve: head ${head} is not in irnode2types`);
       heads2type = extendArrayofMap(heads2type, irnode2types.get(head)!.length);
       let cnt = 1;
       for (let type of irnode2types.get(head)!) {
-        if (heads2type_length === 0) {
-          heads2type.push(new Map([[head, type]]));
-        }
-        else {
-          for (let i = (cnt - 1) * heads2type_length; i < cnt * heads2type_length; i++) {
-            heads2type[i].set(head, type);
-          }
+        for (let i = (cnt - 1) * heads2type_length; i < cnt * heads2type_length; i++) {
+          heads2type[i].set(head, type);
         }
         cnt++;
       }
