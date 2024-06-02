@@ -6,6 +6,7 @@ import { irnodes } from "./node";
 import * as exp from "./expression";
 import * as decl from "./declare";
 import * as type from "./type";
+import { Log } from "./logging";
 // import { pickRandomElement } from "./utility";
 import {
   PrettyFormatter,
@@ -28,6 +29,8 @@ export let debug = false;
 export let tuple_prob = 0.3;
 export let var_count = 5;
 export let tuple_vardecl_count = 3;
+export let maximum_type_resolution_for_heads = 5000;
+export let log = new Log();
 const version = "0.1.0";
 
 function terminate(message ?: string, exitCode = 0) : never {
@@ -54,6 +57,7 @@ function error(message : string) : never {
     .version(version, "-v, --version", "Print package version.")
     .helpOption("-h, --help", "Print help message.");
   program
+    .option("-mxt --maximum_type_resolution <number>", "The maximum number of type resolutions for heads.", `${maximum_type_resolution_for_heads}`)
     .option("-vc --var_count <number>", "The number of variables Erwin will generate.", `${var_count}`)
     .option("-tvc --tuple_vardecl_count <number>", "The number of variables in a tuple Erwin will generate.", `${tuple_vardecl_count}`)
     .option("-tp --tuple_prob <float>", "The probability of generating a tuple surrounding an expression.", `${tuple_prob}`)
@@ -67,6 +71,7 @@ function error(message : string) : never {
   var_count = parseInt(program.opts().var_count);
   tuple_vardecl_count = parseInt(program.opts().tuple_vardecl_count);
   tuple_prob = parseFloat(program.opts().tuple_prob);
+  maximum_type_resolution_for_heads = parseInt(program.opts().maximum_type_resolution);
   // open and init DB
   await db.irnode_db.open();
   await db.irnode_db.init();
@@ -88,9 +93,7 @@ function error(message : string) : never {
   // resolve constraints
   if (debug) gen.type_dag.draw();
   try {
-    console.log('1')
     gen.type_dag.resolve();
-    console.log('2')
     if (debug) gen.type_dag.verify();
     console.log(`>> In total, there are ${gen.type_dag.resolved_types_collection.length} resolutions`);
     if (gen.type_dag.resolved_types_collection.length === 0) {

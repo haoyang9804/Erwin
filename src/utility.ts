@@ -164,3 +164,19 @@ export function shuffle<T>(array : T[]) : T[] {
 export function intersection_array<T>(array1 : T[], array2 : T[]) : T[] {
   return array1.filter(value => array2.includes(value));
 }
+
+export function selectRandomElements<T>(array : T[], n : number) : T[] {
+  if (n > array.length) {
+    throw new Error("Cannot select more elements than available in the array.");
+  }
+  const selectedIndices = new Set<number>();
+  const selectedElements : T[] = [];
+  while (selectedIndices.size < n) {
+    const randomIndex = Math.floor(Math.random() * array.length);
+    if (!selectedIndices.has(randomIndex)) {
+      selectedIndices.add(randomIndex);
+      selectedElements.push(array[randomIndex]);
+    }
+  }
+  return selectedElements;
+}

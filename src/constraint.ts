@@ -13,13 +13,13 @@ export class ConstaintNode {
     this.id = id;
   }
 }
-import { assert, createCustomSet, extendArrayofMap, pickRandomElement, shuffle, intersection_array } from "./utility";
+import { assert, createCustomSet, extendArrayofMap, pickRandomElement, shuffle, intersection_array, selectRandomElements } from "./utility";
 import { irnode2types, Type } from "./type"
 import * as dot from 'ts-graphviz';
+import { maximum_type_resolution_for_heads } from "./index";
 // debug
 import { toFile } from "@ts-graphviz/adapter";
-import { color } from "console-log-colors";
-import { debug } from "./index";
+import { debug, log } from "./index";
 
 // a set of IRNode ids that have backward constrants that cannot be constant
 export const constantLock = new Set<number>();
@@ -243,7 +243,12 @@ export class TypeDominanceDAG {
         cnt++;
       }
     }
-    this.heads2type = shuffle(this.heads2type);
+    if (this.heads2type.length > maximum_type_resolution_for_heads) {
+      this.heads2type = selectRandomElements(this.heads2type, maximum_type_resolution_for_heads);
+    }
+    else {
+      this.heads2type = shuffle(this.heads2type);
+    }
   }
 
   allocate_type_candidates_for_tails_based_on_type_resolution_for_heads(head_resolve : Map<number, Type>) : Map<number, Type[]> {
@@ -417,22 +422,22 @@ export class TypeDominanceDAG {
   resolve() : void {
     // !0. initialize the resolution
     this.initialize_resolve();
-    if (debug) console.log(color.cyan("1. Finish initializing the resolution"));
+    if (debug) log.write("1. Finish initializing the resolution");
     // !1. Get this.heads and this.tails
     this.get_heads_and_tails();
-    if (debug) console.log(color.cyan("2. Finish initializing this.heads and this.tails"));
+    if (debug) log.write("2. Finish initializing this.heads and this.tails");
     // !2. Map nodes to their this.tails, recording if there exists a path from the node to tail with tail_id on which subtype/supertype domination does not holds.
     // If there are multiple paths from node to tail, then the subtype does not hold as long as there exists a path on which subtype domination does not hold.
     // tail_ids are not in this.node2tail
     for (let tail of this.tails) {
       this.dfs4node2tail(tail, tail, false, false);
     }
-    if (debug) console.log(color.cyan("3. Finish initializing node2tail"));
+    if (debug) log.write("3. Finish initializing node2tail");
     // !3. Map edges to their reachable this.tails
     for (let tail of this.tails) {
       this.dfs4edge2tail(tail, tail);
     }
-    if (debug) console.log(color.cyan("4. Finish initializing edge2tail"));
+    if (debug) log.write("4. Finish initializing edge2tail");
     // !4. Remove some removable subtype dominations using this.node2tail and this.edge2tail
     // See the first test case in resolve.test.ts. The subtype domination from node 6 to node 7
     // is removable since the type of node 6 must be the same as the type of node 1, and edge (6, 7)
@@ -440,7 +445,7 @@ export class TypeDominanceDAG {
     for (let head of this.heads) {
       this.remove_subtype_domination(head);
     }
-    if (debug) console.log(color.cyan("4. Finish removing removable subtype dominations"));
+    if (debug) log.write("4. Finish removing removable subtype dominations");
     // !5. Restrict the type range of this.heads.
     // Consider the following scenario.
     // If the true expression of a conditional expression Ec is a unaryop expression Eu whose op is "!", then the type of
@@ -453,11 +458,11 @@ export class TypeDominanceDAG {
     for (let tail of this.tails) {
       this.restrict_type_range(tail);
     }
-    if (debug) console.log(color.cyan("5. Finish restricting the type range of heads"));
+    if (debug) log.write("5. Finish restricting the type range of heads");
     // !6. Assign types to this.heads
     this.allocate_type_candidates_for_heads();
-    if (debug) console.log(color.cyan("6. Finish allocating type candidates for heads"));
-    if (debug) console.log(color.cyan("7. Start traversing all type resolutions for heads"));
+    if (debug) log.write("6. Finish allocating type candidates for heads");
+    if (debug) log.write("7. Start traversing all type resolutions for heads");
     // !7. Traverse each type resolution for heads
     for (const head_resolve of this.heads2type) {
       this.resolved_types.clear();
@@ -465,7 +470,7 @@ export class TypeDominanceDAG {
       // First, narrow down the type range of this.tails
       // !8. Allocate type candidates for tails based on the current type resolution for heads
       const tail2types = this.allocate_type_candidates_for_tails_based_on_type_resolution_for_heads(head_resolve);
-      if (debug) console.log(color.cyan("8. Finish allocating type candidates for tails based on the current type resolution for heads"));
+      if (debug) log.write("8. Finish allocating type candidates for tails based on the current type resolution for heads");
       // Then check if there exists one tail whose type candidates are empty.
       // If all this.tails have non-empty type candidates, then resolve the types of this.tails.
       for (const tail of this.tails) {
@@ -484,10 +489,10 @@ export class TypeDominanceDAG {
       if (!good_resolve) continue;
       // !9. Build connection among tails.
       this.build_tails_relation();
-      if (debug) console.log(color.cyan("9. Finish building type relations among tails"));
+      if (debug) log.write("9. Finish building type relations among tails");
       // !10. Resolve the types of tails.
       const plausible_type_resolution_for_tails = this.resolve_tails(tail2types);
-      if (debug) console.log(color.cyan("10. Finish resolving types for tails"));
+      if (debug) log.write("10. Finish resolving types for tails");
       if (plausible_type_resolution_for_tails === false) continue;
       // !11. Check if the resolved types of tails are compatible with the resolved types of heads.
       for (let [head, type_of_head] of head_resolve) {
@@ -514,12 +519,12 @@ export class TypeDominanceDAG {
             }
           }
         }
-        if (debug) console.log(color.cyan("11. Finish checking the compatibility of resolved types of tails with resolved types of heads"));
+        if (debug) log.write("11. Finish checking the compatibility of resolved types of tails with resolved types of heads");
         // !12. Resolve the types of nonheads and nontails.
         if (compatible_with_resolved_tails) {
           this.resolved_types.set(head, type_of_head);
           this.resolve_nonheads_and_nontails(head);
-          if (debug) console.log(color.cyan("12. Finish resolving types of nonheads and nontails"));
+          if (debug) log.write("12. Finish resolving types of nonheads and nontails");
         }
         else {
           good_resolve = false;
