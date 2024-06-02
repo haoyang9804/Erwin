@@ -391,13 +391,13 @@ export class UnaryOpGenerator extends RValueGenerator {
     const identifier_gen = new IdentifierGenerator();
     await identifier_gen.generate(component + 1);
     let expression : exp.IRExpression = identifier_gen.irnode! as exp.IRExpression;
+    this.irnode = new exp.IRUnaryOp(global_id++, cur_scope_id, field_flag, pickRandomElement([true, false])!, expression, this.op)!;
+    await irnode_db.insert(this.irnode.id, this.irnode.scope, "UnaryOp");
     let extracted_expression = expression;
     while (extracted_expression instanceof exp.IRTuple) {
       assert(extracted_expression.components.length === 1, "UnaryOpGenerator: extracted_expression.components.length is not 1");
       extracted_expression = extracted_expression.components[0];
     }
-    this.irnode = new exp.IRUnaryOp(global_id++, cur_scope_id, field_flag, pickRandomElement([true, false])!, expression, this.op)!;
-    await irnode_db.insert(this.irnode.id, this.irnode.scope, "UnaryOp");
     assert(extracted_expression instanceof exp.IRIdentifier, "UnaryOpGenerator: extracted_expression is not IRIdentifier");
     assert((extracted_expression as exp.IRIdentifier).reference !== undefined, "UnaryOpGenerator: extracted_expression.reference is undefined");
     type_dag.insert(type_dag.newNode(this.irnode.id));
@@ -417,6 +417,7 @@ export class UnaryOpGenerator extends RValueGenerator {
     }
   }
 }
+
 
 const terminal_expression_generators = [
   LiteralGenerator,

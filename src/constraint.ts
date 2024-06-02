@@ -221,7 +221,10 @@ export class TypeDominanceDAG {
     for (let head of heads) {
       remove_subtype_domination(head);
     }
-
+    // 5. Restrict the type range of heads.
+    // If the true expression of a conditional expression Ec is a unaryop expression Eu whose op is "!", then the type of
+    // Eu should be boolean. However, Eu type-dominate Ec and the type range of Eu is more than just boolean.
+    // Therefore, we need to back-propogate the type range from children to parents until the type range of heads are restricted.
     // 5. Assign types to heads
     let heads2type : Map<number, Type>[] = [new Map<number, Type>()];
     for (let head of heads) {
@@ -297,7 +300,7 @@ export class TypeDominanceDAG {
     }
     const resolved_types = new Map<number, Type>();
 
-    // 9. Resolve types from heads to tails.
+    // 8. Resolve types from heads to tails.
     let resolve = (node : number) => {
       for (let child of this.dag_nodes.get(node)!.outs) {
         const edge = `${node} ${child}`;
@@ -330,21 +333,6 @@ export class TypeDominanceDAG {
               if (resolved_types.has(child)) {
                 type_candidates = type_candidates.filter(t => t.same(resolved_types.get(child)!));
               }
-              // if (type_candidates.length === 0) {
-              //   for (let [node, type] of resolved_types) {
-              //     console.log('>', node, type.str());
-              //   }
-              //   for (let [id, tail_info] of node2tail) {
-              //     console.log('?', id, [...tail_info]);
-              //   }
-              //   for (let [edge, tails] of edge2tail) {
-              //     console.log('!', edge, [...tails]);
-              //   }
-              //   console.log('=====subtype=====');
-              //   for (let edge of this.subtype) {
-              //     console.log(edge);
-              //   }
-              // }
               assert(type_candidates.length > 0, `TypeDominanceDAG::resolve::resolve:>3 type_candidates is empty`);
               resolved_types.set(child, pickRandomElement(type_candidates)!);
             }
@@ -355,7 +343,7 @@ export class TypeDominanceDAG {
     }
     for (const head_resolve of heads2type) {
       resolved_types.clear();
-      let good_head_resolve = true;
+      let good_resolve = true;
       // First, narrow down the type range of tails
       const tail2types = get_type_candidates_for_tails(head_resolve);
       // Then check if there exists one tail whose type candidates are empty.
@@ -363,7 +351,7 @@ export class TypeDominanceDAG {
       for (const tail of tails) {
         assert(tail2types.has(tail), `tail2type does not have ${tail}`);
         if (tail2types.get(tail)!.length === 0) {
-          good_head_resolve = false;
+          good_resolve = false;
           break;
         }
         else {
@@ -373,7 +361,7 @@ export class TypeDominanceDAG {
           tail2types.set(tail, shuffle(tail2types.get(tail)!))
         }
       }
-      if (!good_head_resolve) continue;
+      if (!good_resolve) continue;
       // Next, build connection among tails.
       tails_relation();
       // Then, resolve the types of tails.
@@ -469,11 +457,29 @@ export class TypeDominanceDAG {
           resolve(head);
         }
         else {
-          good_head_resolve = false;
+          good_resolve = false;
           break;
         }
       }
-      if (good_head_resolve) {
+      // If the true expression of a conditional expression Ec is a unaryop expression Eu whose op is "!", then the type of
+      // Eu should be boolean. However, Eu type-dominate Ec and the type range of Eu is more than just boolean.
+      // Therefore, we need to check finally whether the type of a node is outside of its type range. If so, then the head_resolve is bad.
+      for (let [nodeid, type_candidates] of irnode2types) {
+        let pass_checking = false;
+        assert(resolved_types.has(nodeid), `TypeDominanceDAG::resolve: resolved_types does not have ${nodeid}`);
+        const resolved_type = resolved_types.get(nodeid)!;
+        for (let type_candidate of type_candidates) {
+          if (resolved_type.same(type_candidate)) {
+            pass_checking = true;
+            break;
+          }
+        }
+        if (pass_checking === false) {
+          good_resolve = false;
+          break;
+        }
+      }
+      if (good_resolve) {
         this.resolved_types_collection.push(new Map(resolved_types));
       }
     }
@@ -481,10 +487,25 @@ export class TypeDominanceDAG {
 
   verify() : void {
     for (const resolved_types of this.resolved_types_collection) {
+      // 1. Verify that all nodes have been resolved.
+      for (let [id, _] of this.dag_nodes) {
+        assert(resolved_types.has(id), `TypeDominanceDAG: node ${id} has not been resolved`);
+      }
+      // 2. Verify that all resolved types are one of the type candidates of the node.
+      for (let [id, type_candidates] of irnode2types) {
+        let resolved_type = resolved_types.get(id)!;
+        let match = false;
+        for (let type_candidate of type_candidates) {
+          if (resolved_type.same(type_candidate)) {
+            match = true;
+            break;
+          }
+        }
+        assert(match, `TypeDominanceDAG: resolved type ${resolved_type.str()} of node ${id} is not one of the type candidates: ${type_candidates.map(t => t.str()).join(", ")}`);
+      }
+      // 3. Verify that all type-domination relations hold.
       for (let [id, node] of this.dag_nodes) {
-        assert(resolved_types.has(id), `TypeDominanceDAG: node ${id} is not resolved.`);
         for (let child of node.outs) {
-          assert(resolved_types.get(child), `TypeDominanceDAG: node ${child} is not resolved.`)
           if (this.subtype.has(`${node.id} ${child}`)) {
             const subttypes = resolved_types.get(node.id)!.subtype();
             let typeofchild = resolved_types.get(child)!;
