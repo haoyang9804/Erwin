@@ -26,6 +26,8 @@ export let type_complex_level = 1;
 export let expression_complex_level = 1;
 export let debug = false;
 export let tuple_prob = 0.3;
+export let var_count = 5;
+export let tuple_vardecl_count = 3;
 const version = "0.1.0";
 
 function terminate(message ?: string, exitCode = 0) : never {
@@ -52,7 +54,9 @@ function error(message : string) : never {
     .version(version, "-v, --version", "Print package version.")
     .helpOption("-h, --help", "Print help message.");
   program
-    .option("-tp --tuple_prob <float>", "The probability of generating a tuple type.", `${tuple_prob}`)
+    .option("-vc --var_count <number>", "The number of variables Erwin will generate.", `${var_count}`)
+    .option("-tvc --tuple_vardecl_count <number>", "The number of variables in a tuple Erwin will generate.", `${tuple_vardecl_count}`)
+    .option("-tp --tuple_prob <float>", "The probability of generating a tuple surrounding an expression.", `${tuple_prob}`)
     .option("-tc --type_complex_level <number>", "The complex level of the type Erwin will generate.\nThe suggested range is [1,2,3]. The bigger, the more complex.", `${type_complex_level}`)
     .option("-ec --expression_complex_level <number>", "The complex level of the expression Erwin will generate.\nThe suggedted range is [1,2,3,4,5]. The bigger, the more complex.", `${expression_complex_level}`)
     .option("-d --debug", "Enable the debug mode.", `${debug}`);
@@ -60,16 +64,25 @@ function error(message : string) : never {
   type_complex_level = parseInt(program.opts().type_complex_level);
   expression_complex_level = parseInt(program.opts().expression_complex_level);
   debug = program.opts().debug;
+  var_count = parseInt(program.opts().var_count);
+  tuple_vardecl_count = parseInt(program.opts().tuple_vardecl_count);
+  tuple_prob = parseFloat(program.opts().tuple_prob);
   // open and init DB
   await db.irnode_db.open();
   await db.irnode_db.init();
   // generation
-  const v1 = new gen.VariableDeclareStatementGenerator();
-  const v2 = new gen.VariableDeclareStatementGenerator();
-  const v3 = new gen.VariableDeclareStatementGenerator();
-  await v1.generate();
-  await v2.generate();
-  await v3.generate();
+  for (let i = 0; i < var_count - tuple_vardecl_count; i++) {
+    const v = new gen.SingleVariableDeclareStatementGenerator();
+    await v.generate();
+  }
+  const tv = new gen.MultipleVariableDeclareStatementGenerator();
+  await tv.generate();
+  // const v1 = new gen.SingleVariableDeclareStatementGenerator();
+  // const v2 = new gen.SingleVariableDeclareStatementGenerator();
+  // const v3 = new gen.SingleVariableDeclareStatementGenerator();
+  // await v1.generate();
+  // await v2.generate();
+  // await v3.generate();
   // resolve constraints
   if (debug) gen.type_dag.draw();
   try {

@@ -6,7 +6,7 @@ import * as stmt from "./statement";
 import * as type from "./type";
 import { irnode_db } from "./db";
 import { TypeDominanceDAG } from "./constraint";
-import { expression_complex_level, tuple_prob } from "./index";
+import { expression_complex_level, tuple_prob, tuple_vardecl_count } from "./index";
 import { irnodes } from "./node";
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Global Variables
@@ -137,7 +137,7 @@ export class IdentifierGenerator extends LRValueGenerator {
   async generate(component : number) : Promise<void> {
     // Generate a variable decl if there is no variable decl available.
     if (this.id === undefined && !(await hasAvailableIRVariableDeclare(cur_scope_id))) {
-      const variable_stmt_gen = new VariableDeclareStatementGenerator();
+      const variable_stmt_gen = new SingleVariableDeclareStatementGenerator();
       await variable_stmt_gen.generate();
     }
     // generate an identifier
@@ -444,7 +444,7 @@ export abstract class StatementGenerator extends Generator {
   abstract generate() : void;
 }
 
-export class VariableDeclareStatementGenerator extends StatementGenerator {
+export class SingleVariableDeclareStatementGenerator extends StatementGenerator {
   constructor() { super(); }
   async generate() : Promise<void> {
     let expression_gen_prototype;
@@ -461,12 +461,49 @@ export class VariableDeclareStatementGenerator extends StatementGenerator {
     this.irnode = new stmt.IRVariableDeclareStatement(global_id++, cur_scope_id, field_flag, [variable_gen.irnode! as decl.IRVariableDeclare], expression_gen.irnode! as exp.IRExpression);
     let expression_gen_extracted = expression_gen.irnode!;
     while (expression_gen_extracted instanceof exp.IRTuple) {
-      assert(expression_gen_extracted.components.length === 1, "VariableDeclareStatementGenerator: expression_gen_extracted.components.length is not 1");
+      assert(expression_gen_extracted.components.length === 1, "SingleVariableDeclareStatementGenerator: expression_gen_extracted.components.length is not 1");
       expression_gen_extracted = expression_gen_extracted.components[0];
     }
     scope_stmt.set(cur_scope_id, scope_stmt.has(cur_scope_id) ? scope_stmt.get(cur_scope_id)!.concat(this.irnode!) : [this.irnode!]);
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "VariableDeclareStatement");
     type_dag.connect(expression_gen_extracted.id, variable_gen.irnode!.id, "supertype");
+  }
+}
+
+export class MultipleVariableDeclareStatementGenerator extends StatementGenerator {
+  constructor() { super(); }
+  async generate() : Promise<void> {
+    const ir_exps : exp.IRExpression[] = [];
+    for (let i = 0; i < tuple_vardecl_count; i++) {
+      let expression_gen_prototype;
+      if (await hasAvailableIRVariableDeclare(cur_scope_id)) {
+        expression_gen_prototype = pickRandomElement(all_expression_generators)!;
+      }
+      else {
+        expression_gen_prototype = LiteralGenerator;
+      }
+      const expression_gen = new expression_gen_prototype();
+      await expression_gen.generate(0);
+      ir_exps.push(expression_gen.irnode! as exp.IRExpression);
+    }
+    const ir_varnodes : decl.IRVariableDeclare[] = [];
+    for (let i = 0; i < tuple_vardecl_count; i++) {
+      const variable_gen = new VariableDeclareGenerator();
+      await variable_gen.generate();
+      ir_varnodes.push(variable_gen.irnode! as decl.IRVariableDeclare);
+    }
+    const ir_tuple_exp = new exp.IRTuple(global_id++, cur_scope_id, field_flag, ir_exps);
+    this.irnode = new stmt.IRVariableDeclareStatement(global_id++, cur_scope_id, field_flag, ir_varnodes, ir_tuple_exp);
+    scope_stmt.set(cur_scope_id, scope_stmt.has(cur_scope_id) ? scope_stmt.get(cur_scope_id)!.concat(this.irnode!) : [this.irnode!]);
+    await irnode_db.insert(this.irnode.id, this.irnode.scope, "VariableDeclareStatement");
+    for (let i = 0; i < tuple_vardecl_count; i++) {
+      let extracted_ir = ir_exps[i];
+      while (extracted_ir instanceof exp.IRTuple) {
+        assert(extracted_ir.components.length === 1, "SingleVariableDeclareStatementGenerator: expression_gen_extracted.components.length is not 1");
+        extracted_ir = extracted_ir.components[0];
+      }
+      type_dag.connect(extracted_ir.id, ir_varnodes[i].id, "supertype");
+    }
   }
 }
 
