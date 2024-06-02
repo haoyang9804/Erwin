@@ -75,8 +75,10 @@ function error(message : string) : never {
     const v = new gen.SingleVariableDeclareStatementGenerator();
     await v.generate();
   }
-  const tv = new gen.MultipleVariableDeclareStatementGenerator();
-  await tv.generate();
+  if (tuple_vardecl_count > 0) {
+    const tv = new gen.MultipleVariableDeclareStatementGenerator();
+    await tv.generate();
+  }
   // const v1 = new gen.SingleVariableDeclareStatementGenerator();
   // const v2 = new gen.SingleVariableDeclareStatementGenerator();
   // const v3 = new gen.SingleVariableDeclareStatementGenerator();
@@ -86,7 +88,9 @@ function error(message : string) : never {
   // resolve constraints
   if (debug) gen.type_dag.draw();
   try {
+    console.log('1')
     gen.type_dag.resolve();
+    console.log('2')
     if (debug) gen.type_dag.verify();
     console.log(`>> In total, there are ${gen.type_dag.resolved_types_collection.length} resolutions`);
     if (gen.type_dag.resolved_types_collection.length === 0) {

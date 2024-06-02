@@ -13,7 +13,7 @@ export class ConstaintNode {
     this.id = id;
   }
 }
-import { assert, createCustomSet, extendArrayofMap, pickRandomElement, shuffle } from "./utility";
+import { assert, createCustomSet, extendArrayofMap, pickRandomElement, shuffle, intersection_array } from "./utility";
 import { irnode2types, Type } from "./type"
 import * as dot from 'ts-graphviz';
 // debug
@@ -22,55 +22,16 @@ import { toFile } from "@ts-graphviz/adapter";
 // a set of IRNode ids that have backward constrants that cannot be constant
 export const constantLock = new Set<number>();
 
-// export class InfoTree<T> {
-//   id: number;
-//   type: T | undefined;
-//   children: InfoTree<T>[] = [];
-//   nt: InfoTree<T> | undefined = undefined;
-//   constructor(id: number, type?: T) {
-//     this.id = id;
-//     this.type = type;
-//   }
-// }
-
-// export class DAGpath {
-//   me: number;
-//   nt: DAGpath | undefined;
-//   subtype_cnt: number;
-//   constructor(me: number, subtype_cnt: number, nt?: DAGpath) {
-//     this.me = me;
-//     this.subtype_cnt = subtype_cnt;
-//     this.nt = nt;
-//   }
-// }
-
-// export class rDAGpath {
-//   me: number;
-//   nt: rDAGpath | undefined;
-//   supertype_cnt: number;
-//   constructor(me: number, supertype_cnt: number, nt?: rDAGpath) {
-//     this.me = me;
-//     this.supertype_cnt = supertype_cnt;
-//     this.nt = nt;
-//   }
-// }
-
-// export function reversePath(path: DAGpath): rDAGpath {
-//   const nodes: DAGpath[] = []
-//   const subtype_cnt = path.subtype_cnt;
-//   let maybe_path: DAGpath | undefined = path;
-//   while(maybe_path !== undefined) {
-//     nodes.push(maybe_path);
-//     maybe_path = maybe_path.nt;
-//   }
-//   nodes.reverse();
-//   let rpath: rDAGpath | undefined = undefined;
-//   for (let node of nodes) {
-//     rpath = new rDAGpath(node.me, subtype_cnt - node.subtype_cnt, rpath);
-//   }
-//   assert(rpath !== undefined, `reversePath: rpath is undefined`);
-//   return rpath;
-// }
+interface toTail {
+  tail_id : number;
+  // subtype/supertype = true if there exists a path from the node to tail with tail_id,
+  // subtype/supertype domination holds.
+  subtype : boolean;
+  supertype : boolean;
+};
+let equal_toTail = (a : toTail, b : toTail) : boolean => {
+  return a.tail_id === b.tail_id;
+}
 
 // The type dependence of the subsequent uses on the previous declacations
 export class TypeDominanceDAG {
@@ -78,7 +39,23 @@ export class TypeDominanceDAG {
   // If 'id1 id2' is installed in subtype/supertype, then the type of id2 is a subtype/supertype of the type of id1
   subtype : Set<string> = new Set();
   supertype : Set<string> = new Set();
+  resolved_types = new Map<number, Type>();
   resolved_types_collection : Map<number, Type>[] = [];
+  // Records the IDs of heads/tails
+  heads: Set<number> = new Set<number>();
+  tails: Set<number> = new Set<number>();
+  // For each node, records the IDs of its reachable tails and the subtype/supertype domination between the node and the tail.
+  // If there are multiple paths from node to tail, then the subtype does not hold as long as there exists a path on which subtype domination does not hold.
+  // tail_ids are not in this.node2tail
+  node2tail: Map<number, Set<toTail>> = new Map<number, Set<toTail>>();
+  // Map each edge to its reachable tails
+  edge2tail: Map<string, Set<number>> = new Map<string, Set<number>>();
+  // Records type candidates of all heads
+  heads2type : Map<number, Type>[] = [new Map<number, Type>()];
+  // If "tail1 tail2" is in tailssubtype, then the type of tail2 is a subtype of the type of tail1.
+  tailssubtype: Set<string> = new Set<string>();
+  // If "tail1 tail2" is in tailssubtype, then the type of tail2 equals to the type of tail1.
+  tailsequal: Set<string> = new Set<string>();
 
   constructor() { }
 
@@ -111,261 +88,220 @@ export class TypeDominanceDAG {
     }
   }
 
-  resolve() : void {
-    // 0. initialize the resolution
-    for (let [_, node] of this.dag_nodes) {
-      node.resolved = false;
-    }
+  initialize_resolve() : void {
+    this.resolved_types = new Map<number, Type>();
     this.resolved_types_collection = [];
-    // 1. Get heads and tails
-    const heads = new Set<number>();
-    const tails = new Set<number>();
+    this.heads = new Set<number>();
+    this.tails = new Set<number>();
+    this.node2tail = new Map<number, Set<toTail>>();
+    this.edge2tail = new Map<string, Set<number>>();
+    this.heads2type = [new Map<number, Type>()];
+    this.tailssubtype = new Set<string>();
+    this.tailsequal = new Set<string>();
+  }
+
+  get_heads_and_tails(): void {
     for (let [_, node] of this.dag_nodes) {
       if (node.inbound === 0) {
-        heads.add(node.id);
+        this.heads.add(node.id);
       }
       if (node.outbound === 0) {
-        tails.add(node.id);
+        this.tails.add(node.id);
       }
     }
-    // 2. Map nodes to their tails, recording if there exists a path from the node to tail with tail_id on which subtype/supertype domination does not holds.
-    // If there are multiple paths from node to tail, then the subtype does not hold as long as there exists a path on which subtype domination does not hold.
-    interface toTail {
-      tail_id : number;
-      // subtype/supertype = true if there exists a path from the node to tail with tail_id,
-      // subtype/supertype domination holds.
-      subtype : boolean;
-      supertype : boolean;
-    };
-    let equal_toTail = (a : toTail, b : toTail) : boolean => {
-      return a.tail_id === b.tail_id;
-    }
-    // tail_ids are not in node2tail
-    const node2tail = new Map<number, Set<toTail>>();
-    let dfs4node2tail = (id : number, tail_id : number, subtype : boolean, supertype : boolean) => {
-      for (let parent of this.dag_nodes.get(id)!.ins) {
-        const key = `${parent} ${id}`;
-        let this_subtype = this.subtype.has(key) || subtype;
-        let this_supertype = this.supertype.has(key) || supertype;
-        if (node2tail.has(parent)) {
-          // pre_subtype = false if there exists a path from the parent to tail with tail_id on which no subtype domination holds.
-          let pre_subtype = true;
-          const pre_tail_info : toTail[] = [];
-          let meet_this_tail_before = false;
-          for (const tail_info of node2tail.get(parent)!) {
-            if (tail_info.tail_id === tail_id) {
-              meet_this_tail_before = true;
-              pre_subtype &&= tail_info.subtype;
-              pre_tail_info.push(tail_info);
-            }
-          }
-          if (meet_this_tail_before) {
-            if (pre_subtype === true && this_subtype == false) {
-              for (const tail_info of pre_tail_info)
-                node2tail.get(parent)!.delete(tail_info);
-              node2tail.get(parent)!.add({ tail_id: tail_id, subtype: false, supertype: this_supertype });
-            }
-            this_subtype &&= pre_subtype;
-          }
-          else {
-            node2tail.get(parent)!.add({ tail_id: tail_id, subtype: this_subtype, supertype: this_supertype });
-          }
-        }
-        else {
-          const s = createCustomSet<toTail>(equal_toTail);
-          s.add({ tail_id: tail_id, subtype: this_subtype, supertype: this_supertype });
-          node2tail.set(parent, s);
-        }
-        dfs4node2tail(parent, tail_id, this_subtype, this_supertype);
+    // Remove nodes that are both head and tail from this.heads and this.tails
+    for (let node of this.heads) {
+      if (this.tails.has(node)) {
+        this.heads.delete(node);
+        this.tails.delete(node);
       }
     }
-    for (let tail of tails) {
-      dfs4node2tail(tail, tail, false, false);
-    }
-    // 3. Map edges to their reachable tails
-    const edge2tail = new Map<string, Set<number>>();
-    let dfs4edge2tail = (id : number, tail_id : number) => {
-      for (let parent of this.dag_nodes.get(id)!.ins) {
-        const edge = `${parent} ${id}`;
-        if (edge2tail.has(edge)) {
-          edge2tail.get(edge)!.add(tail_id);
-        }
-        else {
-          edge2tail.set(edge, new Set([tail_id]));
-        }
-        dfs4edge2tail(parent, tail_id);
-      }
-    }
-    for (let tail of tails) {
-      dfs4edge2tail(tail, tail);
-    }
+  }
 
-    // 4. Remove some removable subtype dominations using node2tail and edge2tail
-    // See the first test case in resolve.test.ts. The subtype domination from node 6 to node 7
-    // is removable since the type of node 6 must be the same as the type of node 1, and edge (6, 7)
-    // can reach tail 1.
-    let remove_subtype_domination = (node : number) => {
-      for (const child of this.dag_nodes.get(node)!.outs) {
-        const edge = `${node} ${child}`;
-        assert(edge2tail.has(edge), `${edge} is not included in edge2tail`);
-        for (const tail of edge2tail.get(edge)!) {
-          const tail_info = [...node2tail.get(node)!].find(t => t.tail_id === tail);
-          assert(tail_info !== undefined, `TypeDominanceDAG::resolve: tail_info of tail whose ID is ${tail} is undefined`);
-          if (!tail_info.subtype && this.subtype.has(edge)) {
-            this.subtype.delete(edge);
+  dfs4node2tail(id : number, tail_id : number, subtype : boolean, supertype : boolean): void {
+    for (let parent of this.dag_nodes.get(id)!.ins) {
+      const key = `${parent} ${id}`;
+      let this_subtype = this.subtype.has(key) || subtype;
+      let this_supertype = this.supertype.has(key) || supertype;
+      if (this.node2tail.has(parent)) {
+        // pre_subtype = false if there exists a path from the parent to tail with tail_id on which no subtype domination holds.
+        let pre_subtype = true;
+        const pre_tail_info : toTail[] = [];
+        let meet_this_tail_before = false;
+        for (const tail_info of this.node2tail.get(parent)!) {
+          if (tail_info.tail_id === tail_id) {
+            meet_this_tail_before = true;
+            pre_subtype &&= tail_info.subtype;
+            pre_tail_info.push(tail_info);
           }
         }
-        remove_subtype_domination(child);
+        if (meet_this_tail_before) {
+          if (pre_subtype === true && this_subtype == false) {
+            for (const tail_info of pre_tail_info)
+              this.node2tail.get(parent)!.delete(tail_info);
+            this.node2tail.get(parent)!.add({ tail_id: tail_id, subtype: false, supertype: this_supertype });
+          }
+          this_subtype &&= pre_subtype;
+        }
+        else {
+          this.node2tail.get(parent)!.add({ tail_id: tail_id, subtype: this_subtype, supertype: this_supertype });
+        }
       }
+      else {
+        const s = createCustomSet<toTail>(equal_toTail);
+        s.add({ tail_id: tail_id, subtype: this_subtype, supertype: this_supertype });
+        this.node2tail.set(parent, s);
+      }
+      this.dfs4node2tail(parent, tail_id, this_subtype, this_supertype);
     }
-    for (let head of heads) {
-      remove_subtype_domination(head);
+  }
+
+  dfs4edge2tail(id: number, tail_id: number): void {
+    for (let parent of this.dag_nodes.get(id)!.ins) {
+      const edge = `${parent} ${id}`;
+      if (this.edge2tail.has(edge)) {
+        this.edge2tail.get(edge)!.add(tail_id);
+      }
+      else {
+        this.edge2tail.set(edge, new Set([tail_id]));
+      }
+      this.dfs4edge2tail(parent, tail_id);
     }
-    // 5. Restrict the type range of heads.
-    // If the true expression of a conditional expression Ec is a unaryop expression Eu whose op is "!", then the type of
-    // Eu should be boolean. However, Eu type-dominate Ec and the type range of Eu is more than just boolean.
-    // Therefore, we need to back-propogate the type range from children to parents until the type range of heads are restricted.
-    // 5. Assign types to heads
-    let heads2type : Map<number, Type>[] = [new Map<number, Type>()];
-    for (let head of heads) {
-      const heads2type_length = heads2type.length;
+  }
+
+  remove_subtype_domination(node: number): void {
+    for (const child of this.dag_nodes.get(node)!.outs) {
+      const edge = `${node} ${child}`;
+      assert(this.edge2tail.has(edge), `${edge} is not included in this.edge2tail`);
+      for (const tail of this.edge2tail.get(edge)!) {
+        const tail_info = [...this.node2tail.get(node)!].find(t => t.tail_id === tail);
+        assert(tail_info !== undefined, `TypeDominanceDAG::resolve: tail_info of tail whose ID is ${tail} is undefined`);
+        if (!tail_info.subtype && this.subtype.has(edge)) {
+          this.subtype.delete(edge);
+        }
+      }
+      this.remove_subtype_domination(child);
+    }
+  }
+
+  restrict_type_range(node: number) {
+    for (let parent of this.dag_nodes.get(node)!.ins) {
+      const edge = `${parent} ${node}`;
+      if (!this.subtype.has(edge) && !this.supertype.has(edge)) {
+        let parent_type_candidates = irnode2types.get(parent)!;
+        let child_type_candidates = irnode2types.get(node)!;
+        let same = true;
+        if (parent_type_candidates.length !== child_type_candidates.length) {
+          same = false;
+        }
+        else {
+          for (let i = 0; i < parent_type_candidates.length; i++) {
+            if (!parent_type_candidates[i].same(child_type_candidates[i])) {
+              same = false;
+              break;
+            }
+          }
+        }
+        if (!same) {
+          let parent_candidates_is_superset_of_child_candidates = true;
+          for (let child_type_candidate of child_type_candidates) {
+            if (!parent_type_candidates.some(t => t.same(child_type_candidate))) {
+              parent_candidates_is_superset_of_child_candidates = false;
+              break;
+            }
+          }
+          let child_candidates_is_superset_of_parent_candidates = true;
+          for (let parent_type_candidate of parent_type_candidates) {
+            if (!child_type_candidates.some(t => t.same(parent_type_candidate))) {
+              child_candidates_is_superset_of_parent_candidates = false;
+              break;
+            }
+          }
+          assert(parent_candidates_is_superset_of_child_candidates || child_candidates_is_superset_of_parent_candidates,
+            `TypeDominanceDAG::resolve: the type range of ${parent}: ${parent_type_candidates.map(x => x.str())} is not a superset or subset of the type range of ${node}: ${child_type_candidates.map(x => x.str())}`);
+          if (parent_candidates_is_superset_of_child_candidates) {
+            irnode2types.set(parent, child_type_candidates);
+          }
+        }
+      }
+      this.restrict_type_range(parent);
+    }
+  }
+
+  allocate_type_candidates_for_heads(): void {
+    for (let head of this.heads) {
+      const heads2type_length = this.heads2type.length;
       assert(irnode2types.has(head), `TypeDominanceDAG::resolve: head ${head} is not in irnode2types`);
-      heads2type = extendArrayofMap(heads2type, irnode2types.get(head)!.length);
+      this.heads2type = extendArrayofMap(this.heads2type, irnode2types.get(head)!.length);
       let cnt = 1;
       for (let type of irnode2types.get(head)!) {
         for (let i = (cnt - 1) * heads2type_length; i < cnt * heads2type_length; i++) {
-          heads2type[i].set(head, type);
+          this.heads2type[i].set(head, type);
         }
         cnt++;
       }
     }
-    heads2type = shuffle(heads2type);
-    // 6. Get type candidates for tails
-    let get_type_candidates_for_tails = (head_resolve : Map<number, Type>) : Map<number, Type[]> => {
-      const tail2types = new Map<number, Type[]>();
-      let types4tail : Type[] = [];
-      for (let [head, type_of_head] of head_resolve) {
-        assert(node2tail.has(head), `TypeDominanceDAG::resolve::get_type_candidates_for_tails node2tail does not have ${head}`);
-        for (const { tail_id, subtype, supertype } of node2tail.get(head)!) {
-          if (subtype) {
-            types4tail = type_of_head.subtype();
-          }
-          else if (supertype) {
-            types4tail = type_of_head.supertype();
-          }
-          else {
-            types4tail = [type_of_head];
-          }
-          if (tail2types.has(tail_id)) {
-            tail2types.set(tail_id, tail2types.get(tail_id)!.filter(t => types4tail.some(tt => tt.same(t))));
-          }
-          else {
-            tail2types.set(tail_id, types4tail);
-          }
-        }
-      }
-      return tail2types;
-    }
-    // 7. Build relation among tails.
-    // If "tail1 tail2" is in tailssubtype, then the type of tail2 is a subtype of the type of tail1.
-    let tailssubtype = new Set<string>();
-    let tailsequal = new Set<string>();
-    let tails_relation = () : void => {
-      for (let [_, tail_infos] of node2tail) {
-        const tail_infos_array = [...tail_infos];
-        const tail_infos_length = tail_infos_array.length;
-        for (let i = 0; i < tail_infos_length; i++) {
-          for (let j = i + 1; j < tail_infos_length; j++) {
-            const tail_info1 = tail_infos_array[i];
-            const tail_info2 = tail_infos_array[j];
-            if (tail_info1.subtype && (!tail_info2.subtype && !tail_info2.supertype)) {
-              tailssubtype.add(`${tail_info2.tail_id} ${tail_info1.tail_id}`);
-            }
-            else if (tail_info1.supertype && (!tail_info2.subtype && !tail_info2.supertype)) {
-              tailssubtype.add(`${tail_info1.tail_id} ${tail_info2.tail_id}`);
-            }
-            else if ((!tail_info1.subtype && !tail_info1.supertype) && tail_info2.subtype) {
-              tailssubtype.add(`${tail_info1.tail_id} ${tail_info2.tail_id}`);
-            }
-            else if ((!tail_info1.subtype && !tail_info1.supertype) && tail_info2.supertype) {
-              tailssubtype.add(`${tail_info2.tail_id} ${tail_info1.tail_id}`);
-            }
-            else if ((!tail_info1.subtype && !tail_info1.supertype) && (!tail_info2.subtype && !tail_info2.supertype)) {
-              tailsequal.add(`${tail_info1.tail_id} ${tail_info2.tail_id}`);
-              tailsequal.add(`${tail_info2.tail_id} ${tail_info1.tail_id}`);
-            }
-          }
-        }
-      }
-    }
-    const resolved_types = new Map<number, Type>();
+    this.heads2type = shuffle(this.heads2type);
+  }
 
-    // 8. Resolve types from heads to tails.
-    let resolve = (node : number) => {
-      for (let child of this.dag_nodes.get(node)!.outs) {
-        const edge = `${node} ${child}`;
-        for (const tail_id of edge2tail.get(edge)!) {
-          if (node2tail.has(child)) { // child is not tail
-            const tail_info = [...node2tail.get(child)!].find(t => t.tail_id === tail_id);
-            if (this.subtype.has(edge)) {
-              if (tail_info!.subtype) {
-                let type_candidates = resolved_types.get(node)!.subtype_with_lowerbound(resolved_types.get(tail_id)!)!;
-                if (resolved_types.has(child)) {
-                  type_candidates = type_candidates.filter(t => t.same(resolved_types.get(child)!));
-                }
-                assert(type_candidates.length > 0, `TypeDominanceDAG::resolve::resolve:>1 type_candidates is empty`);
-                resolved_types.set(child, pickRandomElement(type_candidates)!);
-              }
-              else if (tail_info!.supertype) {
-                throw new Error(`TypeDominanceDAG::resolve::resolve: ${node} should not be the supertype of ${child}`);
-              }
-              else {
-                assert(resolved_types.get(tail_id)!.issubtypeof(resolved_types.get(node)!), `TypeDominanceDAG::resolve::resolve: the type of ${node}: ${resolved_types.get(node)!.str()} is not the supertype of the type of ${tail_id}: ${resolved_types.get(tail_id)!.str()}`);
-                resolved_types.set(child, resolved_types.get(tail_id)!);
-              }
-            }
-            else if (this.supertype.has(edge)) {
-              // child is a tail
-              throw new Error(`TypeDominanceDAG::resolve::resolve: ${node} should not be the supertype of ${child}`);
-            }
-            else {
-              let type_candidates = [resolved_types.get(node)!];
-              if (resolved_types.has(child)) {
-                type_candidates = type_candidates.filter(t => t.same(resolved_types.get(child)!));
-              }
-              assert(type_candidates.length > 0, `TypeDominanceDAG::resolve::resolve:>3 type_candidates is empty`);
-              resolved_types.set(child, pickRandomElement(type_candidates)!);
-            }
-          }
+  allocate_type_candidates_for_tails_based_on_type_resolution_for_heads(head_resolve : Map<number, Type>) : Map<number, Type[]> {
+    const tail2types = new Map<number, Type[]>();
+    let types4tail : Type[] = [];
+    for (let [head, type_of_head] of head_resolve) {
+      if (!this.node2tail.has(head)) continue;
+      assert(this.node2tail.has(head), `TypeDominanceDAG::resolve::allocate_type_candidates_for_tails_based_on_type_resolution_for_heads this.node2tail does not have ${head}`);
+      for (const { tail_id, subtype, supertype } of this.node2tail.get(head)!) {
+        if (subtype) {
+          types4tail = type_of_head.subtype();
         }
-        resolve(child);
-      }
-    }
-    for (const head_resolve of heads2type) {
-      resolved_types.clear();
-      let good_resolve = true;
-      // First, narrow down the type range of tails
-      const tail2types = get_type_candidates_for_tails(head_resolve);
-      // Then check if there exists one tail whose type candidates are empty.
-      // If all tails have non-empty type candidates, then resolve the types of tails.
-      for (const tail of tails) {
-        assert(tail2types.has(tail), `tail2type does not have ${tail}`);
-        if (tail2types.get(tail)!.length === 0) {
-          good_resolve = false;
-          break;
+        else if (supertype) {
+          types4tail = type_of_head.supertype();
         }
         else {
-          // The choice of the type of the tail is restricted by the indirect connection among tails.
-          // If a non-head non-tail node N has two paths two tail T1 and T2 respectively, then the type of
-          // T1 and T2 have a type relation.
-          tail2types.set(tail, shuffle(tail2types.get(tail)!))
+          types4tail = [type_of_head];
+        }
+        if (tail2types.has(tail_id)) {
+          tail2types.set(tail_id, tail2types.get(tail_id)!.filter(t => types4tail.some(tt => tt.same(t))));
+        }
+        else {
+          tail2types.set(tail_id, types4tail);
         }
       }
-      if (!good_resolve) continue;
-      // Next, build connection among tails.
-      tails_relation();
-      // Then, resolve the types of tails.
-      const tails_array = [...tails];
+    }
+    return tail2types;
+  }
+
+  build_tails_relation() : void {
+    for (let [_, tail_infos] of this.node2tail) {
+      const tail_infos_array = [...tail_infos];
+      const tail_infos_length = tail_infos_array.length;
+      for (let i = 0; i < tail_infos_length; i++) {
+        for (let j = i + 1; j < tail_infos_length; j++) {
+          const tail_info1 = tail_infos_array[i];
+          const tail_info2 = tail_infos_array[j];
+          if (tail_info1.subtype && (!tail_info2.subtype && !tail_info2.supertype)) {
+            this.tailssubtype.add(`${tail_info2.tail_id} ${tail_info1.tail_id}`);
+          }
+          else if (tail_info1.supertype && (!tail_info2.subtype && !tail_info2.supertype)) {
+            this.tailssubtype.add(`${tail_info1.tail_id} ${tail_info2.tail_id}`);
+          }
+          else if ((!tail_info1.subtype && !tail_info1.supertype) && tail_info2.subtype) {
+            this.tailssubtype.add(`${tail_info1.tail_id} ${tail_info2.tail_id}`);
+          }
+          else if ((!tail_info1.subtype && !tail_info1.supertype) && tail_info2.supertype) {
+            this.tailssubtype.add(`${tail_info2.tail_id} ${tail_info1.tail_id}`);
+          }
+          else if ((!tail_info1.subtype && !tail_info1.supertype) && (!tail_info2.subtype && !tail_info2.supertype)) {
+            this.tailsequal.add(`${tail_info1.tail_id} ${tail_info2.tail_id}`);
+            this.tailsequal.add(`${tail_info2.tail_id} ${tail_info1.tail_id}`);
+          }
+        }
+      }
+    }
+  }
+
+  resolve_tails(tail2types: Map<number, Type[]>): boolean {
+    const tails_array = [...this.tails];
       let i4tails_array = 0;
       let i4types_of_each_tail = new Array<number>(tails_array.length).fill(0);
       let tailid2type_candidates = new Map<number, Type[]>();
@@ -381,13 +317,13 @@ export class TypeDominanceDAG {
           let types_candidate = tail2types.get(tails_array[i4tails_array])!;
           for (let j = 0; j < i4tails_array; j++) {
             assert(tailid2type_candidates.has(tails_array[j]), `TypeDominanceDAG::resolve: tailid2type_candidates does not have ${tails_array[j]}`);
-            if (tailssubtype.has(`${tails_array[j]} ${tails_array[i4tails_array]}`)) {
+            if (this.tailssubtype.has(`${tails_array[j]} ${tails_array[i4tails_array]}`)) {
               types_candidate = types_candidate.filter(t => t.issubtypeof(tailid2type_candidates.get(tails_array[j])![i4types_of_each_tail[i4tails_array]]));
             }
-            else if (tailssubtype.has(`${tails_array[i4tails_array]} ${tails_array[j]}`)) {
+            else if (this.tailssubtype.has(`${tails_array[i4tails_array]} ${tails_array[j]}`)) {
               types_candidate = types_candidate.filter(t => t.issupertypeof(tailid2type_candidates.get(tails_array[j])![i4types_of_each_tail[i4tails_array]]));
             }
-            else if (tailsequal.has(`${tails_array[j]} ${tails_array[i4tails_array]}`)) {
+            else if (this.tailsequal.has(`${tails_array[j]} ${tails_array[i4tails_array]}`)) {
               types_candidate = types_candidate.filter(t => t.same(tailid2type_candidates.get(tails_array[j])![i4types_of_each_tail[i4tails_array]]));
             }
             if (types_candidate.length === 0) {
@@ -423,64 +359,159 @@ export class TypeDominanceDAG {
         if (cannot_resolve) break;
         if (i4tails_array === tails_array.length) break;
       }
-      if (cannot_resolve) continue;
-      for (let i = 0; i < tails_array.length; i++) {
-        resolved_types.set(tails_array[i], tailid2type_candidates.get(tails_array[i])![i4types_of_each_tail[i]]);
+      if (cannot_resolve === false) {
+        for (let i = 0; i < tails_array.length; i++) {
+          this.resolved_types.set(tails_array[i], tailid2type_candidates.get(tails_array[i])![i4types_of_each_tail[i]]);
+        }
+        return true;
       }
-      // Finally, resolve the types of non-heads and non-tails.
+      else return false;
+  }
+
+  resolve_nonheads_and_nontails(node : number): void {
+    for (let child of this.dag_nodes.get(node)!.outs) {
+        const edge = `${node} ${child}`;
+        for (const tail_id of this.edge2tail.get(edge)!) {
+          if (this.node2tail.has(child)) { // child is not tail
+            const tail_info = [...this.node2tail.get(child)!].find(t => t.tail_id === tail_id);
+            if (this.subtype.has(edge)) {
+              if (tail_info!.subtype) {
+                let type_candidates = this.resolved_types.get(node)!.subtype_with_lowerbound(this.resolved_types.get(tail_id)!)!;
+                if (this.resolved_types.has(child)) {
+                  type_candidates = type_candidates.filter(t => t.same(this.resolved_types.get(child)!));
+                }
+                // Deal with the case where the type range of the child is smaller than the type range of the parent
+                // mentioned by the 5th step.
+                type_candidates = intersection_array(type_candidates, irnode2types.get(child)!);
+                assert(type_candidates.length > 0, `TypeDominanceDAG::resolve::resolve:>1 type_candidates is empty`);
+                this.resolved_types.set(child, pickRandomElement(type_candidates)!);
+              }
+              else if (tail_info!.supertype) {
+                throw new Error(`TypeDominanceDAG::resolve::resolve: ${node} should not be the supertype of ${child}`);
+              }
+              else {
+                assert(this.resolved_types.get(tail_id)!.issubtypeof(this.resolved_types.get(node)!), `TypeDominanceDAG::resolve::resolve: the type of ${node}: ${this.resolved_types.get(node)!.str()} is not the supertype of the type of ${tail_id}: ${this.resolved_types.get(tail_id)!.str()}`);
+                this.resolved_types.set(child, this.resolved_types.get(tail_id)!);
+              }
+            }
+            else if (this.supertype.has(edge)) {
+              // child is a tail
+              throw new Error(`TypeDominanceDAG::resolve::resolve: ${node} should not be the supertype of ${child}`);
+            }
+            else {
+              let type_candidates = [this.resolved_types.get(node)!];
+              if (this.resolved_types.has(child)) {
+                type_candidates = type_candidates.filter(t => t.same(this.resolved_types.get(child)!));
+              }
+              assert(type_candidates.length > 0, `TypeDominanceDAG::resolve::resolve:>3 type_candidates is empty`);
+              this.resolved_types.set(child, pickRandomElement(type_candidates)!);
+            }
+          }
+        }
+        this.resolve_nonheads_and_nontails(child);
+      }
+  }
+
+  resolve() : void {
+    // !0. initialize the resolution
+    this.initialize_resolve();
+    // !1. Get this.heads and this.tails
+    this.get_heads_and_tails();
+    // !2. Map nodes to their this.tails, recording if there exists a path from the node to tail with tail_id on which subtype/supertype domination does not holds.
+    // If there are multiple paths from node to tail, then the subtype does not hold as long as there exists a path on which subtype domination does not hold.
+    // tail_ids are not in this.node2tail
+    for (let tail of this.tails) {
+      this.dfs4node2tail(tail, tail, false, false);
+    }
+    // !3. Map edges to their reachable this.tails
+    for (let tail of this.tails) {
+      this.dfs4edge2tail(tail, tail);
+    }
+    // !4. Remove some removable subtype dominations using this.node2tail and this.edge2tail
+    // See the first test case in resolve.test.ts. The subtype domination from node 6 to node 7
+    // is removable since the type of node 6 must be the same as the type of node 1, and edge (6, 7)
+    // can reach tail 1.
+    for (let head of this.heads) {
+      this.remove_subtype_domination(head);
+    }
+    // !5. Restrict the type range of this.heads.
+    // Consider the following scenario.
+    // If the true expression of a conditional expression Ec is a unaryop expression Eu whose op is "!", then the type of
+    // Eu should be boolean. However, Eu type-dominate Ec and the type range of Eu is more than just boolean.
+    // Therefore, we need to backpropogate the type range from children to parents until the type range of this.heads are restricted.
+    // The backpropogation strategy is simple: if n1 type-dominate n2 by n1.type == n2.type, then the type range of n1 must be a
+    // superset of the type range of n2. In this case, we restrict the type range of n1 to be the same as the type range of n2.
+    // As for the scenario where n1 type-dominate n2 by n1.type is the supertype of n2.type, we resolve the subtype domination
+    // with the consideration of n2's type range in the resolve() function.
+    for (let tail of this.tails) {
+      this.restrict_type_range(tail);
+    }
+    // !6. Assign types to this.heads
+    this.allocate_type_candidates_for_heads();
+    // !7. Traverse each type resolution for heads
+    for (const head_resolve of this.heads2type) {
+      this.resolved_types.clear();
+      let good_resolve = true;
+      // First, narrow down the type range of this.tails
+      // !8. Allocate type candidates for tails based on the current type resolution for heads
+      const tail2types = this.allocate_type_candidates_for_tails_based_on_type_resolution_for_heads(head_resolve);
+      // Then check if there exists one tail whose type candidates are empty.
+      // If all this.tails have non-empty type candidates, then resolve the types of this.tails.
+      for (const tail of this.tails) {
+        assert(tail2types.has(tail), `tail2type does not have ${tail}`);
+        if (tail2types.get(tail)!.length === 0) {
+          good_resolve = false;
+          break;
+        }
+        else {
+          // The choice of the type of the tail is restricted by the indirect connection among this.tails.
+          // If a non-head non-tail node N has two paths two tail T1 and T2 respectively, then the type of
+          // T1 and T2 have a type relation.
+          tail2types.set(tail, shuffle(tail2types.get(tail)!))
+        }
+      }
+      if (!good_resolve) continue;
+      // !9. Build connection among tails.
+      this.build_tails_relation();
+      // !10. Resolve the types of tails.
+      if(this.resolve_tails(tail2types) === false) continue;
       for (let [head, type_of_head] of head_resolve) {
+        // !11. Check if the resolved types of tails are compatible with the resolved types of heads.
         let compatible_with_resolved_tails = true;
-        for (let tail_info of node2tail.get(head)!) {
-          if (resolved_types.has(tail_info.tail_id)) {
+        for (let tail_info of this.node2tail.get(head)!) {
+          if (this.resolved_types.has(tail_info.tail_id)) {
             if (tail_info.subtype) {
-              if (!type_of_head.issupertypeof(resolved_types.get(tail_info.tail_id)!)) {
+              if (!type_of_head.issupertypeof(this.resolved_types.get(tail_info.tail_id)!)) {
                 compatible_with_resolved_tails = false;
                 break;
               }
             }
             else if (tail_info.supertype) {
-              if (!resolved_types.get(tail_info.tail_id)!.issupertypeof(type_of_head)) {
+              if (!this.resolved_types.get(tail_info.tail_id)!.issupertypeof(type_of_head)) {
                 compatible_with_resolved_tails = false;
                 break;
               }
             }
             else {
-              if (!resolved_types.get(tail_info.tail_id)!.same(type_of_head)) {
+              if (!this.resolved_types.get(tail_info.tail_id)!.same(type_of_head)) {
                 compatible_with_resolved_tails = false;
                 break;
               }
             }
           }
         }
+        // !12. Resolve the types of nonheads and nontails.
         if (compatible_with_resolved_tails) {
-          resolved_types.set(head, type_of_head);
-          resolve(head);
+          this.resolved_types.set(head, type_of_head);
+          this.resolve_nonheads_and_nontails(head);
         }
         else {
           good_resolve = false;
           break;
         }
       }
-      // If the true expression of a conditional expression Ec is a unaryop expression Eu whose op is "!", then the type of
-      // Eu should be boolean. However, Eu type-dominate Ec and the type range of Eu is more than just boolean.
-      // Therefore, we need to check finally whether the type of a node is outside of its type range. If so, then the head_resolve is bad.
-      for (let [nodeid, type_candidates] of irnode2types) {
-        let pass_checking = false;
-        assert(resolved_types.has(nodeid), `TypeDominanceDAG::resolve: resolved_types does not have ${nodeid}`);
-        const resolved_type = resolved_types.get(nodeid)!;
-        for (let type_candidate of type_candidates) {
-          if (resolved_type.same(type_candidate)) {
-            pass_checking = true;
-            break;
-          }
-        }
-        if (pass_checking === false) {
-          good_resolve = false;
-          break;
-        }
-      }
       if (good_resolve) {
-        this.resolved_types_collection.push(new Map(resolved_types));
+        this.resolved_types_collection.push(new Map(this.resolved_types));
       }
     }
   }
@@ -504,7 +535,7 @@ export class TypeDominanceDAG {
         assert(match, `TypeDominanceDAG: resolved type ${resolved_type.str()} of node ${id} is not one of the type candidates: ${type_candidates.map(t => t.str()).join(", ")}`);
       }
       // 3. Verify that all type-domination relations hold.
-      for (let [id, node] of this.dag_nodes) {
+      for (let [_, node] of this.dag_nodes) {
         for (let child of node.outs) {
           if (this.subtype.has(`${node.id} ${child}`)) {
             const subttypes = resolved_types.get(node.id)!.subtype();
@@ -546,16 +577,6 @@ export class TypeDominanceDAG {
   }
 
   async draw() : Promise<void> {
-    const heads = new Set<number>();
-    const tails = new Set<number>();
-    for (let [_, node] of this.dag_nodes) {
-      if (node.inbound === 0) {
-        heads.add(node.id);
-      }
-      if (node.outbound === 0) {
-        tails.add(node.id);
-      }
-    }
     const G = new dot.Digraph();
     const visited : Map<number, dot.Node> = new Map<number, dot.Node>();
     let dfs = (pre_gnode : dot.Node | undefined, node : number, subtype : boolean, supertype : boolean) : void => {
@@ -578,7 +599,7 @@ export class TypeDominanceDAG {
       }
       const gnode = new dot.Node(node.toString(), {
         [dot.attribute.color]:
-          heads.has(node) ? 'red' : tails.has(node) ? 'green' : 'blue'
+          this.heads.has(node) ? 'red' : this.tails.has(node) ? 'green' : 'blue'
       });
       visited.set(node, gnode);
       if (pre_gnode !== undefined) {
@@ -600,7 +621,7 @@ export class TypeDominanceDAG {
         dfs(gnode, child, this.subtype.has(`${node} ${child}`), this.supertype.has(`${node} ${child}`));
       }
     }
-    for (let head of heads) {
+    for (let head of this.heads) {
       dfs(undefined, head, false, false);
     }
     const dot_lang = dot.toDot(G);

@@ -159,4 +159,8 @@ export function shuffle<T>(array : T[]) : T[] {
   }
 
   return array;
-};
+}
+
+export function intersection_array<T>(array1 : T[], array2 : T[]) : T[] {
+  return array1.filter(value => array2.includes(value));
+}

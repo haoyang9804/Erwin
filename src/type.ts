@@ -716,8 +716,8 @@ export const elementary_types : Type[] = [
   new ElementaryType("address", "payable"),
   new ElementaryType("address", "nonpayable"),
   new ElementaryType("bool", "nonpayable"),
-  new ElementaryType("string", "nonpayable"),
-  new ElementaryType("bytes", "nonpayable"),
+  // new ElementaryType("string", "nonpayable"),
+  // new ElementaryType("bytes", "nonpayable"),
 ]
 
 export const literal_types : Type[] = [
