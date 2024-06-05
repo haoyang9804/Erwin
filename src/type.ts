@@ -839,3 +839,24 @@ export function includesType(arr : Type[], item : Type) : boolean {
 }
 
 export const all_types = elementary_types.concat(mapping_types).concat(function_types).concat(array_types);
+
+export function isSuperTypeSet(set : Type[], subset : Type[]) : boolean {
+  for (const element of subset) {
+    if (!includesType(set, element)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+export function isEqualTypeSet(s1 : Type[], s2 : Type[]) : boolean {
+  if (s1.length !== s2.length) {
+    return false;
+  }
+  for (let i = 0; i < s1.length; i++) {
+    if (!s1[i].same(s2[i])) {
+      return false;
+    }
+  }
+  return true;
+}

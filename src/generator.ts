@@ -6,8 +6,10 @@ import * as stmt from "./statement";
 import * as type from "./type";
 import { irnode_db } from "./db";
 import { TypeDominanceDAG } from "./constraint";
-import { expression_complex_level, tuple_prob, tuple_vardecl_count } from "./index";
+import { expression_complex_level, tuple_prob, tuple_vardecl_count, literal_prob } from "./index";
 import { irnodes } from "./node";
+import { color } from "console-log-colors"
+import { debug } from "./index";
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Global Variables
 
@@ -22,7 +24,7 @@ let field_flag = FieldFlag.GLOBAL;
 export const scope2userDefinedTypes = new Map<number, number>();
 export const type_dag = new TypeDominanceDAG();
 // global_type_context is used to control the selection of ops in the process of op-involved expression generations.
-let global_type_context : string = "";
+let global_type_context : "" | "int" | "sint" | "uint" | "bool" = "";
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Generator
 
 export abstract class Generator {
@@ -60,14 +62,84 @@ async function getAvailableIRVariableDeclare(scope : number | undefined) : Promi
   return collection;
 }
 
-export async function hasAvailableIRVariableDeclare(scope : number) : Promise<boolean> {
+async function hasAvailableIRVariableDeclare(scope : number) : Promise<boolean> {
   return (await getAvailableIRVariableDeclare(scope)).length > 0;
 }
 
-export async function getIRNodesByID(id : number) : Promise<IRNode[]> {
-  return await irnode_db.run("SELECT * FROM tbl WHERE id = " + id) as IRNode[];
+async function getAvailableIRVariableDeclareWithTypeConstraint(scope : number | undefined, types : type.Type[]) : Promise<decl.IRVariableDeclare[]> {
+  const collection : decl.IRVariableDeclare[] = [];
+  do {
+    const results = await irnode_db.run(`SELECT id FROM tbl WHERE scope = ${scope} AND kind = "VariableDeclare"`) as any[];
+    assert(results !== undefined, "getAvailableIRVariableDeclare: results is undefined")
+    for (let result of results) {
+      collection.push(irnodes[result.id] as decl.IRVariableDeclare);
+    }
+    assert(scope !== undefined, "getAvailableIRVariableDeclare: scope is undefined");
+    scope = scope_parent.get(scope!);
+  } while (scope !== undefined);
+  return collection.filter((irdecl) => type.isSuperTypeSet(type.irnode2types.get(irdecl.id)!, types) || type.isSuperTypeSet(types, type.irnode2types.get(irdecl.id)!));
 }
 
+async function hasAvailableIRVariableDeclareWithTypeConstraint(scope : number, types : type.Type[]) : Promise<boolean> {
+  return (await getAvailableIRVariableDeclareWithTypeConstraint(scope, types)).length > 0;
+}
+
+
+function initializeTypeRange(irnode_id : number, default_range : type.Type[]) : void {
+  switch (global_type_context) {
+    case "bool":
+      type.irnode2types.set(irnode_id, [new type.ElementaryType("bool", "nonpayable")]);
+      break;
+    case "int":
+      type.irnode2types.set(irnode_id, type.all_integer_types);
+      break;
+    case "uint":
+      type.irnode2types.set(irnode_id, type.uinteger_types);
+      break;
+    case "sint":
+      type.irnode2types.set(irnode_id, type.integer_types);
+      break;
+    default:
+      type.irnode2types.set(irnode_id, default_range);
+  }
+}
+
+function initializeTypeRangeWithNoBool(irnode_id : number, default_range : type.Type[]) : void {
+  switch (global_type_context) {
+    case "int":
+      type.irnode2types.set(irnode_id, type.all_integer_types);
+      break;
+    case "uint":
+      type.irnode2types.set(irnode_id, type.uinteger_types);
+      break;
+    case "sint":
+      type.irnode2types.set(irnode_id, type.integer_types);
+      break;
+    default:
+      type.irnode2types.set(irnode_id, default_range);
+  }
+}
+
+
+
+function typeRangeAlignment(irnode_id1 : number, irnode_id2 : number) : void {
+  if (type.isEqualTypeSet(type.irnode2types.get(irnode_id1)!, type.irnode2types.get(irnode_id2)!)) return;
+  if (type.isSuperTypeSet(type.irnode2types.get(irnode_id1)!, type.irnode2types.get(irnode_id2)!)) {
+    type.irnode2types.set(irnode_id1, type.irnode2types.get(irnode_id2)!);
+    return;
+  }
+  if (type.isSuperTypeSet(type.irnode2types.get(irnode_id2)!, type.irnode2types.get(irnode_id1)!)) {
+    type.irnode2types.set(irnode_id2, type.irnode2types.get(irnode_id1)!);
+    return;
+  }
+  console.log(`>>>>>> typeRangeAlignment: type range alignment failed. ${irnode_id1}: ${type.irnode2types.get(irnode_id1)!.map(t => t.str())} v.s. ${irnode_id2}: ${type.irnode2types.get(irnode_id2)!.map(t => t.str())}`);
+}
+
+function updateIntegerTypeRange(prev_global_type_context : "" | "int" | "sint" | "uint" | "bool") : void {
+  if (prev_global_type_context === "sint") global_type_context = "sint";
+  else if (prev_global_type_context === "uint") global_type_context = "uint";
+  else global_type_context = "int";
+}
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Declaration Generator
 
@@ -77,19 +149,52 @@ export abstract class DeclarationGenerator extends Generator {
 }
 
 export class VariableDeclareGenerator extends DeclarationGenerator {
-  constructor() { super(); }
+  type_range : type.Type[] | undefined;
+  constructor(type_range ?: type.Type[]) {
+    super();
+    this.type_range = type_range;
+  }
   async generate() : Promise<void> {
     this.irnode = createVariableDeclare();
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "VariableDeclare");
     type_dag.insert(type_dag.newNode(this.irnode.id));
-    type.irnode2types.set(this.irnode.id, type.elementary_types);
+    if (this.type_range === undefined) {
+      type.irnode2types.set(this.irnode.id, type.elementary_types);
+    }
+    else {
+      type.irnode2types.set(this.irnode.id, this.type_range);
+    }
   }
 }
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Expression Generator
 
 export abstract class ExpressionGenerator extends Generator {
-  constructor() { super(); }
+  type_range : type.Type[] | undefined;
+  constructor(type_range ?: type.Type[]) {
+    super();
+    this.type_range = type_range;
+    if (this.type_range !== undefined) {
+      if (type.isEqualTypeSet(this.type_range, type.all_integer_types)) {
+        global_type_context = "int";
+      }
+      else if (type.isEqualTypeSet(this.type_range, type.uinteger_types)) {
+        global_type_context = "uint";
+      }
+      else if (type.isEqualTypeSet(this.type_range, type.integer_types)) {
+        global_type_context = "sint";
+      }
+      else if (type.isEqualTypeSet(this.type_range, [new type.ElementaryType("bool", "nonpayable")])) {
+        global_type_context = "bool";
+      }
+      else if (type.isEqualTypeSet(this.type_range, type.elementary_types)) {
+        global_type_context = "";
+      }
+      else {
+        throw new Error("ExpressionGenerator constructor: type_range is invalid");
+      }
+    }
+  }
   // If component is 0, the generator will generate a complete statement and update scope_stmt.
   // Otherwise, the generator will generate a component of a statement.
   // The positive number of the component indicates the complex level of the component.
@@ -100,27 +205,36 @@ export abstract class ExpressionGenerator extends Generator {
 }
 
 export abstract class LValueGenerator extends ExpressionGenerator {
-  constructor() { super(); }
+  constructor(type_range ?: type.Type[]) {
+    super(type_range);
+  }
   abstract generate(component : number) : void;
 }
 
 export abstract class RValueGenerator extends ExpressionGenerator {
-  constructor() { super(); }
+  constructor(type_range ?: type.Type[]) {
+    super(type_range);
+  }
   abstract generate(component : number) : void;
 }
 
 export abstract class LRValueGenerator extends ExpressionGenerator {
-  constructor() { super(); }
+  constructor(type_range ?: type.Type[]) {
+    super(type_range);
+  }
   abstract generate(component : number) : void;
 }
 
 export class LiteralGenerator extends RValueGenerator {
-  constructor() { super(); }
+  constructor(type_range ?: type.Type[]) {
+    super(type_range);
+  }
   async generate(component : number) : Promise<void> {
     this.irnode = new exp.IRLiteral(global_id++, cur_scope_id, field_flag);
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "Literal");
     type_dag.insert(type_dag.newNode(this.irnode.id));
-    type.irnode2types.set(this.irnode.id, type.literal_types);
+    initializeTypeRange(this.irnode.id, type.literal_types);
+    if (debug) console.log(color.yellowBG(`${this.irnode.id}: Literal, type: ${type.irnode2types.get(this.irnode.id)!.map(t => t.str())}`));
     if (Math.random() < tuple_prob) {
       this.irnode = new exp.IRTuple(global_id++, cur_scope_id, field_flag, [this.irnode as exp.IRExpression]);
       await irnode_db.insert(this.irnode.id, this.irnode.scope, "Tuple");
@@ -129,37 +243,47 @@ export class LiteralGenerator extends RValueGenerator {
 }
 
 export class IdentifierGenerator extends LRValueGenerator {
-  id : number | undefined;
-  constructor(id ?: number) {
-    super();
-    this.id = id;
+  constructor(type_range ?: type.Type[]) {
+    super(type_range);
   }
   async generate(component : number) : Promise<void> {
     // Generate a variable decl if there is no variable decl available.
-    if (this.id === undefined && !(await hasAvailableIRVariableDeclare(cur_scope_id))) {
-      const variable_stmt_gen = new SingleVariableDeclareStatementGenerator();
+    if (!(await hasAvailableIRVariableDeclareWithTypeConstraint(cur_scope_id,
+      global_type_context === "" ? type.elementary_types :
+        global_type_context === "bool" ? [new type.ElementaryType("bool", "nonpayable")] :
+          global_type_context === "int" ? type.all_integer_types :
+            global_type_context === "uint" ? type.uinteger_types :
+              type.integer_types
+    ))) {
+      const variable_stmt_gen = new SingleVariableDeclareStatementGenerator(
+        global_type_context === "" ? type.elementary_types :
+          global_type_context === "bool" ? [new type.ElementaryType("bool", "nonpayable")] :
+            global_type_context === "int" ? type.all_integer_types :
+              global_type_context === "uint" ? type.uinteger_types :
+                type.integer_types
+      );
       await variable_stmt_gen.generate();
     }
     // generate an identifier
     let irdecl : decl.IRVariableDeclare;
-    if (this.id === undefined) {
-      assert(await hasAvailableIRVariableDeclare(cur_scope_id), "IdentifierGenerator: no available IR irnodes");
-      const availableIRDecl = await getAvailableIRVariableDeclare(cur_scope_id);
-      assert(availableIRDecl !== undefined, "IdentifierGenerator: availableIRDecl is undefined");
-      assert(availableIRDecl.length > 0, "IdentifierGenerator: no available IR irnodes");
-      irdecl = pickRandomElement(availableIRDecl)!;
-      this.irnode = new exp.IRIdentifier(global_id++, cur_scope_id, field_flag, irdecl.name, irdecl.id);
-    }
-    else {
-      assert(this.id! < irnodes.length, "IdentifierGenerator: this.id is out of range");
-      assert(irnodes[this.id!]! instanceof decl.IRVariableDeclare, `IdentifierGenerator: irnodes[${this.id!}] is not IRVariableDeclare`);
-      irdecl = irnodes[this.id!]! as decl.IRVariableDeclare;
-      this.irnode = new exp.IRIdentifier(global_id++, cur_scope_id, field_flag, irdecl.name, irdecl.id);
-    }
+    const availableIRDecl = await getAvailableIRVariableDeclareWithTypeConstraint(cur_scope_id,
+      global_type_context === "" ? type.elementary_types :
+        global_type_context === "bool" ? [new type.ElementaryType("bool", "nonpayable")] :
+          global_type_context === "int" ? type.all_integer_types :
+            global_type_context === "uint" ? type.uinteger_types :
+              type.integer_types
+    );
+    assert(availableIRDecl !== undefined, "IdentifierGenerator: availableIRDecl is undefined");
+    assert(availableIRDecl.length > 0, "IdentifierGenerator: no available IR irnodes");
+    irdecl = pickRandomElement(availableIRDecl)!;
+    this.irnode = new exp.IRIdentifier(global_id++, cur_scope_id, field_flag, irdecl.name, irdecl.id);
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "Identifier");
     type_dag.insert(type_dag.newNode(this.irnode.id));
-    type.irnode2types.set(this.irnode.id, type.elementary_types);
     type_dag.connect(this.irnode.id, irdecl.id);
+    initializeTypeRange(this.irnode.id, type.elementary_types);
+    typeRangeAlignment(this.irnode.id, irdecl.id);
+    type_dag.tighten_type_range_from_a_tail(irdecl.id);
+    if (debug) console.log(color.yellowBG(`${this.irnode.id}: Identifier --> ${irdecl.id}, type: ${type.irnode2types.get(this.irnode.id)!.map(t => t.str())}`));
     if (Math.random() < tuple_prob) {
       this.irnode = new exp.IRTuple(global_id++, cur_scope_id, field_flag, [this.irnode as exp.IRExpression]);
       await irnode_db.insert(this.irnode.id, this.irnode.scope, "Tuple");
@@ -171,8 +295,8 @@ export class AssignmentGenerator extends RValueGenerator {
 
   op : "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | "&=" | "^=" | "|=" | undefined;
 
-  constructor() {
-    super();
+  constructor(type_range ?: type.Type[]) {
+    super(type_range);
     switch (global_type_context) {
       case "bool":
         this.op = "=";
@@ -188,16 +312,21 @@ export class AssignmentGenerator extends RValueGenerator {
   }
 
   async generate(component : number) : Promise<void> {
+    let prev_global_type_context = global_type_context;
+    // Update global_type_context for left_expression
     if (this.op === "=") {
       // keep the original global_type_context
     }
     else {
-      global_type_context = "int";
+      updateIntegerTypeRange(prev_global_type_context);
     }
+    // Generate left_expression
     const identifier_gen = new IdentifierGenerator();
     await identifier_gen.generate(component + 1);
+    global_type_context = prev_global_type_context;
     let left_expression : exp.IRExpression = identifier_gen.irnode as exp.IRExpression;
     let right_expression : exp.IRExpression;
+    // Update global_type_context for right_expression
     if (this.op === "=") {
       // keep the original global_type_context
     }
@@ -205,8 +334,9 @@ export class AssignmentGenerator extends RValueGenerator {
       global_type_context = "uint";
     }
     else {
-      global_type_context = "int";
+      updateIntegerTypeRange(prev_global_type_context);
     }
+    // Generate right_expression
     if (component >= expression_complex_level) {
       const right_expression_gen_prototype = pickRandomElement(terminal_expression_generators)!;
       const right_expression_gen = new right_expression_gen_prototype();
@@ -220,6 +350,7 @@ export class AssignmentGenerator extends RValueGenerator {
       right_expression = right_expression_gen.irnode as exp.IRExpression;
     }
     this.irnode = new exp.IRAssignment(global_id++, cur_scope_id, field_flag, left_expression, right_expression, this.op!);
+    global_type_context = prev_global_type_context;
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "Assignment");
     type_dag.insert(type_dag.newNode(this.irnode.id));
     let left_extracted_expression = left_expression;
@@ -232,21 +363,19 @@ export class AssignmentGenerator extends RValueGenerator {
       assert(right_extracted_expression.components.length === 1, "AssignmentGenerator: right_extracted_expression.components.length is not 1");
       right_extracted_expression = right_extracted_expression.components[0];
     }
-    if (["+=", "-=", "*=", "/=", "%=", "&=", "^=", "|="].filter((op) => op === this.op).length === 1) {
-      type.irnode2types.set(this.irnode.id, type.all_integer_types);
-      type_dag.connect(this.irnode.id, left_extracted_expression.id);
+    if (this.op !== "=") {
+      initializeTypeRangeWithNoBool(this.irnode.id, type.all_integer_types);
+    }
+    else {
+      initializeTypeRange(this.irnode.id, type.elementary_types);
+    }
+    type_dag.connect(this.irnode.id, left_extracted_expression.id);
+    typeRangeAlignment(this.irnode.id, left_extracted_expression.id);
+    if (this.op !== ">>=" && this.op !== "<<=") {
       type_dag.connect(left_extracted_expression.id, right_extracted_expression.id, "subtype");
+      typeRangeAlignment(left_extracted_expression.id, right_extracted_expression.id);
     }
-    else if (this.op === "=") {
-      type.irnode2types.set(this.irnode.id, type.elementary_types);
-      type_dag.connect(this.irnode.id, left_extracted_expression.id);
-      type_dag.connect(left_extracted_expression.id, right_extracted_expression.id, "subtype");
-    }
-    else if (this.op === ">>=" || this.op === "<<=") {
-      type.irnode2types.set(this.irnode.id, type.all_integer_types);
-      type_dag.connect(this.irnode.id, left_extracted_expression.id);
-      type.irnode2types.set(right_extracted_expression.id, type.uinteger_types);
-    }
+    if (debug) console.log(color.yellowBG(`${this.irnode.id}: Assignment ${this.op}, type: ${type.irnode2types.get(this.irnode.id)!.map(t => t.str())}`));
     if (component !== 0) {
       this.irnode = new exp.IRTuple(global_id++, cur_scope_id, field_flag, [this.irnode as exp.IRExpression]);
       await irnode_db.insert(this.irnode.id, this.irnode.scope, "Tuple");
@@ -260,8 +389,8 @@ export class AssignmentGenerator extends RValueGenerator {
 
 export class BinaryOpGenerator extends RValueGenerator {
   op : "+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "<" | ">" | "<=" | ">=" | "==" | "!=" | "&" | "^" | "|" | "&&" | "||";
-  constructor() {
-    super();
+  constructor(type_range ?: type.Type[]) {
+    super(type_range);
     switch (global_type_context) {
       case "bool":
         this.op = pickRandomElement(["&&", "||", ">", "<", "<=", ">=", "==", "!="])!;
@@ -278,55 +407,54 @@ export class BinaryOpGenerator extends RValueGenerator {
     }
   }
   async generate(component : number) : Promise<void> {
+    let prev_global_type_context = global_type_context;
     let left_expression : exp.IRExpression;
     let right_expression : exp.IRExpression;
-    if (component >= expression_complex_level) {
+    let update_global_type_context_for_left_expression = () => {
       if (["&&", "||"].filter((op) => op === this.op).length === 1) {
         global_type_context = "bool";
       }
       else {
-        global_type_context = "int";
+        updateIntegerTypeRange(prev_global_type_context);
       }
+    };
+    let update_global_type_context_for_right_expression = () => {
+      if (["&&", "||"].filter((op) => op === this.op).length === 1) {
+        global_type_context = "bool";
+      }
+      else if (this.op !== ">>" && this.op !== "<<") {
+        updateIntegerTypeRange(prev_global_type_context);
+      }
+      else global_type_context = "uint";
+    };
+    if (component >= expression_complex_level) {
+      update_global_type_context_for_left_expression();
       const left_expression_gen_prototype = pickRandomElement(terminal_expression_generators)!;
       const left_expression_gen = new left_expression_gen_prototype();
       await left_expression_gen.generate(component + 1);
       left_expression = left_expression_gen.irnode as exp.IRExpression;
-      if (["&&", "||"].filter((op) => op === this.op).length === 1) {
-        global_type_context = "bool";
-      }
-      else if (this.op !== ">>" && this.op !== "<<") {
-        global_type_context = "int";
-      }
-      else global_type_context = "uint";
+      global_type_context = prev_global_type_context;
+      update_global_type_context_for_right_expression();
       const right_expression_gen_prototype = pickRandomElement(terminal_expression_generators)!;
       const right_expression_gen = new right_expression_gen_prototype();
       await right_expression_gen.generate(component + 1);
       right_expression = right_expression_gen.irnode as exp.IRExpression;
+      global_type_context = prev_global_type_context;
     }
     else {
-      if (["&&", "||"].filter((op) => op === this.op).length === 1) {
-        global_type_context = "bool";
-      }
-      else {
-        global_type_context = "int";
-      }
+      update_global_type_context_for_left_expression();
       const left_expression_gen_prototype = pickRandomElement(nonterminal_expression_generators)!;
       const left_expression_gen = new left_expression_gen_prototype();
       await left_expression_gen.generate(component + 1);
       left_expression = left_expression_gen.irnode as exp.IRExpression;
-      if (["&&", "||"].filter((op) => op === this.op).length === 1) {
-        global_type_context = "bool";
-      }
-      else if (this.op !== ">>" && this.op !== "<<") {
-        global_type_context = "int";
-      }
-      else global_type_context = "uint";
+      global_type_context = prev_global_type_context;
+      update_global_type_context_for_right_expression();
       const right_expression_gen_prototype = pickRandomElement(nonterminal_expression_generators)!;
       const right_expression_gen = new right_expression_gen_prototype();
       await right_expression_gen.generate(component + 1);
       right_expression = right_expression_gen.irnode as exp.IRExpression;
+      global_type_context = prev_global_type_context;
     }
-
     this.irnode = new exp.IRBinaryOp(global_id++, cur_scope_id, field_flag, left_expression, right_expression, this.op);
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "BinaryOp");
     type_dag.insert(type_dag.newNode(this.irnode.id));
@@ -340,26 +468,24 @@ export class BinaryOpGenerator extends RValueGenerator {
       assert(right_extracted_expression.components.length === 1, "BinaryGenerator: right_extracted_expression.components.length is not 1");
       right_extracted_expression = right_extracted_expression.components[0];
     }
-    if ([">", "<", "<=", ">=", "==", "!="].filter((op) => op === this.op).length === 1) {
+
+    if (["+", "-", "*", "/", "%", "<<", ">>", "&", "^", "|"].filter((op) => op === this.op).length === 1) {
+      initializeTypeRangeWithNoBool(this.irnode.id, type.all_integer_types);
+    }
+    else if (["<", ">", "<=", ">=", "==", "!=", "&&", "||"].filter((op) => op === this.op).length === 1) {
       type.irnode2types.set(this.irnode.id, [new type.ElementaryType("bool", "nonpayable")]);
-      type.irnode2types.set(left_extracted_expression.id, type.all_integer_types);
-      type_dag.connect(left_extracted_expression.id, right_extracted_expression.id, "subtype");
     }
-    else if (this.op === ">>" || this.op === "<<") {
-      type.irnode2types.set(this.irnode.id, type.all_integer_types);
+
+    if (["+", "-", "*", "/", "%", "<<", ">>", "&", "^", "|", "&&", "||"].filter((op) => op === this.op).length === 1) {
       type_dag.connect(this.irnode.id, left_extracted_expression.id);
-      type.irnode2types.set(right_extracted_expression.id, type.uinteger_types);
+      typeRangeAlignment(this.irnode.id, left_extracted_expression.id);
     }
-    else if (this.op === "&&" || this.op === "||") {
-      type.irnode2types.set(this.irnode.id, [new type.ElementaryType("bool", "nonpayable")]);
-      type.irnode2types.set(left_extracted_expression.id, [new type.ElementaryType("bool", "nonpayable")]);
-      type.irnode2types.set(right_extracted_expression.id, [new type.ElementaryType("bool", "nonpayable")]);
-    }
-    else {
-      type.irnode2types.set(this.irnode.id, type.all_integer_types);
-      type_dag.connect(this.irnode.id, left_extracted_expression.id);
+    if (this.op !== ">>" && this.op !== "<<") {
       type_dag.connect(left_extracted_expression.id, right_extracted_expression.id, "subtype");
+      typeRangeAlignment(left_extracted_expression.id, right_extracted_expression.id);
     }
+    if (debug) console.log(color.yellowBG(`${this.irnode.id}: BinaryOp ${this.op}, type: ${type.irnode2types.get(this.irnode.id)!.map(t => t.str())}`));
+
     if (Math.random() < tuple_prob) {
       this.irnode = new exp.IRTuple(global_id++, cur_scope_id, field_flag, [this.irnode as exp.IRExpression]);
       await irnode_db.insert(this.irnode.id, this.irnode.scope, "Tuple");
@@ -370,8 +496,8 @@ export class BinaryOpGenerator extends RValueGenerator {
 //TODO: create a delete Statement Generator
 export class UnaryOpGenerator extends RValueGenerator {
   op : "!" | "-" | "~" | "++" | "--";
-  constructor() {
-    super();
+  constructor(type_range ?: type.Type[]) {
+    super(type_range);
     switch (global_type_context) {
       case "":
         this.op = pickRandomElement(["!", "-", "~", "++", "--"])!;
@@ -390,6 +516,7 @@ export class UnaryOpGenerator extends RValueGenerator {
     }
   }
   async generate(component : number) : Promise<void> {
+    let prev_global_type_context = global_type_context;
     if (this.op === "!") {
       global_type_context = "bool";
     }
@@ -397,10 +524,11 @@ export class UnaryOpGenerator extends RValueGenerator {
       global_type_context = "sint";
     }
     else {
-      global_type_context = "int";
+      updateIntegerTypeRange(prev_global_type_context);
     }
     const identifier_gen = new IdentifierGenerator();
     await identifier_gen.generate(component + 1);
+    global_type_context = prev_global_type_context;
     let expression : exp.IRExpression = identifier_gen.irnode! as exp.IRExpression;
     this.irnode = new exp.IRUnaryOp(global_id++, cur_scope_id, field_flag, pickRandomElement([true, false])!, expression, this.op)!;
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "UnaryOp");
@@ -412,18 +540,19 @@ export class UnaryOpGenerator extends RValueGenerator {
     }
     assert(extracted_expression instanceof exp.IRIdentifier, "UnaryOpGenerator: extracted_expression is not IRIdentifier");
     assert((extracted_expression as exp.IRIdentifier).reference !== undefined, "UnaryOpGenerator: extracted_expression.reference is undefined");
-    if (this.op === "~" || this.op === "++" || this.op === "--") {
-      type.irnode2types.set(this.irnode.id, type.all_integer_types);
-      type_dag.connect(this.irnode.id, extracted_expression.id);
-    }
-    else if (this.op === "-") {
-      type.irnode2types.set(this.irnode.id, type.uinteger_types);
-      type_dag.connect(this.irnode.id, extracted_expression.id);
+    if (this.op == "~" || this.op == "++" || this.op == "--") {
+      initializeTypeRangeWithNoBool(this.irnode.id, type.all_integer_types);
     }
     else if (this.op === "!") {
       type.irnode2types.set(this.irnode.id, [new type.ElementaryType("bool", "nonpayable")]);
-      type.irnode2types.set(extracted_expression.id, [new type.ElementaryType("bool", "nonpayable")]);
     }
+    else if (this.op === "-") {
+      type.irnode2types.set(this.irnode.id, type.integer_types);
+    }
+
+    type_dag.connect(this.irnode.id, extracted_expression.id);
+    typeRangeAlignment(this.irnode.id, extracted_expression.id);
+    if (debug) console.log(color.yellowBG(`${this.irnode.id}: UnaryOp ${this.op}, type: ${type.irnode2types.get(this.irnode.id)!.map(t => t.str())}`));
     if (Math.random() < tuple_prob) {
       this.irnode = new exp.IRTuple(global_id++, cur_scope_id, field_flag, [this.irnode as exp.IRExpression]);
       await irnode_db.insert(this.irnode.id, this.irnode.scope, "Tuple");
@@ -432,15 +561,23 @@ export class UnaryOpGenerator extends RValueGenerator {
 }
 
 export class IRConditional extends RValueGenerator {
+  constructor(type_range ?: type.Type[]) {
+    super(type_range);
+  }
   async generate(component : number) : Promise<void> {
     let e1_gen_prototype, e2_gen_prototype, e3_gen_prototype;
+    let prev_global_type_context = global_type_context;
     if (component >= expression_complex_level) {
+      global_type_context = "bool";
       e1_gen_prototype = pickRandomElement(terminal_expression_generators)!;
+      global_type_context = prev_global_type_context;
       e2_gen_prototype = pickRandomElement(terminal_expression_generators)!;
       e3_gen_prototype = pickRandomElement(terminal_expression_generators)!;
     }
     else {
+      global_type_context = "bool";
       e1_gen_prototype = pickRandomElement(nonterminal_expression_generators)!;
+      global_type_context = prev_global_type_context;
       e2_gen_prototype = pickRandomElement(nonterminal_expression_generators)!;
       e3_gen_prototype = pickRandomElement(nonterminal_expression_generators)!;
     }
@@ -468,10 +605,13 @@ export class IRConditional extends RValueGenerator {
       assert(extracted_e3.components.length === 1, "IRConditional: extracted_e3.components.length is not 1");
       extracted_e3 = extracted_e3.components[0];
     }
-    type_dag.connect(this.irnode.id, extracted_e2.id);
-    type_dag.connect(extracted_e2.id, extracted_e3.id, "subtype");
     type.irnode2types.set(extracted_e1.id, [new type.ElementaryType("bool", "nonpayable")]);
     type.irnode2types.set(this.irnode.id, type.elementary_types);
+    type_dag.connect(extracted_e2.id, extracted_e3.id, "subtype");
+    typeRangeAlignment(extracted_e2.id, extracted_e3.id);
+    type_dag.connect(this.irnode.id, extracted_e2.id);
+    typeRangeAlignment(this.irnode.id, extracted_e2.id);
+    if (debug) console.log(color.yellowBG(`${this.irnode.id}: Conditional, type: ${type.irnode2types.get(this.irnode.id)!.map(t => t.str())}`));
     if (Math.random() < tuple_prob) {
       this.irnode = new exp.IRTuple(global_id++, cur_scope_id, field_flag, [this.irnode as exp.IRExpression]);
       await irnode_db.insert(this.irnode.id, this.irnode.scope, "Tuple");
@@ -508,18 +648,34 @@ export abstract class StatementGenerator extends Generator {
 }
 
 export class SingleVariableDeclareStatementGenerator extends StatementGenerator {
-  constructor() { super(); }
+  type_range : type.Type[] | undefined;
+  constructor(type_range ?: type.Type[]) {
+    super();
+    this.type_range = type_range;
+  }
   async generate() : Promise<void> {
     let expression_gen_prototype;
-    if (await hasAvailableIRVariableDeclare(cur_scope_id)) {
-      expression_gen_prototype = pickRandomElement(all_expression_generators)!;
+    let expression_gen;
+    if (this.type_range === undefined) {
+      if (await hasAvailableIRVariableDeclare(cur_scope_id) && Math.random() > literal_prob) {
+        expression_gen_prototype = pickRandomElement(all_expression_generators)!;
+        expression_gen = new expression_gen_prototype();
+      }
+      else {
+        expression_gen = new LiteralGenerator();
+      }
     }
     else {
-      expression_gen_prototype = LiteralGenerator;
+      if (await hasAvailableIRVariableDeclareWithTypeConstraint(cur_scope_id, this.type_range) && Math.random() > literal_prob) {
+        expression_gen_prototype = pickRandomElement(all_expression_generators)!;
+        expression_gen = new expression_gen_prototype(this.type_range);
+      }
+      else {
+        expression_gen = new LiteralGenerator(this.type_range);
+      }
     }
-    const expression_gen = new expression_gen_prototype();
     await expression_gen.generate(0);
-    const variable_gen = new VariableDeclareGenerator();
+    const variable_gen = new VariableDeclareGenerator(this.type_range);
     await variable_gen.generate();
     this.irnode = new stmt.IRVariableDeclareStatement(global_id++, cur_scope_id, field_flag, [variable_gen.irnode! as decl.IRVariableDeclare], expression_gen.irnode! as exp.IRExpression);
     let expression_gen_extracted = expression_gen.irnode!;
@@ -530,6 +686,8 @@ export class SingleVariableDeclareStatementGenerator extends StatementGenerator 
     scope_stmt.set(cur_scope_id, scope_stmt.has(cur_scope_id) ? scope_stmt.get(cur_scope_id)!.concat(this.irnode!) : [this.irnode!]);
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "VariableDeclareStatement");
     type_dag.connect(expression_gen_extracted.id, variable_gen.irnode!.id, "supertype");
+    typeRangeAlignment(expression_gen_extracted.id, variable_gen.irnode!.id);
+    if (debug) console.log(color.yellowBG(`${variable_gen.irnode!.id}: VarDecl, type: ${type.irnode2types.get(variable_gen.irnode!.id)!.map(t => t.str())}`));
   }
 }
 
@@ -539,7 +697,7 @@ export class MultipleVariableDeclareStatementGenerator extends StatementGenerato
     const ir_exps : exp.IRExpression[] = [];
     for (let i = 0; i < tuple_vardecl_count; i++) {
       let expression_gen_prototype;
-      if (await hasAvailableIRVariableDeclare(cur_scope_id)) {
+      if (await hasAvailableIRVariableDeclare(cur_scope_id) && Math.random() > literal_prob) {
         expression_gen_prototype = pickRandomElement(all_expression_generators)!;
       }
       else {
@@ -566,6 +724,8 @@ export class MultipleVariableDeclareStatementGenerator extends StatementGenerato
         extracted_ir = extracted_ir.components[0];
       }
       type_dag.connect(extracted_ir.id, ir_varnodes[i].id, "supertype");
+      typeRangeAlignment(extracted_ir.id, ir_varnodes[i].id);
+      if (debug) console.log(color.yellowBG(`${ir_varnodes[i].id}: VarDecl, type: ${type.irnode2types.get(ir_varnodes[i].id)!.map(t => t.str())}`));
     }
   }
 }

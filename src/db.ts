@@ -16,7 +16,7 @@ export class DB {
   }
 
   async init() {
-    await this.db.exec('CREATE TABLE tbl (id INTEGER PRIMARY KEY, scope INTEGER, kind TEXT)')
+    await this.db.exec('CREATE TABLE tbl (id INTEGER PRIMARY KEY, scope INTEGER, kind TEXT, type TEXT)')
   }
 
   async close() {
