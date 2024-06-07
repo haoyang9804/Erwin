@@ -1,5 +1,5 @@
 import { assert, pickRandomElement, lazyPickRandomElement, cartesianProduct } from "./utility";
-import { type_complex_level } from "./index";
+import { sizeof } from "sizeof";
 
 export enum TypeKind {
   ElementaryType, // uint256, address, boolean,
@@ -776,7 +776,7 @@ export let function_types : Type[] = [];
 export let array_types : Type[] = [];
 
 //TODO: need to be updated later
-function generate_all_mapping_types() : Type[] {
+export function generate_all_mapping_types() : Type[] {
   const all_types_for_k = elementary_types;
   const all_types_for_v = elementary_types.concat(function_types)
     .concat(array_types)
@@ -790,7 +790,7 @@ function generate_all_mapping_types() : Type[] {
   return collection;
 }
 
-function generate_all_function_types() : Type[] {
+export function generate_all_function_types() : Type[] {
   let collection : Type[] = [];
   let all_visibility : ("public" | "internal" | "external" | "private")[] = ["public", "internal", "external", "private"];
   let all_stateMutability : ("pure" | "view" | "payable" | "nonpayable")[] = ["pure", "view", "payable", "nonpayable"];
@@ -810,7 +810,7 @@ function generate_all_function_types() : Type[] {
 }
 
 //TODO: need to be updated later
-function generate_all_array_types() : Type[] {
+export function generate_all_array_types() : Type[] {
   const all_available_types = elementary_types.concat(function_types)
     .concat(array_types)
     .concat(mapping_types);
@@ -823,11 +823,11 @@ function generate_all_array_types() : Type[] {
   return collection;
 }
 
-for (let i = 0; i < type_complex_level; i++) {
-  mapping_types = mapping_types.concat(generate_all_mapping_types());
-  function_types = function_types.concat(generate_all_function_types());
-  array_types = array_types.concat(generate_all_array_types());
-}
+// for (let i = 0; i < type_complex_level; i++) {
+//   mapping_types = mapping_types.concat(generate_all_mapping_types());
+//   function_types = function_types.concat(generate_all_function_types());
+//   array_types = array_types.concat(generate_all_array_types());
+// }
 
 export function includesType(arr : Type[], item : Type) : boolean {
   for (const element of arr) {
@@ -860,3 +860,5 @@ export function isEqualTypeSet(s1 : Type[], s2 : Type[]) : boolean {
   }
   return true;
 }
+
+export const size_of_type = sizeof(elementary_types[0]);

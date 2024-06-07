@@ -14,7 +14,7 @@ export class ConstaintNode {
   }
 }
 import { assert, createCustomSet, extendArrayofMap, pickRandomElement, shuffle, selectRandomElements } from "./utility";
-import { irnode2types, Type, isSuperTypeSet, isEqualTypeSet } from "./type"
+import { irnode2types, Type, isSuperTypeSet, isEqualTypeSet, size_of_type } from "./type"
 import * as dot from 'ts-graphviz';
 import { maximum_type_resolution_for_heads } from "./index";
 // debug
@@ -55,7 +55,7 @@ export class TypeDominanceDAG {
   // Map each edge to its reachable tails
   edge2tail : Map<string, Set<number>> = new Map<string, Set<number>>();
   // Records type candidates of all heads
-  heads2type : Map<number, Type>[] = [new Map<number, Type>()];
+  heads2type_collection : Map<number, Type>[] = [];
   // If "tail1 tail2" is in tailssubtype, then the type of tail2 is a subtype of the type of tail1.
   tailssubtype : Set<string> = new Set<string>();
   // If "tail1 tail2" is in tailssubtype, then the type of tail2 equals to the type of tail1.
@@ -99,7 +99,7 @@ export class TypeDominanceDAG {
     this.tails = new Set<number>();
     this.node2tail = new Map<number, Set<toTail>>();
     this.edge2tail = new Map<string, Set<number>>();
-    this.heads2type = [new Map<number, Type>()];
+    this.heads2type_collection = [];
     this.tailssubtype = new Set<string>();
     this.tailsequal = new Set<string>();
   }
@@ -255,25 +255,50 @@ export class TypeDominanceDAG {
       for (let [id, _] of this.dag_nodes) {
         console.log(color.redBG(`${id}'s type range: ${irnode2types.get(id)!.map(t => t.str())}`));
       }
+      console.log('=====================================');
     }
-    console.log('=====================================');
+  }
+
+  tighten_type_range_from_a_head(head : number) {
+    let upwards = (node : number) : void => {
+      if (this.dag_nodes.get(node)!.ins.length === 0) {
+        downwards(node);
+        return;
+      }
+      for (let parent of this.dag_nodes.get(node)!.ins) {
+        if (isEqualTypeSet(irnode2types.get(parent)!, irnode2types.get(node)!)) {
+          continue;
+        }
+        assert(isSuperTypeSet(irnode2types.get(parent)!, irnode2types.get(node)!), `tighten_type_range_from_a_head::upwards: the type range of ${parent}: ${irnode2types.get(parent)!.map(t => t.str())} is not a superset of the type range of ${node}: ${irnode2types.get(node)!.map(t => t.str())}`);
+        irnode2types.set(parent, irnode2types.get(node)!);
+        upwards(parent);
+        downwards(parent);
+      }
+    }
+    let downwards = (node : number) : void => {
+      if (this.dag_nodes.get(node)!.outs.length === 0) {
+        upwards(node);
+        return;
+      }
+      for (let child of this.dag_nodes.get(node)!.outs) {
+        if (isEqualTypeSet(irnode2types.get(child)!, irnode2types.get(node)!)) {
+          continue;
+        }
+        assert(isSuperTypeSet(irnode2types.get(child)!, irnode2types.get(node)!), `tighten_type_range_from_a_head::downwards: the type range of ${child}: ${irnode2types.get(child)!.map(t => t.str())} is not a superset of the type range of ${node}: ${irnode2types.get(node)!.map(t => t.str())}`);
+        irnode2types.set(child, irnode2types.get(node)!);
+        downwards(child);
+      }
+    }
+    downwards(head);
+    if (debug) {
+      for (let [id, _] of this.dag_nodes) {
+        console.log(color.greenBG(`${id}'s type range: ${irnode2types.get(id)!.map(t => t.str())}`));
+      }
+      console.log('=====================================');
+    }
   }
 
   tighten_type_range() {
-    let get_the_tightest_type_range_for_each_node = (node : number) : void => {
-      let smallest_type_range = irnode2types.get(node)!;
-      for (let child of this.dag_nodes.get(node)!.outs) {
-        get_the_tightest_type_range_for_each_node(child);
-        if (isSuperTypeSet(smallest_type_range, irnode2types.get(child)!)) {
-          smallest_type_range = irnode2types.get(child)!;
-        }
-      }
-      irnode2types.set(node, smallest_type_range);
-    }
-    for (let head of this.heads) {
-      get_the_tightest_type_range_for_each_node(head);
-    }
-    const visited = new Set<number>();
     let broadcast_the_tightest_type_range_downwards = (node : number) : void => {
       for (let child of this.dag_nodes.get(node)!.outs) {
         let child_type_range = irnode2types.get(child)!;
@@ -281,12 +306,7 @@ export class TypeDominanceDAG {
         if (!isEqualTypeSet(child_type_range, parent_type_range)) {
           assert(isSuperTypeSet(child_type_range, parent_type_range),
             `tighten_type_range::broadcast_the_tightest_type_range_downwards: the type range of ${child}: ${child_type_range.map(t => t.str())} is not a superset of the type range of ${node}: ${parent_type_range.map(t => t.str())}`);
-          visited.add(child);
           irnode2types.set(child, parent_type_range);
-        }
-        else {
-          if (visited.has(child)) continue;
-          visited.add(child);
         }
         broadcast_the_tightest_type_range_downwards(child);
       }
@@ -296,26 +316,49 @@ export class TypeDominanceDAG {
     }
   }
 
+  allocate_type_candidates_for_heads_with_smaller_memory_consumption() : void {
+    for (let head of this.heads) irnode2types.set(head, shuffle(irnode2types.get(head)!));
+    const head_array = shuffle(Array.from(this.heads));
+    let cnt = 0;
+    let dfs = (id : number, heads2type : Map<number, Type>) : void => {
+      if (cnt > maximum_type_resolution_for_heads) return;
+      if (id === head_array.length) {
+        this.heads2type_collection.push(heads2type);
+        cnt++;
+        return;
+      }
+      else {
+        for (let type of irnode2types.get(head_array[id])!) {
+          let heads2type_copy = new Map(heads2type);
+          heads2type_copy.set(head_array[id], type);
+          dfs(id + 1, heads2type_copy);
+        }
+      }
+    }
+    dfs(0, new Map<number, Type>());
+  }
+
   allocate_type_candidates_for_heads() : void {
+    this.heads2type_collection.push(new Map<number, Type>());
     for (let head of this.heads) {
-      const heads2type_length = this.heads2type.length;
+      const heads2type_length = this.heads2type_collection.length;
       if (debug) console.log(color.cyan(`head is ${head}, and irnode2types.get(head)!.length is ${irnode2types.get(head)!.length}`));
       assert(irnode2types.has(head), `allocate_type_candidates_for_heads: head ${head} is not in irnode2types`);
-      this.heads2type = extendArrayofMap(this.heads2type, irnode2types.get(head)!.length);
+      this.heads2type_collection = extendArrayofMap(this.heads2type_collection, irnode2types.get(head)!.length);
       let cnt = 1;
       for (let type of irnode2types.get(head)!) {
         for (let i = (cnt - 1) * heads2type_length; i < cnt * heads2type_length; i++) {
-          this.heads2type[i].set(head, type);
+          this.heads2type_collection[i].set(head, type);
         }
         cnt++;
       }
     }
-    if (debug) console.log(color.cyan(`heads2type.size is ${this.heads2type.length}`));
-    if (this.heads2type.length > maximum_type_resolution_for_heads) {
-      this.heads2type = selectRandomElements(this.heads2type, maximum_type_resolution_for_heads);
+    if (debug) console.log(color.cyan(`heads2type_collection.size is ${this.heads2type_collection.length}`));
+    if (this.heads2type_collection.length > maximum_type_resolution_for_heads) {
+      this.heads2type_collection = selectRandomElements(this.heads2type_collection, maximum_type_resolution_for_heads);
     }
     else {
-      this.heads2type = shuffle(this.heads2type);
+      this.heads2type_collection = shuffle(this.heads2type_collection);
     }
   }
 
@@ -497,6 +540,14 @@ export class TypeDominanceDAG {
     }
   }
 
+  check_type_range_before_tightening(node : number) : void {
+    for (let child of this.dag_nodes.get(node)!.outs) {
+      assert(isSuperTypeSet(irnode2types.get(child)!, irnode2types.get(node)!),
+        `check_type_range_before_tightening: the type range of ${child}: ${irnode2types.get(child)!.map(t => t.str())} is not the superset of the type range of ${node}: ${irnode2types.get(node)!.map(t => t.str())}`);
+      this.check_type_range_before_tightening(child);
+    }
+  }
+
   resolve() : void {
     // !0. initialize the resolution
     this.initialize_resolve();
@@ -519,21 +570,39 @@ export class TypeDominanceDAG {
     for (let head of this.heads) {
       this.remove_subtype_domination(head);
     }
-    // // !5. Tighten the type range for each node
-    // this.tighten_type_range();
+    // !4.5 Check before type range tightening
+    for (let head of this.heads) {
+      this.check_type_range_before_tightening(head);
+    }
+    // !5. Tighten the type range for each node
+    this.tighten_type_range();
     if (debug) {
       for (let [id, _] of this.dag_nodes) {
         console.log(color.redBG(`${id}'s type range: ${irnode2types.get(id)!.map(t => t.str())}`));
       }
     }
-    // !5.5 Check that if node n1 type-dominates node n2, then the type range of n1 is the same as the type range of n2
+    // !5.5 Check after type range tightening
     for (let head of this.heads) {
       this.check_type_range_after_tightening(head);
     }
     // !6. Assign types to this.heads
-    this.allocate_type_candidates_for_heads();
+    let size_estimation1 = 1;
+    for (let head of this.heads) {
+      size_estimation1 *= irnode2types.get(head)!.length;
+    }
+    console.log('sizeof(Type) is', size_of_type);
+    size_estimation1 *= this.heads.size * size_of_type;
+    console.log(`size estimation1 is ${size_estimation1}`);
+    let size_estimation2 = maximum_type_resolution_for_heads * this.heads.size * size_of_type;
+    console.log(`size estimation2 is ${size_estimation2}`);
+    if (size_estimation1 < size_estimation2) {
+      this.allocate_type_candidates_for_heads();
+    }
+    else {
+      this.allocate_type_candidates_for_heads_with_smaller_memory_consumption();
+    }
     // !7. Traverse each type resolution for heads
-    for (const head_resolve of this.heads2type) {
+    for (const head_resolve of this.heads2type_collection) {
       this.resolved_types.clear();
       let good_resolve = true;
       // First, narrow down the type range of this.tails
@@ -642,7 +711,7 @@ export class TypeDominanceDAG {
     // !6. Assign types to this.heads
     this.allocate_type_candidates_for_heads();
     // !7. Traverse each type resolution for heads
-    for (const head_resolve of this.heads2type) {
+    for (const head_resolve of this.heads2type_collection) {
       this.resolved_types.clear();
       let good_resolve = true;
       // First, narrow down the type range of this.tails

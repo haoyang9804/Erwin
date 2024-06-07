@@ -144,7 +144,8 @@ export function createCustomSet<T>(equalityFn : (a : T, b : T) => boolean) : Set
 }
 
 export function shuffle<T>(array : T[]) : T[] {
-  let currentIndex = array.length, randomIndex;
+  let arrayCopy = Array.from(array);
+  let currentIndex = arrayCopy.length, randomIndex;
 
   // While there remain elements to shuffle.
   while (currentIndex != 0) {
@@ -154,11 +155,11 @@ export function shuffle<T>(array : T[]) : T[] {
     currentIndex--;
 
     // And swap it with the current element.
-    [array[currentIndex], array[randomIndex]] = [
-      array[randomIndex], array[currentIndex]];
+    [arrayCopy[currentIndex], arrayCopy[randomIndex]] = [
+      arrayCopy[randomIndex], arrayCopy[currentIndex]];
   }
 
-  return array;
+  return arrayCopy;
 }
 
 export function selectRandomElements<T>(array : T[], n : number) : T[] {
