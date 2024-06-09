@@ -462,10 +462,10 @@ export class IRConditional extends RValueGenerator {
       e3_gen_prototype = pickRandomElement(nonterminal_expression_generators)!;
     }
     const e1_gen = new e1_gen_prototype([new type.ElementaryType("bool", "nonpayable")]);
-    const e2_gen = new e2_gen_prototype(this.type_range);
-    const e3_gen = new e3_gen_prototype(this.type_range);
     await e1_gen.generate(component + 1);
+    const e2_gen = new e2_gen_prototype(this.type_range);
     await e2_gen.generate(component + 1);
+    const e3_gen = new e3_gen_prototype(e2_gen.type_range);
     await e3_gen.generate(component + 1);
     this.irnode = new exp.IRConditional(global_id++, cur_scope_id, field_flag, e1_gen.irnode! as exp.IRExpression, e2_gen.irnode! as exp.IRExpression, e3_gen.irnode! as exp.IRExpression);
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "Conditional");
@@ -508,7 +508,7 @@ const nonterminal_expression_generators = [
   AssignmentGenerator,
   BinaryOpGenerator,
   UnaryOpGenerator,
-  // IRConditional
+  IRConditional
 ]
 const all_expression_generators = [
   LiteralGenerator,
@@ -516,7 +516,7 @@ const all_expression_generators = [
   AssignmentGenerator,
   BinaryOpGenerator,
   UnaryOpGenerator,
-  // IRConditional
+  IRConditional
 ]
 
 
