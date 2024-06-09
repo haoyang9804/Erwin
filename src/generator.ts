@@ -195,6 +195,7 @@ export class IdentifierGenerator extends LRValueGenerator {
     type_dag.connect(this.irnode.id, irdecl.id);
     type.irnode2types.set(this.irnode.id, this.type_range);
     typeRangeAlignment(this.irnode.id, irdecl.id);
+    this.type_range = type.irnode2types.get(this.irnode.id)!;
     type_dag.tighten_type_range_from_a_tail(irdecl.id);
     if (debug) console.log(color.yellowBG(`${this.irnode.id}: Identifier --> ${irdecl.id}, type: ${type.irnode2types.get(this.irnode.id)!.map(t => t.str())}`));
     if (Math.random() < tuple_prob) {
