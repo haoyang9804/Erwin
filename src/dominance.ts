@@ -4,9 +4,9 @@ export abstract class DominanceNode<T> {
     this.kind = kind;
   }
   abstract str() : string;
-  abstract subtype() : DominanceNode<T>[];
+  abstract subs() : DominanceNode<T>[];
   abstract sub_with_lowerbound(lower_bound : DominanceNode<T>) : DominanceNode<T>[];
-  abstract supertype() : DominanceNode<T>[];
+  abstract supers() : DominanceNode<T>[];
   abstract super_with_upperbound(upper_bound : DominanceNode<T>) : DominanceNode<T>[];
   abstract same(t : DominanceNode<T>) : boolean;
   abstract copy() : DominanceNode<T>;

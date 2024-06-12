@@ -1,6 +1,7 @@
-import { assert, pickRandomElement, lazyPickRandomElement, cartesianProduct } from "./utility";
+import { assert, pickRandomElement, lazyPickRandomElement, cartesianProduct, pickRandomSubarray } from "./utility";
 import { sizeof } from "sizeof";
 import { DominanceNode } from "./dominance";
+import { config } from './config';
 
 export enum TypeKind {
   ElementaryType, // uint256, address, boolean,
@@ -28,22 +29,6 @@ export function lowerType(t1 : Type, t2 : Type) {
 
 export abstract class Type extends DominanceNode<TypeKind> { }
 
-// export abstract class Type {
-//   kind : TypeKind;
-//   constructor(kind : TypeKind) {
-//     this.kind = kind;
-//   }
-//   abstract str() : string;
-//   abstract subtype() : Type[];
-//   abstract sub_with_lowerbound(lower_bound : Type) : Type[];
-//   abstract supertype() : Type[];
-//   abstract super_with_upperbound(upper_bound : Type) : Type[];
-//   abstract same(t : Type) : boolean;
-//   abstract copy() : Type;
-//   abstract issubof(t : Type) : boolean;
-//   abstract issuperof(t : Type) : boolean;
-// }
-
 export class EventType extends Type {
   name : string;
   constructor(name : string) {
@@ -53,13 +38,13 @@ export class EventType extends Type {
   str() : string {
     return "event";
   }
-  subtype() : Type[] {
+  subs() : Type[] {
     throw new Error("No subtype for EventType");
   }
   sub_with_lowerbound(lower_bound : Type) : Type[] {
     throw new Error("No subtype for EventType");
   }
-  supertype() : Type[] {
+  supers() : Type[] {
     throw new Error("No supertype for EventType");
   }
   super_with_upperbound(upper_bound : Type) : Type[] {
@@ -88,13 +73,13 @@ export class ErrorType extends Type {
   str() : string {
     return "error";
   }
-  subtype() : Type[] {
+  subs() : Type[] {
     throw new Error("No subtype for ErrorType");
   }
   sub_with_lowerbound(lower_bound : Type) : Type[] {
     throw new Error("No subtype for ErrorType");
   }
-  supertype() : Type[] {
+  supers() : Type[] {
     throw new Error("No supertype for ErrorType");
   }
   super_with_upperbound(upper_bound : Type) : Type[] {
@@ -123,13 +108,13 @@ export class StructType extends Type {
   str() : string {
     return "struct";
   }
-  subtype() : Type[] {
+  subs() : Type[] {
     throw new Error("No subtype for StructType");
   }
   sub_with_lowerbound(lower_bound : Type) : Type[] {
     throw new Error("No subtype for StructType");
   }
-  supertype() : Type[] {
+  supers() : Type[] {
     throw new Error("No supertype for StructType");
   }
   super_with_upperbound(upper_bound : Type) : Type[] {
@@ -158,13 +143,13 @@ export class ContractType extends Type {
   str() : string {
     return "contract";
   }
-  subtype() : Type[] {
+  subs() : Type[] {
     throw new Error("No subtype for ContractType");
   }
   sub_with_lowerbound(lower_bound : Type) : Type[] {
     throw new Error("No subtype for ContractType");
   }
-  supertype() : Type[] {
+  supers() : Type[] {
     throw new Error("No supertype for ContractType");
   }
   super_with_upperbound(upper_bound : Type) : Type[] {
@@ -210,7 +195,7 @@ export class ElementaryType extends Type {
     return new ElementaryType(this.name, this.stateMutability);
   }
 
-  subtype() : Type[] {
+  subs() : Type[] {
     switch (this.name) {
       case "uint256":
         return [new ElementaryType("uint256", this.stateMutability), new ElementaryType("uint128", this.stateMutability), new ElementaryType("uint64", this.stateMutability), new ElementaryType("uint32", this.stateMutability), new ElementaryType("uint16", this.stateMutability), new ElementaryType("uint8", this.stateMutability)];
@@ -256,10 +241,10 @@ export class ElementaryType extends Type {
   }
 
   sub_with_lowerbound(lower_bound : Type) : Type[] {
-    return this.subtype().filter(x => x.issuperof(lower_bound));
+    return this.subs().filter(x => x.issuperof(lower_bound));
   }
 
-  supertype() : Type[] {
+  supers() : Type[] {
     switch (this.name) {
       case "uint256":
         return [new ElementaryType("uint256", this.stateMutability)];
@@ -305,7 +290,7 @@ export class ElementaryType extends Type {
   }
 
   super_with_upperbound(upper_bound : Type) : Type[] {
-    return this.supertype().filter(x => x.issubof(upper_bound));
+    return this.supers().filter(x => x.issubof(upper_bound));
   }
 
   same(t : Type) : boolean {
@@ -456,17 +441,17 @@ export class UnionType extends Type {
   copy() : Type {
     return new UnionType(this.types.map(x => x.copy()));
   }
-  subtype() : Type[] {
-    return cartesianProduct(this.types.map(x => x.subtype())).map(x => new UnionType(x));
+  subs() : Type[] {
+    return cartesianProduct(this.types.map(x => x.subs())).map(x => new UnionType(x));
   }
   sub_with_lowerbound(lower_bound : Type) : Type[] {
-    return this.subtype().filter(x => x.issuperof(lower_bound));
+    return this.subs().filter(x => x.issuperof(lower_bound));
   }
-  supertype() : Type[] {
-    return cartesianProduct(this.types.map(x => x.supertype())).map(x => new UnionType(x));
+  supers() : Type[] {
+    return cartesianProduct(this.types.map(x => x.supers())).map(x => new UnionType(x));
   }
   super_with_upperbound(upper_bound : Type) : Type[] {
-    return this.supertype().filter(x => x.issubof(upper_bound));
+    return this.supers().filter(x => x.issubof(upper_bound));
   }
   same(t : Type) : boolean {
     if (t.kind !== TypeKind.UnionType) return false;
@@ -521,7 +506,7 @@ export class FunctionType extends Type {
   returnTypes_str() : string {
     return this.returnTypes.types.map(x => x.str()).join(", ");
   }
-  subtype() : Type[] {
+  subs() : Type[] {
     switch (this.stateMutability) {
       case "pure":
         return [new FunctionType(this.visibility, "pure", this.parameterTypes, this.returnTypes)];
@@ -538,9 +523,9 @@ export class FunctionType extends Type {
     }
   }
   sub_with_lowerbound(lower_bound : Type) : Type[] {
-    return this.subtype().filter(x => x.issuperof(lower_bound));
+    return this.subs().filter(x => x.issuperof(lower_bound));
   }
-  supertype() : Type[] {
+  supers() : Type[] {
     switch (this.stateMutability) {
       case "pure":
         return [new FunctionType(this.visibility, "pure", this.parameterTypes, this.returnTypes),
@@ -557,7 +542,7 @@ export class FunctionType extends Type {
     }
   }
   super_with_upperbound(upper_bound : Type) : Type[] {
-    return this.supertype().filter(x => x.issubof(upper_bound));
+    return this.supers().filter(x => x.issubof(upper_bound));
   }
   same(t : Type) : boolean {
     if (t.kind !== TypeKind.FunctionType) return false;
@@ -632,15 +617,15 @@ export class ArrayType extends Type {
     return new ArrayType(this.base.copy(), this.length);
   }
   super_with_upperbound(upper_bound : Type) : Type[] {
-    return this.supertype().filter(x => x.issubof(upper_bound));
+    return this.supers().filter(x => x.issubof(upper_bound));
   }
-  supertype() : Type[] {
+  supers() : Type[] {
     return [this.copy()];
   }
   sub_with_lowerbound(lower_bound : Type) : Type[] {
-    return this.subtype().filter(x => x.issuperof(lower_bound));
+    return this.subs().filter(x => x.issuperof(lower_bound));
   }
-  subtype() : Type[] {
+  subs() : Type[] {
     return [this.copy()];
   }
   same(t : Type) : boolean {
@@ -679,17 +664,17 @@ export class MappingType extends Type {
     }
     return false;
   }
-  subtype() : Type[] {
+  subs() : Type[] {
     return [this.copy()];
   }
   sub_with_lowerbound(lower_bound : Type) : Type[] {
-    return this.subtype().filter(x => x.issuperof(lower_bound));
+    return this.subs().filter(x => x.issuperof(lower_bound));
   }
-  supertype() : Type[] {
+  supers() : Type[] {
     return [this.copy()];
   }
   super_with_upperbound(upper_bound : Type) : Type[] {
-    return this.supertype().filter(x => x.issubof(upper_bound));
+    return this.supers().filter(x => x.issubof(upper_bound));
   }
   issubof(t : Type) : boolean {
     return this.same(t);
@@ -699,48 +684,9 @@ export class MappingType extends Type {
   }
 }
 
-
 export const irnode2types = new Map<number, Type[]>();
 
-export const elementary_types : Type[] = [
-  new ElementaryType("uint256", "nonpayable"),
-  new ElementaryType("uint128", "nonpayable"),
-  new ElementaryType("uint64", "nonpayable"),
-  new ElementaryType("uint32", "nonpayable"),
-  new ElementaryType("uint16", "nonpayable"),
-  new ElementaryType("uint8", "nonpayable"),
-  new ElementaryType("int256", "nonpayable"),
-  new ElementaryType("int128", "nonpayable"),
-  new ElementaryType("int64", "nonpayable"),
-  new ElementaryType("int32", "nonpayable"),
-  new ElementaryType("int16", "nonpayable"),
-  new ElementaryType("int8", "nonpayable"),
-  new ElementaryType("address", "payable"),
-  new ElementaryType("address", "nonpayable"),
-  new ElementaryType("bool", "nonpayable"),
-  // new ElementaryType("string", "nonpayable"),
-  // new ElementaryType("bytes", "nonpayable"),
-]
-
-export const literal_types : Type[] = [
-  new ElementaryType("uint256", "nonpayable"),
-  new ElementaryType("uint128", "nonpayable"),
-  new ElementaryType("uint64", "nonpayable"),
-  new ElementaryType("uint32", "nonpayable"),
-  new ElementaryType("uint16", "nonpayable"),
-  new ElementaryType("uint8", "nonpayable"),
-  new ElementaryType("int256", "nonpayable"),
-  new ElementaryType("int128", "nonpayable"),
-  new ElementaryType("int64", "nonpayable"),
-  new ElementaryType("int32", "nonpayable"),
-  new ElementaryType("int16", "nonpayable"),
-  new ElementaryType("int8", "nonpayable"),
-  new ElementaryType("address", "payable"),
-  new ElementaryType("address", "nonpayable"),
-  new ElementaryType("bool", "nonpayable"),
-]
-
-export const integer_types : Type[] = [
+export let integer_types : Type[] = [
   new ElementaryType("int256", "nonpayable"),
   new ElementaryType("int128", "nonpayable"),
   new ElementaryType("int64", "nonpayable"),
@@ -748,8 +694,7 @@ export const integer_types : Type[] = [
   new ElementaryType("int16", "nonpayable"),
   new ElementaryType("int8", "nonpayable"),
 ]
-
-export const uinteger_types : Type[] = [
+export let uinteger_types : Type[] = [
   new ElementaryType("uint256", "nonpayable"),
   new ElementaryType("uint128", "nonpayable"),
   new ElementaryType("uint64", "nonpayable"),
@@ -757,21 +702,18 @@ export const uinteger_types : Type[] = [
   new ElementaryType("uint16", "nonpayable"),
   new ElementaryType("uint8", "nonpayable"),
 ]
+uinteger_types = pickRandomSubarray(uinteger_types, config.uint_num);
+integer_types = pickRandomSubarray(integer_types, config.int_num);
+export const all_integer_types : Type[] = integer_types.concat(uinteger_types);
+export const bool_types : Type[] = [new ElementaryType("bool", "nonpayable")];
+export const address_types : Type[] = [new ElementaryType("address", "payable"), new ElementaryType("address", "nonpayable")];
+export const elementary_types : Type[] = all_integer_types.concat(bool_types).concat(address_types);
 
-export const all_integer_types : Type[] = [
-  new ElementaryType("uint256", "nonpayable"),
-  new ElementaryType("uint128", "nonpayable"),
-  new ElementaryType("uint64", "nonpayable"),
-  new ElementaryType("uint32", "nonpayable"),
-  new ElementaryType("uint16", "nonpayable"),
-  new ElementaryType("uint8", "nonpayable"),
-  new ElementaryType("int256", "nonpayable"),
-  new ElementaryType("int128", "nonpayable"),
-  new ElementaryType("int64", "nonpayable"),
-  new ElementaryType("int32", "nonpayable"),
-  new ElementaryType("int16", "nonpayable"),
-  new ElementaryType("int8", "nonpayable")
-]
+export const type_range_collection : Type[][] = [
+  all_integer_types,
+  bool_types,
+  address_types
+];
 
 export let mapping_types : Type[] = [];
 export let function_types : Type[] = [];

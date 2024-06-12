@@ -370,10 +370,10 @@ export class TypeDominanceDAG {
       if (!this.node2tail.has(head)) continue;
       for (const { tail_id, subtype, supertype } of this.node2tail.get(head)!) {
         if (subtype) {
-          types4tail = type_of_head.subtype();
+          types4tail = type_of_head.subs();
         }
         else if (supertype) {
-          types4tail = type_of_head.supertype();
+          types4tail = type_of_head.supers();
         }
         else {
           types4tail = [type_of_head];
@@ -801,7 +801,7 @@ export class TypeDominanceDAG {
       for (let [_, node] of this.dag_nodes) {
         for (let child of node.outs) {
           if (this.subtype.has(`${node.id} ${child}`)) {
-            const subttypes = resolved_types.get(node.id)!.subtype();
+            const subttypes = resolved_types.get(node.id)!.subs();
             let typeofchild = resolved_types.get(child)!;
             let match = false;
             for (let subtype of subttypes) {
@@ -816,7 +816,7 @@ export class TypeDominanceDAG {
               Maybe you forget to add a subtype constraint in constraint.ts: TypeDominanceDAG: verify.`);
           }
           else if (this.supertype.has(`${node.id} ${child}`)) {
-            const supertypes = resolved_types.get(node.id)!.supertype();
+            const supertypes = resolved_types.get(node.id)!.supers();
             let typeofchild = resolved_types.get(child)!;
             let match = false;
             for (let subtype of supertypes) {
