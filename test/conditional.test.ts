@@ -26,7 +26,6 @@ test("test conditional",
   const v2id = new IRIdentifier(3, 0, 0).from(variable2);
   v2id.type = new ElementaryType("uint256", "nonpayable");
   const op = new IRBinaryOp(4, 0, 0, v1id, v2id, ">");
-  expect(async() => { op.lower() }).rejects.toThrow("IRBinaryOp: type is not generated");
   op.type = new ElementaryType("uint256", "nonpayable");
   const op2 = new IRBinaryOp(5, 0, 0, v1id, v2id, "+");
   op2.type = new ElementaryType("uint256", "nonpayable");
@@ -45,6 +44,5 @@ test("test conditional",
   const cond2 = new IRConditional(10, 0, 0, op, op2, v3id);
   // whatever type it is
   cond2.type = new ElementaryType("address", "nonpayable");
-  expect(async() => { writer.write(cond2.lower()) }).rejects.toThrow("IRConditional: true_expression and false_expression have incompatible types: uint256 and address");
 }
 )

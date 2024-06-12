@@ -6,7 +6,7 @@ import { irnodes } from "./node";
 import * as exp from "./expression";
 import * as decl from "./declare";
 import * as type from "./type";
-import { Log } from "./logging";
+import { config } from "./config";
 import { pickRandomElement } from "./utility";
 import {
   PrettyFormatter,
@@ -23,15 +23,6 @@ const writer = new ASTWriter(
 );
 import * as figlet from "figlet"
 console.log(figlet.textSync('Erwin'));
-export let type_complex_level = 1;
-export let expression_complex_level = 1;
-export let debug : boolean = false;
-export let tuple_prob = 0.3;
-export let var_count = 5;
-export let tuple_vardecl_count = 3;
-export let maximum_type_resolution_for_heads = 100000;
-export let literal_prob = 0.3;
-export let log = new Log();
 const version = "0.1.0";
 
 function terminate(message ?: string, exitCode = 0) : never {
@@ -58,40 +49,48 @@ function error(message : string) : never {
     .version(version, "-v, --version", "Print package version.")
     .helpOption("-h, --help", "Print help message.");
   program
-    .option("-lp --literal_prob <float>", "The probability of generating a literal.", `${literal_prob}`)
-    .option("-mxt --maximum_type_resolution <number>", "The maximum number of type resolutions for heads.", `${maximum_type_resolution_for_heads}`)
-    .option("-vc --var_count <number>", "The number of variables Erwin will generate.", `${var_count}`)
-    .option("-tvc --tuple_vardecl_count <number>", "The number of variables in a tuple Erwin will generate.", `${tuple_vardecl_count}`)
-    .option("-tp --tuple_prob <float>", "The probability of generating a tuple surrounding an expression.", `${tuple_prob}`)
+    .option("-scf --stmt_count_of_function_upperlimit <number>", "The upper limit of the number of statements of a function.", `${config.stmt_count_of_function_upperlimit}`)
+    .option("-rcf --return_count_of_function_upperlimit <number>", "The upper limit of the number of return values of a function.", `${config.return_count_of_function_upperlimit}`)
+    .option("-pcf --param_count_of_function_upperlimit <number>", "The upper limit of the number of parameters of a function.", `${config.param_count_of_function_upperlimit}`)
+    .option("-fc --function_count <number>", "The number of functions Erwin will generate.", `${config.function_count}`)
+    .option("-lp --literal_prob <float>", "The probability of generating a literal.", `${config.literal_prob}`)
+    .option("-mxt --maximum_type_resolution <number>", "The maximum number of type resolutions for heads.", `${config.maximum_type_resolution_for_heads}`)
+    .option("-vc --var_count <number>", "The number of variables Erwin will generate.", `${config.var_count}`)
+    .option("-tvc --tuple_vardecl_count <number>", "The number of variables in a tuple Erwin will generate.", `${config.tuple_vardecl_count}`)
+    .option("-tp --tuple_prob <float>", "The probability of generating a tuple surrounding an expression.", `${config.tuple_prob}`)
     // .option("-tc --type_complex_level <number>", "The complex level of the type Erwin will generate.\nThe suggested range is [1,2,3]. The bigger, the more complex.", `${type_complex_level}`)
-    .option("-ec --expression_complex_level <number>", "The complex level of the expression Erwin will generate.\nThe suggedted range is [1,2,3,4,5]. The bigger, the more complex.", `${expression_complex_level}`)
-    .option("-d --debug", "Enable the debug mode.", `${debug}`);
+    .option("-ec --expression_complex_level <number>", "The complex level of the expression Erwin will generate.\nThe suggedted range is [1,2,3,4,5]. The bigger, the more complex.", `${config.expression_complex_level}`)
+    .option("-d --debug", "Enable the debug mode.", `${config.debug}`);
   program.parse(process.argv);
-  type_complex_level = parseInt(program.opts().type_complex_level);
-  expression_complex_level = parseInt(program.opts().expression_complex_level);
-  var_count = parseInt(program.opts().var_count);
-  tuple_vardecl_count = parseInt(program.opts().tuple_vardecl_count);
-  tuple_prob = parseFloat(program.opts().tuple_prob);
-  maximum_type_resolution_for_heads = parseInt(program.opts().maximum_type_resolution);
-  literal_prob = parseFloat(program.opts().literal_prob);
-  if (program.opts().debug === true) debug = true;
+  config.stmt_count_of_function_upperlimit = parseInt(program.opts().stmt_count_of_function_upperlimit);
+  config.return_count_of_function_upperlimit = parseInt(program.opts().return_count_of_function_upperlimit);
+  config.param_count_of_function_upperlimit = parseInt(program.opts().param_count_of_function_upperlimit);
+  config.function_count = parseInt(program.opts().function_count);
+  config.literal_prob = parseFloat(program.opts().literal_prob);
+  config.maximum_type_resolution_for_heads = parseInt(program.opts().maximum_type_resolution);
+  config.var_count = parseInt(program.opts().var_count);
+  config.tuple_vardecl_count = parseInt(program.opts().tuple_vardecl_count);
+  config.tuple_prob = parseFloat(program.opts().tuple_prob);
+  // type_complex_level = parseInt(program.opts().type_complex_level);
+  config.expression_complex_level = parseInt(program.opts().expression_complex_level);
+  if (program.opts().debug === true) config.debug = true;
   // open and init DB
   await db.irnode_db.open();
   await db.irnode_db.init();
   // generation
-  for (let i = 0; i < var_count - tuple_vardecl_count; i++) {
+  for (let i = 0; i < config.var_count - config.tuple_vardecl_count; i++) {
     const v = new gen.SingleVariableDeclareStatementGenerator();
     await v.generate();
   }
-  if (tuple_vardecl_count > 0) {
+  if (config.tuple_vardecl_count > 0) {
     const tv = new gen.MultipleVariableDeclareStatementGenerator();
     await tv.generate();
   }
   // resolve constraints
-  if (debug) gen.type_dag.draw();
+  if (config.debug) gen.type_dag.draw();
   try {
     gen.type_dag.resolve();
-    if (debug) gen.type_dag.verify();
+    if (config.debug) gen.type_dag.verify();
     console.log(`>> In total, there are ${gen.type_dag.resolved_types_collection.length} resolutions`);
     if (gen.type_dag.resolved_types_collection.length === 0) {
       for (let [key, value] of type.irnode2types) {
@@ -132,8 +131,6 @@ function error(message : string) : never {
     console.log(error)
   }
   await db.irnode_db.close();
-  // const args = program.args;
-  // const options = program.opts();
 })().catch((e) => {
   error(e.message);
 });

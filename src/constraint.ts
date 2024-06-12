@@ -16,10 +16,9 @@ export class ConstaintNode {
 import { assert, createCustomSet, extendArrayofMap, pickRandomElement, shuffle, selectRandomElements } from "./utility";
 import { irnode2types, Type, isSuperTypeSet, isEqualTypeSet, size_of_type } from "./type"
 import * as dot from 'ts-graphviz';
-import { maximum_type_resolution_for_heads } from "./index";
+import { config } from './config'
 // debug
 import { toFile } from "@ts-graphviz/adapter";
-import { debug } from "./index";
 import { color } from "console-log-colors"
 
 // a set of IRNode ids that have backward constrants that cannot be constant
@@ -251,7 +250,7 @@ export class TypeDominanceDAG {
       }
     }
     upwards(tail);
-    if (debug) {
+    if (config.debug) {
       for (let [id, _] of this.dag_nodes) {
         console.log(color.redBG(`${id}'s type range: ${irnode2types.get(id)!.map(t => t.str())}`));
       }
@@ -290,7 +289,7 @@ export class TypeDominanceDAG {
       }
     }
     downwards(head);
-    if (debug) {
+    if (config.debug) {
       for (let [id, _] of this.dag_nodes) {
         console.log(color.greenBG(`${id}'s type range: ${irnode2types.get(id)!.map(t => t.str())}`));
       }
@@ -321,7 +320,7 @@ export class TypeDominanceDAG {
     const head_array = shuffle(Array.from(this.heads));
     let cnt = 0;
     let dfs = (id : number, heads2type : Map<number, Type>) : void => {
-      if (cnt > maximum_type_resolution_for_heads) return;
+      if (cnt > config.maximum_type_resolution_for_heads) return;
       if (id === head_array.length) {
         this.heads2type_collection.push(heads2type);
         cnt++;
@@ -342,7 +341,7 @@ export class TypeDominanceDAG {
     this.heads2type_collection.push(new Map<number, Type>());
     for (let head of this.heads) {
       const heads2type_length = this.heads2type_collection.length;
-      if (debug) console.log(color.cyan(`head is ${head}, and irnode2types.get(head)!.length is ${irnode2types.get(head)!.length}`));
+      if (config.debug) console.log(color.cyan(`head is ${head}, and irnode2types.get(head)!.length is ${irnode2types.get(head)!.length}`));
       assert(irnode2types.has(head), `allocate_type_candidates_for_heads: head ${head} is not in irnode2types`);
       this.heads2type_collection = extendArrayofMap(this.heads2type_collection, irnode2types.get(head)!.length);
       let cnt = 1;
@@ -353,9 +352,9 @@ export class TypeDominanceDAG {
         cnt++;
       }
     }
-    if (debug) console.log(color.cyan(`heads2type_collection.size is ${this.heads2type_collection.length}`));
-    if (this.heads2type_collection.length > maximum_type_resolution_for_heads) {
-      this.heads2type_collection = selectRandomElements(this.heads2type_collection, maximum_type_resolution_for_heads);
+    if (config.debug) console.log(color.cyan(`heads2type_collection.size is ${this.heads2type_collection.length}`));
+    if (this.heads2type_collection.length > config.maximum_type_resolution_for_heads) {
+      this.heads2type_collection = selectRandomElements(this.heads2type_collection, config.maximum_type_resolution_for_heads);
     }
     else {
       this.heads2type_collection = shuffle(this.heads2type_collection);
@@ -437,10 +436,10 @@ export class TypeDominanceDAG {
         for (let j = 0; j < i4tails_array; j++) {
           assert(tailid2type_candidates.has(tails_array[j]), `resolve_tails: tailid2type_candidates does not have ${tails_array[j]}`);
           if (this.tailssubtype.has(`${tails_array[j]} ${tails_array[i4tails_array]}`)) {
-            types_candidate = types_candidate.filter(t => t.issubtypeof(tailid2type_candidates.get(tails_array[j])![i4types_of_each_tail[i4tails_array]]));
+            types_candidate = types_candidate.filter(t => t.issubof(tailid2type_candidates.get(tails_array[j])![i4types_of_each_tail[i4tails_array]]));
           }
           else if (this.tailssubtype.has(`${tails_array[i4tails_array]} ${tails_array[j]}`)) {
-            types_candidate = types_candidate.filter(t => t.issupertypeof(tailid2type_candidates.get(tails_array[j])![i4types_of_each_tail[i4tails_array]]));
+            types_candidate = types_candidate.filter(t => t.issuperof(tailid2type_candidates.get(tails_array[j])![i4types_of_each_tail[i4tails_array]]));
           }
           else if (this.tailsequal.has(`${tails_array[j]} ${tails_array[i4tails_array]}`)) {
             types_candidate = types_candidate.filter(t => t.same(tailid2type_candidates.get(tails_array[j])![i4types_of_each_tail[i4tails_array]]));
@@ -495,7 +494,7 @@ export class TypeDominanceDAG {
           const tail_info = [...this.node2tail.get(child)!].find(t => t.tail_id === tail_id);
           if (this.subtype.has(edge)) {
             if (tail_info!.subtype) {
-              let type_candidates = this.resolved_types.get(node)!.subtype_with_lowerbound(this.resolved_types.get(tail_id)!)!;
+              let type_candidates = this.resolved_types.get(node)!.sub_with_lowerbound(this.resolved_types.get(tail_id)!)!;
               if (this.resolved_types.has(child)) {
                 type_candidates = type_candidates.filter(t => t.same(this.resolved_types.get(child)!));
               }
@@ -510,7 +509,7 @@ export class TypeDominanceDAG {
               throw new Error(`resolve_nonheads_and_nontails: ${node} should not be the supertype of ${child}`);
             }
             else {
-              assert(this.resolved_types.get(tail_id)!.issubtypeof(this.resolved_types.get(node)!), `resolve_nonheads_and_nontails: the type of ${node}: ${this.resolved_types.get(node)!.str()} is not the supertype of the type of ${tail_id}: ${this.resolved_types.get(tail_id)!.str()}`);
+              assert(this.resolved_types.get(tail_id)!.issubof(this.resolved_types.get(node)!), `resolve_nonheads_and_nontails: the type of ${node}: ${this.resolved_types.get(node)!.str()} is not the supertype of the type of ${tail_id}: ${this.resolved_types.get(tail_id)!.str()}`);
               this.resolved_types.set(child, this.resolved_types.get(tail_id)!);
             }
           }
@@ -576,7 +575,7 @@ export class TypeDominanceDAG {
     }
     // !5. Tighten the type range for each node
     this.tighten_type_range();
-    if (debug) {
+    if (config.debug) {
       for (let [id, _] of this.dag_nodes) {
         console.log(color.redBG(`${id}'s type range: ${irnode2types.get(id)!.map(t => t.str())}`));
       }
@@ -590,11 +589,8 @@ export class TypeDominanceDAG {
     for (let head of this.heads) {
       size_estimation1 *= irnode2types.get(head)!.length;
     }
-    console.log('sizeof(Type) is', size_of_type);
     size_estimation1 *= this.heads.size * size_of_type;
-    console.log(`size estimation1 is ${size_estimation1}`);
-    let size_estimation2 = maximum_type_resolution_for_heads * this.heads.size * size_of_type;
-    console.log(`size estimation2 is ${size_estimation2}`);
+    let size_estimation2 = config.maximum_type_resolution_for_heads * this.heads.size * size_of_type;
     if (size_estimation1 < size_estimation2) {
       this.allocate_type_candidates_for_heads();
     }
@@ -639,13 +635,13 @@ export class TypeDominanceDAG {
         for (let tail_info of this.node2tail.get(head)!) {
           if (this.resolved_types.has(tail_info.tail_id)) {
             if (tail_info.subtype) {
-              if (!type_of_head.issupertypeof(this.resolved_types.get(tail_info.tail_id)!)) {
+              if (!type_of_head.issuperof(this.resolved_types.get(tail_info.tail_id)!)) {
                 compatible_with_resolved_tails = false;
                 break;
               }
             }
             else if (tail_info.supertype) {
-              if (!this.resolved_types.get(tail_info.tail_id)!.issupertypeof(type_of_head)) {
+              if (!this.resolved_types.get(tail_info.tail_id)!.issuperof(type_of_head)) {
                 compatible_with_resolved_tails = false;
                 break;
               }
@@ -748,13 +744,13 @@ export class TypeDominanceDAG {
         for (let tail_info of this.node2tail.get(head)!) {
           if (this.resolved_types.has(tail_info.tail_id)) {
             if (tail_info.subtype) {
-              if (!type_of_head.issupertypeof(this.resolved_types.get(tail_info.tail_id)!)) {
+              if (!type_of_head.issuperof(this.resolved_types.get(tail_info.tail_id)!)) {
                 compatible_with_resolved_tails = false;
                 break;
               }
             }
             else if (tail_info.supertype) {
-              if (!this.resolved_types.get(tail_info.tail_id)!.issupertypeof(type_of_head)) {
+              if (!this.resolved_types.get(tail_info.tail_id)!.issuperof(type_of_head)) {
                 compatible_with_resolved_tails = false;
                 break;
               }
@@ -893,6 +889,6 @@ export class TypeDominanceDAG {
       dfs(undefined, head, false, false);
     }
     const dot_lang = dot.toDot(G);
-    await toFile(dot_lang, './constraint.svg', { format: 'svg' });
+    await toFile(dot_lang, './type-constraint.svg', { format: 'svg' });
   }
 }

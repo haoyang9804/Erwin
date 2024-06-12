@@ -33,7 +33,7 @@ test("test try catch",
   event_id.type = new EventType(event_id.name!);
   const emit = new IREmitStatement(6, 0, 0, event_id, [variable2_id]);
 
-  const function1 = new IRFunctionDefinition(7, 0, 0, "F", FunctionKind.Function, false, false, FunctionVisibility.Public, FunctionStateMutability.NonPayable, [], [], [], []);
+  const function1 = new IRFunctionDefinition(7, 0, 0, "F", FunctionKind.Function, false, false, [], [], [], [], FunctionVisibility.Public, FunctionStateMutability.NonPayable);
   const f_id = new IRIdentifier(8, 0, 0, "F", 7);
   f_id.type = new FunctionType("public", "nonpayable",
     new UnionType([new ElementaryType()]), new UnionType([new ElementaryType()]));
