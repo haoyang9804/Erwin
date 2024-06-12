@@ -68,22 +68,11 @@ v3.type = new ElementaryType("uint256", "nonpayable");
 
 
 const f_correct = new IRFunctionDefinition(7, 0, 0, "F", FunctionKind.Function,
-true, true, FunctionVisibility.Private, FunctionStateMutability.View,
-[v2], [v3], [variable_declare_stmt], [{name: "M", arg_names: ["x"]}]);
+true, true, [v2], [v3], [variable_declare_stmt], [{name: "M", arg_names: ["x"]}], FunctionVisibility.Private, FunctionStateMutability.View);
 
 test("test function 1",
 () => {
   expect(writer.write(f_correct.lower())).toBe("function F(uint256 y) virtual override private view M(x) returns (uint256 z) {\n  (uint256 x, uint128 y) = (" + literal1.value + ", " + literal2.value + ");\n}")
-}
-)
-
-
-test("test function 2",
-() => {
-  expect(async() => { new IRFunctionDefinition(7, 0, 0, "F", FunctionKind.Function,
-  true, true, FunctionVisibility.Default, FunctionStateMutability.View,
-  [v2], [v3], [], [{name: "M", arg_names: ["x"]}]) }).rejects.toThrow(
-    "IRFunctionDefinition: visibility is default");
 }
 )
 

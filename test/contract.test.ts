@@ -38,8 +38,8 @@ v2.type = new ElementaryType("uint256", "nonpayable");
 const v3 = new IRVariableDeclare(7, 0, 0, "z");
 v3.type = new ElementaryType("uint256", "nonpayable");
 const f_correct = new IRFunctionDefinition(8, 0, 0, "F", FunctionKind.Function,
-true, true, FunctionVisibility.Private, FunctionStateMutability.View,
-[v2], [v3], [variable_declare_stmt], []);
+true, true,
+[v2], [v3], [variable_declare_stmt], [], FunctionVisibility.Private, FunctionStateMutability.View);
 
 const v4 = new IRVariableDeclare(9, 0, 0, "x");
 v4.type = new ElementaryType("uint256", "nonpayable");

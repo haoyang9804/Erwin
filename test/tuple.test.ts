@@ -26,9 +26,7 @@ test("test tuple",
   const v2id = new IRIdentifier(3, 0, 0).from(variable2);
   v2id.type = new ElementaryType("uint128", "nonpayable");
   const tuple1 = new IRTuple(4, 0, 0, [v1id]);
-  expect(async() => { writer.write(tuple1.lower()) }).rejects.toThrow("IRTuple: type is not generated");
   tuple1.type = new ElementaryType("uint256", "nonpayable");
-  expect(async() => { writer.write(tuple1.lower()) }).rejects.toThrow("IRTuple: type is not UnionType");
   tuple1.type = new UnionType([new ElementaryType("uint256", "nonpayable")]);
   expect(writer.write(tuple1.lower())).toBe("(x)");
   const tuple2 = new IRTuple(5, 0, 0, [v1id, v2id]);

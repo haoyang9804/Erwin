@@ -186,8 +186,8 @@ export class IRFunctionDefinition extends IRDeclare {
   kind : FunctionKind;
   virtual : boolean;
   override : boolean;
-  visibility : FunctionVisibility;
-  stateMutability : FunctionStateMutability;
+  visibility : FunctionVisibility | undefined;
+  stateMutability : FunctionStateMutability | undefined;
   parameters : IRVariableDeclare[];
   returns : IRVariableDeclare[];
   modifier : Modifier[];
@@ -196,12 +196,8 @@ export class IRFunctionDefinition extends IRDeclare {
   parameter_type : UnionType | undefined;
   function_type : FunctionType | undefined;
   constructor(id : number, scope : number, field_flag : FieldFlag, name : string, kind : FunctionKind,
-    virtual : boolean, override : boolean, visibility : FunctionVisibility, stateMutability : FunctionStateMutability,
-    parameters : IRVariableDeclare[], returns : IRVariableDeclare[], body : IRStatement[],
-    modifier : Modifier[]) {
-    //WARNING: currently, we don't support visibility = default or stateMutability = constant
-    assert(visibility !== FunctionVisibility.Default, "IRFunctionDefinition: visibility is default");
-    assert(stateMutability !== FunctionStateMutability.Constant, "IRFunctionDefinition: stateMutability is constant");
+    virtual : boolean, override : boolean, parameters : IRVariableDeclare[], returns : IRVariableDeclare[],
+    body : IRStatement[], modifier : Modifier[], visibility ?: FunctionVisibility, stateMutability ?: FunctionStateMutability) {
     super(id, scope, field_flag, name);
     this.virtual = virtual;
     this.override = override;
@@ -254,6 +250,11 @@ export class IRFunctionDefinition extends IRDeclare {
   }
 
   lower() : ASTNode {
+    assert(this.visibility !== undefined, "IRFunctionDefinition: visibility is undefined");
+    assert(this.stateMutability !== undefined, "IRFunctionDefinition: stateMutability is undefined");
+    //WARNING: currently, we don't support visibility = default or stateMutability = constant
+    assert(this.visibility !== FunctionVisibility.Default, "IRFunctionDefinition: visibility is default");
+    assert(this.stateMutability !== FunctionStateMutability.Constant, "IRFunctionDefinition: stateMutability is constant");
     const modifier_invocation : ModifierInvocation[] = [];
     for (const modifier of this.modifier) {
       assert(name2declare.has(modifier.name), `IRFunctionDefinition: modifier ${modifier} is not declared`);

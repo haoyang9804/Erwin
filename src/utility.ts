@@ -166,14 +166,32 @@ export function selectRandomElements<T>(array : T[], n : number) : T[] {
   if (n > array.length) {
     throw new Error("Cannot select more elements than available in the array.");
   }
+  const indexSet = new Set<number>();
+  for (let i = 0; i < array.length; i++) indexSet.add(i);
   const selectedIndices = new Set<number>();
   const selectedElements : T[] = [];
   while (selectedIndices.size < n) {
-    const randomIndex = Math.floor(Math.random() * array.length);
-    if (!selectedIndices.has(randomIndex)) {
-      selectedIndices.add(randomIndex);
-      selectedElements.push(array[randomIndex]);
-    }
+    const randomIndexofIndex = Math.floor(Math.random() * indexSet.size);
+    const randomIndex = Array.from(indexSet)[randomIndexofIndex];
+    indexSet.delete(randomIndex);
+    selectedIndices.add(randomIndex);
+    selectedElements.push(array[randomIndex]);
   }
   return selectedElements;
+}
+
+export function pickRandomSubarray<T>(array : T[], length : number) : T[] {
+  const shuffled = array.slice();
+  let i = array.length;
+  let temp;
+  let index;
+
+  while (i--) {
+    index = Math.floor((i + 1) * Math.random());
+    temp = shuffled[index];
+    shuffled[index] = shuffled[i];
+    shuffled[i] = temp;
+  }
+
+  return shuffled.slice(0, length);
 }
