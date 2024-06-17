@@ -4,13 +4,13 @@ import {
   FunctionCallKind
 } from "solc-typed-ast"
 
-import { assert, generateRandomString, str2hex } from "./utility";
-import { TypeKind, Type, ElementaryType, UnionType } from "./type";
+import { assert, generateRandomString, str2hex, randomBigInt } from "./utility";
+import { TypeKind, Type, ElementaryType } from "./type";
 import { IRNode, FieldFlag, factory } from "./node";
 import { IRVariableDeclare } from "./declare";
+import { config } from "./config";
 
 export abstract class IRExpression extends IRNode {
-  type : Type | undefined;
   constructor(id : number, scope : number, field_flag : FieldFlag) {
     super(id, scope, field_flag);
   }
@@ -18,14 +18,19 @@ export abstract class IRExpression extends IRNode {
 }
 
 export class IRLiteral extends IRExpression {
+  type : Type | undefined;
   kind : LiteralKind | undefined;
   value : string | undefined;
-  positive : boolean = true;
-  constructor(id : number, scope : number, field_flag : FieldFlag, value ?: string, positive ?: boolean) {
+  mustBeNegaitive : boolean = false;
+  mustHaveIntTypeConversion: boolean = false;
+  constructor(id : number, scope : number, field_flag : FieldFlag, value ?: string,
+    mustBeNegaitive ?: boolean, mustHaveIntTypeConversion?: boolean) {
     super(id, scope, field_flag);
     this.value = value;
-    if (positive !== undefined)
-      this.positive = positive;
+    if (mustBeNegaitive !== undefined)
+      this.mustBeNegaitive = mustBeNegaitive;
+    if (mustHaveIntTypeConversion !== undefined)
+      this.mustHaveIntTypeConversion = mustHaveIntTypeConversion;
   }
   private generateKind() : void {
     const type = this.type as ElementaryType;
@@ -39,16 +44,33 @@ export class IRLiteral extends IRExpression {
     else this.kind = LiteralKind.String;
   }
   private generateVal() : void {
-    //TODO: add support for strange value, such as huge number and overlong string, etc.
+    //TODO: add support for strange value, such as large number and overlong string, etc.
     switch (this.kind) {
       case LiteralKind.Bool:
         this.value = Math.random() > 0.5 ? "true" : "false";
         break;
       case LiteralKind.Number:
-        if ((this.type! as ElementaryType).name !== "address") {
-          this.value = Math.floor(Math.random() * 100).toString();
-          if (!this.positive)
+        const typename = (this.type! as ElementaryType).name;
+        if (typename !== "address") {
+          let bits;
+          if (typename.startsWith("uint")) {
+            bits = parseInt(typename.slice(4));
+          }
+          else {
+            assert(typename.startsWith("int"), `IRLiteral: typename ${typename} is not supported`);
+            bits = parseInt(typename.slice(3));
+          }
+          this.value = randomBigInt(1n << BigInt(bits) + 1n).toString();
+          if (this.mustBeNegaitive)
             this.value = "-" + this.value;
+          else {
+            if (typename === "int256" || typename === "int128" || typename === "int64" ||
+               typename === "int32" || typename === "int16" || typename === "int8") {
+              if (Math.random() > 0.5)
+                this.value = "-" + this.value;
+              this.mustHaveIntTypeConversion = true;
+            }
+          }
         }
         else {
           function checksum_encode(hex_addr : string) : string {
@@ -105,8 +127,14 @@ export class IRLiteral extends IRExpression {
     this.generateKind();
     if (this.value === undefined) this.generateVal();
     if (this.type.str() === "address payable") {
-      return factory.makeFunctionCall("", FunctionCallKind.TypeConversion, factory.makeElementaryTypeNameExpression("", factory.makeElementaryTypeName("", "address", "payable")), [factory.makeLiteral("", this.kind!, str2hex(this.value!), this.value!)]);
+      return factory.makeFunctionCall("", FunctionCallKind.TypeConversion,
+        factory.makeElementaryTypeNameExpression("", factory.makeElementaryTypeName("", "address", "payable")),
+        [factory.makeLiteral("", this.kind!, str2hex(this.value!), this.value!)]);
     }
+    if (this.mustHaveIntTypeConversion || (config.debug && Math.random() > 0.5))
+      return factory.makeFunctionCall("", FunctionCallKind.TypeConversion,
+        factory.makeElementaryTypeNameExpression("", factory.makeElementaryTypeName("", (this.type as ElementaryType).name, "nonpayable")),
+        [factory.makeLiteral("", this.kind!, str2hex(this.value!), this.value!)]);
     return factory.makeLiteral("", this.kind!, str2hex(this.value!), this.value!);
   }
 }
@@ -126,7 +154,6 @@ export class IRIdentifier extends IRExpression {
     return this;
   }
   lower() : Expression {
-    assert(this.type !== undefined, "IRIdentifier: type is not generated");
     assert(this.name !== undefined, "IRIdentifier: name is not generated");
     assert(this.reference !== undefined, "IRIdentifier: reference is not generated");
     return factory.makeIdentifier("", this.name, this.reference);
@@ -144,7 +171,6 @@ export class IRAssignment extends IRExpression {
     this.operator = operator;
   }
   lower() : Expression {
-    assert(this.type !== undefined, "IRAssignment: type is undefined");
     return factory.makeAssignment("", this.operator, this.left.lower() as Expression, this.right.lower() as Expression);
   }
 }
@@ -163,7 +189,6 @@ export class IRBinaryOp extends IRExpression {
     this.operator = operator;
   }
   lower() : Expression {
-    assert(this.type !== undefined, "IRBinaryOp: type is not generated");
     assert(this.operator !== undefined, "IRBinaryOp: operator is not generated")
     return factory.makeBinaryOperation("", this.operator, this.left.lower() as Expression, this.right.lower() as Expression);
   }
@@ -189,7 +214,6 @@ export class IRUnaryOp extends IRExpression {
     }
   }
   lower() : Expression {
-    assert(this.type !== undefined, "IRUnaryOp: type is not generated");
     assert(this.operator !== undefined, "IRUnaryOp: operator is not generated")
     return factory.makeUnaryOperation("", this.prefix, this.operator, this.expression.lower() as Expression);
   }
@@ -224,7 +248,6 @@ export class IRFunctionCall extends IRExpression {
     this.arguments = arguments_;
   }
   lower() : Expression {
-    assert(this.type !== undefined, "IRFunctionCall: type is not generated");
     return factory.makeFunctionCall("", this.kind, this.function_expression.lower() as Expression, this.arguments.map((arg) => arg.lower() as Expression));
   }
 }
@@ -239,12 +262,6 @@ export class IRTuple extends IRExpression {
   }
   lower() : Expression {
     const lowered_components = this.components.map((component) => component?.lower() as Expression);
-    const type_array : Type[] = [];
-    for (let component of this.components) {
-      assert(component.type !== undefined, "IRTuple: type cannot be generated");
-      type_array.push(component.type!);
-    }
-    this.type = new UnionType(type_array);
     return factory.makeTupleExpression("", this.isInlineArray === undefined ? false : true, lowered_components);
   }
 }
@@ -264,7 +281,6 @@ export class IRIndexedAccess extends IRExpression {
     this.indexed = indexed;
   }
   lower() {
-    assert(this.type !== undefined, "IRIndexedAccess: type is not generated");
     return factory.makeIndexAccess("", this.base.lower() as Expression, this.indexed?.lower() as Expression);
   }
 }
@@ -280,7 +296,6 @@ export class IRMemberAccess extends IRExpression {
     this.member_name = member_name;
   }
   lower() {
-    assert(this.type !== undefined, "IRMemberAccess: type is not generated");
     return factory.makeMemberAccess("", this.expression.lower() as Expression, this.member_name, this.referenced_id);
   }
 }
@@ -292,7 +307,6 @@ export class IRNew extends IRExpression {
     this.type_name = type_name;
   }
   lower() {
-    assert(this.type !== undefined, "IRNew: type is not generated");
     return factory.makeNewExpression("", factory.makeUserDefinedTypeName("", this.type_name, -1));
   }
 }

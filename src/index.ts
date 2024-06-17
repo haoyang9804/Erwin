@@ -103,7 +103,8 @@ function error(message : string) : never {
     }
     let resolved_types = pickRandomElement(gen.type_dag.resolved_types_collection)!;
     for (let [key, value] of resolved_types) {
-      (irnodes[key] as exp.IRExpression | decl.IRVariableDeclare).type = value;
+      if (irnodes[key] instanceof exp.IRLiteral || irnodes[key] instanceof decl.IRVariableDeclare)
+        (irnodes[key] as exp.IRLiteral | decl.IRVariableDeclare).type = value;
     }
     for (let stmt of gen.scope_stmt.get(0)!) {
       console.log(writer.write(stmt.lower()));

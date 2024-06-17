@@ -189,14 +189,14 @@ export abstract class LRValueGenerator extends ExpressionGenerator {
 export class LiteralGenerator extends RValueGenerator {
   constructor(type_range : type.Type[]) {
     super(type_range);
-    console.log('>> Literal');
   }
   async generate(component : number) : Promise<void> {
     this.irnode = new exp.IRLiteral(global_id++, cur_scope_id, field_flag);
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "Literal");
     type_dag.insert(type_dag.newNode(this.irnode.id));
     type.irnode2types.set(this.irnode.id, this.type_range);
-    if (config.debug) console.log(color.yellowBG(`${this.irnode.id}: Literal, type: ${type.irnode2types.get(this.irnode.id)!.map(t => t.str())}`));
+    if (config.debug)
+      console.log(color.yellowBG(`${this.irnode.id}: Literal, type: ${type.irnode2types.get(this.irnode.id)!.map(t => t.str())}`));
     if (Math.random() < config.tuple_prob) {
       this.irnode = new exp.IRTuple(global_id++, cur_scope_id, field_flag, [this.irnode as exp.IRExpression]);
       await irnode_db.insert(this.irnode.id, this.irnode.scope, "Tuple");
@@ -207,7 +207,6 @@ export class LiteralGenerator extends RValueGenerator {
 export class IdentifierGenerator extends LRValueGenerator {
   constructor(type_range : type.Type[]) {
     super(type_range);
-    console.log('>> Identifier');
   }
   async generate(component : number) : Promise<void> {
     // Generate a variable decl if there is no variable decl available.
@@ -227,7 +226,8 @@ export class IdentifierGenerator extends LRValueGenerator {
     type_dag.connect(this.irnode.id, irdecl.id);
     type.irnode2types.set(this.irnode.id, this.type_range);
     typeRangeAlignment(this.irnode.id, irdecl.id);
-    if (config.debug) console.log(color.yellowBG(`${this.irnode.id}: Identifier --> ${irdecl.id}, type: ${type.irnode2types.get(this.irnode.id)!.map(t => t.str())}`));
+    if (config.debug)
+      console.log(color.yellowBG(`${this.irnode.id}: Identifier --> ${irdecl.id}, type: ${type.irnode2types.get(this.irnode.id)!.map(t => t.str())}`));
     if (Math.random() < config.tuple_prob) {
       this.irnode = new exp.IRTuple(global_id++, cur_scope_id, field_flag, [this.irnode as exp.IRExpression]);
       await irnode_db.insert(this.irnode.id, this.irnode.scope, "Tuple");
@@ -235,25 +235,28 @@ export class IdentifierGenerator extends LRValueGenerator {
   }
 }
 
+type ASSIOP = "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | "&=" | "^=" | "|=";
+
 export class AssignmentGenerator extends RValueGenerator {
 
-  op : "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | "&=" | "^=" | "|=" | undefined;
+  op : ASSIOP;
 
-  constructor(type_range : type.Type[]) {
+  constructor(type_range : type.Type[], op?: ASSIOP) {
     super(type_range);
-    if (type.isEqualTypeSet(type_range, [new type.ElementaryType("bool", "nonpayable")])) {
+    if (op !== undefined) {
+      this.op = op;
+    }
+    else if (type.isEqualTypeSet(type_range, [new type.ElementaryType("bool", "nonpayable")])) {
       this.op = "=";
     }
     else if (type.isSuperTypeSet(type.all_integer_types, type_range) ||
       type.isEqualTypeSet(type_range, type.elementary_types)) {
       this.op = pickRandomElement(
-        ["=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|="]);
+        ["=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|="])!;
     }
     else {
-      console.log('type_range: ', type_range);
       throw new Error(`AssignmentGenerator constructor: type_range ${type_range.map(t => t.str())} is invalid`);
     }
-    console.log('>> Assignment ' + this.op);
   }
 
   async generate(component : number) : Promise<void> {
@@ -307,10 +310,8 @@ export class AssignmentGenerator extends RValueGenerator {
     type_dag.insert(type_dag.newNode(this.irnode.id));
     type_dag.connect(this.irnode.id, left_extracted_expression.id);
     typeRangeAlignment(this.irnode.id, left_extracted_expression.id);
-    if (config.debug) {
-      assert(type.irnode2types.has(this.irnode.id), `irnode2types does not contain ${this.irnode.id}`);
+    if (config.debug)
       console.log(color.yellowBG(`${this.irnode.id}: Assignment ${this.op}, type: ${type.irnode2types.get(this.irnode.id)!.map(t => t.str())}`));
-    }
     if (component !== 0) {
       this.irnode = new exp.IRTuple(global_id++, cur_scope_id, field_flag, [this.irnode as exp.IRExpression]);
       await irnode_db.insert(this.irnode.id, this.irnode.scope, "Tuple");
@@ -322,12 +323,16 @@ export class AssignmentGenerator extends RValueGenerator {
   }
 }
 
+type BOP = "+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "<" | ">" | "<=" | ">=" | "==" | "!=" | "&" | "^" | "|" | "&&" | "||";
+
 export class BinaryOpGenerator extends RValueGenerator {
-  op : "+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "<" | ">" | "<=" | ">=" | "==" | "!=" | "&" | "^" | "|" | "&&" | "||";
-  constructor(type_range : type.Type[]) {
+  op : BOP;
+  constructor(type_range : type.Type[], op?: BOP) {
     super(type_range);
-    console.log('>> BinaryOp');
-    if (type.isEqualTypeSet(type_range, [new type.ElementaryType("bool", "nonpayable")])) {
+    if (op !== undefined) {
+      this.op = op;
+    }
+    else if (type.isEqualTypeSet(type_range, [new type.ElementaryType("bool", "nonpayable")])) {
       this.op = pickRandomElement(["&&", "||", ">", "<", "<=", ">=", "==", "!="])!;
     }
     else if (type.isSuperTypeSet(type.all_integer_types, type_range)) {
@@ -403,7 +408,8 @@ export class BinaryOpGenerator extends RValueGenerator {
       type_dag.connect(this.irnode.id, left_extracted_expression.id);
       typeRangeAlignment(this.irnode.id, left_extracted_expression.id);
     }
-    if (config.debug) console.log(color.yellowBG(`${this.irnode.id}: BinaryOp ${this.op}, type: ${type.irnode2types.get(this.irnode.id)!.map(t => t.str())}`));
+    if (config.debug)
+      console.log(color.yellowBG(`${this.irnode.id}: BinaryOp ${this.op}, type: ${type.irnode2types.get(this.irnode.id)!.map(t => t.str())}`));
     if (Math.random() < config.tuple_prob) {
       this.irnode = new exp.IRTuple(global_id++, cur_scope_id, field_flag, [this.irnode as exp.IRExpression]);
       await irnode_db.insert(this.irnode.id, this.irnode.scope, "Tuple");
@@ -411,13 +417,17 @@ export class BinaryOpGenerator extends RValueGenerator {
   }
 }
 
+type UOP = "!" | "-" | "~" | "++" | "--";
+
 //TODO: create a delete Statement Generator
 export class UnaryOpGenerator extends RValueGenerator {
-  op : "!" | "-" | "~" | "++" | "--";
-  constructor(type_range : type.Type[]) {
+  op : UOP;
+  constructor(type_range : type.Type[], op?: UOP) {
     super(type_range);
-    console.log('>> UnaryOp');
-    if (type.isEqualTypeSet(type_range, type.elementary_types)) {
+    if (op !== undefined) {
+      this.op = op;
+    }
+    else if (type.isEqualTypeSet(type_range, type.elementary_types)) {
       this.op = pickRandomElement(["!", "-", "~", "++", "--"])!;
     }
     else if (type.isEqualTypeSet(type_range, [new type.ElementaryType("bool", "nonpayable")])) {
@@ -473,7 +483,8 @@ export class UnaryOpGenerator extends RValueGenerator {
     type.irnode2types.set(this.irnode.id, this.type_range);
     type_dag.connect(this.irnode.id, extracted_expression.id);
     typeRangeAlignment(this.irnode.id, extracted_expression.id);
-    if (config.debug) console.log(color.yellowBG(`${this.irnode.id}: UnaryOp ${this.op}, type: ${type.irnode2types.get(this.irnode.id)!.map(t => t.str())}`));
+    if (config.debug)
+      console.log(color.yellowBG(`${this.irnode.id}: UnaryOp ${this.op}, type: ${type.irnode2types.get(this.irnode.id)!.map(t => t.str())}`));
     if (Math.random() < config.tuple_prob) {
       this.irnode = new exp.IRTuple(global_id++, cur_scope_id, field_flag, [this.irnode as exp.IRExpression]);
       await irnode_db.insert(this.irnode.id, this.irnode.scope, "Tuple");
@@ -484,7 +495,6 @@ export class UnaryOpGenerator extends RValueGenerator {
 export class ConditionalGenerator extends RValueGenerator {
   constructor(type_range : type.Type[]) {
     super(type_range);
-    console.log('Conditional');
   }
   async generate(component : number) : Promise<void> {
     let e1_gen_prototype, e2_gen_prototype, e3_gen_prototype;
@@ -532,7 +542,8 @@ export class ConditionalGenerator extends RValueGenerator {
     type_dag.insert(type_dag.newNode(this.irnode.id));
     type_dag.connect(this.irnode.id, extracted_e2.id);
     typeRangeAlignment(this.irnode.id, extracted_e2.id);
-    if (config.debug) console.log(color.yellowBG(`${this.irnode.id}: Conditional, type: ${type.irnode2types.get(this.irnode.id)!.map(t => t.str())}`));
+    if (config.debug)
+      console.log(color.yellowBG(`${this.irnode.id}: Conditional, type: ${type.irnode2types.get(this.irnode.id)!.map(t => t.str())}`));
     if (Math.random() < config.tuple_prob) {
       this.irnode = new exp.IRTuple(global_id++, cur_scope_id, field_flag, [this.irnode as exp.IRExpression]);
       await irnode_db.insert(this.irnode.id, this.irnode.scope, "Tuple");
@@ -572,7 +583,6 @@ export class SingleVariableDeclareStatementGenerator extends StatementGenerator 
   type_range : type.Type[] | undefined;
   constructor(type_range ?: type.Type[]) {
     super();
-    console.log('>> SingleVariableDeclare');
     this.type_range = type_range;
   }
   async generate() : Promise<void> {
@@ -599,7 +609,8 @@ export class SingleVariableDeclareStatementGenerator extends StatementGenerator 
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "VariableDeclareStatement");
     type_dag.connect(expression_gen_extracted.id, variable_gen.irnode!.id, "supertype");
     typeRangeAlignment(expression_gen_extracted.id, variable_gen.irnode!.id);
-    if (config.debug) console.log(color.yellowBG(`${variable_gen.irnode!.id}: VarDecl, type: ${type.irnode2types.get(variable_gen.irnode!.id)!.map(t => t.str())}`));
+    if (config.debug)
+      console.log(color.yellowBG(`${variable_gen.irnode!.id}: VarDecl, type: ${type.irnode2types.get(variable_gen.irnode!.id)!.map(t => t.str())}`));
   }
 }
 
@@ -637,7 +648,8 @@ export class MultipleVariableDeclareStatementGenerator extends StatementGenerato
       }
       type_dag.connect(extracted_ir.id, ir_varnodes[i].id, "supertype");
       typeRangeAlignment(extracted_ir.id, ir_varnodes[i].id);
-      if (config.debug) console.log(color.yellowBG(`${ir_varnodes[i].id}: VarDecl, type: ${type.irnode2types.get(ir_varnodes[i].id)!.map(t => t.str())}`));
+      if (config.debug)
+        console.log(color.yellowBG(`${ir_varnodes[i].id}: VarDecl, type: ${type.irnode2types.get(ir_varnodes[i].id)!.map(t => t.str())}`));
     }
   }
 }
