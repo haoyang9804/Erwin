@@ -12,4 +12,5 @@ export const config = {
   stmt_count_of_function_upperlimit: 5,
   uint_num: 6,
   int_num: 6,
+  unit_test_mode: false,
 }

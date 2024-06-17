@@ -241,7 +241,7 @@ export class AssignmentGenerator extends RValueGenerator {
 
   op : ASSIOP;
 
-  constructor(type_range : type.Type[], op?: ASSIOP) {
+  constructor(type_range : type.Type[], op ?: ASSIOP) {
     super(type_range);
     if (op !== undefined) {
       this.op = op;
@@ -327,7 +327,7 @@ type BOP = "+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "<" | ">" | "<=" | ">=" |
 
 export class BinaryOpGenerator extends RValueGenerator {
   op : BOP;
-  constructor(type_range : type.Type[], op?: BOP) {
+  constructor(type_range : type.Type[], op ?: BOP) {
     super(type_range);
     if (op !== undefined) {
       this.op = op;
@@ -422,7 +422,7 @@ type UOP = "!" | "-" | "~" | "++" | "--";
 //TODO: create a delete Statement Generator
 export class UnaryOpGenerator extends RValueGenerator {
   op : UOP;
-  constructor(type_range : type.Type[], op?: UOP) {
+  constructor(type_range : type.Type[], op ?: UOP) {
     super(type_range);
     if (op !== undefined) {
       this.op = op;

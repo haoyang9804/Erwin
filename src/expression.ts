@@ -22,9 +22,9 @@ export class IRLiteral extends IRExpression {
   kind : LiteralKind | undefined;
   value : string | undefined;
   mustBeNegaitive : boolean = false;
-  mustHaveIntTypeConversion: boolean = false;
+  mustHaveIntTypeConversion : boolean = false;
   constructor(id : number, scope : number, field_flag : FieldFlag, value ?: string,
-    mustBeNegaitive ?: boolean, mustHaveIntTypeConversion?: boolean) {
+    mustBeNegaitive ?: boolean, mustHaveIntTypeConversion ?: boolean) {
     super(id, scope, field_flag);
     this.value = value;
     if (mustBeNegaitive !== undefined)
@@ -65,7 +65,7 @@ export class IRLiteral extends IRExpression {
             this.value = "-" + this.value;
           else {
             if (typename === "int256" || typename === "int128" || typename === "int64" ||
-               typename === "int32" || typename === "int16" || typename === "int8") {
+              typename === "int32" || typename === "int16" || typename === "int8") {
               if (Math.random() > 0.5)
                 this.value = "-" + this.value;
               this.mustHaveIntTypeConversion = true;
@@ -131,7 +131,7 @@ export class IRLiteral extends IRExpression {
         factory.makeElementaryTypeNameExpression("", factory.makeElementaryTypeName("", "address", "payable")),
         [factory.makeLiteral("", this.kind!, str2hex(this.value!), this.value!)]);
     }
-    if (this.mustHaveIntTypeConversion || (config.debug && Math.random() > 0.5))
+    if (this.mustHaveIntTypeConversion || (!config.unit_test_mode && Math.random() > 0.5))
       return factory.makeFunctionCall("", FunctionCallKind.TypeConversion,
         factory.makeElementaryTypeNameExpression("", factory.makeElementaryTypeName("", (this.type as ElementaryType).name, "nonpayable")),
         [factory.makeLiteral("", this.kind!, str2hex(this.value!), this.value!)]);

@@ -196,19 +196,19 @@ export function pickRandomSubarray<T>(array : T[], length : number) : T[] {
   return shuffled.slice(0, length);
 }
 
-export function randomBigInt(min: bigint | number | string, max?: bigint | number | string): bigint {
-    if (max === undefined) return randomBigInt(0n, min);
-    // choose if you want to allow not-bigints yourself
-    // this wrapper allows `bigint | number | string` (you may want to keep at least `bigint | number`
-    min = BigInt(min);
-    max = BigInt(max);
+export function randomBigInt(min : bigint | number | string, max ?: bigint | number | string) : bigint {
+  if (max === undefined) return randomBigInt(0n, min);
+  // choose if you want to allow not-bigints yourself
+  // this wrapper allows `bigint | number | string` (you may want to keep at least `bigint | number`
+  min = BigInt(min);
+  max = BigInt(max);
 
-    // choose what happens when input order is invalid (e.g. throw error)
-    // this wrapper keeps `min` in and `max` out of generatable numbers
-    if (min <= max)
-      return min + _generateRandomBigInt(max - min);
-    else
-      return max - 1n - _generateRandomBigInt(min - max);
+  // choose what happens when input order is invalid (e.g. throw error)
+  // this wrapper keeps `min` in and `max` out of generatable numbers
+  if (min <= max)
+    return min + _generateRandomBigInt(max - min);
+  else
+    return max - 1n - _generateRandomBigInt(min - max);
 }
 
 /**
@@ -216,7 +216,7 @@ export function randomBigInt(min: bigint | number | string, max?: bigint | numbe
  * @param max exclusive maximum
  * (c) <CC-BY-SA-4.0 or Unlicense> Dimava, 2023
  */
-function _generateRandomBigInt(max: bigint): bigint {
+function _generateRandomBigInt(max : bigint) : bigint {
   if (max < 0) throw new Error("generateRandomBigInt cannot generate negative BigInt");
   if (max === 0n) return 0n;
 
@@ -225,10 +225,10 @@ function _generateRandomBigInt(max: bigint): bigint {
 
   // 1. Create an BigInt64Array representation of max number
   let num = max;
-  const maxList: bigint[] = [];
+  const maxList : bigint[] = [];
   while (num) {
-      maxList.unshift(num & FILTER);
-      num >>= POWER;
+    maxList.unshift(num & FILTER);
+    num >>= POWER;
   }
   const maxArray = BigInt64Array.from(maxList);
 
@@ -245,8 +245,8 @@ function _generateRandomBigInt(max: bigint): bigint {
   // 4. Convert to bigint
   let rnd = 0n;
   for (let i = 0; i < rndArray.length; i++) {
-      rnd <<= POWER;
-      rnd += rndArray[i];
+    rnd <<= POWER;
+    rnd += rndArray[i];
   }
 
   // 5. Check for failure (the random number being higher then max)
