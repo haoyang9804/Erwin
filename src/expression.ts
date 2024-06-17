@@ -20,9 +20,12 @@ export abstract class IRExpression extends IRNode {
 export class IRLiteral extends IRExpression {
   kind : LiteralKind | undefined;
   value : string | undefined;
-  constructor(id : number, scope : number, field_flag : FieldFlag, value ?: string) {
+  positive : boolean = true;
+  constructor(id : number, scope : number, field_flag : FieldFlag, value ?: string, positive ?: boolean) {
     super(id, scope, field_flag);
     this.value = value;
+    if (positive !== undefined)
+      this.positive = positive;
   }
   private generateKind() : void {
     const type = this.type as ElementaryType;
@@ -44,6 +47,8 @@ export class IRLiteral extends IRExpression {
       case LiteralKind.Number:
         if ((this.type! as ElementaryType).name !== "address") {
           this.value = Math.floor(Math.random() * 100).toString();
+          if (!this.positive)
+            this.value = "-" + this.value;
         }
         else {
           function checksum_encode(hex_addr : string) : string {

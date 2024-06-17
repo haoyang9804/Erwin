@@ -591,6 +591,9 @@ export class TypeDominanceDAG {
     }
     size_estimation1 *= this.heads.size * size_of_type;
     let size_estimation2 = config.maximum_type_resolution_for_heads * this.heads.size * size_of_type;
+    if (config.debug) {
+      console.log(color.cyan(`size_estimation1 is ${size_estimation1}, size_estimation2 is ${size_estimation2}`));
+    }
     if (size_estimation1 < size_estimation2) {
       this.allocate_type_candidates_for_heads();
     }

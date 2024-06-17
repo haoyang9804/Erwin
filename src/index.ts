@@ -71,7 +71,7 @@ function error(message : string) : never {
   config.param_count_of_function_upperlimit = parseInt(program.opts().param_count_of_function_upperlimit);
   config.function_count = parseInt(program.opts().function_count);
   config.literal_prob = parseFloat(program.opts().literal_prob);
-  config.maximum_type_resolution_for_heads = parseInt(program.opts().maximum_type_resolution);
+  config.maximum_type_resolution_for_heads = parseInt(program.opts().maximum_type_resolution_for_heads);
   config.var_count = parseInt(program.opts().var_count);
   config.tuple_vardecl_count = parseInt(program.opts().tuple_vardecl_count);
   config.tuple_prob = parseFloat(program.opts().tuple_prob);
