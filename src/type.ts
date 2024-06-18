@@ -198,35 +198,35 @@ export class ElementaryType extends Type {
   subs() : Type[] {
     switch (this.name) {
       case "uint256":
-        return [new ElementaryType("uint256", this.stateMutability), new ElementaryType("uint128", this.stateMutability), new ElementaryType("uint64", this.stateMutability), new ElementaryType("uint32", this.stateMutability), new ElementaryType("uint16", this.stateMutability), new ElementaryType("uint8", this.stateMutability)];
+        return [TypeProvider.uint256(), TypeProvider.uint128(), TypeProvider.uint64(), TypeProvider.uint32(), TypeProvider.uint16(), TypeProvider.uint8()];
       case "uint128":
-        return [new ElementaryType("uint128", this.stateMutability), new ElementaryType("uint64", this.stateMutability), new ElementaryType("uint32", this.stateMutability), new ElementaryType("uint16", this.stateMutability), new ElementaryType("uint8", this.stateMutability)];
+        return [TypeProvider.uint128(), TypeProvider.uint64(), TypeProvider.uint32(), TypeProvider.uint16(), TypeProvider.uint8()];
       case "uint64":
-        return [new ElementaryType("uint64", this.stateMutability), new ElementaryType("uint32", this.stateMutability), new ElementaryType("uint16", this.stateMutability), new ElementaryType("uint8", this.stateMutability)];
+        return [TypeProvider.uint64(), TypeProvider.uint32(), TypeProvider.uint16(), TypeProvider.uint8()];
       case "uint32":
-        return [new ElementaryType("uint32", this.stateMutability), new ElementaryType("uint16", this.stateMutability), new ElementaryType("uint8", this.stateMutability)];
+        return [TypeProvider.uint32(), TypeProvider.uint16(), TypeProvider.uint8()];
       case "uint16":
-        return [new ElementaryType("uint16", this.stateMutability), new ElementaryType("uint8", this.stateMutability)];
+        return [TypeProvider.uint16(), TypeProvider.uint8()];
       case "uint8":
-        return [new ElementaryType("uint8", this.stateMutability)];
+        return [TypeProvider.uint8()];
       case "int256":
-        return [new ElementaryType("int256", this.stateMutability), new ElementaryType("int128", this.stateMutability), new ElementaryType("int64", this.stateMutability), new ElementaryType("int32", this.stateMutability), new ElementaryType("int16", this.stateMutability), new ElementaryType("int8", this.stateMutability)];
+        return [TypeProvider.int256(), TypeProvider.int128(), TypeProvider.int64(), TypeProvider.int32(), TypeProvider.int16(), TypeProvider.int8()];
       case "int128":
-        return [new ElementaryType("int128", this.stateMutability), new ElementaryType("int64", this.stateMutability), new ElementaryType("int32", this.stateMutability), new ElementaryType("int16", this.stateMutability), new ElementaryType("int8", this.stateMutability)];
+        return [TypeProvider.int128(), TypeProvider.int64(), TypeProvider.int32(), TypeProvider.int16(), TypeProvider.int8()];
       case "int64":
-        return [new ElementaryType("int64", this.stateMutability), new ElementaryType("int32", this.stateMutability), new ElementaryType("int16", this.stateMutability), new ElementaryType("int8", this.stateMutability)];
+        return [TypeProvider.int64(), TypeProvider.int32(), TypeProvider.int16(), TypeProvider.int8()];
       case "int32":
-        return [new ElementaryType("int32", this.stateMutability), new ElementaryType("int16", this.stateMutability), new ElementaryType("int8", this.stateMutability)];
+        return [TypeProvider.int32(), TypeProvider.int16(), TypeProvider.int8()];
       case "int16":
-        return [new ElementaryType("int16", this.stateMutability), new ElementaryType("int8", this.stateMutability)];
+        return [TypeProvider.int16(), TypeProvider.int8()];
       case "int8":
-        return [new ElementaryType("int8", this.stateMutability)];
+        return [TypeProvider.int8()];
       case "address":
         if (this.stateMutability === "payable") {
-          return [new ElementaryType("address", "payable")];
+          return [TypeProvider.address()];
         }
         else if (this.stateMutability === "nonpayable") {
-          return [new ElementaryType("address", "nonpayable"), new ElementaryType("address", "payable")];
+          return [TypeProvider.payable_address(), TypeProvider.address()];
         }
         else {
           assert(false, `Elementary::subtype: unrecognized stateMutability: ${this.stateMutability}`);
@@ -247,35 +247,35 @@ export class ElementaryType extends Type {
   supers() : Type[] {
     switch (this.name) {
       case "uint256":
-        return [new ElementaryType("uint256", this.stateMutability)];
+        return [TypeProvider.uint256()];
       case "uint128":
-        return [new ElementaryType("uint256", this.stateMutability), new ElementaryType("uint128", this.stateMutability)];
+        return [TypeProvider.uint256(), TypeProvider.uint128()];
       case "uint64":
-        return [new ElementaryType("uint256", this.stateMutability), new ElementaryType("uint128", this.stateMutability), new ElementaryType("uint64", this.stateMutability)];
+        return [TypeProvider.uint256(), TypeProvider.uint128(), TypeProvider.uint64()];
       case "uint32":
-        return [new ElementaryType("uint256", this.stateMutability), new ElementaryType("uint128", this.stateMutability), new ElementaryType("uint64", this.stateMutability), new ElementaryType("uint32", this.stateMutability)];
+        return [TypeProvider.uint256(), TypeProvider.uint128(), TypeProvider.uint64(), TypeProvider.uint32()];
       case "uint16":
-        return [new ElementaryType("uint256", this.stateMutability), new ElementaryType("uint128", this.stateMutability), new ElementaryType("uint64", this.stateMutability), new ElementaryType("uint32", this.stateMutability), new ElementaryType("uint16", this.stateMutability)];
+        return [TypeProvider.uint256(), TypeProvider.uint128(), TypeProvider.uint64(), TypeProvider.uint32(), TypeProvider.uint16()];
       case "uint8":
-        return [new ElementaryType("uint256", this.stateMutability), new ElementaryType("uint128", this.stateMutability), new ElementaryType("uint64", this.stateMutability), new ElementaryType("uint32", this.stateMutability), new ElementaryType("uint16", this.stateMutability), new ElementaryType("uint8", this.stateMutability)];
+        return [TypeProvider.uint256(), TypeProvider.uint128(), TypeProvider.uint64(), TypeProvider.uint32(), TypeProvider.uint16(), TypeProvider.uint8()];
       case "int256":
-        return [new ElementaryType("int256", this.stateMutability)];
+        return [TypeProvider.int256()];
       case "int128":
-        return [new ElementaryType("int256", this.stateMutability), new ElementaryType("int128", this.stateMutability)];
+        return [TypeProvider.int256(), TypeProvider.int128()];
       case "int64":
-        return [new ElementaryType("int256", this.stateMutability), new ElementaryType("int128", this.stateMutability), new ElementaryType("int64", this.stateMutability)];
+        return [TypeProvider.int256(), TypeProvider.int128(), TypeProvider.int64()];
       case "int32":
-        return [new ElementaryType("int256", this.stateMutability), new ElementaryType("int128", this.stateMutability), new ElementaryType("int64", this.stateMutability), new ElementaryType("int32", this.stateMutability)];
+        return [TypeProvider.int256(), TypeProvider.int128(), TypeProvider.int64(), TypeProvider.int32()];
       case "int16":
-        return [new ElementaryType("int256", this.stateMutability), new ElementaryType("int128", this.stateMutability), new ElementaryType("int64", this.stateMutability), new ElementaryType("int32", this.stateMutability), new ElementaryType("int16", this.stateMutability)];
+        return [TypeProvider.int256(), TypeProvider.int128(), TypeProvider.int64(), TypeProvider.int32(), TypeProvider.int16()];
       case "int8":
-        return [new ElementaryType("int256", this.stateMutability), new ElementaryType("int128", this.stateMutability), new ElementaryType("int64", this.stateMutability), new ElementaryType("int32", this.stateMutability), new ElementaryType("int16", this.stateMutability), new ElementaryType("int8", this.stateMutability)];
+        return [TypeProvider.int256(), TypeProvider.int128(), TypeProvider.int64(), TypeProvider.int32(), TypeProvider.int16(), TypeProvider.int8()];
       case "address":
         if (this.stateMutability === "payable") {
-          return [new ElementaryType("address", "nonpayable"), new ElementaryType("address", "payable")];
+          return [TypeProvider.payable_address(), TypeProvider.address()];
         }
         else if (this.stateMutability === "nonpayable") {
-          return [new ElementaryType("address", "nonpayable")];
+          return [TypeProvider.payable_address()];
         }
         else {
           assert(false, `Elementary::subtype: unrecognized stateMutability: ${this.stateMutability}`);
@@ -684,29 +684,62 @@ export class MappingType extends Type {
   }
 }
 
+export class TypeProvider {
+  static int256() : Type { return this.m_int256; }
+  static int128() : Type { return this.m_int128; }
+  static int64() : Type { return this.m_int64; }
+  static int32() : Type { return this.m_int32; }
+  static int16() : Type { return this.m_int16; }
+  static int8() : Type { return this.m_int8; }
+  static uint256() : Type { return this.m_uint256; }
+  static uint128() : Type { return this.m_uint128; }
+  static uint64() : Type { return this.m_uint64; }
+  static uint32() : Type { return this.m_uint32; }
+  static uint16() : Type { return this.m_uint16; }
+  static uint8() : Type { return this.m_uint8; }
+  static bool() : Type { return this.m_bool; }
+  static address() : Type { return this.m_address; }
+  static payable_address() : Type { return this.m_payable_address; }
+  private static m_int256 : Type = new ElementaryType("int256", "nonpayable");
+  private static m_int128 : Type = new ElementaryType("int128", "nonpayable");
+  private static m_int64 : Type = new ElementaryType("int64", "nonpayable");
+  private static m_int32 : Type = new ElementaryType("int32", "nonpayable");
+  private static m_int16 : Type = new ElementaryType("int16", "nonpayable");
+  private static m_int8 : Type = new ElementaryType("int8", "nonpayable");
+  private static m_uint256 : Type = new ElementaryType("uint256", "nonpayable");
+  private static m_uint128 : Type = new ElementaryType("uint128", "nonpayable");
+  private static m_uint64 : Type = new ElementaryType("uint64", "nonpayable");
+  private static m_uint32 : Type = new ElementaryType("uint32", "nonpayable");
+  private static m_uint16 : Type = new ElementaryType("uint16", "nonpayable");
+  private static m_uint8 : Type = new ElementaryType("uint8", "nonpayable");
+  private static m_bool : Type = new ElementaryType("bool", "nonpayable");
+  private static m_address : Type = new ElementaryType("address", "nonpayable");
+  private static m_payable_address : Type = new ElementaryType("address", "payable");
+}
+
 export const irnode2types = new Map<number, Type[]>();
 
 export let integer_types : Type[] = [
-  new ElementaryType("int256", "nonpayable"),
-  new ElementaryType("int128", "nonpayable"),
-  new ElementaryType("int64", "nonpayable"),
-  new ElementaryType("int32", "nonpayable"),
-  new ElementaryType("int16", "nonpayable"),
-  new ElementaryType("int8", "nonpayable"),
+  TypeProvider.int256(),
+  TypeProvider.int128(),
+  TypeProvider.int64(),
+  TypeProvider.int32(),
+  TypeProvider.int16(),
+  TypeProvider.int8()
 ]
 export let uinteger_types : Type[] = [
-  new ElementaryType("uint256", "nonpayable"),
-  new ElementaryType("uint128", "nonpayable"),
-  new ElementaryType("uint64", "nonpayable"),
-  new ElementaryType("uint32", "nonpayable"),
-  new ElementaryType("uint16", "nonpayable"),
-  new ElementaryType("uint8", "nonpayable"),
+  TypeProvider.uint256(),
+  TypeProvider.uint128(),
+  TypeProvider.uint64(),
+  TypeProvider.uint32(),
+  TypeProvider.uint16(),
+  TypeProvider.uint8()
 ]
 uinteger_types = pickRandomSubarray(uinteger_types, config.uint_num);
 integer_types = pickRandomSubarray(integer_types, config.int_num);
 export const all_integer_types : Type[] = integer_types.concat(uinteger_types);
-export const bool_types : Type[] = [new ElementaryType("bool", "nonpayable")];
-export const address_types : Type[] = [new ElementaryType("address", "payable"), new ElementaryType("address", "nonpayable")];
+export const bool_types : Type[] = [TypeProvider.bool()];
+export const address_types : Type[] = [TypeProvider.address(), TypeProvider.payable_address()];
 export const elementary_types : Type[] = all_integer_types.concat(bool_types).concat(address_types);
 
 export const type_range_collection : Type[][] = [

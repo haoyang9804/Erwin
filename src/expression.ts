@@ -60,7 +60,11 @@ export class IRLiteral extends IRExpression {
             assert(typename.startsWith("int"), `IRLiteral: typename ${typename} is not supported`);
             bits = parseInt(typename.slice(3));
           }
-          this.value = randomBigInt(1n << BigInt(bits) + 1n).toString();
+          if (typename === "int256" || typename === "int128" || typename === "int64" ||
+            typename === "int32" || typename === "int16" || typename === "int8")
+            this.value = randomBigInt((1n << BigInt(bits) - 1n) + 1n).toString();
+          else
+            this.value = randomBigInt((1n << BigInt(bits)) + 1n).toString();
           if (this.mustBeNegaitive)
             this.value = "-" + this.value;
           else {
@@ -126,16 +130,18 @@ export class IRLiteral extends IRExpression {
     assert(this.type.kind === TypeKind.ElementaryType, "IRLiteral: type is not ElementaryType")
     this.generateKind();
     if (this.value === undefined) this.generateVal();
+    const value = this.value!;
+    this.value = undefined;
     if (this.type.str() === "address payable") {
       return factory.makeFunctionCall("", FunctionCallKind.TypeConversion,
         factory.makeElementaryTypeNameExpression("", factory.makeElementaryTypeName("", "address", "payable")),
-        [factory.makeLiteral("", this.kind!, str2hex(this.value!), this.value!)]);
+        [factory.makeLiteral("", this.kind!, str2hex(value!), value!)]);
     }
     if (this.mustHaveIntTypeConversion || (!config.unit_test_mode && Math.random() > 0.5))
       return factory.makeFunctionCall("", FunctionCallKind.TypeConversion,
         factory.makeElementaryTypeNameExpression("", factory.makeElementaryTypeName("", (this.type as ElementaryType).name, "nonpayable")),
-        [factory.makeLiteral("", this.kind!, str2hex(this.value!), this.value!)]);
-    return factory.makeLiteral("", this.kind!, str2hex(this.value!), this.value!);
+        [factory.makeLiteral("", this.kind!, str2hex(value!), value!)]);
+    return factory.makeLiteral("", this.kind!, str2hex(value!), value!);
   }
 }
 
