@@ -315,26 +315,58 @@ export class TypeDominanceDAG {
     }
   }
 
-  allocate_type_candidates_for_heads_with_smaller_memory_consumption() : void {
+  allocate_type_candidates_for_heads_with_uplimit() : void {
     for (let head of this.heads) irnode2types.set(head, shuffle(irnode2types.get(head)!));
     const head_array = shuffle(Array.from(this.heads));
     let cnt = 0;
     let dfs = (id : number, heads2type : Map<number, Type>) : void => {
       if (cnt > config.maximum_type_resolution_for_heads) return;
       if (id === head_array.length) {
-        this.heads2type_collection.push(heads2type);
+        this.heads2type_collection.push(new Map(heads2type));
         cnt++;
         return;
       }
       else {
         for (let type of irnode2types.get(head_array[id])!) {
-          let heads2type_copy = new Map(heads2type);
-          heads2type_copy.set(head_array[id], type);
-          dfs(id + 1, heads2type_copy);
+          heads2type.set(head_array[id], type);
+          dfs(id + 1, heads2type);
+          heads2type.delete(head_array[id]);
         }
       }
     }
     dfs(0, new Map<number, Type>());
+  }
+
+  allocate_type_candidates_for_heads_in_chunks() : Generator<Map<number, Type>[]> {
+    for (let head of this.heads) irnode2types.set(head, shuffle(irnode2types.get(head)!));
+    const head_array = shuffle(Array.from(this.heads));
+    let cnt = 0;
+    let local_heads2type_collection : Map<number, Type>[] = [];
+    const uplimit = head_array.reduce((acc, cur) => acc * irnode2types.get(cur)!.length, 1);
+    function* dfs(id : number, heads2type : Map<number, Type>) : Generator<Map<number, Type>[]> {
+      if (cnt > config.maximum_type_resolution_for_heads) return;
+      if (id === head_array.length) {
+        local_heads2type_collection.push(new Map(heads2type));
+        cnt++;
+        if (cnt % config.chunk_size === 0) {
+          yield local_heads2type_collection;
+          local_heads2type_collection = [];
+        }
+        else if (cnt === uplimit) {
+          yield local_heads2type_collection;
+          local_heads2type_collection = [];
+        }
+        return;
+      }
+      else {
+        for (let type of irnode2types.get(head_array[id])!) {
+          heads2type.set(head_array[id], type);
+          yield* dfs(id + 1, heads2type);
+          heads2type.delete(head_array[id]);
+        }
+      }
+    }
+    return dfs(0, new Map<number, Type>());
   }
 
   allocate_type_candidates_for_heads() : void {
@@ -547,6 +579,119 @@ export class TypeDominanceDAG {
     }
   }
 
+  resolve_by_chunk() : void {
+    // !0. initialize the resolution
+    this.initialize_resolve();
+    // !1. Get heads and tails
+    this.get_heads_and_tails();
+    // !2. Map nodes to their tails, recording if there exists a path from the node to tail with tail_id on which subtype/supertype domination does not holds.
+    // If there are multiple paths from node to tail, then the subtype does not hold as long as there exists a path on which subtype domination does not hold.
+    // tail_ids are not in this.node2tail
+    for (let tail of this.tails) {
+      this.dfs4node2tail(tail, tail, false, false);
+    }
+    // !3. Map edges to their reachable this.tails
+    for (let tail of this.tails) {
+      this.dfs4edge2tail(tail, tail);
+    }
+    // !4. Remove some removable subtype dominations using node2tail and edge2tail
+    // See the first test case in resolve.test.ts. The subtype domination from node 6 to node 7
+    // is removable since the type of node 6 must be the same as the type of node 1, and edge (6, 7)
+    // can reach tail 1.
+    for (let head of this.heads) {
+      this.remove_subtype_domination(head);
+    }
+    // !4.5 Check before type range tightening
+    for (let head of this.heads) {
+      this.check_type_range_before_tightening(head);
+    }
+    // !5. Tighten the type range for each node
+    this.tighten_type_range();
+    if (config.debug) {
+      for (let [id, _] of this.dag_nodes) {
+        console.log(color.redBG(`${id}'s type range: ${irnode2types.get(id)!.map(t => t.str())}`));
+      }
+    }
+    // !5.5 Check after type range tightening
+    for (let head of this.heads) {
+      this.check_type_range_after_tightening(head);
+    }
+    // !6. Assign types to this.heads
+    for (let local_heads2type_collection of this.allocate_type_candidates_for_heads_in_chunks()) {
+      // !7. Traverse each type resolution for heads
+      for (const head_resolve of local_heads2type_collection) {
+        this.resolved_types.clear();
+        let good_resolve = true;
+        // First, narrow down the type range of this.tails
+        // !8. Allocate type candidates for tails based on the current type resolution for heads
+        const tail2types = this.allocate_type_candidates_for_tails_based_on_type_resolution_for_heads(head_resolve);
+        // Then check if there exists one tail whose type candidates are empty.
+        // If all this.tails have non-empty type candidates, then resolve the types of this.tails.
+        for (const tail of this.tails) {
+          assert(tail2types.has(tail), `tail2type does not have ${tail}`);
+          if (tail2types.get(tail)!.length === 0) {
+            good_resolve = false;
+            break;
+          }
+          else {
+            // The choice of the type of the tail is restricted by the indirect connection among this.tails.
+            // If a non-head non-tail node N has two paths two tail T1 and T2 respectively, then the type of
+            // T1 and T2 have a type relation.
+            tail2types.set(tail, shuffle(tail2types.get(tail)!))
+          }
+        }
+        if (!good_resolve) continue;
+        // !9. Build connection among tails.
+        this.build_tails_relation();
+        // !10. Resolve the types of tails.
+        const plausible_type_resolution_for_tails = this.resolve_tails(tail2types);
+        if (plausible_type_resolution_for_tails === false) continue;
+        // !11. Check if the resolved types of tails are compatible with the resolved types of heads.
+        for (let [head, type_of_head] of head_resolve) {
+          if (this.node2tail.has(head) === false) {
+            this.resolved_types.set(head, type_of_head);
+            continue;
+          }
+          let compatible_with_resolved_tails = true;
+          for (let tail_info of this.node2tail.get(head)!) {
+            if (this.resolved_types.has(tail_info.tail_id)) {
+              if (tail_info.subtype) {
+                if (!type_of_head.issuperof(this.resolved_types.get(tail_info.tail_id)!)) {
+                  compatible_with_resolved_tails = false;
+                  break;
+                }
+              }
+              else if (tail_info.supertype) {
+                if (!this.resolved_types.get(tail_info.tail_id)!.issuperof(type_of_head)) {
+                  compatible_with_resolved_tails = false;
+                  break;
+                }
+              }
+              else {
+                if (!this.resolved_types.get(tail_info.tail_id)!.same(type_of_head)) {
+                  compatible_with_resolved_tails = false;
+                  break;
+                }
+              }
+            }
+          }
+          // !12. Resolve the types of nonheads and nontails.
+          if (compatible_with_resolved_tails) {
+            this.resolved_types.set(head, type_of_head);
+            this.resolve_nonheads_and_nontails(head);
+          }
+          else {
+            good_resolve = false;
+            break;
+          }
+        }
+        if (good_resolve) {
+          this.resolved_types_collection.push(new Map(this.resolved_types));
+        }
+      }
+    }
+  }
+
   resolve() : void {
     // !0. initialize the resolution
     this.initialize_resolve();
@@ -598,7 +743,7 @@ export class TypeDominanceDAG {
       this.allocate_type_candidates_for_heads();
     }
     else {
-      this.allocate_type_candidates_for_heads_with_smaller_memory_consumption();
+      this.allocate_type_candidates_for_heads_with_uplimit();
     }
     // !7. Traverse each type resolution for heads
     for (const head_resolve of this.heads2type_collection) {

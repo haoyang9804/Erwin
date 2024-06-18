@@ -7,7 +7,7 @@ import * as exp from "./expression";
 import * as decl from "./declare";
 import * as type from "./type";
 import { config } from "./config";
-import { pickRandomElement } from "./utility";
+import { pickRandomElement, assert } from "./utility";
 import {
   PrettyFormatter,
   ASTWriter,
@@ -60,9 +60,9 @@ function error(message : string) : never {
     .option("-vc --var_count <number>", "The number of variables Erwin will generate.", `${config.var_count}`)
     .option("-tvc --tuple_vardecl_count <number>", "The number of variables in a tuple Erwin will generate.", `${config.tuple_vardecl_count}`)
     .option("-tp --tuple_prob <float>", "The probability of generating a tuple surrounding an expression.", `${config.tuple_prob}`)
-    // .option("-tc --type_complex_level <number>", "The complex level of the type Erwin will generate.\nThe suggested range is [1,2,3]. The bigger, the more complex.", `${type_complex_level}`)
     .option("-ec --expression_complex_level <number>", "The complex level of the expression Erwin will generate.\nThe suggedted range is [1,2,3,4,5]. The bigger, the more complex.", `${config.expression_complex_level}`)
-    .option("-d --debug", "Enable the debug mode.", `${config.debug}`);
+    .option("-d --debug", "Enable the debug mode.", `${config.debug}`)
+    .option("-cs --chunk_size <number>", "The chunk size of the database.", `${config.chunk_size}`);
   program.parse(process.argv);
   config.int_num = parseInt(program.opts().int_types_num);
   config.uint_num = parseInt(program.opts().uint_types_num);
@@ -75,8 +75,21 @@ function error(message : string) : never {
   config.var_count = parseInt(program.opts().var_count);
   config.tuple_vardecl_count = parseInt(program.opts().tuple_vardecl_count);
   config.tuple_prob = parseFloat(program.opts().tuple_prob);
-  // type_complex_level = parseInt(program.opts().type_complex_level);
   config.expression_complex_level = parseInt(program.opts().expression_complex_level);
+  config.chunk_size = parseInt(program.opts().chunk_size);
+  assert(config.int_num >= 0, "The number of int types must be not less than 0.");
+  assert(config.uint_num >= 0, "The number of uint types must be not less than 0.");
+  assert(config.stmt_count_of_function_upperlimit >= 0, "The upper limit of the number of statements of a function must be not less than 0.");
+  assert(config.return_count_of_function_upperlimit >= 0, "The upper limit of the number of return values of a function must be not less than 0.");
+  assert(config.param_count_of_function_upperlimit >= 0, "The upper limit of the number of parameters of a function must be not less than 0.");
+  assert(config.function_count >= 0, "The number of functions must be not less than 0.");
+  assert(config.literal_prob >= 0 && config.literal_prob <= 1, "The probability of generating a literal must be in the range [0,1].");
+  assert(config.maximum_type_resolution_for_heads >= config.chunk_size, "The maximum number of type resolutions for heads must be not less than the size of chunk.");
+  assert(config.var_count >= 0, "The number of variables must be not less than 0.");
+  assert(config.tuple_vardecl_count >= 0, "The number of variables in a tuple must be not less than 0.");
+  assert(config.tuple_prob >= 0 && config.tuple_prob <= 1, "The probability of generating a tuple surrounding an expression must be in the range [0,1].");
+  assert(config.expression_complex_level >= 1 && config.expression_complex_level <= 5, "The complex level of the expression must be in the range [1,2,3,4,5].");
+  assert(config.chunk_size > 0, "The chunk size of the database must be greater than 0.");
   if (program.opts().debug === true) config.debug = true;
   // open and init DB
   await db.irnode_db.open();
@@ -93,7 +106,7 @@ function error(message : string) : never {
   // resolve constraints
   if (config.debug) gen.type_dag.draw();
   try {
-    gen.type_dag.resolve();
+    gen.type_dag.resolve_by_chunk();
     if (config.debug) gen.type_dag.verify();
     console.log(`>> In total, there are ${gen.type_dag.resolved_types_collection.length} resolutions`);
     if (gen.type_dag.resolved_types_collection.length === 0) {
