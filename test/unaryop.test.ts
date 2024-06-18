@@ -20,15 +20,12 @@ test("test binary op",
   const variable1 = new IRVariableDeclare(0, 0, 0, "x")
   variable1.type = new ElementaryType("uint256", "nonpayable");
   const v1id = new IRIdentifier(2, 0, 0).from(variable1);
-  v1id.type = new ElementaryType("uint256", "nonpayable");
   const uop = new IRUnaryOp(2, 0, 0, true, v1id, "++");
-  uop.type = new ElementaryType("uint256", "nonpayable");
   const result = writer.write(uop.lower());
   expect(result).toEqual(
     "++x"
   );
   const uop2 = new IRUnaryOp(2, 0, 0, false, v1id, "++");
-  uop2.type = new ElementaryType("uint256", "nonpayable");
   const result2 = writer.write(uop2.lower());
   expect(result2).toEqual(
     "x++"

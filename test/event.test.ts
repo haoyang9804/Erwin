@@ -1,4 +1,4 @@
-import { ElementaryType, EventType } from "../src/type"
+import { ElementaryType } from "../src/type"
 import { IREventDefinition, IRVariableDeclare } from "../src/declare";
 import { IRIdentifier } from "../src/expression";
 import { IREmitStatement } from "../src/statement";
@@ -33,9 +33,7 @@ test("test event and emit",
   const variable2 = new IRVariableDeclare(3, 0, 0, "y");
   variable2.type = variable1.type.copy();
   const variable2_id = new IRIdentifier(4, 0, 0, variable2.name, variable2.id);
-  variable2_id.type = variable2.type.copy();
   const event_id = new IRIdentifier(5, 0, 0, event.name, event.id);
-  event_id.type = new EventType(event_id.name!);
   const emit = new IREmitStatement(6, 0, 0, event_id, [variable2_id]);
   expect(writer.write(emit.lower())).toBe("emit E(y);")
 }

@@ -1,5 +1,4 @@
 import { IRIdentifier } from "../src/expression"
-import { ElementaryType } from "../src/type"
 import {
   PrettyFormatter,
   ASTWriter,
@@ -17,7 +16,6 @@ const writer = new ASTWriter(
 test("test identifier",
 () => {
   const ir = new IRIdentifier(0, 0, 0, "x", 0);
-  ir.type = new ElementaryType("uint256", "nonpayable");
   const result = writer.write(ir.lower());
   expect(result).toEqual(
     "x"

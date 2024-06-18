@@ -192,7 +192,7 @@ export class ElementaryType extends Type {
   }
 
   copy() : Type {
-    return new ElementaryType(this.name, this.stateMutability);
+    throw new Error("ElementaryType::copy() not implemented.");
   }
 
   subs() : Type[] {
