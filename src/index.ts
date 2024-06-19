@@ -5,7 +5,6 @@ import * as db from "./db"
 import { irnodes } from "./node";
 import * as exp from "./expression";
 import * as decl from "./declare";
-import * as type from "./type";
 import { config } from "./config";
 import { pickRandomElement, assert } from "./utility";
 import {
@@ -104,18 +103,13 @@ function error(message : string) : never {
     await tv.generate();
   }
   // resolve constraints
-  if (config.debug) gen.type_dag.draw();
+  if (config.debug) gen.type_dag.draw("./type-constraint.svg");
   try {
     gen.type_dag.resolve_by_chunk();
     if (config.debug) gen.type_dag.verify();
-    console.log(`>> In total, there are ${gen.type_dag.resolutions_collection.length} resolutions`);
-    if (gen.type_dag.resolutions_collection.length === 0) {
-      for (let [key, value] of type.irnode2types) {
-        console.log(`${key} -> ${value.forEach((x) => x.str())}`);
-      }
-    }
-    let resolutions = pickRandomElement(gen.type_dag.resolutions_collection)!;
-    for (let [key, value] of resolutions) {
+    console.log(`>> In total, there are ${gen.type_dag.solutions_collection.length} resolutions`);
+    let solutions = pickRandomElement(gen.type_dag.solutions_collection)!;
+    for (let [key, value] of solutions) {
       if (irnodes[key] instanceof exp.IRLiteral || irnodes[key] instanceof decl.IRVariableDeclare)
         (irnodes[key] as exp.IRLiteral | decl.IRVariableDeclare).type = value;
     }

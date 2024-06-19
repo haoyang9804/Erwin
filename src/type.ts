@@ -39,16 +39,16 @@ export class EventType extends Type {
     return "event";
   }
   subs() : Type[] {
-    throw new Error("No _sub for EventType");
+    throw new Error("No sub_dominance for EventType");
   }
   sub_with_lowerbound(lower_bound : Type) : Type[] {
-    throw new Error("No _sub for EventType");
+    throw new Error("No sub_dominance for EventType");
   }
   supers() : Type[] {
-    throw new Error("No _super for EventType");
+    throw new Error("No super_dominance for EventType");
   }
   super_with_upperbound(upper_bound : Type) : Type[] {
-    throw new Error("No _super for EventType");
+    throw new Error("No super_dominance for EventType");
   }
   copy() : Type {
     return new EventType(this.name);
@@ -74,16 +74,16 @@ export class ErrorType extends Type {
     return "error";
   }
   subs() : Type[] {
-    throw new Error("No _sub for ErrorType");
+    throw new Error("No sub_dominance for ErrorType");
   }
   sub_with_lowerbound(lower_bound : Type) : Type[] {
-    throw new Error("No _sub for ErrorType");
+    throw new Error("No sub_dominance for ErrorType");
   }
   supers() : Type[] {
-    throw new Error("No _super for ErrorType");
+    throw new Error("No super_dominance for ErrorType");
   }
   super_with_upperbound(upper_bound : Type) : Type[] {
-    throw new Error("No _super for ErrorType");
+    throw new Error("No super_dominance for ErrorType");
   }
   copy() : Type {
     return new EventType(this.name);
@@ -109,16 +109,16 @@ export class StructType extends Type {
     return "struct";
   }
   subs() : Type[] {
-    throw new Error("No _sub for StructType");
+    throw new Error("No sub_dominance for StructType");
   }
   sub_with_lowerbound(lower_bound : Type) : Type[] {
-    throw new Error("No _sub for StructType");
+    throw new Error("No sub_dominance for StructType");
   }
   supers() : Type[] {
-    throw new Error("No _super for StructType");
+    throw new Error("No super_dominance for StructType");
   }
   super_with_upperbound(upper_bound : Type) : Type[] {
-    throw new Error("No _super for StructType");
+    throw new Error("No super_dominance for StructType");
   }
   copy() : Type {
     return new StructType(this.name);
@@ -144,16 +144,16 @@ export class ContractType extends Type {
     return "contract";
   }
   subs() : Type[] {
-    throw new Error("No _sub for ContractType");
+    throw new Error("No sub_dominance for ContractType");
   }
   sub_with_lowerbound(lower_bound : Type) : Type[] {
-    throw new Error("No _sub for ContractType");
+    throw new Error("No sub_dominance for ContractType");
   }
   supers() : Type[] {
-    throw new Error("No _super for ContractType");
+    throw new Error("No super_dominance for ContractType");
   }
   super_with_upperbound(upper_bound : Type) : Type[] {
-    throw new Error("No _super for ContractType");
+    throw new Error("No super_dominance for ContractType");
   }
   copy() : Type {
     return new ContractType(this.name);
@@ -229,7 +229,7 @@ export class ElementaryType extends Type {
           return [TypeProvider.payable_address(), TypeProvider.address()];
         }
         else {
-          assert(false, `Elementary::_sub: unrecognized stateMutability: ${this.stateMutability}`);
+          assert(false, `Elementary::sub_dominance: unrecognized stateMutability: ${this.stateMutability}`);
         }
       case "bool":
         return [new ElementaryType("bool", this.stateMutability)];
@@ -278,7 +278,7 @@ export class ElementaryType extends Type {
           return [TypeProvider.payable_address()];
         }
         else {
-          assert(false, `Elementary::_sub: unrecognized stateMutability: ${this.stateMutability}`);
+          assert(false, `Elementary::sub_dominance: unrecognized stateMutability: ${this.stateMutability}`);
         }
       case "bool":
         return [new ElementaryType("bool", this.stateMutability)];
@@ -717,7 +717,7 @@ export class TypeProvider {
   private static m_payable_address : Type = new ElementaryType("address", "payable");
 }
 
-export const irnode2types = new Map<number, Type[]>();
+// export const irnode2types = new Map<number, Type[]>();
 
 export let integer_types : Type[] = [
   TypeProvider.int256(),
@@ -800,42 +800,35 @@ export function generate_all_array_types() : Type[] {
   return collection;
 }
 
-// for (let i = 0; i < type_complex_level; i++) {
-//   mapping_types = mapping_types.concat(generate_all_mapping_types());
-//   function_types = function_types.concat(generate_all_function_types());
-//   array_types = array_types.concat(generate_all_array_types());
+// export function includesType(arr : Type[], item : Type) : boolean {
+//   for (const element of arr) {
+//     if (element.kind === item.kind && element.same(item)) {
+//       return true;
+//     }
+//   }
+//   return false;
 // }
 
-export function includesType(arr : Type[], item : Type) : boolean {
-  for (const element of arr) {
-    if (element.kind === item.kind && element.same(item)) {
-      return true;
-    }
-  }
-  return false;
-}
 
-export const all_types = elementary_types.concat(mapping_types).concat(function_types).concat(array_types);
+// export function isSuperTypeSet(set : Type[], subset : Type[]) : boolean {
+//   for (const element of subset) {
+//     if (!includesType(set, element)) {
+//       return false;
+//     }
+//   }
+//   return true;
+// }
 
-export function isSuperTypeSet(set : Type[], subset : Type[]) : boolean {
-  for (const element of subset) {
-    if (!includesType(set, element)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-export function isEqualTypeSet(s1 : Type[], s2 : Type[]) : boolean {
-  if (s1.length !== s2.length) {
-    return false;
-  }
-  for (let i = 0; i < s1.length; i++) {
-    if (!s1[i].same(s2[i])) {
-      return false;
-    }
-  }
-  return true;
-}
+// export function isEqualTypeSet(s1 : Type[], s2 : Type[]) : boolean {
+//   if (s1.length !== s2.length) {
+//     return false;
+//   }
+//   for (let i = 0; i < s1.length; i++) {
+//     if (!s1[i].same(s2[i])) {
+//       return false;
+//     }
+//   }
+//   return true;
+// }
 
 export const size_of_type = sizeof(elementary_types[0]);
