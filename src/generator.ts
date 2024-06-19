@@ -303,7 +303,7 @@ export class AssignmentGenerator extends RValueGenerator {
       left_extracted_expression = left_extracted_expression.components[0];
     }
     if (this.op !== ">>=" && this.op !== "<<=") {
-      type_dag.connect(left_extracted_expression.id, right_extracted_expression.id, "subtype");
+      type_dag.connect(left_extracted_expression.id, right_extracted_expression.id, "_sub");
       typeRangeAlignment(left_extracted_expression.id, right_extracted_expression.id);
     }
     type.irnode2types.set(this.irnode.id, this.type_range);
@@ -399,7 +399,7 @@ export class BinaryOpGenerator extends RValueGenerator {
       right_extracted_expression = right_extracted_expression.components[0];
     }
     if (this.op !== ">>" && this.op !== "<<") {
-      type_dag.connect(left_extracted_expression.id, right_extracted_expression.id, "subtype");
+      type_dag.connect(left_extracted_expression.id, right_extracted_expression.id, "_sub");
       typeRangeAlignment(left_extracted_expression.id, right_extracted_expression.id);
     }
     type_dag.insert(type_dag.newNode(this.irnode.id));
@@ -537,7 +537,7 @@ export class ConditionalGenerator extends RValueGenerator {
     }
     type.irnode2types.set(extracted_e1.id, [new type.ElementaryType("bool", "nonpayable")]);
     type.irnode2types.set(this.irnode.id, type.elementary_types);
-    type_dag.connect(extracted_e2.id, extracted_e3.id, "subtype");
+    type_dag.connect(extracted_e2.id, extracted_e3.id, "_sub");
     typeRangeAlignment(extracted_e2.id, extracted_e3.id);
     type_dag.insert(type_dag.newNode(this.irnode.id));
     type_dag.connect(this.irnode.id, extracted_e2.id);
@@ -607,7 +607,7 @@ export class SingleVariableDeclareStatementGenerator extends StatementGenerator 
     }
     scope_stmt.set(cur_scope_id, scope_stmt.has(cur_scope_id) ? scope_stmt.get(cur_scope_id)!.concat(this.irnode!) : [this.irnode!]);
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "VariableDeclareStatement");
-    type_dag.connect(expression_gen_extracted.id, variable_gen.irnode!.id, "supertype");
+    type_dag.connect(expression_gen_extracted.id, variable_gen.irnode!.id, "_super");
     typeRangeAlignment(expression_gen_extracted.id, variable_gen.irnode!.id);
     if (config.debug)
       console.log(color.yellowBG(`${variable_gen.irnode!.id}: VarDecl, type: ${type.irnode2types.get(variable_gen.irnode!.id)!.map(t => t.str())}`));
@@ -646,7 +646,7 @@ export class MultipleVariableDeclareStatementGenerator extends StatementGenerato
         assert(extracted_ir.components.length === 1, "SingleVariableDeclareStatementGenerator: expression_gen_extracted.components.length is not 1");
         extracted_ir = extracted_ir.components[0];
       }
-      type_dag.connect(extracted_ir.id, ir_varnodes[i].id, "supertype");
+      type_dag.connect(extracted_ir.id, ir_varnodes[i].id, "_super");
       typeRangeAlignment(extracted_ir.id, ir_varnodes[i].id);
       if (config.debug)
         console.log(color.yellowBG(`${ir_varnodes[i].id}: VarDecl, type: ${type.irnode2types.get(ir_varnodes[i].id)!.map(t => t.str())}`));

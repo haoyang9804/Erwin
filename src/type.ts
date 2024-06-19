@@ -39,16 +39,16 @@ export class EventType extends Type {
     return "event";
   }
   subs() : Type[] {
-    throw new Error("No subtype for EventType");
+    throw new Error("No _sub for EventType");
   }
   sub_with_lowerbound(lower_bound : Type) : Type[] {
-    throw new Error("No subtype for EventType");
+    throw new Error("No _sub for EventType");
   }
   supers() : Type[] {
-    throw new Error("No supertype for EventType");
+    throw new Error("No _super for EventType");
   }
   super_with_upperbound(upper_bound : Type) : Type[] {
-    throw new Error("No supertype for EventType");
+    throw new Error("No _super for EventType");
   }
   copy() : Type {
     return new EventType(this.name);
@@ -74,16 +74,16 @@ export class ErrorType extends Type {
     return "error";
   }
   subs() : Type[] {
-    throw new Error("No subtype for ErrorType");
+    throw new Error("No _sub for ErrorType");
   }
   sub_with_lowerbound(lower_bound : Type) : Type[] {
-    throw new Error("No subtype for ErrorType");
+    throw new Error("No _sub for ErrorType");
   }
   supers() : Type[] {
-    throw new Error("No supertype for ErrorType");
+    throw new Error("No _super for ErrorType");
   }
   super_with_upperbound(upper_bound : Type) : Type[] {
-    throw new Error("No supertype for ErrorType");
+    throw new Error("No _super for ErrorType");
   }
   copy() : Type {
     return new EventType(this.name);
@@ -109,16 +109,16 @@ export class StructType extends Type {
     return "struct";
   }
   subs() : Type[] {
-    throw new Error("No subtype for StructType");
+    throw new Error("No _sub for StructType");
   }
   sub_with_lowerbound(lower_bound : Type) : Type[] {
-    throw new Error("No subtype for StructType");
+    throw new Error("No _sub for StructType");
   }
   supers() : Type[] {
-    throw new Error("No supertype for StructType");
+    throw new Error("No _super for StructType");
   }
   super_with_upperbound(upper_bound : Type) : Type[] {
-    throw new Error("No supertype for StructType");
+    throw new Error("No _super for StructType");
   }
   copy() : Type {
     return new StructType(this.name);
@@ -144,16 +144,16 @@ export class ContractType extends Type {
     return "contract";
   }
   subs() : Type[] {
-    throw new Error("No subtype for ContractType");
+    throw new Error("No _sub for ContractType");
   }
   sub_with_lowerbound(lower_bound : Type) : Type[] {
-    throw new Error("No subtype for ContractType");
+    throw new Error("No _sub for ContractType");
   }
   supers() : Type[] {
-    throw new Error("No supertype for ContractType");
+    throw new Error("No _super for ContractType");
   }
   super_with_upperbound(upper_bound : Type) : Type[] {
-    throw new Error("No supertype for ContractType");
+    throw new Error("No _super for ContractType");
   }
   copy() : Type {
     return new ContractType(this.name);
@@ -229,7 +229,7 @@ export class ElementaryType extends Type {
           return [TypeProvider.payable_address(), TypeProvider.address()];
         }
         else {
-          assert(false, `Elementary::subtype: unrecognized stateMutability: ${this.stateMutability}`);
+          assert(false, `Elementary::_sub: unrecognized stateMutability: ${this.stateMutability}`);
         }
       case "bool":
         return [new ElementaryType("bool", this.stateMutability)];
@@ -278,7 +278,7 @@ export class ElementaryType extends Type {
           return [TypeProvider.payable_address()];
         }
         else {
-          assert(false, `Elementary::subtype: unrecognized stateMutability: ${this.stateMutability}`);
+          assert(false, `Elementary::_sub: unrecognized stateMutability: ${this.stateMutability}`);
         }
       case "bool":
         return [new ElementaryType("bool", this.stateMutability)];
