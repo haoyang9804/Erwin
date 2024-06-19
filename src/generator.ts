@@ -9,6 +9,7 @@ import { TypeDominanceDAG } from "./constraint";
 import { config } from './config';
 import { irnodes } from "./node";
 import { color } from "console-log-colors"
+import { isSuperSet, isEqualSet } from "./dominance";
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Global Variables
 
@@ -77,7 +78,7 @@ async function getAvailableIRVariableDeclareWithTypeConstraint(scope : number | 
     assert(scope !== undefined, "getAvailableIRVariableDeclare: scope is undefined");
     scope = scope_parent.get(scope!);
   } while (scope !== undefined);
-  return collection.filter((irdecl) => type.isSuperTypeSet(type.irnode2types.get(irdecl.id)!, types) || type.isSuperTypeSet(types, type.irnode2types.get(irdecl.id)!));
+  return collection.filter((irdecl) => isSuperSet(type_dag.solution_range.get(irdecl.id)!, types) || isSuperSet(types, type_dag.solution_range.get(irdecl.id)!));
 }
 
 async function hasAvailableIRVariableDeclareWithTypeConstraint(scope : number, types : type.Type[]) : Promise<boolean> {
@@ -86,17 +87,17 @@ async function hasAvailableIRVariableDeclareWithTypeConstraint(scope : number, t
 
 
 function typeRangeAlignment(irnode_id1 : number, irnode_id2 : number) : void {
-  if (type.isEqualTypeSet(type.irnode2types.get(irnode_id1)!, type.irnode2types.get(irnode_id2)!)) return;
-  if (type.isSuperTypeSet(type.irnode2types.get(irnode_id1)!, type.irnode2types.get(irnode_id2)!)) {
-    type.irnode2types.set(irnode_id1, type.irnode2types.get(irnode_id2)!);
-    if (vardecls.has(irnode_id1)) type_dag.tighten_type_range_from_a_tail(irnode_id1);
-    else type_dag.tighten_type_range_from_a_head(irnode_id1);
+  if (isEqualSet(type_dag.solution_range.get(irnode_id1)!, type_dag.solution_range.get(irnode_id2)!)) return;
+  if (isSuperSet(type_dag.solution_range.get(irnode_id1)!, type_dag.solution_range.get(irnode_id2)!)) {
+    type_dag.solution_range.set(irnode_id1, type_dag.solution_range.get(irnode_id2)!);
+    if (vardecls.has(irnode_id1)) type_dag.tighten_solution_range_from_a_tail(irnode_id1);
+    else type_dag.tighten_solution_range_from_a_head(irnode_id1);
     return;
   }
-  if (type.isSuperTypeSet(type.irnode2types.get(irnode_id2)!, type.irnode2types.get(irnode_id1)!)) {
-    type.irnode2types.set(irnode_id2, type.irnode2types.get(irnode_id1)!);
-    if (vardecls.has(irnode_id2)) type_dag.tighten_type_range_from_a_tail(irnode_id2);
-    else type_dag.tighten_type_range_from_a_head(irnode_id2);
+  if (isSuperSet(type_dag.solution_range.get(irnode_id2)!, type_dag.solution_range.get(irnode_id1)!)) {
+    type_dag.solution_range.set(irnode_id2, type_dag.solution_range.get(irnode_id1)!);
+    if (vardecls.has(irnode_id2)) type_dag.tighten_solution_range_from_a_tail(irnode_id2);
+    else type_dag.tighten_solution_range_from_a_head(irnode_id2);
     return;
   }
 }
@@ -118,7 +119,7 @@ export class VariableDeclareGenerator extends DeclarationGenerator {
     this.irnode = createVariableDeclare();
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "VariableDeclare");
     type_dag.insert(type_dag.newNode(this.irnode.id));
-    type.irnode2types.set(this.irnode.id, this.type_range);
+    type_dag.solution_range.set(this.irnode.id, this.type_range);
     vardecls.add(this.irnode.id);
   }
 }
@@ -194,9 +195,9 @@ export class LiteralGenerator extends RValueGenerator {
     this.irnode = new exp.IRLiteral(global_id++, cur_scope_id, field_flag);
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "Literal");
     type_dag.insert(type_dag.newNode(this.irnode.id));
-    type.irnode2types.set(this.irnode.id, this.type_range);
+    type_dag.solution_range.set(this.irnode.id, this.type_range);
     if (config.debug)
-      console.log(color.yellowBG(`${this.irnode.id}: Literal, type: ${type.irnode2types.get(this.irnode.id)!.map(t => t.str())}`));
+      console.log(color.yellowBG(`${this.irnode.id}: Literal, type: ${type_dag.solution_range.get(this.irnode.id)!.map(t => t.str())}`));
     if (Math.random() < config.tuple_prob) {
       this.irnode = new exp.IRTuple(global_id++, cur_scope_id, field_flag, [this.irnode as exp.IRExpression]);
       await irnode_db.insert(this.irnode.id, this.irnode.scope, "Tuple");
@@ -224,10 +225,10 @@ export class IdentifierGenerator extends LRValueGenerator {
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "Identifier");
     type_dag.insert(type_dag.newNode(this.irnode.id));
     type_dag.connect(this.irnode.id, irdecl.id);
-    type.irnode2types.set(this.irnode.id, this.type_range);
+    type_dag.solution_range.set(this.irnode.id, this.type_range);
     typeRangeAlignment(this.irnode.id, irdecl.id);
     if (config.debug)
-      console.log(color.yellowBG(`${this.irnode.id}: Identifier --> ${irdecl.id}, type: ${type.irnode2types.get(this.irnode.id)!.map(t => t.str())}`));
+      console.log(color.yellowBG(`${this.irnode.id}: Identifier --> ${irdecl.id}, type: ${type_dag.solution_range.get(this.irnode.id)!.map(t => t.str())}`));
     if (Math.random() < config.tuple_prob) {
       this.irnode = new exp.IRTuple(global_id++, cur_scope_id, field_flag, [this.irnode as exp.IRExpression]);
       await irnode_db.insert(this.irnode.id, this.irnode.scope, "Tuple");
@@ -246,11 +247,11 @@ export class AssignmentGenerator extends RValueGenerator {
     if (op !== undefined) {
       this.op = op;
     }
-    else if (type.isEqualTypeSet(type_range, [new type.ElementaryType("bool", "nonpayable")])) {
+    else if (isEqualSet(type_range, [new type.ElementaryType("bool", "nonpayable")])) {
       this.op = "=";
     }
-    else if (type.isSuperTypeSet(type.all_integer_types, type_range) ||
-      type.isEqualTypeSet(type_range, type.elementary_types)) {
+    else if (isSuperSet(type.all_integer_types, type_range) ||
+      isEqualSet(type_range, type.elementary_types)) {
       this.op = pickRandomElement(
         ["=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|="])!;
     }
@@ -263,7 +264,7 @@ export class AssignmentGenerator extends RValueGenerator {
     let type_range;
     if (this.op === "=") type_range = this.type_range;
     else {
-      if (type.isEqualTypeSet(this.type_range, type.elementary_types)) {
+      if (isEqualSet(this.type_range, type.elementary_types)) {
         this.type_range = type_range = type.all_integer_types;
       }
       else {
@@ -291,8 +292,8 @@ export class AssignmentGenerator extends RValueGenerator {
       assert(right_extracted_expression.components.length === 1, "AssignmentGenerator: right_extracted_expression.components.length is not 1");
       right_extracted_expression = right_extracted_expression.components[0];
     }
-    assert(type.irnode2types.has(right_extracted_expression.id), `irnode2types does not contain ${right_extracted_expression.id}`);
-    const identifier_gen = new IdentifierGenerator(type.irnode2types.get(right_extracted_expression.id)!);
+    assert(type_dag.solution_range.has(right_extracted_expression.id), `irnode2types does not contain ${right_extracted_expression.id}`);
+    const identifier_gen = new IdentifierGenerator(type_dag.solution_range.get(right_extracted_expression.id)!);
     await identifier_gen.generate(component + 1);
     let left_expression : exp.IRExpression = identifier_gen.irnode as exp.IRExpression;
     this.irnode = new exp.IRAssignment(global_id++, cur_scope_id, field_flag, left_expression, right_expression, this.op!);
@@ -303,15 +304,15 @@ export class AssignmentGenerator extends RValueGenerator {
       left_extracted_expression = left_extracted_expression.components[0];
     }
     if (this.op !== ">>=" && this.op !== "<<=") {
-      type_dag.connect(left_extracted_expression.id, right_extracted_expression.id, "_sub");
+      type_dag.connect(left_extracted_expression.id, right_extracted_expression.id, "sub_dominance");
       typeRangeAlignment(left_extracted_expression.id, right_extracted_expression.id);
     }
-    type.irnode2types.set(this.irnode.id, this.type_range);
+    type_dag.solution_range.set(this.irnode.id, this.type_range);
     type_dag.insert(type_dag.newNode(this.irnode.id));
     type_dag.connect(this.irnode.id, left_extracted_expression.id);
     typeRangeAlignment(this.irnode.id, left_extracted_expression.id);
     if (config.debug)
-      console.log(color.yellowBG(`${this.irnode.id}: Assignment ${this.op}, type: ${type.irnode2types.get(this.irnode.id)!.map(t => t.str())}`));
+      console.log(color.yellowBG(`${this.irnode.id}: Assignment ${this.op}, type: ${type_dag.solution_range.get(this.irnode.id)!.map(t => t.str())}`));
     if (component !== 0) {
       this.irnode = new exp.IRTuple(global_id++, cur_scope_id, field_flag, [this.irnode as exp.IRExpression]);
       await irnode_db.insert(this.irnode.id, this.irnode.scope, "Tuple");
@@ -332,14 +333,14 @@ export class BinaryOpGenerator extends RValueGenerator {
     if (op !== undefined) {
       this.op = op;
     }
-    else if (type.isEqualTypeSet(type_range, [new type.ElementaryType("bool", "nonpayable")])) {
+    else if (isEqualSet(type_range, [new type.ElementaryType("bool", "nonpayable")])) {
       this.op = pickRandomElement(["&&", "||", ">", "<", "<=", ">=", "==", "!="])!;
     }
-    else if (type.isSuperTypeSet(type.all_integer_types, type_range)) {
+    else if (isSuperSet(type.all_integer_types, type_range)) {
       this.op = pickRandomElement(
         ["+", "-", "*", "/", "%", "<<", ">>", "&", "^", "|"])!;
     }
-    else if (type.isEqualTypeSet(type_range, type.elementary_types)) {
+    else if (isEqualSet(type_range, type.elementary_types)) {
       this.op = pickRandomElement(["+", "-", "*", "/", "%", "<<", ">>", "<", ">", "<=", ">=", "==", "!=", "&", "^", "|", "&&", "||"])!;
     }
     else {
@@ -349,7 +350,7 @@ export class BinaryOpGenerator extends RValueGenerator {
   async generate(component : number) : Promise<void> {
     let type_range;
     if (["+", "-", "*", "/", "%", "<<", ">>", "&", "^", "|"].filter((op) => op === this.op).length === 1) {
-      if (type.isEqualTypeSet(this.type_range, type.elementary_types)) {
+      if (isEqualSet(this.type_range, type.elementary_types)) {
         this.type_range = type_range = type.all_integer_types;
       }
       else {
@@ -387,7 +388,7 @@ export class BinaryOpGenerator extends RValueGenerator {
       right_expression_gen = new right_expression_gen_prototype(type.uinteger_types);
     }
     else {
-      right_expression_gen = new right_expression_gen_prototype(type.irnode2types.get(left_extracted_expression.id)!);
+      right_expression_gen = new right_expression_gen_prototype(type_dag.solution_range.get(left_extracted_expression.id)!);
     }
     await right_expression_gen.generate(component + 1);
     right_expression = right_expression_gen.irnode as exp.IRExpression;
@@ -399,17 +400,17 @@ export class BinaryOpGenerator extends RValueGenerator {
       right_extracted_expression = right_extracted_expression.components[0];
     }
     if (this.op !== ">>" && this.op !== "<<") {
-      type_dag.connect(left_extracted_expression.id, right_extracted_expression.id, "_sub");
+      type_dag.connect(left_extracted_expression.id, right_extracted_expression.id, "sub_dominance");
       typeRangeAlignment(left_extracted_expression.id, right_extracted_expression.id);
     }
     type_dag.insert(type_dag.newNode(this.irnode.id));
-    type.irnode2types.set(this.irnode.id, this.type_range);
+    type_dag.solution_range.set(this.irnode.id, this.type_range);
     if (["+", "-", "*", "/", "%", "<<", ">>", "&", "^", "|", "&&", "||"].filter((op) => op === this.op).length === 1) {
       type_dag.connect(this.irnode.id, left_extracted_expression.id);
       typeRangeAlignment(this.irnode.id, left_extracted_expression.id);
     }
     if (config.debug)
-      console.log(color.yellowBG(`${this.irnode.id}: BinaryOp ${this.op}, type: ${type.irnode2types.get(this.irnode.id)!.map(t => t.str())}`));
+      console.log(color.yellowBG(`${this.irnode.id}: BinaryOp ${this.op}, type: ${type_dag.solution_range.get(this.irnode.id)!.map(t => t.str())}`));
     if (Math.random() < config.tuple_prob) {
       this.irnode = new exp.IRTuple(global_id++, cur_scope_id, field_flag, [this.irnode as exp.IRExpression]);
       await irnode_db.insert(this.irnode.id, this.irnode.scope, "Tuple");
@@ -427,16 +428,16 @@ export class UnaryOpGenerator extends RValueGenerator {
     if (op !== undefined) {
       this.op = op;
     }
-    else if (type.isEqualTypeSet(type_range, type.elementary_types)) {
+    else if (isEqualSet(type_range, type.elementary_types)) {
       this.op = pickRandomElement(["!", "-", "~", "++", "--"])!;
     }
-    else if (type.isEqualTypeSet(type_range, [new type.ElementaryType("bool", "nonpayable")])) {
+    else if (isEqualSet(type_range, [new type.ElementaryType("bool", "nonpayable")])) {
       this.op = "!";
     }
-    else if (type.isEqualTypeSet(type_range, type.integer_types) || type.isEqualTypeSet(type_range, type.all_integer_types)) {
+    else if (isEqualSet(type_range, type.integer_types) || isEqualSet(type_range, type.all_integer_types)) {
       this.op = pickRandomElement(["-", "~", "++", "--"])!;
     }
-    else if (type.isEqualTypeSet(type_range, type.uinteger_types)) {
+    else if (isEqualSet(type_range, type.uinteger_types)) {
       this.op = pickRandomElement(["~", "++", "--"])!;
     }
     else {
@@ -449,7 +450,7 @@ export class UnaryOpGenerator extends RValueGenerator {
       this.type_range = type_range = [new type.ElementaryType("bool", "nonpayable")];
     }
     else if (this.op === "~" || this.op === "++" || this.op === "--") {
-      if (type.isEqualTypeSet(this.type_range, type.elementary_types)) {
+      if (isEqualSet(this.type_range, type.elementary_types)) {
         this.type_range = type_range = type.all_integer_types;
       }
       else {
@@ -457,7 +458,7 @@ export class UnaryOpGenerator extends RValueGenerator {
       }
     }
     else if (this.op === "-") {
-      if (type.isEqualTypeSet(this.type_range, type.elementary_types)) {
+      if (isEqualSet(this.type_range, type.elementary_types)) {
         this.type_range = type_range = type.integer_types;
       }
       else {
@@ -480,11 +481,11 @@ export class UnaryOpGenerator extends RValueGenerator {
     assert(extracted_expression instanceof exp.IRIdentifier, "UnaryOpGenerator: extracted_expression is not IRIdentifier");
     assert((extracted_expression as exp.IRIdentifier).reference !== undefined, "UnaryOpGenerator: extracted_expression.reference is undefined");
     type_dag.insert(type_dag.newNode(this.irnode.id));
-    type.irnode2types.set(this.irnode.id, this.type_range);
+    type_dag.solution_range.set(this.irnode.id, this.type_range);
     type_dag.connect(this.irnode.id, extracted_expression.id);
     typeRangeAlignment(this.irnode.id, extracted_expression.id);
     if (config.debug)
-      console.log(color.yellowBG(`${this.irnode.id}: UnaryOp ${this.op}, type: ${type.irnode2types.get(this.irnode.id)!.map(t => t.str())}`));
+      console.log(color.yellowBG(`${this.irnode.id}: UnaryOp ${this.op}, type: ${type_dag.solution_range.get(this.irnode.id)!.map(t => t.str())}`));
     if (Math.random() < config.tuple_prob) {
       this.irnode = new exp.IRTuple(global_id++, cur_scope_id, field_flag, [this.irnode as exp.IRExpression]);
       await irnode_db.insert(this.irnode.id, this.irnode.scope, "Tuple");
@@ -522,11 +523,11 @@ export class ConditionalGenerator extends RValueGenerator {
       assert(extracted_e2.components.length === 1, "ConditionalGenerator: extracted_e2.components.length is not 1");
       extracted_e2 = extracted_e2.components[0];
     }
-    if (type.isEqualTypeSet(type.irnode2types.get(extracted_e2.id)!, type.elementary_types)) {
-      type.irnode2types.set(extracted_e2.id, pickRandomElement(type.type_range_collection)!);
-      type_dag.tighten_type_range_from_a_head(extracted_e2.id);
+    if (isEqualSet(type_dag.solution_range.get(extracted_e2.id)!, type.elementary_types)) {
+      type_dag.solution_range.set(extracted_e2.id, pickRandomElement(type.type_range_collection)!);
+      type_dag.tighten_solution_range_from_a_head(extracted_e2.id);
     }
-    const e3_gen = new e3_gen_prototype(type.irnode2types.get(extracted_e2.id)!);
+    const e3_gen = new e3_gen_prototype(type_dag.solution_range.get(extracted_e2.id)!);
     await e3_gen.generate(component + 1);
     this.irnode = new exp.IRConditional(global_id++, cur_scope_id, field_flag, e1_gen.irnode! as exp.IRExpression, e2_gen.irnode! as exp.IRExpression, e3_gen.irnode! as exp.IRExpression);
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "Conditional");
@@ -535,15 +536,15 @@ export class ConditionalGenerator extends RValueGenerator {
       assert(extracted_e3.components.length === 1, "ConditionalGenerator: extracted_e3.components.length is not 1");
       extracted_e3 = extracted_e3.components[0];
     }
-    type.irnode2types.set(extracted_e1.id, [new type.ElementaryType("bool", "nonpayable")]);
-    type.irnode2types.set(this.irnode.id, type.elementary_types);
-    type_dag.connect(extracted_e2.id, extracted_e3.id, "_sub");
+    type_dag.solution_range.set(extracted_e1.id, [new type.ElementaryType("bool", "nonpayable")]);
+    type_dag.solution_range.set(this.irnode.id, type.elementary_types);
+    type_dag.connect(extracted_e2.id, extracted_e3.id, "sub_dominance");
     typeRangeAlignment(extracted_e2.id, extracted_e3.id);
     type_dag.insert(type_dag.newNode(this.irnode.id));
     type_dag.connect(this.irnode.id, extracted_e2.id);
     typeRangeAlignment(this.irnode.id, extracted_e2.id);
     if (config.debug)
-      console.log(color.yellowBG(`${this.irnode.id}: Conditional, type: ${type.irnode2types.get(this.irnode.id)!.map(t => t.str())}`));
+      console.log(color.yellowBG(`${this.irnode.id}: Conditional, type: ${type_dag.solution_range.get(this.irnode.id)!.map(t => t.str())}`));
     if (Math.random() < config.tuple_prob) {
       this.irnode = new exp.IRTuple(global_id++, cur_scope_id, field_flag, [this.irnode as exp.IRExpression]);
       await irnode_db.insert(this.irnode.id, this.irnode.scope, "Tuple");
@@ -607,10 +608,10 @@ export class SingleVariableDeclareStatementGenerator extends StatementGenerator 
     }
     scope_stmt.set(cur_scope_id, scope_stmt.has(cur_scope_id) ? scope_stmt.get(cur_scope_id)!.concat(this.irnode!) : [this.irnode!]);
     await irnode_db.insert(this.irnode.id, this.irnode.scope, "VariableDeclareStatement");
-    type_dag.connect(expression_gen_extracted.id, variable_gen.irnode!.id, "_super");
+    type_dag.connect(expression_gen_extracted.id, variable_gen.irnode!.id, "super_dominance");
     typeRangeAlignment(expression_gen_extracted.id, variable_gen.irnode!.id);
     if (config.debug)
-      console.log(color.yellowBG(`${variable_gen.irnode!.id}: VarDecl, type: ${type.irnode2types.get(variable_gen.irnode!.id)!.map(t => t.str())}`));
+      console.log(color.yellowBG(`${variable_gen.irnode!.id}: VarDecl, type: ${type_dag.solution_range.get(variable_gen.irnode!.id)!.map(t => t.str())}`));
   }
 }
 
@@ -646,10 +647,10 @@ export class MultipleVariableDeclareStatementGenerator extends StatementGenerato
         assert(extracted_ir.components.length === 1, "SingleVariableDeclareStatementGenerator: expression_gen_extracted.components.length is not 1");
         extracted_ir = extracted_ir.components[0];
       }
-      type_dag.connect(extracted_ir.id, ir_varnodes[i].id, "_super");
+      type_dag.connect(extracted_ir.id, ir_varnodes[i].id, "super_dominance");
       typeRangeAlignment(extracted_ir.id, ir_varnodes[i].id);
       if (config.debug)
-        console.log(color.yellowBG(`${ir_varnodes[i].id}: VarDecl, type: ${type.irnode2types.get(ir_varnodes[i].id)!.map(t => t.str())}`));
+        console.log(color.yellowBG(`${ir_varnodes[i].id}: VarDecl, type: ${type_dag.solution_range.get(ir_varnodes[i].id)!.map(t => t.str())}`));
     }
   }
 }
