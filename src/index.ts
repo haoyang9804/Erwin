@@ -108,14 +108,14 @@ function error(message : string) : never {
   try {
     gen.type_dag.resolve_by_chunk();
     if (config.debug) gen.type_dag.verify();
-    console.log(`>> In total, there are ${gen.type_dag.resolved_types_collection.length} resolutions`);
-    if (gen.type_dag.resolved_types_collection.length === 0) {
+    console.log(`>> In total, there are ${gen.type_dag.resolutions_collection.length} resolutions`);
+    if (gen.type_dag.resolutions_collection.length === 0) {
       for (let [key, value] of type.irnode2types) {
         console.log(`${key} -> ${value.forEach((x) => x.str())}`);
       }
     }
-    let resolved_types = pickRandomElement(gen.type_dag.resolved_types_collection)!;
-    for (let [key, value] of resolved_types) {
+    let resolutions = pickRandomElement(gen.type_dag.resolutions_collection)!;
+    for (let [key, value] of resolutions) {
       if (irnodes[key] instanceof exp.IRLiteral || irnodes[key] instanceof decl.IRVariableDeclare)
         (irnodes[key] as exp.IRLiteral | decl.IRVariableDeclare).type = value;
     }
@@ -129,9 +129,9 @@ function error(message : string) : never {
       }
     }
     // let cnt = 0;
-    // for (let resolved_types of gen.type_dag.resolved_types_collection) {
+    // for (let resolutions of gen.type_dag.resolutions_collection) {
     //   console.log(`>>>>>>>>>> Resolution ${cnt++} <<<<<<<<<<`);
-    //   for (let [key, value] of resolved_types) {
+    //   for (let [key, value] of resolutions) {
     //     (irnodes[key] as exp.IRExpression | decl.IRVariableDeclare).type = value;
     //   }
     //   for (let stmt of gen.scope_stmt.get(0)!) {

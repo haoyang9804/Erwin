@@ -35,14 +35,13 @@ let equal_toTail = (a : toTail, b : toTail) : boolean => {
   return a.tail_id === b.tail_id;
 }
 
-// The type dependence of the subsequent uses on the previous declacations
 export class TypeDominanceDAG {
   dag_nodes : Map<number, ConstaintNode> = new Map<number, ConstaintNode>();
   // If 'id1 id2' is installed in _sub/_super, then the type of id2 is a _sub/_super of the type of id1
   _sub : Set<string> = new Set();
   _super : Set<string> = new Set();
-  resolved_types = new Map<number, Type>();
-  resolved_types_collection : Map<number, Type>[] = [];
+  resolutions = new Map<number, Type>();
+  resolutions_collection : Map<number, Type>[] = [];
   // Records the IDs of heads/tails
   heads : Set<number> = new Set<number>();
   tails : Set<number> = new Set<number>();
@@ -54,10 +53,10 @@ export class TypeDominanceDAG {
   // Map each edge to its reachable tails
   edge2tail : Map<string, Set<number>> = new Map<string, Set<number>>();
   // Records type candidates of all heads
-  heads2type_collection : Map<number, Type>[] = [];
-  // If "tail1 tail2" is in tailssubtype, then the type of tail2 is a _sub of the type of tail1.
-  tailssubtype : Set<string> = new Set<string>();
-  // If "tail1 tail2" is in tailssubtype, then the type of tail2 equals to the type of tail1.
+  head_resolution_collection : Map<number, Type>[] = [];
+  // If "tail1 tail2" is in tailssub, then the type of tail2 is a _sub of the type of tail1.
+  tailssub : Set<string> = new Set<string>();
+  // If "tail1 tail2" is in tailssub, then the type of tail2 equals to the type of tail1.
   tailsequal : Set<string> = new Set<string>();
 
   constructor() { }
@@ -92,14 +91,14 @@ export class TypeDominanceDAG {
   }
 
   initialize_resolve() : void {
-    this.resolved_types = new Map<number, Type>();
-    this.resolved_types_collection = [];
+    this.resolutions = new Map<number, Type>();
+    this.resolutions_collection = [];
     this.heads = new Set<number>();
     this.tails = new Set<number>();
     this.node2tail = new Map<number, Set<toTail>>();
     this.edge2tail = new Map<string, Set<number>>();
-    this.heads2type_collection = [];
-    this.tailssubtype = new Set<string>();
+    this.head_resolution_collection = [];
+    this.tailssub = new Set<string>();
     this.tailsequal = new Set<string>();
   }
 
@@ -124,38 +123,38 @@ export class TypeDominanceDAG {
   dfs4node2tail(id : number, tail_id : number, _sub : boolean, _super : boolean) : void {
     for (let parent of this.dag_nodes.get(id)!.ins) {
       const key = `${parent} ${id}`;
-      let this_subtype = this._sub.has(key) || _sub;
-      let this_supertype = this._super.has(key) || _super;
+      let this_sub = this._sub.has(key) || _sub;
+      let this_super = this._super.has(key) || _super;
       if (this.node2tail.has(parent)) {
-        // pre_subtype = false if there exists a path from the parent to tail with tail_id on which no _sub domination holds.
-        let pre_subtype = true;
+        // pre_sub = false if there exists a path from the parent to tail with tail_id on which no _sub domination holds.
+        let pre_sub = true;
         const pre_tail_info : toTail[] = [];
         let meet_this_tail_before = false;
         for (const tail_info of this.node2tail.get(parent)!) {
           if (tail_info.tail_id === tail_id) {
             meet_this_tail_before = true;
-            pre_subtype &&= tail_info._sub;
+            pre_sub &&= tail_info._sub;
             pre_tail_info.push(tail_info);
           }
         }
         if (meet_this_tail_before) {
-          if (pre_subtype === true && this_subtype == false) {
+          if (pre_sub === true && this_sub == false) {
             for (const tail_info of pre_tail_info)
               this.node2tail.get(parent)!.delete(tail_info);
-            this.node2tail.get(parent)!.add({ tail_id: tail_id, _sub: false, _super: this_supertype });
+            this.node2tail.get(parent)!.add({ tail_id: tail_id, _sub: false, _super: this_super });
           }
-          this_subtype &&= pre_subtype;
+          this_sub &&= pre_sub;
         }
         else {
-          this.node2tail.get(parent)!.add({ tail_id: tail_id, _sub: this_subtype, _super: this_supertype });
+          this.node2tail.get(parent)!.add({ tail_id: tail_id, _sub: this_sub, _super: this_super });
         }
       }
       else {
         const s = createCustomSet<toTail>(equal_toTail);
-        s.add({ tail_id: tail_id, _sub: this_subtype, _super: this_supertype });
+        s.add({ tail_id: tail_id, _sub: this_sub, _super: this_super });
         this.node2tail.set(parent, s);
       }
-      this.dfs4node2tail(parent, tail_id, this_subtype, this_supertype);
+      this.dfs4node2tail(parent, tail_id, this_sub, this_super);
     }
   }
 
@@ -172,18 +171,18 @@ export class TypeDominanceDAG {
     }
   }
 
-  remove_subtype_domination(node : number) : void {
+  remove_sub_domination(node : number) : void {
     for (const child of this.dag_nodes.get(node)!.outs) {
       const edge = `${node} ${child}`;
       assert(this.edge2tail.has(edge), `${edge} is not included in this.edge2tail`);
       for (const tail of this.edge2tail.get(edge)!) {
         const tail_info = [...this.node2tail.get(node)!].find(t => t.tail_id === tail);
-        assert(tail_info !== undefined, `remove_subtype_domination: tail_info of tail whose ID is ${tail} is undefined`);
+        assert(tail_info !== undefined, `remove_sub_domination: tail_info of tail whose ID is ${tail} is undefined`);
         if (!tail_info._sub && this._sub.has(edge)) {
           this._sub.delete(edge);
         }
       }
-      this.remove_subtype_domination(child);
+      this.remove_sub_domination(child);
     }
   }
 
@@ -319,18 +318,18 @@ export class TypeDominanceDAG {
     for (let head of this.heads) irnode2types.set(head, shuffle(irnode2types.get(head)!));
     const head_array = shuffle(Array.from(this.heads));
     let cnt = 0;
-    let dfs = (id : number, heads2type : Map<number, Type>) : void => {
+    let dfs = (id : number, head_resolution : Map<number, Type>) : void => {
       if (cnt > config.maximum_type_resolution_for_heads) return;
       if (id === head_array.length) {
-        this.heads2type_collection.push(new Map(heads2type));
+        this.head_resolution_collection.push(new Map(head_resolution));
         cnt++;
         return;
       }
       else {
         for (let type of irnode2types.get(head_array[id])!) {
-          heads2type.set(head_array[id], type);
-          dfs(id + 1, heads2type);
-          heads2type.delete(head_array[id]);
+          head_resolution.set(head_array[id], type);
+          dfs(id + 1, head_resolution);
+          head_resolution.delete(head_array[id]);
         }
       }
     }
@@ -341,28 +340,28 @@ export class TypeDominanceDAG {
     for (let head of this.heads) irnode2types.set(head, shuffle(irnode2types.get(head)!));
     const head_array = shuffle(Array.from(this.heads));
     let cnt = 0;
-    let local_heads2type_collection : Map<number, Type>[] = [];
+    let local_head_resolution_collection : Map<number, Type>[] = [];
     const uplimit = head_array.reduce((acc, cur) => acc * irnode2types.get(cur)!.length, 1);
-    function* dfs(id : number, heads2type : Map<number, Type>) : Generator<Map<number, Type>[]> {
+    function* dfs(id : number, head_resolution : Map<number, Type>) : Generator<Map<number, Type>[]> {
       if (cnt > config.maximum_type_resolution_for_heads) return;
       if (id === head_array.length) {
-        local_heads2type_collection.push(new Map(heads2type));
+        local_head_resolution_collection.push(new Map(head_resolution));
         cnt++;
         if (cnt % config.chunk_size === 0) {
-          yield local_heads2type_collection;
-          local_heads2type_collection = [];
+          yield local_head_resolution_collection;
+          local_head_resolution_collection = [];
         }
         else if (cnt === uplimit) {
-          yield local_heads2type_collection;
-          local_heads2type_collection = [];
+          yield local_head_resolution_collection;
+          local_head_resolution_collection = [];
         }
         return;
       }
       else {
         for (let type of irnode2types.get(head_array[id])!) {
-          heads2type.set(head_array[id], type);
-          yield* dfs(id + 1, heads2type);
-          heads2type.delete(head_array[id]);
+          head_resolution.set(head_array[id], type);
+          yield* dfs(id + 1, head_resolution);
+          head_resolution.delete(head_array[id]);
         }
       }
     }
@@ -370,26 +369,26 @@ export class TypeDominanceDAG {
   }
 
   allocate_type_candidates_for_heads() : void {
-    this.heads2type_collection.push(new Map<number, Type>());
+    this.head_resolution_collection.push(new Map<number, Type>());
     for (let head of this.heads) {
-      const heads2type_length = this.heads2type_collection.length;
+      const head_resolution_length = this.head_resolution_collection.length;
       if (config.debug) console.log(color.cyan(`head is ${head}, and irnode2types.get(head)!.length is ${irnode2types.get(head)!.length}`));
       assert(irnode2types.has(head), `allocate_type_candidates_for_heads: head ${head} is not in irnode2types`);
-      this.heads2type_collection = extendArrayofMap(this.heads2type_collection, irnode2types.get(head)!.length);
+      this.head_resolution_collection = extendArrayofMap(this.head_resolution_collection, irnode2types.get(head)!.length);
       let cnt = 1;
       for (let type of irnode2types.get(head)!) {
-        for (let i = (cnt - 1) * heads2type_length; i < cnt * heads2type_length; i++) {
-          this.heads2type_collection[i].set(head, type);
+        for (let i = (cnt - 1) * head_resolution_length; i < cnt * head_resolution_length; i++) {
+          this.head_resolution_collection[i].set(head, type);
         }
         cnt++;
       }
     }
-    if (config.debug) console.log(color.cyan(`heads2type_collection.size is ${this.heads2type_collection.length}`));
-    if (this.heads2type_collection.length > config.maximum_type_resolution_for_heads) {
-      this.heads2type_collection = selectRandomElements(this.heads2type_collection, config.maximum_type_resolution_for_heads);
+    if (config.debug) console.log(color.cyan(`head_resolution_collection.size is ${this.head_resolution_collection.length}`));
+    if (this.head_resolution_collection.length > config.maximum_type_resolution_for_heads) {
+      this.head_resolution_collection = selectRandomElements(this.head_resolution_collection, config.maximum_type_resolution_for_heads);
     }
     else {
-      this.heads2type_collection = shuffle(this.heads2type_collection);
+      this.head_resolution_collection = shuffle(this.head_resolution_collection);
     }
   }
 
@@ -430,16 +429,16 @@ export class TypeDominanceDAG {
           const tail_info1 = tail_infos_array[i];
           const tail_info2 = tail_infos_array[j];
           if (tail_info1._sub && (!tail_info2._sub && !tail_info2._super)) {
-            this.tailssubtype.add(`${tail_info2.tail_id} ${tail_info1.tail_id}`);
+            this.tailssub.add(`${tail_info2.tail_id} ${tail_info1.tail_id}`);
           }
           else if (tail_info1._super && (!tail_info2._sub && !tail_info2._super)) {
-            this.tailssubtype.add(`${tail_info1.tail_id} ${tail_info2.tail_id}`);
+            this.tailssub.add(`${tail_info1.tail_id} ${tail_info2.tail_id}`);
           }
           else if ((!tail_info1._sub && !tail_info1._super) && tail_info2._sub) {
-            this.tailssubtype.add(`${tail_info1.tail_id} ${tail_info2.tail_id}`);
+            this.tailssub.add(`${tail_info1.tail_id} ${tail_info2.tail_id}`);
           }
           else if ((!tail_info1._sub && !tail_info1._super) && tail_info2._super) {
-            this.tailssubtype.add(`${tail_info2.tail_id} ${tail_info1.tail_id}`);
+            this.tailssub.add(`${tail_info2.tail_id} ${tail_info1.tail_id}`);
           }
           else if ((!tail_info1._sub && !tail_info1._super) && (!tail_info2._sub && !tail_info2._super)) {
             this.tailsequal.add(`${tail_info1.tail_id} ${tail_info2.tail_id}`);
@@ -467,10 +466,10 @@ export class TypeDominanceDAG {
         let types_candidate = tail2types.get(tails_array[i4tails_array])!;
         for (let j = 0; j < i4tails_array; j++) {
           assert(tailid2type_candidates.has(tails_array[j]), `resolve_tails: tailid2type_candidates does not have ${tails_array[j]}`);
-          if (this.tailssubtype.has(`${tails_array[j]} ${tails_array[i4tails_array]}`)) {
+          if (this.tailssub.has(`${tails_array[j]} ${tails_array[i4tails_array]}`)) {
             types_candidate = types_candidate.filter(t => t.issubof(tailid2type_candidates.get(tails_array[j])![i4types_of_each_tail[i4tails_array]]));
           }
-          else if (this.tailssubtype.has(`${tails_array[i4tails_array]} ${tails_array[j]}`)) {
+          else if (this.tailssub.has(`${tails_array[i4tails_array]} ${tails_array[j]}`)) {
             types_candidate = types_candidate.filter(t => t.issuperof(tailid2type_candidates.get(tails_array[j])![i4types_of_each_tail[i4tails_array]]));
           }
           else if (this.tailsequal.has(`${tails_array[j]} ${tails_array[i4tails_array]}`)) {
@@ -511,7 +510,7 @@ export class TypeDominanceDAG {
     }
     if (cannot_resolve === false) {
       for (let i = 0; i < tails_array.length; i++) {
-        this.resolved_types.set(tails_array[i], tailid2type_candidates.get(tails_array[i])![i4types_of_each_tail[i]]);
+        this.resolutions.set(tails_array[i], tailid2type_candidates.get(tails_array[i])![i4types_of_each_tail[i]]);
       }
       return true;
     }
@@ -526,23 +525,23 @@ export class TypeDominanceDAG {
           const tail_info = [...this.node2tail.get(child)!].find(t => t.tail_id === tail_id);
           if (this._sub.has(edge)) {
             if (tail_info!._sub) {
-              let type_candidates = this.resolved_types.get(node)!.sub_with_lowerbound(this.resolved_types.get(tail_id)!)!;
-              if (this.resolved_types.has(child)) {
-                type_candidates = type_candidates.filter(t => t.same(this.resolved_types.get(child)!));
+              let type_candidates = this.resolutions.get(node)!.sub_with_lowerbound(this.resolutions.get(tail_id)!)!;
+              if (this.resolutions.has(child)) {
+                type_candidates = type_candidates.filter(t => t.same(this.resolutions.get(child)!));
               }
               // Deal with the case where the type range of the child is smaller than the type range of the parent
               // mentioned by the 5th step.
               const type_candidate_copy = type_candidates;
               type_candidates = type_candidates.filter(t => irnode2types.get(child)!.some(tt => t.same(tt)));
               assert(type_candidates.length > 0, `resolve_nonheads_and_nontails:>1 type_candidates is empty when resolving ${child} on edge ${edge}. type_candidates before and after set intersection is ${type_candidate_copy.map(t => t.str())} and ${irnode2types.get(child)!.map(t => t.str())}`);
-              this.resolved_types.set(child, pickRandomElement(type_candidates)!);
+              this.resolutions.set(child, pickRandomElement(type_candidates)!);
             }
             else if (tail_info!._super) {
               throw new Error(`resolve_nonheads_and_nontails: ${node} should not be the _super of ${child}`);
             }
             else {
-              assert(this.resolved_types.get(tail_id)!.issubof(this.resolved_types.get(node)!), `resolve_nonheads_and_nontails: the type of ${node}: ${this.resolved_types.get(node)!.str()} is not the _super of the type of ${tail_id}: ${this.resolved_types.get(tail_id)!.str()}`);
-              this.resolved_types.set(child, this.resolved_types.get(tail_id)!);
+              assert(this.resolutions.get(tail_id)!.issubof(this.resolutions.get(node)!), `resolve_nonheads_and_nontails: the type of ${node}: ${this.resolutions.get(node)!.str()} is not the _super of the type of ${tail_id}: ${this.resolutions.get(tail_id)!.str()}`);
+              this.resolutions.set(child, this.resolutions.get(tail_id)!);
             }
           }
           else if (this._super.has(edge)) {
@@ -550,12 +549,12 @@ export class TypeDominanceDAG {
             throw new Error(`resolve_nonheads_and_nontails: ${node} should not be the _super of ${child}`);
           }
           else {
-            let type_candidates = [this.resolved_types.get(node)!];
-            if (this.resolved_types.has(child)) {
-              type_candidates = type_candidates.filter(t => t.same(this.resolved_types.get(child)!));
+            let type_candidates = [this.resolutions.get(node)!];
+            if (this.resolutions.has(child)) {
+              type_candidates = type_candidates.filter(t => t.same(this.resolutions.get(child)!));
             }
             assert(type_candidates.length > 0, `resolve_nonheads_and_nontails:>3 type_candidates is empty`);
-            this.resolved_types.set(child, pickRandomElement(type_candidates)!);
+            this.resolutions.set(child, pickRandomElement(type_candidates)!);
           }
         }
       }
@@ -599,7 +598,7 @@ export class TypeDominanceDAG {
     // is removable since the type of node 6 must be the same as the type of node 1, and edge (6, 7)
     // can reach tail 1.
     for (let head of this.heads) {
-      this.remove_subtype_domination(head);
+      this.remove_sub_domination(head);
     }
     // !4.5 Check before type range tightening
     for (let head of this.heads) {
@@ -617,10 +616,10 @@ export class TypeDominanceDAG {
       this.check_type_range_after_tightening(head);
     }
     // !6. Assign types to this.heads
-    for (let local_heads2type_collection of this.allocate_type_candidates_for_heads_in_chunks()) {
+    for (let local_head_resolution_collection of this.allocate_type_candidates_for_heads_in_chunks()) {
       // !7. Traverse each type resolution for heads
-      for (const head_resolve of local_heads2type_collection) {
-        this.resolved_types.clear();
+      for (const head_resolve of local_head_resolution_collection) {
+        this.resolutions.clear();
         let good_resolve = true;
         // First, narrow down the type range of this.tails
         // !8. Allocate type candidates for tails based on the current type resolution for heads
@@ -649,26 +648,26 @@ export class TypeDominanceDAG {
         // !11. Check if the resolved types of tails are compatible with the resolved types of heads.
         for (let [head, type_of_head] of head_resolve) {
           if (this.node2tail.has(head) === false) {
-            this.resolved_types.set(head, type_of_head);
+            this.resolutions.set(head, type_of_head);
             continue;
           }
           let compatible_with_resolved_tails = true;
           for (let tail_info of this.node2tail.get(head)!) {
-            if (this.resolved_types.has(tail_info.tail_id)) {
+            if (this.resolutions.has(tail_info.tail_id)) {
               if (tail_info._sub) {
-                if (!type_of_head.issuperof(this.resolved_types.get(tail_info.tail_id)!)) {
+                if (!type_of_head.issuperof(this.resolutions.get(tail_info.tail_id)!)) {
                   compatible_with_resolved_tails = false;
                   break;
                 }
               }
               else if (tail_info._super) {
-                if (!this.resolved_types.get(tail_info.tail_id)!.issuperof(type_of_head)) {
+                if (!this.resolutions.get(tail_info.tail_id)!.issuperof(type_of_head)) {
                   compatible_with_resolved_tails = false;
                   break;
                 }
               }
               else {
-                if (!this.resolved_types.get(tail_info.tail_id)!.same(type_of_head)) {
+                if (!this.resolutions.get(tail_info.tail_id)!.same(type_of_head)) {
                   compatible_with_resolved_tails = false;
                   break;
                 }
@@ -677,7 +676,7 @@ export class TypeDominanceDAG {
           }
           // !12. Resolve the types of nonheads and nontails.
           if (compatible_with_resolved_tails) {
-            this.resolved_types.set(head, type_of_head);
+            this.resolutions.set(head, type_of_head);
             this.resolve_nonheads_and_nontails(head);
           }
           else {
@@ -686,7 +685,7 @@ export class TypeDominanceDAG {
           }
         }
         if (good_resolve) {
-          this.resolved_types_collection.push(new Map(this.resolved_types));
+          this.resolutions_collection.push(new Map(this.resolutions));
         }
       }
     }
@@ -712,7 +711,7 @@ export class TypeDominanceDAG {
     // is removable since the type of node 6 must be the same as the type of node 1, and edge (6, 7)
     // can reach tail 1.
     for (let head of this.heads) {
-      this.remove_subtype_domination(head);
+      this.remove_sub_domination(head);
     }
     // !4.5 Check before type range tightening
     for (let head of this.heads) {
@@ -746,8 +745,8 @@ export class TypeDominanceDAG {
       this.allocate_type_candidates_for_heads_with_uplimit();
     }
     // !7. Traverse each type resolution for heads
-    for (const head_resolve of this.heads2type_collection) {
-      this.resolved_types.clear();
+    for (const head_resolve of this.head_resolution_collection) {
+      this.resolutions.clear();
       let good_resolve = true;
       // First, narrow down the type range of this.tails
       // !8. Allocate type candidates for tails based on the current type resolution for heads
@@ -776,26 +775,26 @@ export class TypeDominanceDAG {
       // !11. Check if the resolved types of tails are compatible with the resolved types of heads.
       for (let [head, type_of_head] of head_resolve) {
         if (this.node2tail.has(head) === false) {
-          this.resolved_types.set(head, type_of_head);
+          this.resolutions.set(head, type_of_head);
           continue;
         }
         let compatible_with_resolved_tails = true;
         for (let tail_info of this.node2tail.get(head)!) {
-          if (this.resolved_types.has(tail_info.tail_id)) {
+          if (this.resolutions.has(tail_info.tail_id)) {
             if (tail_info._sub) {
-              if (!type_of_head.issuperof(this.resolved_types.get(tail_info.tail_id)!)) {
+              if (!type_of_head.issuperof(this.resolutions.get(tail_info.tail_id)!)) {
                 compatible_with_resolved_tails = false;
                 break;
               }
             }
             else if (tail_info._super) {
-              if (!this.resolved_types.get(tail_info.tail_id)!.issuperof(type_of_head)) {
+              if (!this.resolutions.get(tail_info.tail_id)!.issuperof(type_of_head)) {
                 compatible_with_resolved_tails = false;
                 break;
               }
             }
             else {
-              if (!this.resolved_types.get(tail_info.tail_id)!.same(type_of_head)) {
+              if (!this.resolutions.get(tail_info.tail_id)!.same(type_of_head)) {
                 compatible_with_resolved_tails = false;
                 break;
               }
@@ -804,7 +803,7 @@ export class TypeDominanceDAG {
         }
         // !12. Resolve the types of nonheads and nontails.
         if (compatible_with_resolved_tails) {
-          this.resolved_types.set(head, type_of_head);
+          this.resolutions.set(head, type_of_head);
           this.resolve_nonheads_and_nontails(head);
         }
         else {
@@ -813,7 +812,7 @@ export class TypeDominanceDAG {
         }
       }
       if (good_resolve) {
-        this.resolved_types_collection.push(new Map(this.resolved_types));
+        this.resolutions_collection.push(new Map(this.resolutions));
       }
     }
   }
@@ -838,7 +837,7 @@ export class TypeDominanceDAG {
     // is removable since the type of node 6 must be the same as the type of node 1, and edge (6, 7)
     // can reach tail 1.
     for (let head of this.heads) {
-      this.remove_subtype_domination(head);
+      this.remove_sub_domination(head);
     }
     // !5. Restrict the type range of heads.
     // Consider the following scenario.
@@ -855,8 +854,8 @@ export class TypeDominanceDAG {
     // !6. Assign types to this.heads
     this.allocate_type_candidates_for_heads();
     // !7. Traverse each type resolution for heads
-    for (const head_resolve of this.heads2type_collection) {
-      this.resolved_types.clear();
+    for (const head_resolve of this.head_resolution_collection) {
+      this.resolutions.clear();
       let good_resolve = true;
       // First, narrow down the type range of this.tails
       // !8. Allocate type candidates for tails based on the current type resolution for heads
@@ -885,26 +884,26 @@ export class TypeDominanceDAG {
       // !11. Check if the resolved types of tails are compatible with the resolved types of heads.
       for (let [head, type_of_head] of head_resolve) {
         if (this.node2tail.has(head) === false) {
-          this.resolved_types.set(head, type_of_head);
+          this.resolutions.set(head, type_of_head);
           continue;
         }
         let compatible_with_resolved_tails = true;
         for (let tail_info of this.node2tail.get(head)!) {
-          if (this.resolved_types.has(tail_info.tail_id)) {
+          if (this.resolutions.has(tail_info.tail_id)) {
             if (tail_info._sub) {
-              if (!type_of_head.issuperof(this.resolved_types.get(tail_info.tail_id)!)) {
+              if (!type_of_head.issuperof(this.resolutions.get(tail_info.tail_id)!)) {
                 compatible_with_resolved_tails = false;
                 break;
               }
             }
             else if (tail_info._super) {
-              if (!this.resolved_types.get(tail_info.tail_id)!.issuperof(type_of_head)) {
+              if (!this.resolutions.get(tail_info.tail_id)!.issuperof(type_of_head)) {
                 compatible_with_resolved_tails = false;
                 break;
               }
             }
             else {
-              if (!this.resolved_types.get(tail_info.tail_id)!.same(type_of_head)) {
+              if (!this.resolutions.get(tail_info.tail_id)!.same(type_of_head)) {
                 compatible_with_resolved_tails = false;
                 break;
               }
@@ -913,7 +912,7 @@ export class TypeDominanceDAG {
         }
         // !12. Resolve the types of nonheads and nontails.
         if (compatible_with_resolved_tails) {
-          this.resolved_types.set(head, type_of_head);
+          this.resolutions.set(head, type_of_head);
           this.resolve_nonheads_and_nontails(head);
         }
         else {
@@ -922,20 +921,20 @@ export class TypeDominanceDAG {
         }
       }
       if (good_resolve) {
-        this.resolved_types_collection.push(new Map(this.resolved_types));
+        this.resolutions_collection.push(new Map(this.resolutions));
       }
     }
   }
 
   verify() : void {
-    for (const resolved_types of this.resolved_types_collection) {
+    for (const resolutions of this.resolutions_collection) {
       // 1. Verify that all nodes have been resolved.
       for (let [id, _] of this.dag_nodes) {
-        assert(resolved_types.has(id), `Verify: node ${id} has not been resolved`);
+        assert(resolutions.has(id), `Verify: node ${id} has not been resolved`);
       }
       // 2. Verify that all resolved types are one of the type candidates of the node.
       for (let [id, type_candidates] of irnode2types) {
-        let resolved_type = resolved_types.get(id)!;
+        let resolved_type = resolutions.get(id)!;
         let match = false;
         for (let type_candidate of type_candidates) {
           if (resolved_type.same(type_candidate)) {
@@ -949,8 +948,8 @@ export class TypeDominanceDAG {
       for (let [_, node] of this.dag_nodes) {
         for (let child of node.outs) {
           if (this._sub.has(`${node.id} ${child}`)) {
-            const subttypes = resolved_types.get(node.id)!.subs();
-            let typeofchild = resolved_types.get(child)!;
+            const subttypes = resolutions.get(node.id)!.subs();
+            let typeofchild = resolutions.get(child)!;
             let match = false;
             for (let _sub of subttypes) {
               if (typeofchild.same(_sub)) {
@@ -960,14 +959,14 @@ export class TypeDominanceDAG {
             }
             assert(match,
               `Verify: _sub constraint is not satisfied:
-              ${node.id} of ${resolved_types.get(node.id)!.str()} --> ${child} of ${resolved_types.get(child)!.str()}.
+              ${node.id} of ${resolutions.get(node.id)!.str()} --> ${child} of ${resolutions.get(child)!.str()}.
               Maybe you forget to add a _sub constraint in constraint.ts: TypeDominanceDAG: verify.`);
           }
           else if (this._super.has(`${node.id} ${child}`)) {
-            const supertypes = resolved_types.get(node.id)!.supers();
-            let typeofchild = resolved_types.get(child)!;
+            const supers = resolutions.get(node.id)!.supers();
+            let typeofchild = resolutions.get(child)!;
             let match = false;
-            for (let _sub of supertypes) {
+            for (let _sub of supers) {
               if (typeofchild.same(_sub)) {
                 match = true;
                 break;
@@ -975,12 +974,12 @@ export class TypeDominanceDAG {
             }
             assert(match,
               `Verify: _super constraint is not satisfied:
-              ${node.id} of ${resolved_types.get(node.id)!.str()} --> ${child} of ${resolved_types.get(child)!.str()}.
+              ${node.id} of ${resolutions.get(node.id)!.str()} --> ${child} of ${resolutions.get(child)!.str()}.
               Maybe you forget to add a _super constraint in constraint.ts: TypeDominanceDAG: verify.`);
           }
           else {
-            assert(resolved_types.get(node.id)!.same(resolved_types.get(child)!),
-              `Verify: strong type constraint is not satisfied: ${node.id} of ${resolved_types.get(node.id)!.str()} --> ${child} of ${resolved_types.get(child)!.str()}`);
+            assert(resolutions.get(node.id)!.same(resolutions.get(child)!),
+              `Verify: strong type constraint is not satisfied: ${node.id} of ${resolutions.get(node.id)!.str()} --> ${child} of ${resolutions.get(child)!.str()}`);
           }
         }
       }

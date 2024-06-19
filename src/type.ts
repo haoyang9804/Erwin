@@ -17,13 +17,13 @@ export enum TypeKind {
 
 export function upperType(t1 : Type, t2 : Type) {
   assert(t1.kind === t2.kind, `upperType: t1.kind !== t2.kind`);
-  assert(t1.issubof(t2) || t2.issubof(t1), `upperType: t1 is not subtypeof t2 and t2 is not subtypeof t1`);
+  assert(t1.issubof(t2) || t2.issubof(t1), `upperType: t1 is not subof t2 and t2 is not subof t1`);
   return t1.issubof(t2) ? t2 : t1;
 }
 
 export function lowerType(t1 : Type, t2 : Type) {
   assert(t1.kind === t2.kind, `upperType: t1.kind !== t2.kind`);
-  assert(t1.issubof(t2) || t2.issubof(t1), `upperType: t1 is not subtypeof t2 and t2 is not subtypeof t1`);
+  assert(t1.issubof(t2) || t2.issubof(t1), `upperType: t1 is not subof t2 and t2 is not subof t1`);
   return t1.issuperof(t2) ? t2 : t1;
 }
 
