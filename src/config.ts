@@ -1,5 +1,5 @@
 export const config = {
-  expression_complex_level: 1,
+  expression_complex_level: 3,
   debug: false,
   tuple_prob: 0.3,
   var_count: 5,
