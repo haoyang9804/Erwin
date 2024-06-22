@@ -21,6 +21,7 @@ export class IRLiteral extends IRExpression {
   type : Type | undefined;
   kind : LiteralKind | undefined;
   value : string | undefined;
+  str : string | undefined;
   mustBeNegaitive : boolean = false;
   mustHaveIntTypeConversion : boolean = false;
   constructor(id : number, scope : number, field_flag : FieldFlag, value ?: string,
@@ -57,7 +58,8 @@ export class IRLiteral extends IRExpression {
             bits = parseInt(typename.slice(4));
           }
           else {
-            assert(typename.startsWith("int"), `IRLiteral: typename ${typename} is not supported`);
+            if (config.debug)
+              assert(typename.startsWith("int"), `IRLiteral: typename ${typename} is not supported`);
             bits = parseInt(typename.slice(3));
           }
           if (typename === "int256" || typename === "int128" || typename === "int64" ||
@@ -126,13 +128,15 @@ export class IRLiteral extends IRExpression {
     }
   }
   lower() : Expression {
-    assert(this.type !== undefined, "IRLiteral: type is not generated");
-    assert(this.type.kind === TypeKind.ElementaryType, "IRLiteral: type is not ElementaryType")
+    if (config.debug) {
+      assert(this.type !== undefined, "IRLiteral: type is not generated");
+      assert(this.type.kind === TypeKind.ElementaryType, "IRLiteral: type is not ElementaryType")
+    }
     this.generateKind();
     if (this.value === undefined) this.generateVal();
     const value = this.value!;
-    this.value = undefined;
-    if (this.type.str() === "address payable") {
+    if (!config.unit_test_mode) this.value = undefined;
+    if (this.type!.str() === "address payable") {
       return factory.makeFunctionCall("", FunctionCallKind.TypeConversion,
         factory.makeElementaryTypeNameExpression("", factory.makeElementaryTypeName("", "address", "payable")),
         [factory.makeLiteral("", this.kind!, str2hex(value!), value!)]);
@@ -160,9 +164,11 @@ export class IRIdentifier extends IRExpression {
     return this;
   }
   lower() : Expression {
-    assert(this.name !== undefined, "IRIdentifier: name is not generated");
-    assert(this.reference !== undefined, "IRIdentifier: reference is not generated");
-    return factory.makeIdentifier("", this.name, this.reference);
+    if (config.debug) {
+      assert(this.name !== undefined, "IRIdentifier: name is not generated");
+      assert(this.reference !== undefined, "IRIdentifier: reference is not generated");
+    }
+    return factory.makeIdentifier("", this.name!, this.reference!);
   }
 }
 
@@ -189,14 +195,18 @@ export class IRBinaryOp extends IRExpression {
     super(id, scope, field_flag);
     this.left = left;
     this.right = right;
-    if (operator !== undefined) {
-      assert(["+", "-", "*", "/", "%", "<<", ">>", "<", ">", "<=", ">=", "==", "!=", "&", "^", "|", "&&", "||"].includes(operator), `IRBinaryOp: operator ${operator} is not supported`)
+    if (config.debug) {
+      if (operator !== undefined) {
+        assert(["+", "-", "*", "/", "%", "<<", ">>", "<", ">", "<=", ">=", "==", "!=", "&", "^", "|", "&&", "||"].includes(operator),
+          `IRBinaryOp: operator ${operator} is not supported`)
+      }
     }
     this.operator = operator;
   }
   lower() : Expression {
-    assert(this.operator !== undefined, "IRBinaryOp: operator is not generated")
-    return factory.makeBinaryOperation("", this.operator, this.left.lower() as Expression, this.right.lower() as Expression);
+    if (config.debug)
+      assert(this.operator !== undefined, "IRBinaryOp: operator is not generated")
+    return factory.makeBinaryOperation("", this.operator!, this.left.lower() as Expression, this.right.lower() as Expression);
   }
 }
 
@@ -210,8 +220,10 @@ export class IRUnaryOp extends IRExpression {
     super(id, scope, field_flag);
     this.prefix = prefix;
     this.expression = expression;
-    if (operator !== undefined) {
-      assert(["!", "-", "~", "++", "--", "delete"].includes(operator), `IRUnaryOp: operator ${operator} is not supported`)
+    if (config.debug) {
+      if (operator !== undefined) {
+        assert(["!", "-", "~", "++", "--", "delete"].includes(operator), `IRUnaryOp: operator ${operator} is not supported`)
+      }
     }
     this.operator = operator;
     this.useFunction = useFunction;
@@ -220,7 +232,8 @@ export class IRUnaryOp extends IRExpression {
     }
   }
   lower() : Expression {
-    assert(this.operator !== undefined, "IRUnaryOp: operator is not generated")
+    if (config.debug)
+      assert(this.operator !== undefined, "IRUnaryOp: operator is not generated")
     return factory.makeUnaryOperation("", this.prefix, this.operator, this.expression.lower() as Expression);
   }
 }

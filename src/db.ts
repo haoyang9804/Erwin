@@ -1,7 +1,9 @@
 import * as sqlite from 'sqlite';
-import * as sqlite3 from 'sqlite3'
+import * as sqlite3 from 'sqlite3';
+import { Tree } from './dataStructor';
 
-export class DB {
+// Deprecated Database
+export class DeprecatedDB {
   db : sqlite.Database;
   constructor(filename : string = ":memory:") {
     const config = {
@@ -36,6 +38,44 @@ export class DB {
   async insert(id : number, scope : number, kind : string) {
     const cmd = `INSERT INTO tbl (id, scope, kind) VALUES (${id}, ${scope}, "${kind}")`;
     await this.run(cmd);
+  }
+}
+
+export class DB {
+  private scope_set : Tree<number>;
+  private scope2IRNodesID : Map<number, number[]>;
+  constructor() {
+    this.scope_set = new Tree();
+    this.scope2IRNodesID = new Map<number, number[]>();
+  }
+  init() {
+    this.scope_set = new Tree();
+    this.scope2IRNodesID = new Map<number, number[]>();
+  }
+  new_scope(cur_scope : number, parent_scope : number) : void {
+    this.scope_set.insert(parent_scope, cur_scope);
+  }
+  insert(id : number, scope : number) : void {
+    if (this.scope2IRNodesID.has(scope)) {
+      this.scope2IRNodesID.set(scope, this.scope2IRNodesID.get(scope)!.concat(id));
+    }
+    else {
+      this.scope2IRNodesID.set(scope, [id]);
+    }
+  }
+  get_IRNodes_by_scope(scope : number) : number[] {
+    let irnodes_ids : number[] = [];
+    while (true) {
+      if (this.scope2IRNodesID.has(scope))
+        irnodes_ids = irnodes_ids.concat(this.scope2IRNodesID.get(scope)!);
+      if (this.scope_set.hasParent(scope)) {
+        scope = this.scope_set.getParent(scope);
+      }
+      else {
+        break;
+      }
+    }
+    return irnodes_ids;
   }
 }
 

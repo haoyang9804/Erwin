@@ -1,4 +1,4 @@
-import { ElementaryType } from "../src/type"
+import { TypeProvider } from "../src/type"
 import { IREventDefinition, IRVariableDeclare, IRFunctionDefinition } from "../src/declare";
 import { IRIdentifier, IRFunctionCall } from "../src/expression";
 import { IRTryCatchClause, IRTry, IREmitStatement } from "../src/statement";
@@ -12,7 +12,8 @@ import {
   FunctionVisibility,
   FunctionStateMutability
 } from "solc-typed-ast"
-
+import { config } from '../src/config';
+config.unit_test_mode = true;
 const formatter = new PrettyFormatter(2, 0);
 const writer = new ASTWriter(
     DefaultASTWriterMapping,
@@ -23,10 +24,10 @@ const writer = new ASTWriter(
 test("test try catch",
 () => {
   const variable1 = new IRVariableDeclare(0, 0, 0, "x")
-  variable1.type = new ElementaryType("uint256", "nonpayable");
+  variable1.type = TypeProvider.uint256();
   const event = new IREventDefinition(1, 0, 0, "E", false, [variable1]);
   const variable2 = new IRVariableDeclare(3, 0, 0, "y");
-  variable2.type = variable1.type.copy();
+  variable2.type = TypeProvider.uint256();
   const variable2_id = new IRIdentifier(4, 0, 0, variable2.name, variable2.id);
   const event_id = new IRIdentifier(5, 0, 0, event.name, event.id);
   const emit = new IREmitStatement(6, 0, 0, event_id, [variable2_id]);
