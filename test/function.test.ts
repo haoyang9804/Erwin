@@ -25,11 +25,11 @@ const writer = new ASTWriter(
 const variable1 = new IRVariableDeclare(0, 0, 0, "x");
 variable1.type = TypeProvider.uint256();
 const variable2 = new IRVariableDeclare(1, 0, 0, "y");
-variable2.type = TypeProvider.int256();
+variable2.type = TypeProvider.uint256();
 const literal1 = new IRLiteral(2, 0, 0);
 literal1.type = TypeProvider.uint256();
 const literal2 = new IRLiteral(3, 0, 0);
-literal2.type = TypeProvider.int256();
+literal2.type = TypeProvider.uint256();
 const tuple = new IRTuple(5, 0, 0, [literal1, literal2]);
 const variable_declare_stmt = new IRVariableDeclareStatement(4, 0, 0, [variable1, variable2], tuple);
 
@@ -69,7 +69,7 @@ true, true, [v2], [v3], [variable_declare_stmt], [{name: "M", arg_names: ["x"]}]
 
 test("test function 1",
 () => {
-  expect(writer.write(f_correct.lower())).toBe("function F(uint256 y) virtual override private view M(x) returns (uint256 z) {\n  (uint256 x, uint128 y) = (" + literal1.value + ", " + literal2.value + ");\n}")
+  expect(writer.write(f_correct.lower())).toBe("function F(uint256 y) virtual override private view M(x) returns (uint256 z) {\n  (uint256 x, uint256 y) = (" + literal1.value + ", " + literal2.value + ");\n}")
 }
 )
 

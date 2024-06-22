@@ -21,7 +21,6 @@ test("test do while",
 () => {
   const v1 = new IRVariableDeclare(0, 0, 0, "x")
   v1.type = TypeProvider.uint256();
-  const v1id = new IRIdentifier(3, 0, 0).from(v1);
   const v2id = new IRIdentifier(5, 0, 0).from(v1);
   const l2 = new IRLiteral(6, 0, 0, "100");
   l2.type = TypeProvider.uint256();

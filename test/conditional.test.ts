@@ -34,7 +34,5 @@ test("test conditional",
   );
   const variable3 = new IRVariableDeclare(8, 0, 0, "z");
   variable3.type = TypeProvider.payable_address();
-  const v3id = new IRIdentifier(9, 0, 0).from(variable3);
-  const cond2 = new IRConditional(10, 0, 0, op, op2, v3id);
 }
 )

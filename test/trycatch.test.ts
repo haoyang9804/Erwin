@@ -1,5 +1,5 @@
 import { TypeProvider } from "../src/type"
-import { IREventDefinition, IRVariableDeclare, IRFunctionDefinition } from "../src/declare";
+import { IREventDefinition, IRVariableDeclare } from "../src/declare";
 import { IRIdentifier, IRFunctionCall } from "../src/expression";
 import { IRTryCatchClause, IRTry, IREmitStatement } from "../src/statement";
 import {
@@ -8,9 +8,6 @@ import {
   DefaultASTWriterMapping,
   LatestCompilerVersion,
   FunctionCallKind,
-  FunctionKind,
-  FunctionVisibility,
-  FunctionStateMutability
 } from "solc-typed-ast"
 import { config } from '../src/config';
 config.unit_test_mode = true;
@@ -32,7 +29,6 @@ test("test try catch",
   const event_id = new IRIdentifier(5, 0, 0, event.name, event.id);
   const emit = new IREmitStatement(6, 0, 0, event_id, [variable2_id]);
 
-  const function1 = new IRFunctionDefinition(7, 0, 0, "F", FunctionKind.Function, false, false, [], [], [], [], FunctionVisibility.Public, FunctionStateMutability.NonPayable);
   const f_id = new IRIdentifier(8, 0, 0, "F", 7);
   const tc1 = new IRTryCatchClause(10, 0, 0, "", [], [emit]);
   const tc2 = new IRTryCatchClause(11, 0, 0, "", [], [emit]);

@@ -23,7 +23,6 @@ export function includes<T>(arr : DominanceNode<T>[], item : DominanceNode<T>) :
   return false;
 }
 
-
 export function isSuperSet<T>(set : DominanceNode<T>[], subset : DominanceNode<T>[]) : boolean {
   for (const element of subset) {
     if (!includes(set, element)) {

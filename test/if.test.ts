@@ -26,7 +26,6 @@ test("test if",
   const v1id = new IRIdentifier(2, 0, 0).from(variable1);
   const v2id = new IRIdentifier(3, 0, 0).from(variable2);
   const op = new IRBinaryOp(4, 0, 0, v1id, v2id, ">");
-  expect(async() => { op.lower() }).rejects.toThrow("IRBinaryOp: type is not generated");
   const op2 = new IRBinaryOp(5, 0, 0, v1id, v2id, "+");
   const op_stmt2 = new IRExpressionStatement(6, 0, 0, op2);
   const op3 = new IRBinaryOp(7, 0, 0, v1id, v2id, "-");

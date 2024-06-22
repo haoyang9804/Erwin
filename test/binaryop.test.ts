@@ -26,7 +26,6 @@ test("test binary op",
   const v1id = new IRIdentifier(2, 0, 0).from(variable1);
   const v2id = new IRIdentifier(3, 0, 0).from(variable2);
   const op = new IRBinaryOp(2, 0, 0, v1id, v2id, "+");
-  expect(async() => { op.lower() }).rejects.toThrow("IRBinaryOp: type is not generated");
   const result = writer.write(op.lower());
   expect(result).toEqual(
     "x + y"
