@@ -1,4 +1,4 @@
-import { ElementaryType } from "../src/type"
+import { TypeProvider } from "../src/type"
 import { IRStructDefinition, IRVariableDeclare } from "../src/declare";
 import {
   PrettyFormatter,
@@ -6,7 +6,8 @@ import {
   DefaultASTWriterMapping,
   LatestCompilerVersion,
 } from "solc-typed-ast"
-
+import { config } from '../src/config';
+config.unit_test_mode = true;
 const formatter = new PrettyFormatter(2, 0);
 const writer = new ASTWriter(
     DefaultASTWriterMapping,
@@ -17,7 +18,7 @@ const writer = new ASTWriter(
 test("test struct",
 () => {
   const variable1 = new IRVariableDeclare(0, 0, 0, "x")
-  variable1.type = new ElementaryType("uint256", "nonpayable");
+  variable1.type = TypeProvider.uint256();
   const error = new IRStructDefinition(1, 0, 0, "S", [variable1]);
   const result = writer.write(error.lower());
   expect(result).toEqual(

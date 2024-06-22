@@ -254,3 +254,35 @@ function _generateRandomBigInt(max : bigint) : bigint {
   if (rnd >= max) return _generateRandomBigInt(max);
   return rnd;
 }
+
+export function randomInt(min : number, max : number) : number {
+  assert(min <= max, `min ${min} must be less than or equal to max ${max}`);
+  const array : number[] = [];
+  for (let i = min; i <= max; i++) {
+    array.push(i);
+  }
+  return pickRandomElement(array)!;
+}
+
+export function swap(a : any, b : any) {
+  const temp = a;
+  a = b;
+  b = temp;
+  return [a, b];
+}
+
+export function terminate(message ?: string, exitCode = 0) : never {
+  if (message !== undefined) {
+    if (exitCode === 0) {
+      console.log(message);
+    } else {
+      console.error(message);
+    }
+  }
+
+  process.exit(exitCode);
+}
+
+export function error(message : string) : never {
+  terminate(message, 1);
+}

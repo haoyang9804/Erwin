@@ -198,29 +198,83 @@ export class ElementaryType extends Type {
   subs() : Type[] {
     switch (this.name) {
       case "uint256":
-        return [TypeProvider.uint256(), TypeProvider.uint128(), TypeProvider.uint64(), TypeProvider.uint32(), TypeProvider.uint16(), TypeProvider.uint8()];
+        return [
+          TypeProvider.uint256(),
+          TypeProvider.uint128(),
+          TypeProvider.uint64(),
+          TypeProvider.uint32(),
+          TypeProvider.uint16(),
+          TypeProvider.uint8()
+        ].filter(t => uinteger_types.some(tt => tt.same(t)));
       case "uint128":
-        return [TypeProvider.uint128(), TypeProvider.uint64(), TypeProvider.uint32(), TypeProvider.uint16(), TypeProvider.uint8()];
+        return [
+          TypeProvider.uint128(),
+          TypeProvider.uint64(),
+          TypeProvider.uint32(),
+          TypeProvider.uint16(),
+          TypeProvider.uint8()
+        ].filter(t => uinteger_types.some(tt => tt.same(t)));
       case "uint64":
-        return [TypeProvider.uint64(), TypeProvider.uint32(), TypeProvider.uint16(), TypeProvider.uint8()];
+        return [
+          TypeProvider.uint64(),
+          TypeProvider.uint32(),
+          TypeProvider.uint16(),
+          TypeProvider.uint8()
+        ].filter(t => uinteger_types.some(tt => tt.same(t)));
       case "uint32":
-        return [TypeProvider.uint32(), TypeProvider.uint16(), TypeProvider.uint8()];
+        return [
+          TypeProvider.uint32(),
+          TypeProvider.uint16(),
+          TypeProvider.uint8()
+        ].filter(t => uinteger_types.some(tt => tt.same(t)));
       case "uint16":
-        return [TypeProvider.uint16(), TypeProvider.uint8()];
+        return [
+          TypeProvider.uint16(),
+          TypeProvider.uint8()
+        ].filter(t => uinteger_types.some(tt => tt.same(t)));
       case "uint8":
-        return [TypeProvider.uint8()];
+        return [
+          TypeProvider.uint8()
+        ].filter(t => uinteger_types.some(tt => tt.same(t)));
       case "int256":
-        return [TypeProvider.int256(), TypeProvider.int128(), TypeProvider.int64(), TypeProvider.int32(), TypeProvider.int16(), TypeProvider.int8()];
+        return [
+          TypeProvider.int256(),
+          TypeProvider.int128(),
+          TypeProvider.int64(),
+          TypeProvider.int32(),
+          TypeProvider.int16(),
+          TypeProvider.int8()
+        ].filter(t => integer_types.some(tt => tt.same(t)));
       case "int128":
-        return [TypeProvider.int128(), TypeProvider.int64(), TypeProvider.int32(), TypeProvider.int16(), TypeProvider.int8()];
+        return [
+          TypeProvider.int128(),
+          TypeProvider.int64(),
+          TypeProvider.int32(),
+          TypeProvider.int16(),
+          TypeProvider.int8()
+        ].filter(t => integer_types.some(tt => tt.same(t)));
       case "int64":
-        return [TypeProvider.int64(), TypeProvider.int32(), TypeProvider.int16(), TypeProvider.int8()];
+        return [
+          TypeProvider.int64(),
+          TypeProvider.int32(),
+          TypeProvider.int16(),
+          TypeProvider.int8()
+        ].filter(t => integer_types.some(tt => tt.same(t)));
       case "int32":
-        return [TypeProvider.int32(), TypeProvider.int16(), TypeProvider.int8()];
+        return [
+          TypeProvider.int32(),
+          TypeProvider.int16(),
+          TypeProvider.int8()
+        ].filter(t => integer_types.some(tt => tt.same(t)));
       case "int16":
-        return [TypeProvider.int16(), TypeProvider.int8()];
+        return [
+          TypeProvider.int16(),
+          TypeProvider.int8()
+        ].filter(t => integer_types.some(tt => tt.same(t)));
       case "int8":
-        return [TypeProvider.int8()];
+        return [
+          TypeProvider.int8()
+        ].filter(t => integer_types.some(tt => tt.same(t)));
       case "address":
         if (this.stateMutability === "payable") {
           return [TypeProvider.address()];
@@ -247,29 +301,83 @@ export class ElementaryType extends Type {
   supers() : Type[] {
     switch (this.name) {
       case "uint256":
-        return [TypeProvider.uint256()];
+        return [
+          TypeProvider.uint256()
+        ].filter(t => uinteger_types.some(tt => tt.same(t)));
       case "uint128":
-        return [TypeProvider.uint256(), TypeProvider.uint128()];
+        return [
+          TypeProvider.uint256(),
+          TypeProvider.uint128()
+        ].filter(t => uinteger_types.some(tt => tt.same(t)));
       case "uint64":
-        return [TypeProvider.uint256(), TypeProvider.uint128(), TypeProvider.uint64()];
+        return [
+          TypeProvider.uint256(),
+          TypeProvider.uint128(),
+          TypeProvider.uint64()
+        ].filter(t => uinteger_types.some(tt => tt.same(t)));
       case "uint32":
-        return [TypeProvider.uint256(), TypeProvider.uint128(), TypeProvider.uint64(), TypeProvider.uint32()];
+        return [
+          TypeProvider.uint256(),
+          TypeProvider.uint128(),
+          TypeProvider.uint64(),
+          TypeProvider.uint32()
+        ].filter(t => uinteger_types.some(tt => tt.same(t)));
       case "uint16":
-        return [TypeProvider.uint256(), TypeProvider.uint128(), TypeProvider.uint64(), TypeProvider.uint32(), TypeProvider.uint16()];
+        return [
+          TypeProvider.uint256(),
+          TypeProvider.uint128(),
+          TypeProvider.uint64(),
+          TypeProvider.uint32(),
+          TypeProvider.uint16()
+        ].filter(t => uinteger_types.some(tt => tt.same(t)));
       case "uint8":
-        return [TypeProvider.uint256(), TypeProvider.uint128(), TypeProvider.uint64(), TypeProvider.uint32(), TypeProvider.uint16(), TypeProvider.uint8()];
+        return [
+          TypeProvider.uint256(),
+          TypeProvider.uint128(),
+          TypeProvider.uint64(),
+          TypeProvider.uint32(),
+          TypeProvider.uint16(),
+          TypeProvider.uint8()
+        ].filter(t => uinteger_types.some(tt => tt.same(t)));
       case "int256":
-        return [TypeProvider.int256()];
+        return [
+          TypeProvider.int256()
+        ].filter(t => integer_types.some(tt => tt.same(t)));
       case "int128":
-        return [TypeProvider.int256(), TypeProvider.int128()];
+        return [
+          TypeProvider.int256(),
+          TypeProvider.int128()
+        ].filter(t => integer_types.some(tt => tt.same(t)));
       case "int64":
-        return [TypeProvider.int256(), TypeProvider.int128(), TypeProvider.int64()];
+        return [
+          TypeProvider.int256(),
+          TypeProvider.int128(),
+          TypeProvider.int64()
+        ].filter(t => integer_types.some(tt => tt.same(t)));
       case "int32":
-        return [TypeProvider.int256(), TypeProvider.int128(), TypeProvider.int64(), TypeProvider.int32()];
+        return [
+          TypeProvider.int256(),
+          TypeProvider.int128(),
+          TypeProvider.int64(),
+          TypeProvider.int32()
+        ].filter(t => integer_types.some(tt => tt.same(t)));
       case "int16":
-        return [TypeProvider.int256(), TypeProvider.int128(), TypeProvider.int64(), TypeProvider.int32(), TypeProvider.int16()];
+        return [
+          TypeProvider.int256(),
+          TypeProvider.int128(),
+          TypeProvider.int64(),
+          TypeProvider.int32(),
+          TypeProvider.int16()
+        ].filter(t => integer_types.some(tt => tt.same(t)));
       case "int8":
-        return [TypeProvider.int256(), TypeProvider.int128(), TypeProvider.int64(), TypeProvider.int32(), TypeProvider.int16(), TypeProvider.int8()];
+        return [
+          TypeProvider.int256(),
+          TypeProvider.int128(),
+          TypeProvider.int64(),
+          TypeProvider.int32(),
+          TypeProvider.int16(),
+          TypeProvider.int8()
+        ].filter(t => integer_types.some(tt => tt.same(t)));
       case "address":
         if (this.stateMutability === "payable") {
           return [TypeProvider.payable_address(), TypeProvider.address()];
@@ -799,36 +907,5 @@ export function generate_all_array_types() : Type[] {
   });
   return collection;
 }
-
-// export function includesType(arr : Type[], item : Type) : boolean {
-//   for (const element of arr) {
-//     if (element.kind === item.kind && element.same(item)) {
-//       return true;
-//     }
-//   }
-//   return false;
-// }
-
-
-// export function isSuperTypeSet(set : Type[], subset : Type[]) : boolean {
-//   for (const element of subset) {
-//     if (!includesType(set, element)) {
-//       return false;
-//     }
-//   }
-//   return true;
-// }
-
-// export function isEqualTypeSet(s1 : Type[], s2 : Type[]) : boolean {
-//   if (s1.length !== s2.length) {
-//     return false;
-//   }
-//   for (let i = 0; i < s1.length; i++) {
-//     if (!s1[i].same(s2[i])) {
-//       return false;
-//     }
-//   }
-//   return true;
-// }
 
 export const size_of_type = sizeof(elementary_types[0]);

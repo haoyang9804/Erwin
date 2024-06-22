@@ -1,4 +1,4 @@
-import { ElementaryType } from "../src/type"
+import { TypeProvider } from "../src/type"
 import { IRModifier, IRVariableDeclare, IRFunctionDefinition } from "../src/declare";
 import { IRIdentifier, IRBinaryOp, IRLiteral, IRTuple, IRFunctionCall } from "../src/expression";
 import { IRPlaceholderStatement, IRVariableDeclareStatement, IRExpressionStatement } from "../src/statement";
@@ -12,7 +12,8 @@ import {
   FunctionStateMutability,
   FunctionCallKind
 } from "solc-typed-ast"
-
+import { config } from '../src/config';
+config.unit_test_mode = true;
 const formatter = new PrettyFormatter(2, 0);
 const writer = new ASTWriter(
     DefaultASTWriterMapping,
@@ -22,18 +23,18 @@ const writer = new ASTWriter(
 
 
 const variable1 = new IRVariableDeclare(0, 0, 0, "x");
-variable1.type = new ElementaryType("uint256", "nonpayable");
+variable1.type = TypeProvider.uint256();
 const variable2 = new IRVariableDeclare(1, 0, 0, "y");
-variable2.type = new ElementaryType("uint128", "nonpayable");
+variable2.type = TypeProvider.int256();
 const literal1 = new IRLiteral(2, 0, 0);
-literal1.type = new ElementaryType("uint256", "nonpayable");
+literal1.type = TypeProvider.uint256();
 const literal2 = new IRLiteral(3, 0, 0);
-literal2.type = new ElementaryType("uint128", "nonpayable");
+literal2.type = TypeProvider.int256();
 const tuple = new IRTuple(5, 0, 0, [literal1, literal2]);
 const variable_declare_stmt = new IRVariableDeclareStatement(4, 0, 0, [variable1, variable2], tuple);
 
 const v1 = new IRVariableDeclare(1, 0, 0, "x");
-v1.type = new ElementaryType("uint256", "nonpayable");
+v1.type = TypeProvider.uint256();
 const id1 = new IRIdentifier(2,0,0).from(v1);
 const id2 = new IRIdentifier(3,0,0).from(v1);
 const op = new IRBinaryOp(4,0,0,id1,id2,"+");
@@ -56,10 +57,10 @@ test("test modifier 2",
 )
 
 const v2 = new IRVariableDeclare(5, 0, 0, "y");
-v2.type = new ElementaryType("uint256", "nonpayable");
+v2.type = TypeProvider.uint256()
 
 const v3 = new IRVariableDeclare(6, 0, 0, "z");
-v3.type = new ElementaryType("uint256", "nonpayable");
+v3.type = TypeProvider.uint256()
 
 
 
@@ -73,7 +74,7 @@ test("test function 1",
 )
 
 const v4 = new IRVariableDeclare(8, 0, 0, "x");
-v4.type = new ElementaryType("uint256", "nonpayable");
+v4.type = TypeProvider.uint256()
 const id4 = new IRIdentifier(9,0,0).from(v4);
 const f_id = new IRIdentifier(11, 0, 0, f_correct.name, f_correct.id);
 

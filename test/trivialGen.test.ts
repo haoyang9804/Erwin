@@ -13,7 +13,8 @@ import {
   DefaultASTWriterMapping,
   LatestCompilerVersion,
 } from "solc-typed-ast"
-
+import { config } from '../src/config';
+config.unit_test_mode = true;
 const factory = new ASTNodeFactory();
 const formatter = new PrettyFormatter(2, 0);
 const writer = new ASTWriter(

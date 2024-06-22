@@ -210,3 +210,10 @@ export class FuncStatProvider {
   private static m_payable = new Payable();
   private static m_empty = new EmptyStat();
 }
+
+export const all_func_mutability_stats = [
+  FuncStatProvider.pure(),
+  FuncStatProvider.view(),
+  FuncStatProvider.payable(),
+  FuncStatProvider.empty()
+]

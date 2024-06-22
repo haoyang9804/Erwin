@@ -7,7 +7,8 @@ import {
   DefaultASTWriterMapping,
   LatestCompilerVersion,
 } from "solc-typed-ast"
-
+import { config } from '../src/config';
+config.unit_test_mode = true;
 const formatter = new PrettyFormatter(2, 0);
 const writer = new ASTWriter(
     DefaultASTWriterMapping,
@@ -18,6 +19,7 @@ const writer = new ASTWriter(
 test("test indexed access",
 () => {
   const v1 = new IRVariableDeclare(0, 0, 0, "x")
+  //TODO: support ArrayType generation in TypeProvider
   v1.type = new ArrayType(new ElementaryType("uint256", "nonpayable"), 10);
   const v1id = new IRIdentifier(1, 0, 0).from(v1);
   const v1id2 = new IRIdentifier(5, 0, 0).from(v1);

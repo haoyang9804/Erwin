@@ -78,13 +78,16 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   2. If node1 weakly and reversely dominates node2 in solution, then the solution of node2 is a super_dominance of the solution of node1.
   */
   connect(from : number, to : number, rank ?: string) : void {
-    assert(this.dag_nodes.get(from)! !== undefined, `DominanceDAG::connect: node (from) ${from} is not in the DAG`)
-    assert(this.dag_nodes.get(to)! !== undefined, `DominanceDAG::connect: node (to) ${to} is not in the DAG`)
+    if (config.debug) {
+      assert(this.dag_nodes.get(from)! !== undefined, `DominanceDAG::connect: node (from) ${from} is not in the DAG`)
+      assert(this.dag_nodes.get(to)! !== undefined, `DominanceDAG::connect: node (to) ${to} is not in the DAG`)
+    }
     this.dag_nodes.get(to)!.ins.push(from);
     this.dag_nodes.get(from)!.outs.push(to);
     this.dag_nodes.get(to)!.inbound++;
     this.dag_nodes.get(from)!.outbound++;
-    assert(rank === undefined || rank === "sub_dominance" || rank === "super_dominance", `DominanceDAG: rank ${rank} is not supported`)
+    if (config.debug)
+      assert(rank === undefined || rank === "sub_dominance" || rank === "super_dominance", `DominanceDAG: rank ${rank} is not supported`)
     if (rank === "sub_dominance") {
       this.sub_dominance.add(`${from} ${to}`);
     }
@@ -175,18 +178,20 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     }
   }
 
-  removesub_dominance_domination(node : number) : void {
+  remove_removable_sub_dominance(node : number) : void {
     for (const child of this.dag_nodes.get(node)!.outs) {
       const edge = `${node} ${child}`;
-      assert(this.edge2tail.has(edge), `${edge} is not included in this.edge2tail`);
+      if (config.debug)
+        assert(this.edge2tail.has(edge), `${edge} is not included in this.edge2tail`);
       for (const tail of this.edge2tail.get(edge)!) {
         const tail_info = [...this.node2tail.get(node)!].find(t => t.tail_id === tail);
-        assert(tail_info !== undefined, `removesub_dominance_domination: tail_info of tail whose ID is ${tail} is undefined`);
-        if (!tail_info.sub_dominance && this.sub_dominance.has(edge)) {
+        if (config.debug)
+          assert(tail_info !== undefined, `remove_removable_sub_dominance: tail_info of tail whose ID is ${tail} is undefined`);
+        if (!tail_info!.sub_dominance && this.sub_dominance.has(edge)) {
           this.sub_dominance.delete(edge);
         }
       }
-      this.removesub_dominance_domination(child);
+      this.remove_removable_sub_dominance(child);
     }
   }
 
@@ -211,8 +216,10 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         if (!same) {
           let parent_candidates_issuper_dominanceset_of_child_candidates = isSuperSet(parent_solution_candidates, child_solution_candidates);
           let child_candidates_issuper_dominanceset_of_parent_candidates = isSuperSet(child_solution_candidates, parent_solution_candidates);
-          assert(parent_candidates_issuper_dominanceset_of_child_candidates || child_candidates_issuper_dominanceset_of_parent_candidates,
-            `restrict_solution_range: the solution range of ${parent}: ${parent_solution_candidates.map(x => x.str())} is not a superset or subset of the solution range of ${node}: ${child_solution_candidates.map(x => x.str())}`);
+          if (config.debug)
+            assert(parent_candidates_issuper_dominanceset_of_child_candidates || child_candidates_issuper_dominanceset_of_parent_candidates,
+              `restrict_solution_range: the solution range of ${parent}: ${parent_solution_candidates.map(x => x.str())} is not a superset
+            or subset of the solution range of ${node}: ${child_solution_candidates.map(x => x.str())}`);
           if (parent_candidates_issuper_dominanceset_of_child_candidates) {
             this.solution_range.set(parent, child_solution_candidates);
           }
@@ -232,7 +239,11 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         if (isEqualSet(this.solution_range.get(parent)!, this.solution_range.get(node)!)) {
           continue;
         }
-        assert(isSuperSet(this.solution_range.get(parent)!, this.solution_range.get(node)!), `tighten_solution_range_from_a_tail::upwards: the solution range of ${parent}: ${this.solution_range.get(parent)!.map(t => t.str())} is not a superset of the solution range of ${node}: ${this.solution_range.get(node)!.map(t => t.str())}`);
+        if (config.debug)
+          assert(isSuperSet(this.solution_range.get(parent)!, this.solution_range.get(node)!),
+            `tighten_solution_range_from_a_tail::upwards: the solution range of ${parent}:
+        ${this.solution_range.get(parent)!.map(t => t.str())} is not a superset of the solution
+        range of ${node}: ${this.solution_range.get(node)!.map(t => t.str())}`);
         this.solution_range.set(parent, this.solution_range.get(node)!);
         upwards(parent);
         downwards(parent);
@@ -271,7 +282,11 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         if (isEqualSet(this.solution_range.get(parent)!, this.solution_range.get(node)!)) {
           continue;
         }
-        assert(isSuperSet(this.solution_range.get(parent)!, this.solution_range.get(node)!), `tighten_solution_range_from_a_head::upwards: the solution range of ${parent}: ${this.solution_range.get(parent)!.map(t => t.str())} is not a superset of the solution range of ${node}: ${this.solution_range.get(node)!.map(t => t.str())}`);
+        if (config.debug)
+          assert(isSuperSet(this.solution_range.get(parent)!, this.solution_range.get(node)!),
+            `tighten_solution_range_from_a_head::upwards: the solution range of ${parent}:
+        ${this.solution_range.get(parent)!.map(t => t.str())} is not a superset of the solution
+        range of ${node}: ${this.solution_range.get(node)!.map(t => t.str())}`);
         this.solution_range.set(parent, this.solution_range.get(node)!);
         upwards(parent);
         downwards(parent);
@@ -286,7 +301,11 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         if (isEqualSet(this.solution_range.get(child)!, this.solution_range.get(node)!)) {
           continue;
         }
-        assert(isSuperSet(this.solution_range.get(child)!, this.solution_range.get(node)!), `tighten_solution_range_from_a_head::downwards: the solution range of ${child}: ${this.solution_range.get(child)!.map(t => t.str())} is not a superset of the solution range of ${node}: ${this.solution_range.get(node)!.map(t => t.str())}`);
+        if (config.debug)
+          assert(isSuperSet(this.solution_range.get(child)!, this.solution_range.get(node)!),
+            `tighten_solution_range_from_a_head::downwards: the solution range of ${child}:
+        ${this.solution_range.get(child)!.map(t => t.str())} is not a superset of the solution
+        range of ${node}: ${this.solution_range.get(node)!.map(t => t.str())}`);
         this.solution_range.set(child, this.solution_range.get(node)!);
         downwards(child);
       }
@@ -306,8 +325,11 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         let child_type_range = this.solution_range.get(child)!;
         let parent_type_range = this.solution_range.get(node)!;
         if (!isEqualSet(child_type_range, parent_type_range)) {
-          assert(isSuperSet(child_type_range, parent_type_range),
-            `tighten_solution_range::broadcast_the_tightest_type_range_downwards: the solution range of ${child}: ${child_type_range.map(t => t.str())} is not a superset of the solution range of ${node}: ${parent_type_range.map(t => t.str())}`);
+          if (config.debug)
+            assert(isSuperSet(child_type_range, parent_type_range),
+              `tighten_solution_range::broadcast_the_tightest_type_range_downwards: the solution
+              range of ${child}: ${child_type_range.map(t => t.str())} is not a superset of the
+              solution range of ${node}: ${parent_type_range.map(t => t.str())}`);
           this.solution_range.set(child, parent_type_range);
         }
         broadcast_the_tightest_type_range_downwards(child);
@@ -341,6 +363,14 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   }
 
   allocate_solutions_for_heads_in_chunks() : Generator<Map<number, Node>[]> {
+    if (config.debug) {
+      let mul = 1n;
+      for (let head of this.heads) {
+        console.log(color.cyan(`head is ${head}, and this.solution_range.get(head)!.length is ${this.solution_range.get(head)!.length}`));
+        mul *= BigInt(this.solution_range.get(head)!.length)
+      }
+      console.log(color.cyan(`The size of of type resolution candidate of heads is ${mul}`))
+    }
     for (let head of this.heads) this.solution_range.set(head, shuffle(this.solution_range.get(head)!));
     const head_array = shuffle(Array.from(this.heads));
     let cnt = 0;
@@ -378,7 +408,8 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     for (let head of this.heads) {
       const head_resolution_length = this.head_solution_collection.length;
       if (config.debug) console.log(color.cyan(`head is ${head}, and this.solution_range.get(head)!.length is ${this.solution_range.get(head)!.length}`));
-      assert(this.solution_range.has(head), `allocate_solutions_for_heads: head ${head} is not in this.solution_range`);
+      if (config.debug)
+        assert(this.solution_range.has(head), `allocate_solutions_for_heads: head ${head} is not in this.solution_range`);
       this.head_solution_collection = extendArrayofMap(this.head_solution_collection, this.solution_range.get(head)!.length);
       let cnt = 1;
       for (let solution of this.solution_range.get(head)!) {
@@ -455,6 +486,11 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   }
 
   resolve_tails(tail_solution : Map<number, Node[]>) : boolean {
+    if (tail_solution.size === 0) {
+      if (config.debug)
+        assert(this.tails.size === 0, "DominanceDAG::resolve_tails: tails is not empty when tail_solution is empty");
+      return true;
+    }
     const tails_array = [...this.tails];
     let i4tails_array = 0;
     let i4solutions_of_each_tail = new Array<number>(tails_array.length).fill(0);
@@ -470,7 +506,8 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         // Use previous tail solution to restrict the current tail solution.
         let types_candidate = tail_solution.get(tails_array[i4tails_array])!;
         for (let j = 0; j < i4tails_array; j++) {
-          assert(tailID_to_solution_candidates.has(tails_array[j]), `resolve_tails: tailID_to_solution_candidates does not have ${tails_array[j]}`);
+          if (config.debug)
+            assert(tailID_to_solution_candidates.has(tails_array[j]), `resolve_tails: tailID_to_solution_candidates does not have ${tails_array[j]}`);
           if (this.tailssub.has(`${tails_array[j]} ${tails_array[i4tails_array]}`)) {
             types_candidate = types_candidate.filter(t => t.issubof(tailID_to_solution_candidates.get(tails_array[j])![i4solutions_of_each_tail[i4tails_array]]));
           }
@@ -538,14 +575,21 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
               // mentioned by the 5th step.
               const type_candidate_copy = solution_candidates;
               solution_candidates = solution_candidates.filter(t => this.solution_range.get(child)!.some(tt => t.same(tt)));
-              assert(solution_candidates.length > 0, `resolve_nonheads_and_nontails:>1 solution_candidates is empty when resolving ${child} on edge ${edge}. solution_candidates before and after set intersection is ${type_candidate_copy.map(t => t.str())} and ${this.solution_range.get(child)!.map(t => t.str())}`);
+              if (config.debug)
+                assert(solution_candidates.length > 0,
+                  `resolve_nonheads_and_nontails:>1 solution_candidates is empty when resolving ${child} on edge ${edge}.
+                  solution_candidates before and after set intersection is ${type_candidate_copy.map(t => t.str())} and
+                  ${this.solution_range.get(child)!.map(t => t.str())}`);
               this.solutions.set(child, pickRandomElement(solution_candidates)! as Node);
             }
             else if (tail_info!.super_dominance) {
               throw new Error(`resolve_nonheads_and_nontails: ${node} should not be the super_dominance of ${child}`);
             }
             else {
-              assert(this.solutions.get(tail_id)!.issubof(this.solutions.get(node)!), `resolve_nonheads_and_nontails: the type of ${node}: ${this.solutions.get(node)!.str()} is not the super_dominance of the type of ${tail_id}: ${this.solutions.get(tail_id)!.str()}`);
+              if (config.debug)
+                assert(this.solutions.get(tail_id)!.issubof(this.solutions.get(node)!),
+                  `resolve_nonheads_and_nontails: the type of ${node}: ${this.solutions.get(node)!.str()} is not the
+                super_dominance of the type of ${tail_id}: ${this.solutions.get(tail_id)!.str()}`);
               this.solutions.set(child, this.solutions.get(tail_id)!);
             }
           }
@@ -558,7 +602,8 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
             if (this.solutions.has(child)) {
               solution_candidates = solution_candidates.filter(t => t.same(this.solutions.get(child)!));
             }
-            assert(solution_candidates.length > 0, `resolve_nonheads_and_nontails:>3 solution_candidates is empty`);
+            if (config.debug)
+              assert(solution_candidates.length > 0, `resolve_nonheads_and_nontails:>3 solution_candidates is empty`);
             this.solutions.set(child, pickRandomElement(solution_candidates)!);
           }
         }
@@ -569,16 +614,22 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
 
   check_solution_range_after_tightening(node : number) : void {
     for (let child of this.dag_nodes.get(node)!.outs) {
-      assert(isEqualSet(this.solution_range.get(node)!, this.solution_range.get(child)!),
-        `check_solution_range_after_tightening: the solution range of ${node}: ${this.solution_range.get(node)!.map(t => t.str())} is not the same as the solution range of ${child}: ${this.solution_range.get(child)!.map(t => t.str())}`);
+      if (config.debug)
+        assert(isEqualSet(this.solution_range.get(node)!, this.solution_range.get(child)!),
+          `check_solution_range_after_tightening: the solution range of ${node}:
+          ${this.solution_range.get(node)!.map(t => t.str())} is not the same as the solution
+          range of ${child}: ${this.solution_range.get(child)!.map(t => t.str())}`);
       this.check_solution_range_after_tightening(child);
     }
   }
 
   check_solution_range_before_tightening(node : number) : void {
     for (let child of this.dag_nodes.get(node)!.outs) {
-      assert(isSuperSet(this.solution_range.get(child)!, this.solution_range.get(node)!),
-        `check_solution_range_before_tightening: the solution range of ${child}: ${this.solution_range.get(child)!.map(t => t.str())} is not the superset of the solution range of ${node}: ${this.solution_range.get(node)!.map(t => t.str())}`);
+      if (config.debug)
+        assert(isSuperSet(this.solution_range.get(child)!, this.solution_range.get(node)!),
+          `check_solution_range_before_tightening: the solution range of ${child}:
+          ${this.solution_range.get(child)!.map(t => t.str())} is not the superset of the solution
+          range of ${node}: ${this.solution_range.get(node)!.map(t => t.str())}`);
       this.check_solution_range_before_tightening(child);
     }
   }
@@ -594,6 +645,12 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     for (let tail of this.tails) {
       this.dfs4node2tail(tail, tail, false, false);
     }
+    if (config.debug) {
+      console.log(color.green("===node2tail==="));
+      for (const [node, tails] of this.node2tail) {
+        console.log(color.green(`${node} -> ${[...tails].map(t => [t.tail_id, t.sub_dominance, t.super_dominance])}`))
+      }
+    }
     // !3. Map edges to their reachable this.tails
     for (let tail of this.tails) {
       this.dfs4edge2tail(tail, tail);
@@ -603,7 +660,13 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     // is removable since the solution of node 6 must be the same as the solution of node 1, and edge (6, 7)
     // can reach tail 1.
     for (let head of this.heads) {
-      this.removesub_dominance_domination(head);
+      this.remove_removable_sub_dominance(head);
+    }
+    if (config.debug) {
+      console.log(color.magenta("==sub_dominance after remove_removable_sub_dominance=="));
+      for (const edge of this.sub_dominance) {
+        console.log(color.magenta(edge));
+      }
     }
     // !4.5 Check before solution range tightening
     for (let head of this.heads) {
@@ -611,11 +674,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     }
     // !5. Tighten the solution range for each node
     this.tighten_solution_range();
-    if (config.debug) {
-      for (let [id, _] of this.dag_nodes) {
-        console.log(color.redBG(`${id}'s solution range: ${this.solution_range.get(id)!.map(t => t.str())}`));
-      }
-    }
     // !5.5 Check after solution range tightening
     for (let head of this.heads) {
       this.check_solution_range_after_tightening(head);
@@ -632,7 +690,8 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         // Then check if there exists one tail whose solution candidates are empty.
         // If all this.tails have non-empty solution candidates, then resolve the types of this.tails.
         for (const tail of this.tails) {
-          assert(tail_solution.has(tail), `tail2type does not have ${tail}`);
+          if (config.debug)
+            assert(tail_solution.has(tail), `tail2type does not have ${tail}`);
           if (tail_solution.get(tail)!.length === 0) {
             good_resolve = false;
             break;
@@ -716,7 +775,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     // is removable since the solution of node 6 must be the same as the solution of node 1, and edge (6, 7)
     // can reach tail 1.
     for (let head of this.heads) {
-      this.removesub_dominance_domination(head);
+      this.remove_removable_sub_dominance(head);
     }
     // !4.5 Check before solution range tightening
     for (let head of this.heads) {
@@ -724,11 +783,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     }
     // !5. Tighten the solution range for each node
     this.tighten_solution_range();
-    if (config.debug) {
-      for (let [id, _] of this.dag_nodes) {
-        console.log(color.redBG(`${id}'s solution range: ${this.solution_range.get(id)!.map(t => t.str())}`));
-      }
-    }
     // !5.5 Check after solution range tightening
     for (let head of this.heads) {
       this.check_solution_range_after_tightening(head);
@@ -759,7 +813,8 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       // Then check if there exists one tail whose solution candidates are empty.
       // If all this.tails have non-empty solution candidates, then resolve the types of this.tails.
       for (const tail of this.tails) {
-        assert(tail_solution.has(tail), `tail2type does not have ${tail}`);
+        if (config.debug)
+          assert(tail_solution.has(tail), `tail2type does not have ${tail}`);
         if (tail_solution.get(tail)!.length === 0) {
           good_resolve = false;
           break;
@@ -842,7 +897,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     // is removable since the solution to node 6 must be the same as the solution to node 1, and edge (6, 7)
     // can reach tail 1.
     for (let head of this.heads) {
-      this.removesub_dominance_domination(head);
+      this.remove_removable_sub_dominance(head);
     }
     // !5. Restrict the solution range of heads.
     // Consider the following scenario.
@@ -868,7 +923,8 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       // Then check if there exists one tail whose solution candidates are empty.
       // If all this.tails have non-empty solution candidates, then resolve the types of this.tails.
       for (const tail of this.tails) {
-        assert(tail_solution.has(tail), `tail2type does not have ${tail}`);
+        if (config.debug)
+          assert(tail_solution.has(tail), `tail2type does not have ${tail}`);
         if (tail_solution.get(tail)!.length === 0) {
           good_resolve = false;
           break;
@@ -999,11 +1055,11 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       if (visited.has(node)) {
         if (pre_gnode !== undefined) {
           if (super_dominance) {
-            const edge = new dot.Edge([pre_gnode, visited.get(node)!], { [dot.attribute.label]: "is sub_dominance of" });
+            const edge = new dot.Edge([pre_gnode, visited.get(node)!], { [dot.attribute.label]: "is sub of" });
             G.addEdge(edge);
           }
           else if (sub_dominance) {
-            const edge = new dot.Edge([pre_gnode, visited.get(node)!], { [dot.attribute.label]: 'is super_dominance of' });
+            const edge = new dot.Edge([pre_gnode, visited.get(node)!], { [dot.attribute.label]: 'is super of' });
             G.addEdge(edge);
           }
           else {
@@ -1020,11 +1076,11 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       visited.set(node, gnode);
       if (pre_gnode !== undefined) {
         if (sub_dominance) {
-          const edge = new dot.Edge([pre_gnode, gnode], { [dot.attribute.label]: 'is super_dominance of' });
+          const edge = new dot.Edge([pre_gnode, gnode], { [dot.attribute.label]: 'is super of' });
           G.addEdge(edge);
         }
         else if (super_dominance) {
-          const edge = new dot.Edge([pre_gnode, visited.get(node)!], { [dot.attribute.label]: "is sub_dominance of" });
+          const edge = new dot.Edge([pre_gnode, visited.get(node)!], { [dot.attribute.label]: "is sub of" });
           G.addEdge(edge);
         }
         else {
@@ -1046,4 +1102,4 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
 }
 
 export class TypeDominanceDAG extends DominanceDAG<TypeKind, Type> { }
-export class StateMutabilityDominanceDAG extends DominanceDAG<FunctionStateMutability, FuncStat> { }
+export class FuncStateMutabilityDominanceDAG extends DominanceDAG<FunctionStateMutability, FuncStat> { }
