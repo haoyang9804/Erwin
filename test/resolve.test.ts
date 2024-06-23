@@ -23,3 +23,32 @@ test("test type dominance dag 1",
   type_dag.verify();
 }
 )
+
+test("test type dominance dag 2",
+  () => {
+    const type_dag = new TypeDominanceDAG();
+    type_dag.insert(type_dag.newNode(1));
+    type_dag.insert(type_dag.newNode(2));
+    type_dag.insert(type_dag.newNode(3));
+    type_dag.insert(type_dag.newNode(4));
+    type_dag.insert(type_dag.newNode(5));
+    type_dag.insert(type_dag.newNode(6));
+    type_dag.insert(type_dag.newNode(7));
+    type_dag.solution_range.set(1, all_integer_types);
+    type_dag.solution_range.set(2, all_integer_types);
+    type_dag.solution_range.set(3, all_integer_types);
+    type_dag.solution_range.set(4, all_integer_types);
+    type_dag.solution_range.set(5, all_integer_types);
+    type_dag.solution_range.set(6, all_integer_types);
+    type_dag.solution_range.set(7, all_integer_types);
+    type_dag.connect(1, 2, "sub_dominance");
+    type_dag.connect(2, 3);
+    type_dag.connect(3, 4);
+    type_dag.connect(3, 7, "sub_dominance");
+    type_dag.connect(1, 5);
+    type_dag.connect(5, 6, "sub_dominance");
+    type_dag.connect(6, 4);
+    type_dag.resolve_by_chunk();
+    type_dag.verify();
+  }
+  )

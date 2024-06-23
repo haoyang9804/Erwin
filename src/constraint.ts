@@ -91,7 +91,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     if (rank === "sub_dominance") {
       this.sub_dominance.add(`${from} ${to}`);
     }
-    // haoyang
     if (rank === "super_dominance") {
       this.super_dominance.add(`${from} ${to}`);
     }
@@ -232,7 +231,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   tighten_solution_range_from_a_tail(tail : number) {
     let upwards = (node : number) : void => {
       if (this.dag_nodes.get(node)!.ins.length === 0) {
-        if (this.dag_nodes.get(node)!.outs.length === 0)
+        if (this.dag_nodes.get(node)!.outs.length !== 0)
           downwards(node);
         return;
       }
@@ -252,7 +251,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     }
     let downwards = (node : number) : void => {
       if (this.dag_nodes.get(node)!.outs.length === 0) {
-        if (this.dag_nodes.get(node)!.ins.length === 0)
+        if (this.dag_nodes.get(node)!.ins.length !== 0)
           upwards(node);
         return;
       }
@@ -271,7 +270,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   tighten_solution_range_from_a_head(head : number) {
     let upwards = (node : number) : void => {
       if (this.dag_nodes.get(node)!.ins.length === 0) {
-        if (this.dag_nodes.get(node)!.outs.length === 0)
+        if (this.dag_nodes.get(node)!.outs.length !== 0)
           downwards(node);
         return;
       }
@@ -291,7 +290,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     }
     let downwards = (node : number) : void => {
       if (this.dag_nodes.get(node)!.outs.length === 0) {
-        if (this.dag_nodes.get(node)!.ins.length === 0)
+        if (this.dag_nodes.get(node)!.ins.length !== 0)
           upwards(node);
         return;
       }
@@ -361,7 +360,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         console.log(color.cyan(`head is ${head}, and this.solution_range.get(head)!.length is ${this.solution_range.get(head)!.length}`));
         mul *= BigInt(this.solution_range.get(head)!.length)
       }
-      console.log(color.cyan(`The size of of type resolution candidate of heads is ${mul}`))
+      console.log(color.cyan(`The size of of solution candidate of heads is ${mul}`))
     }
     for (let head of this.heads) this.solution_range.set(head, shuffle(this.solution_range.get(head)!));
     const head_array = shuffle(Array.from(this.heads));
@@ -399,7 +398,8 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     this.head_solution_collection.push(new Map<number, Node>());
     for (let head of this.heads) {
       const head_resolution_length = this.head_solution_collection.length;
-      if (config.debug) console.log(color.cyan(`head is ${head}, and this.solution_range.get(head)!.length is ${this.solution_range.get(head)!.length}`));
+      if (config.debug)
+        console.log(color.cyan(`head is ${head}, and this.solution_range.get(head)!.length is ${this.solution_range.get(head)!.length}`));
       if (config.debug)
         assert(this.solution_range.has(head), `allocate_solutions_for_heads: head ${head} is not in this.solution_range`);
       this.head_solution_collection = extendArrayofMap(this.head_solution_collection, this.solution_range.get(head)!.length);
@@ -554,35 +554,47 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   resolve_nonheads_and_nontails(node : number) : void {
     for (let child of this.dag_nodes.get(node)!.outs) {
       const edge = `${node} ${child}`;
+      let solution_candidates : DominanceNode<T>[] = [];
+      let first = true;
+      /*
+      For each edge from node n1 to node n2, consider all the tails that can be reached from n1 through the edge.
+      Since the solution of the reachable tails have been settled, we can first restrict the solution range of n2
+      based on the solution of the reachable tails and then randomly pick a solution from the restricted solution range.
+      */
       for (const tail_id of this.edge2tail.get(edge)!) {
         if (this.node2tail.has(child)) { // child is not tail
           const tail_info = [...this.node2tail.get(child)!].find(t => t.tail_id === tail_id);
           if (this.sub_dominance.has(edge)) {
             if (tail_info!.sub_dominance) {
-              let solution_candidates = this.solutions.get(node)!.sub_with_lowerbound(this.solutions.get(tail_id)!)!;
-              if (this.solutions.has(child)) {
-                solution_candidates = solution_candidates.filter(t => t.same(this.solutions.get(child)!));
+              const solution_candidates_for_this_tail = this.solutions.get(node)!.sub_with_lowerbound(this.solutions.get(tail_id)!)!;
+              if (first) {
+                solution_candidates = solution_candidates_for_this_tail;
+                first = false;
               }
-              // Deal with the case where the type range of the child is smaller than the type range of the parent
-              // mentioned by the 5th step.
-              const type_candidate_copy = solution_candidates;
-              solution_candidates = solution_candidates.filter(t => this.solution_range.get(child)!.some(tt => t.same(tt)));
-              if (config.debug)
-                assert(solution_candidates.length > 0,
-                  `resolve_nonheads_and_nontails:>1 solution_candidates is empty when resolving ${child} on edge ${edge}.
-                  solution_candidates before and after set intersection is ${type_candidate_copy.map(t => t.str())} and
-                  ${this.solution_range.get(child)!.map(t => t.str())}`);
-              this.solutions.set(child, pickRandomElement(solution_candidates)! as Node);
+              else {
+                solution_candidates = solution_candidates.filter(
+                  t => solution_candidates_for_this_tail.some(tt => t.same(tt))
+                );
+                if (config.debug) {
+                  assert(solution_candidates.length > 0,
+                    `resolve_nonheads_and_nontails case 1: solution_candidates is empty when edge is ${edge}`);
+                }
+              }
             }
             else if (tail_info!.super_dominance) {
               throw new Error(`resolve_nonheads_and_nontails: ${node} should not be the super_dominance of ${child}`);
             }
             else {
-              if (config.debug)
-                assert(this.solutions.get(tail_id)!.issubof(this.solutions.get(node)!),
-                  `resolve_nonheads_and_nontails: the type of ${node}: ${this.solutions.get(node)!.str()} is not the
-                super_dominance of the type of ${tail_id}: ${this.solutions.get(tail_id)!.str()}`);
-              this.solutions.set(child, this.solutions.get(tail_id)!);
+              const solution_for_tail = this.solutions.get(tail_id)!;
+              if (first) {
+                solution_candidates = [solution_for_tail];
+                first = false;
+              }
+              else {
+                solution_candidates = solution_candidates.filter(
+                  t => solution_for_tail.same(t)
+                );
+              }
             }
           }
           else if (this.super_dominance.has(edge)) {
@@ -590,17 +602,30 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
             throw new Error(`resolve_nonheads_and_nontails: ${node} should not be the super_dominance of ${child}`);
           }
           else {
-            let solution_candidates = [this.solutions.get(node)!];
-            if (this.solutions.has(child)) {
-              solution_candidates = solution_candidates.filter(t => t.same(this.solutions.get(child)!));
+            if (first) {
+              solution_candidates = [this.solutions.get(node)!];
+              first = false;
             }
-            if (config.debug)
-              assert(solution_candidates.length > 0, `resolve_nonheads_and_nontails:>3 solution_candidates is empty`);
-            this.solutions.set(child, pickRandomElement(solution_candidates)!);
+            else {
+              solution_candidates = solution_candidates.filter(
+                t => [this.solutions.get(node)!].some(tt => t.same(tt))
+              );
+              if (config.debug) {
+                assert(solution_candidates.length > 0,
+                  `resolve_nonheads_and_nontails case 2: solution_candidates is empty when edge is ${edge}`);
+              }
+            }
           }
         }
       }
-      this.resolve_nonheads_and_nontails(child);
+      if (!this.tails.has(child)) {
+        if (config.debug) {
+          assert(solution_candidates.length > 0,
+            `resolve_nonheads_and_nontails case 3: solution_candidates is empty when edge is ${edge}`);
+        }
+        this.solutions.set(child, pickRandomElement(solution_candidates)! as Node);
+        this.resolve_nonheads_and_nontails(child);
+      }
     }
   }
 
@@ -647,6 +672,12 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     for (let tail of this.tails) {
       this.dfs4edge2tail(tail, tail);
     }
+    if (config.debug) {
+      console.log(color.green("===edge2tail==="));
+      for (const [edge, tails] of this.edge2tail) {
+        console.log(color.green(`${edge} -> ${[...tails]}`))
+      }
+    }
     // !4. Remove some removable sub_dominance dominations using node2tail and edge2tail
     // See the first test case in resolve.test.ts. The sub_dominance domination from node 6 to node 7
     // is removable since the solution of node 6 must be the same as the solution of node 1, and edge (6, 7)
@@ -672,6 +703,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     }
     // !6. Assign types to this.heads
     for (let local_head_resolution_collection of this.allocate_solutions_for_heads_in_chunks()) {
+      this.solutions.clear();
       // !7. Traverse each resolution for heads
       for (const head_resolve of local_head_resolution_collection) {
         this.solutions.clear();
@@ -698,18 +730,21 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         if (!good_resolve) continue;
         // !9. Build connection among tails.
         this.build_tails_relation();
-        // !10. Resolve the types of tails.
+        // !10. Resolve tails.
         const plausible_type_resolution_for_tails = this.resolve_tails(tail_solution);
         if (plausible_type_resolution_for_tails === false) continue;
-        // !11. Check if the resolved types of tails are compatible with the resolved types of heads.
+        // !11. Check if the solutions to tails are compatible with the solutions to heads.
         for (let [head, solution_to_head] of head_resolve) {
           if (this.node2tail.has(head) === false) {
+            // This head is isolated from other nodes.
             this.solutions.set(head, solution_to_head);
             continue;
           }
-          let compatible_with_resolved_tails = true;
-          for (let tail_info of this.node2tail.get(head)!) {
-            if (this.solutions.has(tail_info.tail_id)) {
+          if (config.debug) {
+            let compatible_with_resolved_tails = true;
+            for (let tail_info of this.node2tail.get(head)!) {
+              assert(this.solutions.has(tail_info.tail_id),
+                `resolve: tail ${tail_info.tail_id} is not resolved`);
               if (tail_info.sub_dominance) {
                 if (!solution_to_head.issuperof(this.solutions.get(tail_info.tail_id)!)) {
                   compatible_with_resolved_tails = false;
@@ -729,16 +764,12 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
                 }
               }
             }
+            assert(compatible_with_resolved_tails,
+              `resolve: the solution to head is not compatible with the solutions to tails`);
           }
           // !12. Resolve the types of nonheads and nontails.
-          if (compatible_with_resolved_tails) {
-            this.solutions.set(head, solution_to_head);
-            this.resolve_nonheads_and_nontails(head);
-          }
-          else {
-            good_resolve = false;
-            break;
-          }
+          this.solutions.set(head, solution_to_head);
+          this.resolve_nonheads_and_nontails(head);
         }
         if (good_resolve) {
           this.solutions_collection.push(new Map(this.solutions));
@@ -1032,7 +1063,8 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
           }
           else {
             assert(solutions.get(node.id)!.same(solutions.get(child)!),
-              `Dominance::Verify: strong constraint is not satisfied: ${node.id} of ${solutions.get(node.id)!.str()} --> ${child} of ${solutions.get(child)!.str()}`);
+              `Dominance::Verify: strong constraint is not satisfied: ${node.id} of ${solutions.get(node.id)!.str()} --> ${child} of ${solutions.get(child)!.str()}.
+              Here are solutions to all nodes:\n${[...solutions].sort((a, b) => a[0] - b[0]).map(([id, t]) => `${id}: ${t.str()}`).join("\n")}`);
           }
         }
       }

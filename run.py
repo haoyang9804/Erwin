@@ -1,13 +1,16 @@
 import subprocess
-import time
 
-command = "npx erwin -d -fc 1 -pcf 1 -rcf 0 -bscf 3"
+command = "npx erwin -d -fc 1 -pcf 1 -rcf 0 -bscf 2"
 
 while True:
-    process = subprocess.Popen(command, shell=True)
-    process.wait()  # Wait for the process to finish
-    print(process.returncode)
-    time.sleep(1)
-    # if process.returncode != 0:
-    #     # Command executed successfully
-    #     break
+  p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  stdout, stderr = p.communicate()
+  # if p.returncode != 0 or 'Error: resolve_nonheads_and_nontails: solution_candidates' in stdout.decode('utf-8'):
+  if p.returncode != 0 or 'Error:' in stdout.decode('utf-8'):
+    print('>>> stdout')
+    print(stdout.decode('utf-8'))
+    print('>>> stderr')
+    print(stderr.decode('utf-8'))
+    print('>>> returncode')
+    print(p.returncode)
+    break

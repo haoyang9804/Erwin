@@ -345,7 +345,10 @@ export class AssignmentGenerator extends RValueGenerator {
       right_extracted_expression = right_extracted_expression.components[0];
     }
     assert(type_dag.solution_range.has(right_extracted_expression.id), `irnode2types does not contain ${right_extracted_expression.id}`);
-    const identifier_gen = new IdentifierGenerator(type_dag.solution_range.get(right_extracted_expression.id)!);
+    const identifier_gen =
+      this.op !== "<<=" && this.op !== ">>=" ?
+        new IdentifierGenerator(type_dag.solution_range.get(right_extracted_expression.id)!) :
+        new IdentifierGenerator(type_range);
     identifier_gen.generate(component + 1);
     let left_expression : exp.IRExpression = identifier_gen.irnode as exp.IRExpression;
     this.irnode = new exp.IRAssignment(global_id++, cur_scope.value(), field_flag, left_expression, right_expression, this.op!);
@@ -516,12 +519,7 @@ export class UnaryOpGenerator extends RValueGenerator {
       }
     }
     else if (this.op === "-") {
-      if (isEqualSet(this.type_range, type.elementary_types)) {
-        this.type_range = type_range = type.integer_types;
-      }
-      else {
-        type_range = this.type_range;
-      }
+      this.type_range = type_range = type.integer_types;
     }
     else {
       throw new Error(`UnaryOpGenerator generate: this.op ${this.op} is invalid`);
