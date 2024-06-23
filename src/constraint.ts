@@ -14,7 +14,7 @@ export class ConstaintNode {
   }
 }
 import { assert, createCustomSet, extendArrayofMap, pickRandomElement, shuffle, selectRandomElements } from "./utility";
-import { Type, size_of_type, TypeKind } from "./type"
+import { Type, TypeKind } from "./type"
 import * as dot from 'ts-graphviz';
 import { config } from './config'
 // debug
@@ -58,7 +58,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   edge2tail : Map<string, Set<number>> = new Map<string, Set<number>>();
   // Records solution candidates of all heads
   head_solution_collection : Map<number, Node>[] = [];
-  // If "tail1 tail2" is in tailssub, then the solution of tail2 is a sub_dominance of the solution of tail1.
+  // If "tail1 tail2" is in tailssub, then the solution of tail2 is a sub of the solution of tail1.
   tailssub : Set<string> = new Set<string>();
   // If "tail1 tail2" is in tailssub, then the solution of tail2 equals to the solution of tail1.
   tailsequal : Set<string> = new Set<string>();
@@ -126,71 +126,104 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     }
   }
 
-  dfs4node2tail(id : number, tail_id : number, sub_dominance : boolean, super_dominance : boolean) : void {
-    for (let parent of this.dag_nodes.get(id)!.ins) {
-      const key = `${parent} ${id}`;
-      let thissub_dominance = this.sub_dominance.has(key) || sub_dominance;
-      let thissuper_dominance = this.super_dominance.has(key) || super_dominance;
-      if (this.node2tail.has(parent)) {
-        // presub_dominance = false if there exists a path from the parent to tail with tail_id on which no sub_dominance domination holds.
-        let presub_dominance = true;
-        const pre_tail_info : toTail[] = [];
-        let meet_this_tail_before = false;
-        for (const tail_info of this.node2tail.get(parent)!) {
-          if (tail_info.tail_id === tail_id) {
-            meet_this_tail_before = true;
-            presub_dominance &&= tail_info.sub_dominance;
-            pre_tail_info.push(tail_info);
+  dfs4node2tail() : void {
+    let broadcast_from_tails_upwards = (id : number, tail_id : number, sub_dominance : boolean, super_dominance : boolean) : void => {
+      for (let parent of this.dag_nodes.get(id)!.ins) {
+        const key = `${parent} ${id}`;
+        let thissub_dominance = this.sub_dominance.has(key) || sub_dominance;
+        let thissuper_dominance = this.super_dominance.has(key) || super_dominance;
+        if (this.node2tail.has(parent)) {
+          // presub_dominance = false if there exists a path from the parent to tail with tail_id on which no sub_dominance domination holds.
+          let presub_dominance = true;
+          const pre_tail_info : toTail[] = [];
+          let meet_this_tail_before = false;
+          for (const tail_info of this.node2tail.get(parent)!) {
+            if (tail_info.tail_id === tail_id) {
+              meet_this_tail_before = true;
+              presub_dominance &&= tail_info.sub_dominance;
+              pre_tail_info.push(tail_info);
+            }
           }
-        }
-        if (meet_this_tail_before) {
-          if (presub_dominance === true && thissub_dominance == false) {
-            for (const tail_info of pre_tail_info)
-              this.node2tail.get(parent)!.delete(tail_info);
-            this.node2tail.get(parent)!.add({ tail_id: tail_id, sub_dominance: false, super_dominance: thissuper_dominance });
+          if (meet_this_tail_before) {
+            if (presub_dominance === true && thissub_dominance == false) {
+              for (const tail_info of pre_tail_info)
+                this.node2tail.get(parent)!.delete(tail_info);
+              this.node2tail.get(parent)!.add({ tail_id: tail_id, sub_dominance: false, super_dominance: thissuper_dominance });
+            }
+            thissub_dominance &&= presub_dominance;
           }
-          thissub_dominance &&= presub_dominance;
+          else {
+            this.node2tail.get(parent)!.add({ tail_id: tail_id, sub_dominance: thissub_dominance, super_dominance: thissuper_dominance });
+          }
         }
         else {
-          this.node2tail.get(parent)!.add({ tail_id: tail_id, sub_dominance: thissub_dominance, super_dominance: thissuper_dominance });
+          const s = createCustomSet<toTail>(equal_toTail);
+          s.add({ tail_id: tail_id, sub_dominance: thissub_dominance, super_dominance: thissuper_dominance });
+          this.node2tail.set(parent, s);
         }
+        broadcast_from_tails_upwards(parent, tail_id, thissub_dominance, thissuper_dominance);
       }
-      else {
-        const s = createCustomSet<toTail>(equal_toTail);
-        s.add({ tail_id: tail_id, sub_dominance: thissub_dominance, super_dominance: thissuper_dominance });
-        this.node2tail.set(parent, s);
+    }
+    let broadcast_from_heads_downwards = (id : number) : void => {
+      for (let child of this.dag_nodes.get(id)!.outs) {
+        if (!this.node2tail.has(child)) continue;
+        for (let this_tail_info of this.node2tail.get(id)!) {
+          for (let child_tail_info of this.node2tail.get(child)!) {
+            if (this_tail_info.tail_id === child_tail_info.tail_id
+              && !this_tail_info.sub_dominance && !this_tail_info.super_dominance
+              && child_tail_info.sub_dominance) {
+              child_tail_info.sub_dominance = false;
+            }
+          }
+        }
+        broadcast_from_heads_downwards(child);
       }
-      this.dfs4node2tail(parent, tail_id, thissub_dominance, thissuper_dominance);
+    }
+    for (let tail of this.tails) {
+      broadcast_from_tails_upwards(tail, tail, false, false);
+    }
+    for (let head of this.heads) {
+      broadcast_from_heads_downwards(head);
     }
   }
 
-  dfs4edge2tail(id : number, tail_id : number) : void {
-    for (let parent of this.dag_nodes.get(id)!.ins) {
-      const edge = `${parent} ${id}`;
-      if (this.edge2tail.has(edge)) {
-        this.edge2tail.get(edge)!.add(tail_id);
+  dfs4edge2tail() : void {
+    let broadcast_from_tails_upwards = (id : number, tail_id : number) : void => {
+      for (let parent of this.dag_nodes.get(id)!.ins) {
+        const edge = `${parent} ${id}`;
+        if (this.edge2tail.has(edge)) {
+          this.edge2tail.get(edge)!.add(tail_id);
+        }
+        else {
+          this.edge2tail.set(edge, new Set([tail_id]));
+        }
+        broadcast_from_tails_upwards(parent, tail_id);
       }
-      else {
-        this.edge2tail.set(edge, new Set([tail_id]));
-      }
-      this.dfs4edge2tail(parent, tail_id);
+    }
+    for (let tail of this.tails) {
+      broadcast_from_tails_upwards(tail, tail);
     }
   }
 
-  remove_removable_sub_dominance(node : number) : void {
-    for (const child of this.dag_nodes.get(node)!.outs) {
-      const edge = `${node} ${child}`;
-      if (config.debug)
-        assert(this.edge2tail.has(edge), `${edge} is not included in this.edge2tail`);
-      for (const tail of this.edge2tail.get(edge)!) {
-        const tail_info = [...this.node2tail.get(node)!].find(t => t.tail_id === tail);
+  remove_removable_sub_dominance() : void {
+    let remove_from_heads = (node : number) : void => {
+      for (const child of this.dag_nodes.get(node)!.outs) {
+        const edge = `${node} ${child}`;
         if (config.debug)
-          assert(tail_info !== undefined, `remove_removable_sub_dominance: tail_info of tail whose ID is ${tail} is undefined`);
-        if (!tail_info!.sub_dominance && this.sub_dominance.has(edge)) {
-          this.sub_dominance.delete(edge);
+          assert(this.edge2tail.has(edge), `${edge} is not included in this.edge2tail`);
+        for (const tail of this.edge2tail.get(edge)!) {
+          const tail_info = [...this.node2tail.get(node)!].find(t => t.tail_id === tail);
+          if (config.debug)
+            assert(tail_info !== undefined, `remove_removable_sub_dominance: tail_info of tail whose ID is ${tail} is undefined`);
+          if (!tail_info!.sub_dominance && this.sub_dominance.has(edge)) {
+            this.sub_dominance.delete(edge);
+          }
         }
+        remove_from_heads(child);
       }
-      this.remove_removable_sub_dominance(child);
+    }
+    for (let head of this.heads) {
+      remove_from_heads(head);
     }
   }
 
@@ -456,6 +489,10 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         for (let j = i + 1; j < tail_infos_length; j++) {
           const tail_info1 = tail_infos_array[i];
           const tail_info2 = tail_infos_array[j];
+          if (tail_info1.tail_id === 3 && tail_info2.tail_id === 9
+            || tail_info1.tail_id === 9 && tail_info2.tail_id === 3) {
+            console.log('>>> ', _);
+          }
           if (tail_info1.sub_dominance && (!tail_info2.sub_dominance && !tail_info2.super_dominance)) {
             this.tailssub.add(`${tail_info2.tail_id} ${tail_info1.tail_id}`);
           }
@@ -652,64 +689,76 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   }
 
   resolve_by_chunk() : void {
-    // !0. initialize the resolution
+    // !initialize the resolution
     this.initialize_resolve();
-    // !1. Get heads and tails
+    // !Get heads and tails
     this.get_heads_and_tails();
-    // !2. Map nodes to their tails, recording if there exists a path from the node to tail with tail_id on which sub_dominance/super_dominance domination does not holds.
+    // !Map nodes to their tails, recording if there exists a path from the node to tail with tail_id on which sub_dominance/super_dominance domination does not holds.
     // If there are multiple paths from node to tail, then the sub_dominance does not hold as long as there exists a path on which sub_dominance domination does not hold.
     // tail_ids are not in this.node2tail
-    for (let tail of this.tails) {
-      this.dfs4node2tail(tail, tail, false, false);
-    }
+    this.dfs4node2tail();
+    // !Map edges to their reachable this.tails
+    this.dfs4edge2tail();
+    // !Remove some removable sub_dominance dominations using node2tail and edge2tail
+    this.remove_removable_sub_dominance();
+    // !Re-dfs4node2tail
+    /*
+      Take `type-constraint1.svg` in the folder constraintDAGs for instance.
+      In dfs4node2tail, we first broadcast the tail information upwards. This step lets node 29 be aware of
+      the existence of an dominance path to tail 18 when the node has more than one path connected to
+      the tail.
+      Then we broadcast downwards. This step lets node 36 know that it should not sub-dominate node 40.
+      Otherwise, node 29, which is the ancestor of node 36, cannot dominate node 40.
+      However, after removing removable sub_dominance, node 45 still stubbornly believe it sub-dominates node 33
+      though the sub-dominance from 29 to 42 has been removed.
+    */
+    this.node2tail.clear();
+    this.dfs4node2tail();
     if (config.debug) {
       console.log(color.green("===node2tail==="));
       for (const [node, tails] of this.node2tail) {
         console.log(color.green(`${node} -> ${[...tails].map(t => [t.tail_id, t.sub_dominance, t.super_dominance])}`))
       }
-    }
-    // !3. Map edges to their reachable this.tails
-    for (let tail of this.tails) {
-      this.dfs4edge2tail(tail, tail);
-    }
-    if (config.debug) {
       console.log(color.green("===edge2tail==="));
       for (const [edge, tails] of this.edge2tail) {
         console.log(color.green(`${edge} -> ${[...tails]}`))
       }
-    }
-    // !4. Remove some removable sub_dominance dominations using node2tail and edge2tail
-    // See the first test case in resolve.test.ts. The sub_dominance domination from node 6 to node 7
-    // is removable since the solution of node 6 must be the same as the solution of node 1, and edge (6, 7)
-    // can reach tail 1.
-    for (let head of this.heads) {
-      this.remove_removable_sub_dominance(head);
-    }
-    if (config.debug) {
       console.log(color.magenta("==sub_dominance after remove_removable_sub_dominance=="));
       for (const edge of this.sub_dominance) {
         console.log(color.magenta(edge));
       }
     }
-    // !4.5 Check before solution range tightening
+    // !Check before solution range tightening
     for (let head of this.heads) {
       this.check_solution_range_before_tightening(head);
     }
-    // !5. Tighten the solution range for each node
+    // !Tighten the solution range for each node
     this.tighten_solution_range();
-    // !5.5 Check after solution range tightening
+    // !Check after solution range tightening
     for (let head of this.heads) {
       this.check_solution_range_after_tightening(head);
     }
-    // !6. Assign types to this.heads
+    // !Build connection among tails.
+    this.build_tails_relation();
+    if (config.debug) {
+      console.log(color.green("===tailssub==="));
+      for (const edge of this.tailssub) {
+        console.log(color.green(edge));
+      }
+      console.log(color.red("===tailsequal==="));
+      for (const edge of this.tailsequal) {
+        console.log(color.red(edge));
+      }
+    }
+    // !Assign types to this.heads
     for (let local_head_resolution_collection of this.allocate_solutions_for_heads_in_chunks()) {
       this.solutions.clear();
-      // !7. Traverse each resolution for heads
+      // !Traverse each resolution for heads
       for (const head_resolve of local_head_resolution_collection) {
         this.solutions.clear();
         let good_resolve = true;
         // First, narrow down the solution range of this.tails
-        // !8. Allocate solution candidates for tails based on the current solution to heads
+        // !Allocate solution candidates for tails based on the current solution to heads
         const tail_solution = this.allocate_solutions_for_tails_based_on_solutions_to_heads(head_resolve);
         // Then check if there exists one tail whose solution candidates are empty.
         // If all this.tails have non-empty solution candidates, then resolve the types of this.tails.
@@ -728,12 +777,10 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
           }
         }
         if (!good_resolve) continue;
-        // !9. Build connection among tails.
-        this.build_tails_relation();
-        // !10. Resolve tails.
+        // !Resolve tails.
         const plausible_type_resolution_for_tails = this.resolve_tails(tail_solution);
         if (plausible_type_resolution_for_tails === false) continue;
-        // !11. Check if the solutions to tails are compatible with the solutions to heads.
+        // !Check if the solutions to tails are compatible with the solutions to heads.
         for (let [head, solution_to_head] of head_resolve) {
           if (this.node2tail.has(head) === false) {
             // This head is isolated from other nodes.
@@ -767,245 +814,13 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
             assert(compatible_with_resolved_tails,
               `resolve: the solution to head is not compatible with the solutions to tails`);
           }
-          // !12. Resolve the types of nonheads and nontails.
+          // !Resolve the types of nonheads and nontails.
           this.solutions.set(head, solution_to_head);
           this.resolve_nonheads_and_nontails(head);
         }
         if (good_resolve) {
           this.solutions_collection.push(new Map(this.solutions));
         }
-      }
-    }
-  }
-
-  resolve() : void {
-    // !0. initialize the resolution
-    this.initialize_resolve();
-    // !1. Get heads and tails
-    this.get_heads_and_tails();
-    // !2. Map nodes to their tails, recording if there exists a path from the node to tail with tail_id on which sub_dominance/super_dominance domination does not holds.
-    // If there are multiple paths from node to tail, then the sub_dominance does not hold as long as there exists a path on which sub_dominance domination does not hold.
-    // tail_ids are not in this.node2tail
-    for (let tail of this.tails) {
-      this.dfs4node2tail(tail, tail, false, false);
-    }
-    // !3. Map edges to their reachable this.tails
-    for (let tail of this.tails) {
-      this.dfs4edge2tail(tail, tail);
-    }
-    // !4. Remove some removable sub_dominance dominations using node2tail and edge2tail
-    // See the first test case in resolve.test.ts. The sub_dominance domination from node 6 to node 7
-    // is removable since the solution of node 6 must be the same as the solution of node 1, and edge (6, 7)
-    // can reach tail 1.
-    for (let head of this.heads) {
-      this.remove_removable_sub_dominance(head);
-    }
-    // !4.5 Check before solution range tightening
-    for (let head of this.heads) {
-      this.check_solution_range_before_tightening(head);
-    }
-    // !5. Tighten the solution range for each node
-    this.tighten_solution_range();
-    // !5.5 Check after solution range tightening
-    for (let head of this.heads) {
-      this.check_solution_range_after_tightening(head);
-    }
-    // !6. Assign types to this.heads
-    let size_estimation1 = 1;
-    for (let head of this.heads) {
-      size_estimation1 *= this.solution_range.get(head)!.length;
-    }
-    size_estimation1 *= this.heads.size * size_of_type;
-    let size_estimation2 = config.maximum_type_resolution_for_heads * this.heads.size * size_of_type;
-    if (config.debug) {
-      console.log(color.cyan(`size_estimation1 is ${size_estimation1}, size_estimation2 is ${size_estimation2}`));
-    }
-    if (size_estimation1 < size_estimation2) {
-      this.allocate_solutions_for_heads();
-    }
-    else {
-      this.allocate_solutions_for_heads_with_uplimit();
-    }
-    // !7. Traverse each solution for heads
-    for (const head_resolve of this.head_solution_collection) {
-      this.solutions.clear();
-      let good_resolve = true;
-      // First, narrow down the solution range of this.tails
-      // !8. Allocate solution candidates for tails based on the current solution for heads
-      const tail_solution = this.allocate_solutions_for_tails_based_on_solutions_to_heads(head_resolve);
-      // Then check if there exists one tail whose solution candidates are empty.
-      // If all this.tails have non-empty solution candidates, then resolve the types of this.tails.
-      for (const tail of this.tails) {
-        if (config.debug)
-          assert(tail_solution.has(tail), `tail2type does not have ${tail}`);
-        if (tail_solution.get(tail)!.length === 0) {
-          good_resolve = false;
-          break;
-        }
-        else {
-          // The choice of the solution of the tail is restricted by the indirect connection among this.tails.
-          // If a non-head non-tail node N has two paths two tail T1 and T2 respectively, then the solution of
-          // T1 and T2 have a solution relation.
-          tail_solution.set(tail, shuffle(tail_solution.get(tail)!))
-        }
-      }
-      if (!good_resolve) continue;
-      // !9. Build connection among tails.
-      this.build_tails_relation();
-      // !10. Resolve the types of tails.
-      const plausible_type_resolution_for_tails = this.resolve_tails(tail_solution);
-      if (plausible_type_resolution_for_tails === false) continue;
-      // !11. Check if the resolved types of tails are compatible with the resolved types of heads.
-      for (let [head, solution_to_head] of head_resolve) {
-        if (this.node2tail.has(head) === false) {
-          this.solutions.set(head, solution_to_head);
-          continue;
-        }
-        let compatible_with_resolved_tails = true;
-        for (let tail_info of this.node2tail.get(head)!) {
-          if (this.solutions.has(tail_info.tail_id)) {
-            if (tail_info.sub_dominance) {
-              if (!solution_to_head.issuperof(this.solutions.get(tail_info.tail_id)!)) {
-                compatible_with_resolved_tails = false;
-                break;
-              }
-            }
-            else if (tail_info.super_dominance) {
-              if (!this.solutions.get(tail_info.tail_id)!.issuperof(solution_to_head)) {
-                compatible_with_resolved_tails = false;
-                break;
-              }
-            }
-            else {
-              if (!this.solutions.get(tail_info.tail_id)!.same(solution_to_head)) {
-                compatible_with_resolved_tails = false;
-                break;
-              }
-            }
-          }
-        }
-        // !12. Resolve the types of nonheads and nontails.
-        if (compatible_with_resolved_tails) {
-          this.solutions.set(head, solution_to_head);
-          this.resolve_nonheads_and_nontails(head);
-        }
-        else {
-          good_resolve = false;
-          break;
-        }
-      }
-      if (good_resolve) {
-        this.solutions_collection.push(new Map(this.solutions));
-      }
-    }
-  }
-
-  depracated_resolve() : void {
-    // !0. initialize the resolution
-    this.initialize_resolve();
-    // !1. Get heads and tails
-    this.get_heads_and_tails();
-    // !2. Map nodes to their tails, recording if there exists a path from the node to tail with tail_id on which sub_dominance/super_dominance domination does not holds.
-    // If there are multiple paths from node to tail, then the sub_dominance does not hold as long as there exists a path on which sub_dominance domination does not hold.
-    // tail_ids are not in this.node2tail
-    for (let tail of this.tails) {
-      this.dfs4node2tail(tail, tail, false, false);
-    }
-    // !3. Map edges to their reachable this.tails
-    for (let tail of this.tails) {
-      this.dfs4edge2tail(tail, tail);
-    }
-    // !4. Remove some removable sub_dominance dominations using node2tail and edge2tail
-    // See the first test case in resolve.test.ts. The sub_dominance domination from node 6 to node 7
-    // is removable since the solution to node 6 must be the same as the solution to node 1, and edge (6, 7)
-    // can reach tail 1.
-    for (let head of this.heads) {
-      this.remove_removable_sub_dominance(head);
-    }
-    // !5. Restrict the solution range of heads.
-    // Consider the following scenario.
-    // If the true expression of a conditional expression Ec is a unaryop expression Eu whose op is "!", then the type of
-    // Eu should be boolean. However, Eu type-dominate Ec and the type range of Eu is more than just boolean.
-    // Therefore, we need to backpropogate the type range from children to parents until the type range of this.heads are restricted.
-    // The backpropogation strategy is simple: if n1 type-dominate n2 by n1.type == n2.type, then the type range of n1 must be a
-    // superset of the type range of n2. In this case, we restrict the type range of n1 to be the same as the type range of n2.
-    // As for the scenario where n1 type-dominate n2 by n1.type is the super_dominance of n2.type, we resolve the sub_dominance domination
-    // with the consideration of n2's type range in the resolve() function.
-    for (let tail of this.tails) {
-      this.restrict_solution_range(tail);
-    }
-    // !6. Assign types to this.heads
-    this.allocate_solutions_for_heads();
-    // !7. Traverse each solution for heads
-    for (const head_resolve of this.head_solution_collection) {
-      this.solutions.clear();
-      let good_resolve = true;
-      // First, narrow down the solution range of this.tails
-      // !8. Allocate solution candidates for tails based on the current solution for heads
-      const tail_solution = this.allocate_solutions_for_tails_based_on_solutions_to_heads(head_resolve);
-      // Then check if there exists one tail whose solution candidates are empty.
-      // If all this.tails have non-empty solution candidates, then resolve the types of this.tails.
-      for (const tail of this.tails) {
-        if (config.debug)
-          assert(tail_solution.has(tail), `tail2type does not have ${tail}`);
-        if (tail_solution.get(tail)!.length === 0) {
-          good_resolve = false;
-          break;
-        }
-        else {
-          // The choice of the solution to the tail is restricted by the indirect connection among this.tails.
-          // If a non-head non-tail node N has two paths two tail T1 and T2 respectively, then the solution of
-          // T1 and T2 have a dominance relation.
-          tail_solution.set(tail, shuffle(tail_solution.get(tail)!))
-        }
-      }
-      if (!good_resolve) continue;
-      // !9. Build connection among tails.
-      this.build_tails_relation();
-      // !10. Resolve the types of tails.
-      const plausible_type_resolution_for_tails = this.resolve_tails(tail_solution);
-      if (plausible_type_resolution_for_tails === false) continue;
-      // !11. Check if the resolved types of tails are compatible with the resolved types of heads.
-      for (let [head, solution_to_head] of head_resolve) {
-        if (this.node2tail.has(head) === false) {
-          this.solutions.set(head, solution_to_head);
-          continue;
-        }
-        let compatible_with_resolved_tails = true;
-        for (let tail_info of this.node2tail.get(head)!) {
-          if (this.solutions.has(tail_info.tail_id)) {
-            if (tail_info.sub_dominance) {
-              if (!solution_to_head.issuperof(this.solutions.get(tail_info.tail_id)!)) {
-                compatible_with_resolved_tails = false;
-                break;
-              }
-            }
-            else if (tail_info.super_dominance) {
-              if (!this.solutions.get(tail_info.tail_id)!.issuperof(solution_to_head)) {
-                compatible_with_resolved_tails = false;
-                break;
-              }
-            }
-            else {
-              if (!this.solutions.get(tail_info.tail_id)!.same(solution_to_head)) {
-                compatible_with_resolved_tails = false;
-                break;
-              }
-            }
-          }
-        }
-        // !12. Resolve the types of nonheads and nontails.
-        if (compatible_with_resolved_tails) {
-          this.solutions.set(head, solution_to_head);
-          this.resolve_nonheads_and_nontails(head);
-        }
-        else {
-          good_resolve = false;
-          break;
-        }
-      }
-      if (good_resolve) {
-        this.solutions_collection.push(new Map(this.solutions));
       }
     }
   }
