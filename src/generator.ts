@@ -234,6 +234,9 @@ export class LiteralGenerator extends RValueGenerator {
     super(type_range);
   }
   generate(component : number) : void {
+    if (config.debug) {
+      console.log(color.redBG(`Starting generating Literal`));
+    }
     this.irnode = new exp.IRLiteral(global_id++, cur_scope.value(), field_flag);
     irnode_db.insert(this.irnode.id, this.irnode.scope);
     type_dag.insert(type_dag.newNode(this.irnode.id));
@@ -252,6 +255,9 @@ export class IdentifierGenerator extends LRValueGenerator {
     super(type_range);
   }
   generate(component : number) : void {
+    if (config.debug) {
+      console.log(color.redBG(`Starting generating Identifier`));
+    }
     // Generate a variable decl if there is no variable decl available.
     if (!hasAvailableIRVariableDeclareWithTypeConstraint(this.type_range)) {
       const variable_gen = new SingleVariableDeclareStatementGenerator(this.type_range);
@@ -304,6 +310,9 @@ export class AssignmentGenerator extends RValueGenerator {
   }
 
   generate(component : number) : void {
+    if (config.debug) {
+      console.log(color.redBG(`Starting generating Assignment ${this.op}`));
+    }
     let type_range;
     if (this.op === "=") type_range = this.type_range;
     else {
@@ -391,6 +400,9 @@ export class BinaryOpGenerator extends RValueGenerator {
     }
   }
   generate(component : number) : void {
+    if (config.debug) {
+      console.log(color.redBG(`Starting generating BinaryOp ${this.op}`));
+    }
     let type_range;
     if (["+", "-", "*", "/", "%", "<<", ">>", "&", "^", "|"].filter((op) => op === this.op).length === 1) {
       if (isEqualSet(this.type_range, type.elementary_types)) {
@@ -488,6 +500,9 @@ export class UnaryOpGenerator extends RValueGenerator {
     }
   }
   generate(component : number) : void {
+    if (config.debug) {
+      console.log(color.redBG(`Starting generating UnaryOp ${this.op}`));
+    }
     let type_range;
     if (this.op === "!") {
       this.type_range = type_range = [new type.ElementaryType("bool", "nonpayable")];
@@ -541,6 +556,9 @@ export class ConditionalGenerator extends RValueGenerator {
     super(type_range);
   }
   generate(component : number) : void {
+    if (config.debug) {
+      console.log(color.redBG(`Starting generating Conditional`));
+    }
     let e1_gen_prototype, e2_gen_prototype, e3_gen_prototype;
     if (component >= config.expression_complex_level) {
       e1_gen_prototype = pickRandomElement(terminal_expression_generators)!;
@@ -634,6 +652,9 @@ export class SingleVariableDeclareStatementGenerator extends StatementGenerator 
     this.type_range = type_range;
   }
   generate() : void {
+    if (config.debug) {
+      console.log(color.redBG(`Starting generating SingleVariableDeclareStatement`));
+    }
     if (this.type_range === undefined) this.type_range = type.elementary_types;
     let expression_gen_prototype;
     let expression_gen;
@@ -668,6 +689,9 @@ export class MultipleVariableDeclareStatementGenerator extends StatementGenerato
     this.var_count = var_count;
   }
   generate() : void {
+    if (config.debug) {
+      console.log(color.redBG(`Starting generating Assignment MultipleVariableDeclareStatement`));
+    }
     const ir_exps : exp.IRExpression[] = [];
     for (let i = 0; i < this.var_count; i++) {
       let expression_gen_prototype;

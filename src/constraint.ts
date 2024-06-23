@@ -232,7 +232,8 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   tighten_solution_range_from_a_tail(tail : number) {
     let upwards = (node : number) : void => {
       if (this.dag_nodes.get(node)!.ins.length === 0) {
-        downwards(node);
+        if (this.dag_nodes.get(node)!.outs.length === 0)
+          downwards(node);
         return;
       }
       for (let parent of this.dag_nodes.get(node)!.ins) {
@@ -251,7 +252,8 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     }
     let downwards = (node : number) : void => {
       if (this.dag_nodes.get(node)!.outs.length === 0) {
-        upwards(node);
+        if (this.dag_nodes.get(node)!.ins.length === 0)
+          upwards(node);
         return;
       }
       for (let child of this.dag_nodes.get(node)!.outs) {
@@ -264,18 +266,13 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       }
     }
     upwards(tail);
-    if (config.debug) {
-      for (let [id, _] of this.dag_nodes) {
-        console.log(color.redBG(`${id}'s solution range: ${this.solution_range.get(id)!.map(t => t.str())}`));
-      }
-      console.log('=====================================');
-    }
   }
 
   tighten_solution_range_from_a_head(head : number) {
     let upwards = (node : number) : void => {
       if (this.dag_nodes.get(node)!.ins.length === 0) {
-        downwards(node);
+        if (this.dag_nodes.get(node)!.outs.length === 0)
+          downwards(node);
         return;
       }
       for (let parent of this.dag_nodes.get(node)!.ins) {
@@ -294,7 +291,8 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     }
     let downwards = (node : number) : void => {
       if (this.dag_nodes.get(node)!.outs.length === 0) {
-        upwards(node);
+        if (this.dag_nodes.get(node)!.ins.length === 0)
+          upwards(node);
         return;
       }
       for (let child of this.dag_nodes.get(node)!.outs) {
@@ -311,12 +309,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       }
     }
     downwards(head);
-    if (config.debug) {
-      for (let [id, _] of this.dag_nodes) {
-        console.log(color.greenBG(`${id}'s solution range: ${this.solution_range.get(id)!.map(t => t.str())}`));
-      }
-      console.log('=====================================');
-    }
   }
 
   tighten_solution_range() {
