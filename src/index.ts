@@ -3,7 +3,7 @@ import { Command } from "commander";
 import * as gen from "./generator"
 import * as db from "./db"
 import { irnodes } from "./node";
-import * as exp from "./expression";
+import * as expr from "./expression";
 import * as decl from "./declare";
 import { config } from "./config";
 import { pickRandomElement, assert } from "./utility";
@@ -97,12 +97,12 @@ try {
     gen.type_dag.verify();
     gen.funcstat_dag.verify();
   }
-  console.log(`${gen.type_dag.solutions_collection.length} type solutions`);
-  console.log(`${gen.funcstat_dag.solutions_collection.length} function state solutions`);
+  console.log(`${gen.type_dag.solutions_collection.length} type rsolutions`);
+  console.log(`${gen.funcstat_dag.solutions_collection.length} function state resolutions`);
   let type_solutions = pickRandomElement(gen.type_dag.solutions_collection)!;
   for (let [key, value] of type_solutions) {
-    if (irnodes[key] instanceof exp.IRLiteral || irnodes[key] instanceof decl.IRVariableDeclare)
-      (irnodes[key] as exp.IRLiteral | decl.IRVariableDeclare).type = value;
+    if (irnodes[key] instanceof expr.IRLiteral || irnodes[key] instanceof decl.IRVariableDeclare)
+      (irnodes[key] as expr.IRLiteral | decl.IRVariableDeclare).type = value;
   }
   let funcstat_solutions = pickRandomElement(gen.funcstat_dag.solutions_collection)!;
   for (let [key, value] of funcstat_solutions) {
@@ -113,24 +113,24 @@ try {
     console.log(writer.write(irnodes[id].lower()));
   }
   for (let irnode of irnodes) {
-    if (irnode instanceof exp.IRLiteral) {
-      (irnode as exp.IRLiteral).kind = undefined;
-      (irnode as exp.IRLiteral).value = undefined;
+    if (irnode instanceof expr.IRLiteral) {
+      (irnode as expr.IRLiteral).kind = undefined;
+      (irnode as expr.IRLiteral).value = undefined;
     }
   }
   // let cnt = 0;
   // for (let resolutions of gen.type_dag.resolutions_collection) {
   //   console.log(`>>>>>>>>>> Resolution ${cnt++} <<<<<<<<<<`);
   //   for (let [key, value] of resolutions) {
-  //     (irnodes[key] as exp.IRExpression | decl.IRVariableDeclare).type = value;
+  //     (irnodes[key] as expr.IRExpression | decl.IRVariableDeclare).type = value;
   //   }
   //   for (let stmt of gen.scope_stmt.get(0)!) {
   //     console.log(writer.write(stmt.lower()));
   //   }
   //   for (let irnode of irnodes) {
-  //     if (irnode instanceof exp.IRLiteral) {
-  //       (irnode as exp.IRLiteral).kind = undefined;
-  //       (irnode as exp.IRLiteral).value = undefined;
+  //     if (irnode instanceof expr.IRLiteral) {
+  //       (irnode as expr.IRLiteral).kind = undefined;
+  //       (irnode as expr.IRLiteral).value = undefined;
   //     }
   //   }
   // }

@@ -286,3 +286,11 @@ export function terminate(message ?: string, exitCode = 0) : never {
 export function error(message : string) : never {
   terminate(message, 1);
 }
+
+export function min(a : number, b : number) : number {
+  return a < b ? a : b;
+}
+
+export function max(a : number, b : number) : number {
+  return a > b ? a : b;
+}

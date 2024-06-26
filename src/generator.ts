@@ -1,6 +1,6 @@
 import { assert, pickRandomElement, generateRandomString, randomInt } from "./utility";
 import { FieldFlag, IRNode } from "./node";
-import * as exp from "./expression";
+import * as expr from "./expression";
 import * as decl from "./declare";
 import * as stmt from "./statement";
 import * as type from "./type";
@@ -32,7 +32,7 @@ const vardecls : Set<number> = new Set<number>();
 const funcdecls : Set<number> = new Set<number>();
 let virtual_env = false;
 let override_env = false;
-let unexpected_extra_vardecls : stmt.IRStatement[] = [];
+let unexpected_extra_vardecls : stmt.IRVariableDeclareStatement[] = [];
 // Record statements in each scope.
 export const scope2userDefinedTypes = new Map<number, number>();
 export const type_dag = new TypeDominanceDAG();
@@ -56,7 +56,9 @@ function generateVarName() : string {
 }
 
 
-function createVariableDeclare() : decl.IRVariableDeclare {
+function createVariableDeclare(name ?: string) : decl.IRVariableDeclare {
+  if (name !== undefined)
+    return new decl.IRVariableDeclare(global_id++, cur_scope.value(), field_flag, name);
   return new decl.IRVariableDeclare(global_id++, cur_scope.value(), field_flag, generateVarName());
 }
 
@@ -112,12 +114,14 @@ export abstract class DeclarationGenerator extends Generator {
 
 export class VariableDeclareGenerator extends DeclarationGenerator {
   type_range : type.Type[];
-  constructor(type_range : type.Type[]) {
+  name : string | undefined;
+  constructor(type_range : type.Type[], name ?: string) {
     super();
     this.type_range = type_range;
+    this.name = name;
   }
   generate() : void {
-    this.irnode = createVariableDeclare();
+    this.irnode = createVariableDeclare(this.name);
     irnode_db.insert(this.irnode.id, this.irnode.scope);
     type_dag.insert(type_dag.newNode(this.irnode.id));
     type_dag.solution_range.set(this.irnode.id, this.type_range);
@@ -138,16 +142,25 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
   }
   generate() : void {
     const parameter_count = randomInt(0, config.param_count_of_function_upperlimit);
-    // const return_count = randomInt(0, config.return_count_of_function_upperlimit);
     const body_stmt_count = randomInt(0, config.body_stmt_count_of_function_upperlimit);
     const parameters : decl.IRVariableDeclare[] = [];
     cur_scope = cur_scope.new();
+    console.log('generate paremeters');
     for (let i = 0; i < parameter_count; i++) {
       const variable_gen = new VariableDeclareGenerator(type.elementary_types);
       variable_gen.generate();
       parameters.push(variable_gen.irnode! as decl.IRVariableDeclare);
     }
+    const return_count = randomInt(0, config.return_count_of_function_upperlimit);
+    const return_decls : decl.IRVariableDeclare[] = [];
+    console.log('generate return_decls');
+    for (let i = 0; i < return_count; i++) {
+      const variable_gen = new VariableDeclareGenerator(type.elementary_types);
+      variable_gen.generate();
+      return_decls.push(variable_gen.irnode! as decl.IRVariableDeclare);
+    }
     let body : stmt.IRStatement[] = [];
+    console.log('generate body');
     for (let i = body.length; i < body_stmt_count; i++) {
       const stmt_gen_prototype = pickRandomElement(statement_generators)!;
       const stmt_gen = new stmt_gen_prototype();
@@ -156,12 +169,28 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
       unexpected_extra_vardecls = [];
       body.push(stmt_gen.irnode! as stmt.IRStatement);
     }
-    const returns : decl.IRVariableDeclare[] = [];
-    // for (let i = 0; i < return_count; i++) {
-    //   const variable_gen = new VariableDeclareGenerator(type.elementary_types);
-    //   variable_gen.generate();
-    //   returns.push(variable_gen.irnode! as decl.IRVariableDeclare);
-    // }
+    const return_values : expr.IRExpression[] = [];
+    for (let i = 0; i < return_count; i++) {
+      const expr_gen_prototype = pickRandomElement(all_expression_generators)!;
+      const expr_gen = new expr_gen_prototype(type_dag.solution_range.get(return_decls[i].id)!);
+      expr_gen.generate(0);
+      return_values.push(expr_gen.irnode! as expr.IRExpression);
+      let expression_extracted = return_values[i];
+      while (expression_extracted instanceof expr.IRTuple) {
+        assert(expression_extracted.components.length === 1, "SingleVariableDeclareStatementGenerator: expression_gen_extracted.components.length is not 1");
+        expression_extracted = expression_extracted.components[0];
+      }
+      type_dag.connect(expression_extracted.id, return_decls[i].id, "super_dominance");
+      typeRangeAlignment(expression_extracted.id, return_decls[i].id);
+    }
+    if (return_values.length === 0 && Math.random() > 0.5) { }
+    else {
+      const return_gen = new ReturnStatementGenerator(
+        new expr.IRTuple(global_id++, cur_scope.value(), field_flag, return_values)
+      );
+      return_gen.generate();
+      body.push(return_gen.irnode!);
+    }
     cur_scope = cur_scope.rollback() as ScopeList;
     const modifiers : decl.Modifier[] = [];
     //TODO: fill the modifiers
@@ -176,13 +205,13 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
     ])
     if (this.state_mutability_range === undefined) {
       if (visibility === FunctionVisibility.Internal ||
-          visibility === FunctionVisibility.Private)
+        visibility === FunctionVisibility.Private)
         this.state_mutability_range = funcstat.nonpayable_func_mutability_stats;
       else
         this.state_mutability_range = funcstat.all_func_mutability_stats;
     }
     this.irnode = new decl.IRFunctionDefinition(global_id++, cur_scope.value(), field_flag, name,
-      this.kind, virtual, overide, parameters, returns, body, modifiers, visibility);
+      this.kind, virtual, overide, parameters, return_decls, body, modifiers, visibility);
     irnode_db.insert(this.irnode.id, this.irnode.scope);
     funcstat_dag.insert(funcstat_dag.newNode(this.irnode.id));
     funcstat_dag.solution_range.set(this.irnode.id, this.state_mutability_range);
@@ -236,14 +265,14 @@ export class LiteralGenerator extends RValueGenerator {
     if (config.debug) {
       console.log(color.redBG(`Starting generating Literal`));
     }
-    this.irnode = new exp.IRLiteral(global_id++, cur_scope.value(), field_flag);
+    this.irnode = new expr.IRLiteral(global_id++, cur_scope.value(), field_flag);
     irnode_db.insert(this.irnode.id, this.irnode.scope);
     type_dag.insert(type_dag.newNode(this.irnode.id));
     type_dag.solution_range.set(this.irnode.id, this.type_range);
     if (config.debug)
       console.log(color.yellowBG(`${this.irnode.id}: Literal, type: ${type_dag.solution_range.get(this.irnode.id)!.map(t => t.str())}`));
     if (Math.random() < config.tuple_prob) {
-      this.irnode = new exp.IRTuple(global_id++, cur_scope.value(), field_flag, [this.irnode as exp.IRExpression]);
+      this.irnode = new expr.IRTuple(global_id++, cur_scope.value(), field_flag, [this.irnode as expr.IRExpression]);
       irnode_db.insert(this.irnode.id, this.irnode.scope);
     }
   }
@@ -261,7 +290,7 @@ export class IdentifierGenerator extends LRValueGenerator {
     if (!hasAvailableIRVariableDeclareWithTypeConstraint(this.type_range)) {
       const variable_gen = new SingleVariableDeclareStatementGenerator(this.type_range);
       variable_gen.generate();
-      unexpected_extra_vardecls.push(variable_gen.irnode! as stmt.IRStatement);
+      unexpected_extra_vardecls.push(variable_gen.irnode! as stmt.IRVariableDeclareStatement);
     }
     // generate an identifier
     let irdecl : decl.IRVariableDeclare;
@@ -269,7 +298,7 @@ export class IdentifierGenerator extends LRValueGenerator {
     assert(availableIRDecl !== undefined, "IdentifierGenerator: availableIRDecl is undefined");
     assert(availableIRDecl.length > 0, "IdentifierGenerator: no available IR irnodes");
     irdecl = pickRandomElement(availableIRDecl)!;
-    this.irnode = new exp.IRIdentifier(global_id++, cur_scope.value(), field_flag, irdecl.name, irdecl.id);
+    this.irnode = new expr.IRIdentifier(global_id++, cur_scope.value(), field_flag, irdecl.name, irdecl.id);
     irnode_db.insert(this.irnode.id, this.irnode.scope);
     type_dag.insert(type_dag.newNode(this.irnode.id));
     type_dag.connect(this.irnode.id, irdecl.id);
@@ -278,7 +307,7 @@ export class IdentifierGenerator extends LRValueGenerator {
     if (config.debug)
       console.log(color.yellowBG(`${this.irnode.id}: Identifier --> ${irdecl.id}, type: ${type_dag.solution_range.get(this.irnode.id)!.map(t => t.str())}`));
     if (Math.random() < config.tuple_prob) {
-      this.irnode = new exp.IRTuple(global_id++, cur_scope.value(), field_flag, [this.irnode as exp.IRExpression]);
+      this.irnode = new expr.IRTuple(global_id++, cur_scope.value(), field_flag, [this.irnode as expr.IRExpression]);
       irnode_db.insert(this.irnode.id, this.irnode.scope);
     }
   }
@@ -337,9 +366,9 @@ export class AssignmentGenerator extends RValueGenerator {
       right_expression_gen = new right_expression_gen_prototype(type_range);
     }
     right_expression_gen.generate(component + 1);
-    let right_expression : exp.IRExpression = right_expression_gen.irnode as exp.IRExpression;
+    let right_expression : expr.IRExpression = right_expression_gen.irnode as expr.IRExpression;
     let right_extracted_expression = right_expression;
-    while (right_extracted_expression instanceof exp.IRTuple) {
+    while (right_extracted_expression instanceof expr.IRTuple) {
       assert(right_extracted_expression.components.length === 1, "AssignmentGenerator: right_extracted_expression.components.length is not 1");
       right_extracted_expression = right_extracted_expression.components[0];
     }
@@ -349,11 +378,11 @@ export class AssignmentGenerator extends RValueGenerator {
         new IdentifierGenerator(type_dag.solution_range.get(right_extracted_expression.id)!) :
         new IdentifierGenerator(type_range);
     identifier_gen.generate(component + 1);
-    let left_expression : exp.IRExpression = identifier_gen.irnode as exp.IRExpression;
-    this.irnode = new exp.IRAssignment(global_id++, cur_scope.value(), field_flag, left_expression, right_expression, this.op!);
+    let left_expression : expr.IRExpression = identifier_gen.irnode as expr.IRExpression;
+    this.irnode = new expr.IRAssignment(global_id++, cur_scope.value(), field_flag, left_expression, right_expression, this.op!);
     irnode_db.insert(this.irnode.id, this.irnode.scope);
     let left_extracted_expression = left_expression;
-    while (left_extracted_expression instanceof exp.IRTuple) {
+    while (left_extracted_expression instanceof expr.IRTuple) {
       assert(left_extracted_expression.components.length === 1, "AssignmentGenerator: left_extracted_expression.components.length is not 1");
       left_extracted_expression = left_extracted_expression.components[0];
     }
@@ -368,11 +397,11 @@ export class AssignmentGenerator extends RValueGenerator {
     if (config.debug)
       console.log(color.yellowBG(`${this.irnode.id}: Assignment ${this.op}, type: ${type_dag.solution_range.get(this.irnode.id)!.map(t => t.str())}`));
     if (component !== 0) {
-      this.irnode = new exp.IRTuple(global_id++, cur_scope.value(), field_flag, [this.irnode as exp.IRExpression]);
+      this.irnode = new expr.IRTuple(global_id++, cur_scope.value(), field_flag, [this.irnode as expr.IRExpression]);
       irnode_db.insert(this.irnode.id, this.irnode.scope);
     }
     else if (Math.random() < config.tuple_prob) {
-      this.irnode = new exp.IRTuple(global_id++, cur_scope.value(), field_flag, [this.irnode as exp.IRExpression]);
+      this.irnode = new expr.IRTuple(global_id++, cur_scope.value(), field_flag, [this.irnode as expr.IRExpression]);
       irnode_db.insert(this.irnode.id, this.irnode.scope);
     }
   }
@@ -421,8 +450,8 @@ export class BinaryOpGenerator extends RValueGenerator {
     else { // &&, ||
       this.type_range = type_range = [new type.ElementaryType("bool", "nonpayable")];
     }
-    let left_expression : exp.IRExpression;
-    let right_expression : exp.IRExpression;
+    let left_expression : expr.IRExpression;
+    let right_expression : expr.IRExpression;
     let left_expression_gen_prototype, right_expression_gen_prototype;
     let left_expression_gen, right_expression_gen;
     if (component >= config.expression_complex_level) {
@@ -435,9 +464,9 @@ export class BinaryOpGenerator extends RValueGenerator {
     }
     left_expression_gen = new left_expression_gen_prototype(type_range);
     left_expression_gen.generate(component + 1);
-    left_expression = left_expression_gen.irnode as exp.IRExpression;
+    left_expression = left_expression_gen.irnode as expr.IRExpression;
     let left_extracted_expression = left_expression;
-    while (left_extracted_expression instanceof exp.IRTuple) {
+    while (left_extracted_expression instanceof expr.IRTuple) {
       assert(left_extracted_expression.components.length === 1, "BinaryGenerator: left_extracted_expression.components.length is not 1");
       left_extracted_expression = left_extracted_expression.components[0];
     }
@@ -448,11 +477,11 @@ export class BinaryOpGenerator extends RValueGenerator {
       right_expression_gen = new right_expression_gen_prototype(type_dag.solution_range.get(left_extracted_expression.id)!);
     }
     right_expression_gen.generate(component + 1);
-    right_expression = right_expression_gen.irnode as exp.IRExpression;
-    this.irnode = new exp.IRBinaryOp(global_id++, cur_scope.value(), field_flag, left_expression, right_expression, this.op);
+    right_expression = right_expression_gen.irnode as expr.IRExpression;
+    this.irnode = new expr.IRBinaryOp(global_id++, cur_scope.value(), field_flag, left_expression, right_expression, this.op);
     irnode_db.insert(this.irnode.id, this.irnode.scope);
     let right_extracted_expression = right_expression;
-    while (right_extracted_expression instanceof exp.IRTuple) {
+    while (right_extracted_expression instanceof expr.IRTuple) {
       assert(right_extracted_expression.components.length === 1, "BinaryGenerator: right_extracted_expression.components.length is not 1");
       right_extracted_expression = right_extracted_expression.components[0];
     }
@@ -469,7 +498,7 @@ export class BinaryOpGenerator extends RValueGenerator {
     if (config.debug)
       console.log(color.yellowBG(`${this.irnode.id}: BinaryOp ${this.op}, type: ${type_dag.solution_range.get(this.irnode.id)!.map(t => t.str())}`));
     if (Math.random() < config.tuple_prob) {
-      this.irnode = new exp.IRTuple(global_id++, cur_scope.value(), field_flag, [this.irnode as exp.IRExpression]);
+      this.irnode = new expr.IRTuple(global_id++, cur_scope.value(), field_flag, [this.irnode as expr.IRExpression]);
       irnode_db.insert(this.irnode.id, this.irnode.scope);
     }
   }
@@ -525,16 +554,16 @@ export class UnaryOpGenerator extends RValueGenerator {
     }
     const identifier_gen = new IdentifierGenerator(type_range);
     identifier_gen.generate(component + 1);
-    let expression : exp.IRExpression = identifier_gen.irnode! as exp.IRExpression;
-    this.irnode = new exp.IRUnaryOp(global_id++, cur_scope.value(), field_flag, pickRandomElement([true, false])!, expression, this.op)!;
+    let expression : expr.IRExpression = identifier_gen.irnode! as expr.IRExpression;
+    this.irnode = new expr.IRUnaryOp(global_id++, cur_scope.value(), field_flag, pickRandomElement([true, false])!, expression, this.op)!;
     irnode_db.insert(this.irnode.id, this.irnode.scope);
     let extracted_expression = expression;
-    while (extracted_expression instanceof exp.IRTuple) {
+    while (extracted_expression instanceof expr.IRTuple) {
       assert(extracted_expression.components.length === 1, "UnaryOpGenerator: extracted_expression.components.length is not 1");
       extracted_expression = extracted_expression.components[0];
     }
-    assert(extracted_expression instanceof exp.IRIdentifier, "UnaryOpGenerator: extracted_expression is not IRIdentifier");
-    assert((extracted_expression as exp.IRIdentifier).reference !== undefined, "UnaryOpGenerator: extracted_expression.reference is undefined");
+    assert(extracted_expression instanceof expr.IRIdentifier, "UnaryOpGenerator: extracted_expression is not IRIdentifier");
+    assert((extracted_expression as expr.IRIdentifier).reference !== undefined, "UnaryOpGenerator: extracted_expression.reference is undefined");
     type_dag.insert(type_dag.newNode(this.irnode.id));
     type_dag.solution_range.set(this.irnode.id, this.type_range);
     type_dag.connect(this.irnode.id, extracted_expression.id);
@@ -542,7 +571,7 @@ export class UnaryOpGenerator extends RValueGenerator {
     if (config.debug)
       console.log(color.yellowBG(`${this.irnode.id}: UnaryOp ${this.op}, type: ${type_dag.solution_range.get(this.irnode.id)!.map(t => t.str())}`));
     if (Math.random() < config.tuple_prob) {
-      this.irnode = new exp.IRTuple(global_id++, cur_scope.value(), field_flag, [this.irnode as exp.IRExpression]);
+      this.irnode = new expr.IRTuple(global_id++, cur_scope.value(), field_flag, [this.irnode as expr.IRExpression]);
       irnode_db.insert(this.irnode.id, this.irnode.scope);
     }
   }
@@ -570,14 +599,14 @@ export class ConditionalGenerator extends RValueGenerator {
     const e1_gen = new e1_gen_prototype([new type.ElementaryType("bool", "nonpayable")]);
     e1_gen.generate(component + 1);
     let extracted_e1 = e1_gen.irnode!;
-    while (extracted_e1 instanceof exp.IRTuple) {
+    while (extracted_e1 instanceof expr.IRTuple) {
       assert(extracted_e1.components.length === 1, "ConditionalGenerator: extracted_e1.components.length is not 1");
       extracted_e1 = extracted_e1.components[0];
     }
     const e2_gen = new e2_gen_prototype(this.type_range);
     e2_gen.generate(component + 1);
     let extracted_e2 = e2_gen.irnode!;
-    while (extracted_e2 instanceof exp.IRTuple) {
+    while (extracted_e2 instanceof expr.IRTuple) {
       assert(extracted_e2.components.length === 1, "ConditionalGenerator: extracted_e2.components.length is not 1");
       extracted_e2 = extracted_e2.components[0];
     }
@@ -587,14 +616,14 @@ export class ConditionalGenerator extends RValueGenerator {
     }
     const e3_gen = new e3_gen_prototype(type_dag.solution_range.get(extracted_e2.id)!);
     e3_gen.generate(component + 1);
-    this.irnode = new exp.IRConditional(
-      global_id++, cur_scope.value(), field_flag, e1_gen.irnode! as exp.IRExpression,
-      e2_gen.irnode! as exp.IRExpression,
-      e3_gen.irnode! as exp.IRExpression
+    this.irnode = new expr.IRConditional(
+      global_id++, cur_scope.value(), field_flag, e1_gen.irnode! as expr.IRExpression,
+      e2_gen.irnode! as expr.IRExpression,
+      e3_gen.irnode! as expr.IRExpression
     );
     irnode_db.insert(this.irnode.id, this.irnode.scope);
     let extracted_e3 = e3_gen.irnode!;
-    while (extracted_e3 instanceof exp.IRTuple) {
+    while (extracted_e3 instanceof expr.IRTuple) {
       assert(extracted_e3.components.length === 1, "ConditionalGenerator: extracted_e3.components.length is not 1");
       extracted_e3 = extracted_e3.components[0];
     }
@@ -608,7 +637,7 @@ export class ConditionalGenerator extends RValueGenerator {
     if (config.debug)
       console.log(color.yellowBG(`${this.irnode.id}: Conditional, type: ${type_dag.solution_range.get(this.irnode.id)!.map(t => t.str())}`));
     if (Math.random() < config.tuple_prob) {
-      this.irnode = new exp.IRTuple(global_id++, cur_scope.value(), field_flag, [this.irnode as exp.IRExpression]);
+      this.irnode = new expr.IRTuple(global_id++, cur_scope.value(), field_flag, [this.irnode as expr.IRExpression]);
       irnode_db.insert(this.irnode.id, this.irnode.scope);
     }
   }
@@ -666,10 +695,10 @@ export class SingleVariableDeclareStatementGenerator extends StatementGenerator 
     const variable_gen = new VariableDeclareGenerator(this.type_range);
     variable_gen.generate();
     this.irnode = new stmt.IRVariableDeclareStatement(
-      global_id++, cur_scope.value(), field_flag, [variable_gen.irnode! as decl.IRVariableDeclare], expression_gen.irnode! as exp.IRExpression
+      global_id++, cur_scope.value(), field_flag, [variable_gen.irnode! as decl.IRVariableDeclare], expression_gen.irnode! as expr.IRExpression
     );
     let expression_gen_extracted = expression_gen.irnode!;
-    while (expression_gen_extracted instanceof exp.IRTuple) {
+    while (expression_gen_extracted instanceof expr.IRTuple) {
       assert(expression_gen_extracted.components.length === 1, "SingleVariableDeclareStatementGenerator: expression_gen_extracted.components.length is not 1");
       expression_gen_extracted = expression_gen_extracted.components[0];
     }
@@ -689,7 +718,7 @@ export class MultipleVariableDeclareStatementGenerator extends StatementGenerato
     if (config.debug) {
       console.log(color.redBG(`Starting generating Assignment MultipleVariableDeclareStatement`));
     }
-    const ir_exps : exp.IRExpression[] = [];
+    const ir_exps : expr.IRExpression[] = [];
     for (let i = 0; i < this.var_count; i++) {
       let expression_gen_prototype;
       if (hasAvailableIRVariableDeclare() && Math.random() > config.literal_prob) {
@@ -700,7 +729,7 @@ export class MultipleVariableDeclareStatementGenerator extends StatementGenerato
       }
       const expression_gen = new expression_gen_prototype(type.elementary_types);
       expression_gen.generate(0);
-      ir_exps.push(expression_gen.irnode! as exp.IRExpression);
+      ir_exps.push(expression_gen.irnode! as expr.IRExpression);
     }
     const ir_varnodes : decl.IRVariableDeclare[] = [];
     for (let i = 0; i < this.var_count; i++) {
@@ -708,12 +737,12 @@ export class MultipleVariableDeclareStatementGenerator extends StatementGenerato
       variable_gen.generate();
       ir_varnodes.push(variable_gen.irnode! as decl.IRVariableDeclare);
     }
-    const ir_tuple_exp = new exp.IRTuple(global_id++, cur_scope.value(), field_flag, ir_exps);
+    const ir_tuple_exp = new expr.IRTuple(global_id++, cur_scope.value(), field_flag, ir_exps);
     this.irnode = new stmt.IRVariableDeclareStatement(global_id++, cur_scope.value(), field_flag, ir_varnodes, ir_tuple_exp);
     irnode_db.insert(this.irnode.id, this.irnode.scope);
     for (let i = 0; i < this.var_count; i++) {
       let extracted_ir = ir_exps[i];
-      while (extracted_ir instanceof exp.IRTuple) {
+      while (extracted_ir instanceof expr.IRTuple) {
         assert(extracted_ir.components.length === 1, "SingleVariableDeclareStatementGenerator: expression_gen_extracted.components.length is not 1");
         extracted_ir = extracted_ir.components[0];
       }
@@ -733,7 +762,25 @@ export class AssignmentStatementGenerator extends ExpressionStatementGenerator {
   generate() : void {
     const assignment_gen = new AssignmentGenerator(type.elementary_types);
     assignment_gen.generate(0);
-    this.irnode = new stmt.IRExpressionStatement(global_id++, cur_scope.value(), field_flag, assignment_gen.irnode! as exp.IRAssignment);
+    this.irnode = new stmt.IRExpressionStatement(global_id++, cur_scope.value(), field_flag, assignment_gen.irnode! as expr.IRAssignment);
+    irnode_db.insert(this.irnode.id, this.irnode.scope);
+  }
+}
+
+export class ReturnStatementGenerator extends StatementGenerator {
+  value : expr.IRExpression | undefined;
+  constructor(value ?: expr.IRExpression) {
+    super();
+    this.value = value;
+  }
+  generate() : void {
+    if (this.value === undefined) {
+      const expression_gen_prototype = pickRandomElement(all_expression_generators)!;
+      const expression_gen = new expression_gen_prototype(type.elementary_types);
+      expression_gen.generate(0);
+      this.value = expression_gen.irnode! as expr.IRExpression;
+    }
+    this.irnode = new stmt.IRReturnStatement(global_id++, cur_scope.value(), field_flag, this.value);
     irnode_db.insert(this.irnode.id, this.irnode.scope);
   }
 }

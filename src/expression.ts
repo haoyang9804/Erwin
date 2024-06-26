@@ -135,17 +135,24 @@ export class IRLiteral extends IRExpression {
     this.generateKind();
     if (this.value === undefined) this.generateVal();
     const value = this.value!;
-    if (!config.unit_test_mode) this.value = undefined;
+    const kind = this.kind;
+    const mustHaveIntTypeConversion = this.mustHaveIntTypeConversion;
+    if (!config.unit_test_mode) {
+      this.value = undefined;
+      this.mustBeNegaitive = false;
+      this.kind = undefined;
+      this.mustHaveIntTypeConversion = false;
+    }
     if (this.type!.str() === "address payable") {
       return factory.makeFunctionCall("", FunctionCallKind.TypeConversion,
         factory.makeElementaryTypeNameExpression("", factory.makeElementaryTypeName("", "address", "payable")),
-        [factory.makeLiteral("", this.kind!, str2hex(value!), value!)]);
+        [factory.makeLiteral("", kind!, str2hex(value!), value!)]);
     }
-    if (this.mustHaveIntTypeConversion || (!config.unit_test_mode && Math.random() > 0.5))
+    if (mustHaveIntTypeConversion || (!config.unit_test_mode && Math.random() > 0.5))
       return factory.makeFunctionCall("", FunctionCallKind.TypeConversion,
         factory.makeElementaryTypeNameExpression("", factory.makeElementaryTypeName("", (this.type as ElementaryType).name, "nonpayable")),
-        [factory.makeLiteral("", this.kind!, str2hex(value!), value!)]);
-    return factory.makeLiteral("", this.kind!, str2hex(value!), value!);
+        [factory.makeLiteral("", kind!, str2hex(value!), value!)]);
+    return factory.makeLiteral("", kind!, str2hex(value!), value!);
   }
 }
 
