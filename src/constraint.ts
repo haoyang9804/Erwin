@@ -775,11 +775,26 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       }
     }
     // !Assign types to heads
+    let cnt = 0;
+    let stop = false;
+    let stop_until_find_solution_mode = false;
     for (let local_head_resolution_collection of this.allocate_solutions_for_heads_in_chunks()) {
       this.solutions.clear();
+      if (stop) break;
       // !Traverse each resolution for heads
       for (const head_resolve of local_head_resolution_collection) {
         this.solutions.clear();
+        if (stop) break;
+        cnt++;
+        if (!stop_until_find_solution_mode && cnt >= config.maximum_type_resolution_for_heads) {
+          if (this.solutions_collection.length > 0) {
+            stop = true;
+          }
+          else {
+            stop_until_find_solution_mode = true;
+          }
+          break;
+        }
         let good_resolve = true;
         // First, narrow down the solution range of this.tails
         // !Allocate solution candidates for tails based on the current solution to heads
@@ -847,8 +862,15 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         }
         if (good_resolve) {
           this.solutions_collection.push(new Map(this.solutions));
+          if (stop_until_find_solution_mode) {
+            stop = true;
+            break;
+          }
         }
       }
+    }
+    if (stop_until_find_solution_mode) {
+      console.log(`Start "stop_until_find_solution_mode", find one solution after ${cnt} executions`);
     }
   }
 

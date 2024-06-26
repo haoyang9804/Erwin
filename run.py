@@ -7,5 +7,5 @@ while True:
   stdout, stderr = p.communicate()
   print(stdout.decode('utf-8'))
   print(stderr.decode('utf-8'))
-  if p.returncode != 0 or 'Error:' in stdout.decode('utf-8'):
+  if p.returncode != 0 or 'Error: ' in stdout.decode('utf-8'):
     break

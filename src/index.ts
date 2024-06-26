@@ -91,8 +91,11 @@ if (config.debug) {
   gen.funcstat_dag.draw("./funcstat-constraint.svg");
 }
 try {
+  const startTime = performance.now()
   gen.type_dag.resolve_by_chunk();
   gen.funcstat_dag.resolve_by_chunk();
+  const endTime = performance.now();
+  console.log(`Time cost of resolving: ${endTime - startTime} ms`);
   if (config.debug) {
     gen.type_dag.verify();
     gen.funcstat_dag.verify();
@@ -112,12 +115,12 @@ try {
   for (let id of db.irnode_db.get_IRNodes_by_scope(0)!) {
     console.log(writer.write(irnodes[id].lower()));
   }
-  for (let irnode of irnodes) {
-    if (irnode instanceof expr.IRLiteral) {
-      (irnode as expr.IRLiteral).kind = undefined;
-      (irnode as expr.IRLiteral).value = undefined;
-    }
-  }
+  // for (let irnode of irnodes) {
+  //   if (irnode instanceof expr.IRLiteral) {
+  //     (irnode as expr.IRLiteral).kind = undefined;
+  //     (irnode as expr.IRLiteral).value = undefined;
+  //   }
+  // }
   // let cnt = 0;
   // for (let resolutions of gen.type_dag.resolutions_collection) {
   //   console.log(`>>>>>>>>>> Resolution ${cnt++} <<<<<<<<<<`);

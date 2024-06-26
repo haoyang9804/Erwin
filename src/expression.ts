@@ -63,12 +63,21 @@ export class IRLiteral extends IRExpression {
             bits = parseInt(typename.slice(3));
           }
           if (typename === "int256" || typename === "int128" || typename === "int64" ||
-            typename === "int32" || typename === "int16" || typename === "int8")
-            this.value = randomBigInt((1n << BigInt(bits) - 1n) + 1n).toString();
-          else
-            this.value = randomBigInt((1n << BigInt(bits)) + 1n).toString();
-          if (this.mustBeNegaitive)
+            typename === "int32" || typename === "int16" || typename === "int8") {
+            this.value = randomBigInt(0n, (1n << BigInt(bits) - 1n) + 1n).toString();
+            if (this.value[0] === "-") {
+              this.value = this.value.slice(1);
+            }
+          }
+          else {
+            this.value = randomBigInt(0n, (1n << BigInt(bits)) + 1n).toString();
+            if (this.value[0] === "-") {
+              this.value = this.value.slice(1);
+            }
+          }
+          if (this.mustBeNegaitive) {
             this.value = "-" + this.value;
+          }
           else {
             if (typename === "int256" || typename === "int128" || typename === "int64" ||
               typename === "int32" || typename === "int16" || typename === "int8") {
@@ -76,6 +85,10 @@ export class IRLiteral extends IRExpression {
                 this.value = "-" + this.value;
               this.mustHaveIntTypeConversion = true;
             }
+          }
+          if (typename.startsWith('uint')) {
+            assert(this.value[0] !== "-",
+              `IRLiteral: value is negaitive but the type is uint. mustBeNegaitive is ${this.mustBeNegaitive}, bits is ${bits}, ${1n << BigInt(bits)}`);
           }
         }
         else {

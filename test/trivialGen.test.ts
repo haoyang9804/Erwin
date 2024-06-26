@@ -182,3 +182,11 @@ test("test binary op of two assignment ops",
   const bop3 = factory.makeBinaryOperation("any type", "+", bop1, bop2);
   expect(writer.write(bop3)).toBe("x += x + x += x");
 })
+
+test("test unary op",
+() => {
+  const x_1 = factory.makeIdentifier("any type", "x", 1);
+  const uop = factory.makeUnaryOperation("any type", false, "", x_1);
+  expect(writer.write(uop)).toBe("x");
+}
+)
