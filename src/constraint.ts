@@ -812,31 +812,34 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
             continue;
           }
           if (config.debug) {
-            let compatible_with_resolved_tails = true;
             for (let tail_info of this.node2tail.get(head)!) {
               assert(this.solutions.has(tail_info.tail_id),
                 `resolve: tail ${tail_info.tail_id} is not resolved`);
               if (tail_info.sub_dominance) {
                 if (!solution_to_head.issuperof(this.solutions.get(tail_info.tail_id)!)) {
-                  compatible_with_resolved_tails = false;
-                  break;
+                  assert(false,
+                    `resolve: the solution to head ${head}: ${solution_to_head.str()}
+                  is not the super of the solution to tail ${tail_info.tail_id}:
+                  ${this.solutions.get(tail_info.tail_id)!.str()}`);
                 }
               }
               else if (tail_info.super_dominance) {
                 if (!this.solutions.get(tail_info.tail_id)!.issuperof(solution_to_head)) {
-                  compatible_with_resolved_tails = false;
-                  break;
+                  assert(false,
+                    `resolve: the solution to head ${head}: ${solution_to_head.str()}
+                  is not the sub of the solution to tail ${tail_info.tail_id}:
+                  ${this.solutions.get(tail_info.tail_id)!.str()}`);
                 }
               }
               else {
                 if (!this.solutions.get(tail_info.tail_id)!.same(solution_to_head)) {
-                  compatible_with_resolved_tails = false;
-                  break;
+                  assert(false,
+                    `resolve: the solution to head ${head}: ${solution_to_head.str()}
+                  is not the same as the solution to tail ${tail_info.tail_id}:
+                  ${this.solutions.get(tail_info.tail_id)!.str()}`);
                 }
               }
             }
-            assert(compatible_with_resolved_tails,
-              `resolve: the solution to head is not compatible with the solutions to tails`);
           }
           // !Resolve the types of nonheads and nontails.
           this.solutions.set(head, solution_to_head);
@@ -964,31 +967,34 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
           continue;
         }
         if (config.debug) {
-          let compatible_with_resolved_tails = true;
           for (let tail_info of this.node2tail.get(head)!) {
             assert(this.solutions.has(tail_info.tail_id),
               `resolve: tail ${tail_info.tail_id} is not resolved`);
             if (tail_info.sub_dominance) {
               if (!solution_to_head.issuperof(this.solutions.get(tail_info.tail_id)!)) {
-                compatible_with_resolved_tails = false;
-                break;
+                assert(false,
+                  `resolve: the solution to head ${head}: ${solution_to_head.str()}
+                is not the super of the solution to tail ${tail_info.tail_id}:
+                ${this.solutions.get(tail_info.tail_id)!.str()}`);
               }
             }
             else if (tail_info.super_dominance) {
               if (!this.solutions.get(tail_info.tail_id)!.issuperof(solution_to_head)) {
-                compatible_with_resolved_tails = false;
-                break;
+                assert(false,
+                  `resolve: the solution to head ${head}: ${solution_to_head.str()}
+                is not the sub of the solution to tail ${tail_info.tail_id}:
+                ${this.solutions.get(tail_info.tail_id)!.str()}`);
               }
             }
             else {
               if (!this.solutions.get(tail_info.tail_id)!.same(solution_to_head)) {
-                compatible_with_resolved_tails = false;
-                break;
+                assert(false,
+                  `resolve: the solution to head ${head}: ${solution_to_head.str()}
+                is not the same as the solution to tail ${tail_info.tail_id}:
+                ${this.solutions.get(tail_info.tail_id)!.str()}`);
               }
             }
           }
-          assert(compatible_with_resolved_tails,
-            `resolve: the solution to head is not compatible with the solutions to tails`);
         }
         // !Resolve the types of nonheads and nontails.
         this.solutions.set(head, solution_to_head);

@@ -277,7 +277,7 @@ export class ElementaryType extends Type {
         ].filter(t => integer_types.some(tt => tt.same(t)));
       case "address":
         if (this.stateMutability === "payable") {
-          return [TypeProvider.address()];
+          return [TypeProvider.payable_address()];
         }
         else if (this.stateMutability === "nonpayable") {
           return [TypeProvider.payable_address(), TypeProvider.address()];
@@ -383,7 +383,7 @@ export class ElementaryType extends Type {
           return [TypeProvider.payable_address(), TypeProvider.address()];
         }
         else if (this.stateMutability === "nonpayable") {
-          return [TypeProvider.payable_address()];
+          return [TypeProvider.address()];
         }
         else {
           assert(false, `Elementary::sub_dominance: unrecognized stateMutability: ${this.stateMutability}`);
@@ -456,11 +456,11 @@ export class ElementaryType extends Type {
         return false;
       case "address":
         if (this.name !== "address") return false;
-        if (this.stateMutability === "payable") {
+        if (this.stateMutability === "nonpayable") {
           return true;
         }
-        else if (this.stateMutability === "nonpayable") {
-          if (et.stateMutability === "nonpayable") return true;
+        else if (this.stateMutability === "payable") {
+          if (et.stateMutability === "payable") return true;
           return false;
         }
       case "bool":
@@ -517,11 +517,11 @@ export class ElementaryType extends Type {
         return false;
       case "address":
         if (this.name !== "address") return false;
-        if (this.stateMutability === "payable") {
-          if (et.stateMutability === "payable") return true;
+        if (this.stateMutability === "nonpayable") {
+          if (et.stateMutability === "nonpayable") return true;
           return false;
         }
-        else if (this.stateMutability === "nonpayable") {
+        else if (this.stateMutability === "payable") {
           return true;
         }
       case "bool":
@@ -851,7 +851,8 @@ export const address_types : Type[] = [TypeProvider.address(), TypeProvider.paya
 export const elementary_types : Type[] = all_integer_types.concat(bool_types).concat(address_types);
 
 export const type_range_collection : Type[][] = [
-  all_integer_types,
+  integer_types,
+  uinteger_types,
   bool_types,
   address_types
 ];

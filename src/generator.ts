@@ -145,22 +145,12 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
     const body_stmt_count = randomInt(0, config.body_stmt_count_of_function_upperlimit);
     const parameters : decl.IRVariableDeclare[] = [];
     cur_scope = cur_scope.new();
-    console.log('generate paremeters');
     for (let i = 0; i < parameter_count; i++) {
       const variable_gen = new VariableDeclareGenerator(type.elementary_types);
       variable_gen.generate();
       parameters.push(variable_gen.irnode! as decl.IRVariableDeclare);
     }
-    const return_count = randomInt(0, config.return_count_of_function_upperlimit);
-    const return_decls : decl.IRVariableDeclare[] = [];
-    console.log('generate return_decls');
-    for (let i = 0; i < return_count; i++) {
-      const variable_gen = new VariableDeclareGenerator(type.elementary_types);
-      variable_gen.generate();
-      return_decls.push(variable_gen.irnode! as decl.IRVariableDeclare);
-    }
     let body : stmt.IRStatement[] = [];
-    console.log('generate body');
     for (let i = body.length; i < body_stmt_count; i++) {
       const stmt_gen_prototype = pickRandomElement(statement_generators)!;
       const stmt_gen = new stmt_gen_prototype();
@@ -169,10 +159,12 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
       unexpected_extra_vardecls = [];
       body.push(stmt_gen.irnode! as stmt.IRStatement);
     }
+    const return_decls : decl.IRVariableDeclare[] = [];
     const return_values : expr.IRExpression[] = [];
+    const return_count = randomInt(0, config.return_count_of_function_upperlimit);
     for (let i = 0; i < return_count; i++) {
       const expr_gen_prototype = pickRandomElement(all_expression_generators)!;
-      const expr_gen = new expr_gen_prototype(type_dag.solution_range.get(return_decls[i].id)!);
+      const expr_gen = new expr_gen_prototype(type.elementary_types);
       expr_gen.generate(0);
       return_values.push(expr_gen.irnode! as expr.IRExpression);
       let expression_extracted = return_values[i];
@@ -180,6 +172,9 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
         assert(expression_extracted.components.length === 1, "SingleVariableDeclareStatementGenerator: expression_gen_extracted.components.length is not 1");
         expression_extracted = expression_extracted.components[0];
       }
+      const variable_gen = new VariableDeclareGenerator(type.elementary_types);
+      variable_gen.generate();
+      return_decls.push(variable_gen.irnode! as decl.IRVariableDeclare);
       type_dag.connect(expression_extracted.id, return_decls[i].id, "super_dominance");
       typeRangeAlignment(expression_extracted.id, return_decls[i].id);
     }
@@ -324,7 +319,8 @@ export class AssignmentGenerator extends RValueGenerator {
     if (op !== undefined) {
       this.op = op;
     }
-    else if (isEqualSet(type_range, [new type.ElementaryType("bool", "nonpayable")])) {
+    else if (isEqualSet(type_range, type.bool_types)
+      || isEqualSet(type_range, type.address_types)) {
       this.op = "=";
     }
     else if (isSuperSet(type.all_integer_types, type_range) ||
@@ -416,7 +412,7 @@ export class BinaryOpGenerator extends RValueGenerator {
     if (op !== undefined) {
       this.op = op;
     }
-    else if (isEqualSet(type_range, [new type.ElementaryType("bool", "nonpayable")])) {
+    else if (isEqualSet(type_range, type.bool_types)) {
       this.op = pickRandomElement(["&&", "||", ">", "<", "<=", ">=", "==", "!="])!;
     }
     else if (isSuperSet(type.all_integer_types, type_range)) {
@@ -445,10 +441,10 @@ export class BinaryOpGenerator extends RValueGenerator {
     }
     else if (["<", ">", "<=", ">=", "==", "!="].filter((op) => op === this.op).length === 1) {
       type_range = type.all_integer_types;
-      this.type_range = [new type.ElementaryType("bool", "nonpayable")];
+      this.type_range = type.bool_types;
     }
     else { // &&, ||
-      this.type_range = type_range = [new type.ElementaryType("bool", "nonpayable")];
+      this.type_range = type_range = type.bool_types;
     }
     let left_expression : expr.IRExpression;
     let right_expression : expr.IRExpression;
@@ -517,7 +513,7 @@ export class UnaryOpGenerator extends RValueGenerator {
     else if (isEqualSet(type_range, type.elementary_types)) {
       this.op = pickRandomElement(["!", "-", "~", "++", "--"])!;
     }
-    else if (isEqualSet(type_range, [new type.ElementaryType("bool", "nonpayable")])) {
+    else if (isEqualSet(type_range, type.bool_types)) {
       this.op = "!";
     }
     else if (isEqualSet(type_range, type.integer_types) || isEqualSet(type_range, type.all_integer_types)) {
@@ -536,7 +532,7 @@ export class UnaryOpGenerator extends RValueGenerator {
     }
     let type_range;
     if (this.op === "!") {
-      this.type_range = type_range = [new type.ElementaryType("bool", "nonpayable")];
+      this.type_range = type_range = type.bool_types;
     }
     else if (this.op === "~" || this.op === "++" || this.op === "--") {
       if (isEqualSet(this.type_range, type.elementary_types)) {
@@ -585,7 +581,7 @@ export class ConditionalGenerator extends RValueGenerator {
     if (config.debug) {
       console.log(color.redBG(`Starting generating Conditional`));
     }
-    let e1_gen_prototype, e2_gen_prototype, e3_gen_prototype;
+    let e1_gen_prototype, e2_gen_prototype, e3_gen_prototype
     if (component >= config.expression_complex_level) {
       e1_gen_prototype = pickRandomElement(terminal_expression_generators)!;
       e2_gen_prototype = pickRandomElement(terminal_expression_generators)!;
@@ -596,7 +592,7 @@ export class ConditionalGenerator extends RValueGenerator {
       e2_gen_prototype = pickRandomElement(nonterminal_expression_generators)!;
       e3_gen_prototype = pickRandomElement(nonterminal_expression_generators)!;
     }
-    const e1_gen = new e1_gen_prototype([new type.ElementaryType("bool", "nonpayable")]);
+    const e1_gen = new e1_gen_prototype(type.bool_types);
     e1_gen.generate(component + 1);
     let extracted_e1 = e1_gen.irnode!;
     while (extracted_e1 instanceof expr.IRTuple) {
@@ -614,7 +610,14 @@ export class ConditionalGenerator extends RValueGenerator {
       type_dag.solution_range.set(extracted_e2.id, pickRandomElement(type.type_range_collection)!);
       type_dag.tighten_solution_range_from_a_head(extracted_e2.id);
     }
-    const e3_gen = new e3_gen_prototype(type_dag.solution_range.get(extracted_e2.id)!);
+    if (component < config.expression_complex_level)
+      e3_gen_prototype = isEqualSet(
+        type_dag.solution_range.get(extracted_e2.id)!,
+        type.address_types
+      ) ?
+        pickRandomElement(all_expression_generators_for_address_type)! :
+        pickRandomElement(nonterminal_expression_generators)!;
+    const e3_gen = new e3_gen_prototype!(type_dag.solution_range.get(extracted_e2.id)!);
     e3_gen.generate(component + 1);
     this.irnode = new expr.IRConditional(
       global_id++, cur_scope.value(), field_flag, e1_gen.irnode! as expr.IRExpression,
@@ -627,7 +630,7 @@ export class ConditionalGenerator extends RValueGenerator {
       assert(extracted_e3.components.length === 1, "ConditionalGenerator: extracted_e3.components.length is not 1");
       extracted_e3 = extracted_e3.components[0];
     }
-    type_dag.solution_range.set(extracted_e1.id, [new type.ElementaryType("bool", "nonpayable")]);
+    type_dag.solution_range.set(extracted_e1.id, type.bool_types);
     type_dag.solution_range.set(this.irnode.id, type.elementary_types);
     type_dag.connect(extracted_e2.id, extracted_e3.id, "sub_dominance");
     typeRangeAlignment(extracted_e2.id, extracted_e3.id);
@@ -654,6 +657,14 @@ const nonterminal_expression_generators = [
   UnaryOpGenerator,
   ConditionalGenerator
 ]
+
+const all_expression_generators_for_address_type = [
+  AssignmentGenerator,
+  ConditionalGenerator,
+  LiteralGenerator,
+  IdentifierGenerator
+]
+
 const all_expression_generators = [
   LiteralGenerator,
   IdentifierGenerator,
@@ -662,7 +673,6 @@ const all_expression_generators = [
   UnaryOpGenerator,
   ConditionalGenerator
 ]
-
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Statement Generator
 
