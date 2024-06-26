@@ -424,7 +424,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     const uplimit = head_array.reduce((acc, cur) => acc * this.solution_range.get(cur)!.length, 1);
     const solution_range_copy = this.solution_range;
     function* dfs(id : number, head_resolution : Map<number, Node>) : Generator<Map<number, Node>[]> {
-      if (cnt > config.maximum_type_resolution_for_heads) return;
       if (id === head_array.length) {
         local_head_resolution_collection.push(new Map(head_resolution));
         cnt++;
@@ -775,25 +774,26 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       }
     }
     // !Assign types to heads
-    let cnt = 0;
-    let stop = false;
+    let cnt : number = 0;
+    let should_stop = false;
     let stop_until_find_solution_mode = false;
     for (let local_head_resolution_collection of this.allocate_solutions_for_heads_in_chunks()) {
+      console.log('cnt = ', cnt)
       this.solutions.clear();
-      if (stop) break;
+      if (should_stop) break;
       // !Traverse each resolution for heads
       for (const head_resolve of local_head_resolution_collection) {
         this.solutions.clear();
-        if (stop) break;
+        if (should_stop) break;
         cnt++;
-        if (!stop_until_find_solution_mode && cnt >= config.maximum_type_resolution_for_heads) {
+        if (!stop_until_find_solution_mode && (cnt >= config.maximum_type_resolution_for_heads)) {
           if (this.solutions_collection.length > 0) {
-            stop = true;
+            should_stop = true;
+            break;
           }
           else {
             stop_until_find_solution_mode = true;
           }
-          break;
         }
         let good_resolve = true;
         // First, narrow down the solution range of this.tails
@@ -863,8 +863,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         if (good_resolve) {
           this.solutions_collection.push(new Map(this.solutions));
           if (stop_until_find_solution_mode) {
-            stop = true;
-            break;
+            should_stop = true;
           }
         }
       }

@@ -661,12 +661,12 @@ const nonterminal_expression_generators = [
   ConditionalGenerator
 ]
 
-const all_expression_generators_for_address_type = [
-  AssignmentGenerator,
-  ConditionalGenerator,
-  LiteralGenerator,
-  IdentifierGenerator
-]
+// const all_expression_generators_for_address_type = [
+//   AssignmentGenerator,
+//   ConditionalGenerator,
+//   LiteralGenerator,
+//   IdentifierGenerator
+// ]
 
 const all_expression_generators = [
   LiteralGenerator,
