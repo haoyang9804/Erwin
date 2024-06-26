@@ -138,13 +138,8 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
   }
   generate() : void {
     const parameter_count = randomInt(0, config.param_count_of_function_upperlimit);
-    const return_count = randomInt(0, config.return_count_of_function_upperlimit);
+    // const return_count = randomInt(0, config.return_count_of_function_upperlimit);
     const body_stmt_count = randomInt(0, config.body_stmt_count_of_function_upperlimit);
-    if (config.debug) {
-      console.log('parameter_count is ' + parameter_count);
-      console.log('return_count is ' + return_count);
-      console.log('body_stmt_count is ', body_stmt_count);
-    }
     const parameters : decl.IRVariableDeclare[] = [];
     cur_scope = cur_scope.new();
     for (let i = 0; i < parameter_count; i++) {
@@ -173,15 +168,19 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
     const name = generateVarName();
     const virtual = virtual_env;
     const overide = override_env;
-    if (this.state_mutability_range === undefined) {
-      this.state_mutability_range = funcstat.all_func_mutability_stats;
-    }
     const visibility = pickRandomElement([
       FunctionVisibility.External,
       FunctionVisibility.Internal,
       FunctionVisibility.Private,
       FunctionVisibility.Public
     ])
+    if (this.state_mutability_range === undefined) {
+      if (visibility === FunctionVisibility.Internal ||
+          visibility === FunctionVisibility.Private)
+        this.state_mutability_range = funcstat.nonpayable_func_mutability_stats;
+      else
+        this.state_mutability_range = funcstat.all_func_mutability_stats;
+    }
     this.irnode = new decl.IRFunctionDefinition(global_id++, cur_scope.value(), field_flag, name,
       this.kind, virtual, overide, parameters, returns, body, modifiers, visibility);
     irnode_db.insert(this.irnode.id, this.irnode.scope);

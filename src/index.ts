@@ -97,8 +97,8 @@ try {
     gen.type_dag.verify();
     gen.funcstat_dag.verify();
   }
-  console.log(`${gen.type_dag.solutions_collection.length} type resolutions`);
-  console.log(`${gen.funcstat_dag.solutions_collection.length} function state resolutions`);
+  console.log(`${gen.type_dag.solutions_collection.length} type solutions`);
+  console.log(`${gen.funcstat_dag.solutions_collection.length} function state solutions`);
   let type_solutions = pickRandomElement(gen.type_dag.solutions_collection)!;
   for (let [key, value] of type_solutions) {
     if (irnodes[key] instanceof exp.IRLiteral || irnodes[key] instanceof decl.IRVariableDeclare)
