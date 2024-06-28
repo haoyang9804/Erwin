@@ -293,16 +293,26 @@ export class IRFunctionCall extends IRExpression {
 
 export class IRTuple extends IRExpression {
   isInlineArray : boolean | undefined;
-  components : IRExpression[];
-  constructor(id : number, scope : number, field_flag : FieldFlag, components : IRExpression[], isInlineArray ?: boolean) {
+  components : (IRExpression | null)[];
+  constructor(id : number, scope : number, field_flag : FieldFlag, components : (IRExpression | null)[], isInlineArray ?: boolean) {
     super(id, scope, field_flag);
     this.components = components;
     this.isInlineArray = isInlineArray;
   }
   lower() : Expression {
-    const lowered_components = this.components.map((component) => component?.lower() as Expression);
+    const lowered_components = this.components.map(
+      (component) => component !== null ? component!.lower() as Expression : component);
     return factory.makeTupleExpression("", this.isInlineArray === undefined ? false : true, lowered_components);
   }
+}
+
+export function tupleExtraction(tuple_expr : IRExpression) : IRExpression {
+  let extracted_expression = tuple_expr;
+  while (extracted_expression instanceof IRTuple) {
+    assert(extracted_expression.components.length === 1, "BinaryGenerator: right_extracted_expression.components.length is not 1");
+    extracted_expression = extracted_expression.components[0] as IRExpression;
+  }
+  return extracted_expression;
 }
 
 export class IRIndexedAccess extends IRExpression {

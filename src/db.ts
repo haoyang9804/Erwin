@@ -42,18 +42,18 @@ export class DeprecatedDB {
 }
 
 export class DB {
-  private scope_set : Tree<number>;
+  private scope_tree : Tree<number>;
   private scope2IRNodesID : Map<number, number[]>;
   constructor() {
-    this.scope_set = new Tree();
+    this.scope_tree = new Tree();
     this.scope2IRNodesID = new Map<number, number[]>();
   }
   init() {
-    this.scope_set = new Tree();
+    this.scope_tree = new Tree();
     this.scope2IRNodesID = new Map<number, number[]>();
   }
   new_scope(cur_scope : number, parent_scope : number) : void {
-    this.scope_set.insert(parent_scope, cur_scope);
+    this.scope_tree.insert(parent_scope, cur_scope);
   }
   insert(id : number, scope : number) : void {
     if (this.scope2IRNodesID.has(scope)) {
@@ -68,8 +68,8 @@ export class DB {
     while (true) {
       if (this.scope2IRNodesID.has(scope))
         irnodes_ids = irnodes_ids.concat(this.scope2IRNodesID.get(scope)!);
-      if (this.scope_set.hasParent(scope)) {
-        scope = this.scope_set.getParent(scope);
+      if (this.scope_tree.hasParent(scope)) {
+        scope = this.scope_tree.getParent(scope);
       }
       else {
         break;

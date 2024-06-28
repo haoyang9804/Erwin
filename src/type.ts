@@ -286,7 +286,7 @@ export class ElementaryType extends Type {
           assert(false, `Elementary::sub_dominance: unrecognized stateMutability: ${this.stateMutability}`);
         }
       case "bool":
-        return [new ElementaryType("bool", this.stateMutability)];
+        return [TypeProvider.bool()];
       case "string":
         return [new ElementaryType("string", this.stateMutability)];
       case "bytes":
@@ -389,7 +389,7 @@ export class ElementaryType extends Type {
           assert(false, `Elementary::sub_dominance: unrecognized stateMutability: ${this.stateMutability}`);
         }
       case "bool":
-        return [new ElementaryType("bool", this.stateMutability)];
+        return [TypeProvider.bool()];
       case "string":
         return [new ElementaryType("string", this.stateMutability)];
       case "bytes":

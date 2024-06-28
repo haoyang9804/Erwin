@@ -2,6 +2,7 @@ import {
   ASTNode,
   ASTNodeFactory,
 } from "solc-typed-ast"
+import { irnode_db } from "./db";
 
 export enum FieldFlag {
   GLOBAL,
@@ -28,6 +29,8 @@ export abstract class IRNode {
     this.scope = scope;
     this.field_flag = field_flag;
     irnodes.push(this);
+    irnode_db.insert(this.id, this.scope);
+
   }
   abstract lower() : ASTNode;
 }

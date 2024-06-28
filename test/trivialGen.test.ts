@@ -190,3 +190,11 @@ test("test unary op",
   expect(writer.write(uop)).toBe("x");
 }
 )
+
+test("test tuple",
+() => {
+  const literal_1 = factory.makeLiteral("Uh? No idea..", LiteralKind.Number, "", "333");
+  const tuple = factory.makeTupleExpression("", false, [literal_1, null]);
+  expect(writer.write(tuple)).toBe("(333, )");
+}
+)

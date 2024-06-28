@@ -510,10 +510,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         for (let j = i + 1; j < tail_infos_length; j++) {
           const tail_info1 = tail_infos_array[i];
           const tail_info2 = tail_infos_array[j];
-          if (tail_info1.tail_id === 3 && tail_info2.tail_id === 9
-            || tail_info1.tail_id === 9 && tail_info2.tail_id === 3) {
-            console.log('>>> ', _);
-          }
           if (tail_info1.sub_dominance && (!tail_info2.sub_dominance && !tail_info2.super_dominance)) {
             this.tailssub.add(`${tail_info2.tail_id} ${tail_info1.tail_id}`);
           }
@@ -529,6 +525,12 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
           else if ((!tail_info1.sub_dominance && !tail_info1.super_dominance) && (!tail_info2.sub_dominance && !tail_info2.super_dominance)) {
             this.tailsequal.add(`${tail_info1.tail_id} ${tail_info2.tail_id}`);
             this.tailsequal.add(`${tail_info2.tail_id} ${tail_info1.tail_id}`);
+          }
+          else if (tail_info1.sub_dominance && tail_info2.super_dominance) {
+            this.tailssub.add(`${tail_info2.tail_id} ${tail_info1.tail_id}`);
+          }
+          else if (tail_info1.super_dominance && tail_info2.sub_dominance) {
+            this.tailssub.add(`${tail_info1.tail_id} ${tail_info2.tail_id}`);
           }
         }
       }
@@ -778,7 +780,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     let should_stop = false;
     let stop_until_find_solution_mode = false;
     for (let local_head_resolution_collection of this.allocate_solutions_for_heads_in_chunks()) {
-      console.log('cnt = ', cnt)
       this.solutions.clear();
       if (should_stop) break;
       // !Traverse each resolution for heads
