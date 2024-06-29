@@ -752,6 +752,10 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       for (const edge of this.sub_dominance) {
         console.log(color.magenta(edge));
       }
+      console.log(color.magenta("==super_dominance after remove_removable_super_dominance=="));
+      for (const edge of this.super_dominance) {
+        console.log(color.magenta(edge));
+      }
     }
     // !Check before solution range tightening
     for (let head of this.heads) {

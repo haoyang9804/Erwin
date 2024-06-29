@@ -1,6 +1,6 @@
 import subprocess
 
-command = "npx erwin -d -fc 1"
+command = "npx erwin -d -fc 3"
 
 while True:
   p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

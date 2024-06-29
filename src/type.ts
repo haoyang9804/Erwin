@@ -407,6 +407,7 @@ export class ElementaryType extends Type {
       if ((t as ElementaryType).stateMutability === this.stateMutability) {
         return true;
       }
+      return false;
     }
     if ((t as ElementaryType).name === this.name) {
       return true;
