@@ -50,10 +50,11 @@ For instance, the first function call decides the first retured variable to be a
 the second function call decides the first returned variable to be a boolean.
 The second advances in this race since we should generate the argument before the function call.
 Now the first function call believe the first returned variable is an integer while the second function call
-has made it a boolean. So we need to forbid this recursive function calls to the same returned variable
-of the same function definition.
+has made it a boolean. So we need to forbid this recursive function calls to the same function definition.
+To support function call as an argument of another function call to the same function, we need to introduce
+mutators after resolving domination constraints.
 */
-const forbidden_func_returns : Set<string> = new Set<string>();
+const forbidden_funcs : Set<number> = new Set<number>();
 let virtual_env = false;
 let override_env = false;
 let unexpected_extra_stmt : stmt.IRStatement[] = [];
@@ -927,7 +928,7 @@ export class FunctionCallGenerator extends RValueGenerator {
       if (funcdecls.has(id) && (irnodes.get(id)! as decl.IRFunctionDefinition).visibility !== FunctionVisibility.External) {
         let ret_decl_index = 0;
         for (const ret_decl of (irnodes.get(id)! as decl.IRFunctionDefinition).returns) {
-          if (forbidden_func_returns.has(`${id} ${ret_decl_index}`)) continue;
+          if (forbidden_funcs.has(id)) continue;
           if (isSuperSet(this.type_range, type_dag.solution_range.get(ret_decl.id)!)
             || isSuperSet(type_dag.solution_range.get(ret_decl.id)!, this.type_range)) {
             available_funcdecls_ids.push(id);
@@ -979,7 +980,7 @@ export class FunctionCallGenerator extends RValueGenerator {
     const selected_ret_decl = ret_decls[selected_ret_decls_index];
     type_dag.connect(thisid, selected_ret_decl.id);
     typeRangeAlignment(thisid, selected_ret_decl.id);
-    forbidden_func_returns.add(`${funcdecl_id} ${selected_ret_decls_index}`);
+    forbidden_funcs.add(funcdecl_id);
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  The type range of the selected ret decl is ${selected_ret_decls_index}: ${type_dag.solution_range.get(selected_ret_decl.id)!.map(t => t.str())}`));
     }
@@ -1029,7 +1030,7 @@ export class FunctionCallGenerator extends RValueGenerator {
     //! If the function has more than one returns, we need to first generate a tuple of identifiers to
     //! relay the returned variables. And the irnode of this generation is the same as the one of the generated
     //! IRIdentifiers
-    if (funcdecl.returns.length > 0) {
+    if (funcdecl.returns.length > 1) {
       //* generate an identifier
       let type_range_for_identifier = type_dag.solution_range.get(selected_ret_decl.id)!;
       if (isSuperSet(type_range_for_identifier, this.type_range)) {
@@ -1070,6 +1071,8 @@ export class FunctionCallGenerator extends RValueGenerator {
       unexpected_extra_stmt.push(assignment_stmt_node);
       //* 5. This irnode is the same as the identifier irnode which relays the selected returned value
       this.irnode = identifier_gen.irnode!;
+      expr2used_vardecls.set(this.irnode.id, new Set<number>([selected_ret_decl.id]));
+      expr2dominated_vardecls.set(this.irnode.id, new Set<number>([selected_ret_decl.id]));
     }
     else {
       this.irnode = func_call_node;
@@ -1077,7 +1080,7 @@ export class FunctionCallGenerator extends RValueGenerator {
     if (Math.random() < config.tuple_prob) {
       this.irnode = new expr.IRTuple(global_id++, cur_scope.value(), field_flag, [this.irnode as expr.IRExpression]);
     }
-    forbidden_func_returns.delete(`${funcdecl_id} ${selected_ret_decls_index}`);
+    forbidden_funcs.delete(funcdecl_id);
   }
 }
 
