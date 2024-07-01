@@ -13,5 +13,6 @@ export const config = {
   uint_num: 2,
   int_num: 2,
   unit_test_mode: false,
-  chunk_size: 100000
+  chunk_size: 100000,
+  experimental: false
 }

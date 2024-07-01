@@ -18,7 +18,7 @@ export enum FieldFlag {
 }
 
 export const factory = new ASTNodeFactory();
-export const irnodes : IRNode[] = [];
+export const irnodes = new Map<number, IRNode>();
 
 export abstract class IRNode {
   public id : number;
@@ -28,7 +28,7 @@ export abstract class IRNode {
     this.id = id;
     this.scope = scope;
     this.field_flag = field_flag;
-    irnodes.push(this);
+    irnodes.set(this.id, this);
     irnode_db.insert(this.id, this.scope);
 
   }

@@ -30,6 +30,7 @@ program
   .version(version, "-v, --version", "Print package version.")
   .helpOption("-h, --help", "Print help message.");
 program
+  .option("-exprimental", "Enable the exprimental mode.", `${config.experimental}`)
   .option("-itn --int_types_num <number>", "The number of int types Erwin will consider in resolving type dominance.", `${config.int_num}`)
   .option("-utn --uint_types_num <number>", "The number of uint types Erwin will consider in resolving type dominance.", `${config.uint_num}`)
   .option("-bscf --body_stmt_count_of_function_upperlimit <number>", "The upper limit of the number of non-declaration statements of a function. This value is suggested to be bigger than tha value of var_count", `${config.body_stmt_count_of_function_upperlimit}`)
@@ -45,6 +46,7 @@ program
   .option("-d --debug", "Enable the debug mode.", `${config.debug}`)
   .option("-cs --chunk_size <number>", "The size of head solution chunk. The bigger the size is, the more resolutions Erwin will consider in a round.", `${config.chunk_size}`);
 program.parse(process.argv);
+if (program.opts().experimental === true) config.experimental = true;
 config.int_num = parseInt(program.opts().int_types_num);
 config.uint_num = parseInt(program.opts().uint_types_num);
 config.body_stmt_count_of_function_upperlimit = parseInt(program.opts().body_stmt_count_of_function_upperlimit);
@@ -85,11 +87,13 @@ for (let i = 0; i < config.function_count; i++) {
   const f = new gen.FunctionDeclareGenerator();
   f.generate();
 }
-// resolve constraints
-if (config.debug) {
-  gen.type_dag.draw("./type-constraint.svg");
-  gen.funcstat_dag.draw("./funcstat-constraint.svg");
-}
+(async () => {
+  // resolve constraints
+  if (config.debug) {
+    gen.type_dag.draw("./type-constraint.svg");
+    gen.funcstat_dag.draw("./funcstat-constraint.svg");
+  }
+})();
 try {
   const startTime = performance.now()
   gen.type_dag.resolve_by_chunk();
@@ -104,16 +108,16 @@ try {
   console.log(`${gen.funcstat_dag.solutions_collection.length} function state resolutions`);
   let type_solutions = pickRandomElement(gen.type_dag.solutions_collection)!;
   for (let [key, value] of type_solutions) {
-    if (irnodes[key] instanceof expr.IRLiteral || irnodes[key] instanceof decl.IRVariableDeclare)
-      (irnodes[key] as expr.IRLiteral | decl.IRVariableDeclare).type = value;
+    if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclare)
+      (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclare).type = value;
   }
   let funcstat_solutions = pickRandomElement(gen.funcstat_dag.solutions_collection)!;
   for (let [key, value] of funcstat_solutions) {
-    if (irnodes[key] instanceof decl.IRFunctionDefinition)
-      (irnodes[key] as decl.IRFunctionDefinition).stateMutability! = value.kind;
+    if (irnodes.get(key)! instanceof decl.IRFunctionDefinition)
+      (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability! = value.kind;
   }
   for (let id of db.irnode_db.get_IRNodes_by_scope(0)!) {
-    console.log(writer.write(irnodes[id].lower()));
+    console.log(writer.write(irnodes.get(id)!.lower()));
   }
   // for (let irnode of irnodes) {
   //   if (irnode instanceof expr.IRLiteral) {
@@ -125,7 +129,7 @@ try {
   // for (let resolutions of gen.type_dag.resolutions_collection) {
   //   console.log(`>>>>>>>>>> Resolution ${cnt++} <<<<<<<<<<`);
   //   for (let [key, value] of resolutions) {
-  //     (irnodes[key] as expr.IRExpression | decl.IRVariableDeclare).type = value;
+  //     (irnodes.get(key)! as expr.IRExpression | decl.IRVariableDeclare).type = value;
   //   }
   //   for (let stmt of gen.scope_stmt.get(0)!) {
   //     console.log(writer.write(stmt.lower()));

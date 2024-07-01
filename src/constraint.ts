@@ -535,6 +535,19 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         }
       }
     }
+    for (const key of this.tailssub) {
+      const [tail1, tail2] = key.split(" ");
+      if (this.tailssub.has(`${tail2} ${tail1}`)) {
+        this.tailssub.delete(`${tail2} ${tail1}`);
+        this.tailssub.delete(`${tail1} ${tail2}`);
+        this.tailsequal.add(`${tail1} ${tail2}`);
+        this.tailsequal.add(`${tail2} ${tail1}`);
+      }
+      else if (this.tailsequal.has(`${tail2} ${tail1}`) ||
+        this.tailsequal.has(`${tail1} ${tail2}`)) {
+        this.tailssub.delete(key);
+      }
+    }
   }
 
   resolve_tails(tail_solution : Map<number, Node[]>) : boolean {
@@ -642,7 +655,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
               }
             }
             else if (tail_info!.super_dominance) {
-              throw new Error(`resolve_nonheads_and_nontails: ${node} should not be the super_dominance of ${child}`);
+              throw new Error(`resolve_nonheads_and_nontails: ${node} should not be the sub_dominance of ${child}`);
             }
             else {
               const solution_for_tail = this.solutions.get(tail_id)!;
@@ -706,7 +719,9 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         assert(isSuperSet(this.solution_range.get(child)!, this.solution_range.get(node)!),
           `check_solution_range_before_tightening: the solution range of ${child}:
           ${this.solution_range.get(child)!.map(t => t.str())} is not the superset of the solution
-          range of ${node}: ${this.solution_range.get(node)!.map(t => t.str())}`);
+          range of ${node}: ${this.solution_range.get(node)!.map(t => t.str())}.
+          \nBelow are solution ranges for all nodes:\n
+          ${[...this.solution_range.keys()].map(k => `${k}: ${this.solution_range.get(k)!.map(t => t.str())}`).join("\n")}`);
       this.check_solution_range_before_tightening(child);
     }
   }
@@ -766,6 +781,13 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     // !Check after solution range tightening
     for (let head of this.heads) {
       this.check_solution_range_after_tightening(head);
+    }
+    if (config.debug) {
+      console.log(color.green("===solution_range==="));
+      const keys = [...this.solution_range.keys()].sort();
+      for (const key of keys) {
+        console.log(color.green(`${key} -> ${this.solution_range.get(key)!.map(t => t.str())}`));
+      }
     }
     // !Build connection among tails.
     this.build_tails_relation();

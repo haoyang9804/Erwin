@@ -294,3 +294,7 @@ export function min(a : number, b : number) : number {
 export function max(a : number, b : number) : number {
   return a > b ? a : b;
 }
+
+export function mergeSet<T>(a : Set<T>, b : Set<T>) : Set<T> {
+  return new Set([...a, ...b]);
+}

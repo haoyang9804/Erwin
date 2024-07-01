@@ -30,9 +30,9 @@ export class IRPlaceholderStatement extends IRStatement {
 }
 
 export class IRVariableDeclareStatement extends IRStatement {
-  variable_declares : IRVariableDeclare[];
+  variable_declares : (IRVariableDeclare | null)[];
   value : IRExpression;
-  constructor(id : number, scope : number, field_flag : FieldFlag, variable_declares : IRVariableDeclare[], value : IRExpression) {
+  constructor(id : number, scope : number, field_flag : FieldFlag, variable_declares : (IRVariableDeclare | null)[], value : IRExpression) {
     super(id, scope, field_flag);
     this.variable_declares = variable_declares;
     this.value = value;
@@ -42,7 +42,7 @@ export class IRVariableDeclareStatement extends IRStatement {
     if (this.variable_declares.length > 1) {
       assert(this.value instanceof IRTuple, "IRVariableDeclareStatement: value is not IRTuple when there are more than one variable_declares");
     }
-    const lowered_variable_declares = this.variable_declares.map(v => v.lower() as VariableDeclaration);
+    const lowered_variable_declares = (this.variable_declares.filter(v => v !== null) as IRVariableDeclare[]).map(v => v.lower() as VariableDeclaration);
     const assignments = lowered_variable_declares.map(v => v.id);
     return factory.makeVariableDeclarationStatement(assignments, lowered_variable_declares, this.value.lower());
   }
