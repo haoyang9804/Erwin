@@ -105,7 +105,10 @@ function hasAvailableIRVariableDeclareWithTypeConstraint(types : type.Type[]) : 
   return getAvailableIRVariableDeclareWithTypeConstraint(types).length > 0;
 }
 
-function getAvailableIRVariableDeclareWithTypeConstraintWithForbiddenVardeclcs(types : type.Type[], forbidden_vardecls : Set<number>) : decl.IRVariableDeclare[] {
+function getAvailableIRVariableDeclareWithTypeConstraintWithForbiddenVardeclcs(types : type.Type[],
+  forbidden_vardecls : Set<number>,
+  dominated_vardecls_by_dominator : Set<number>) :
+  decl.IRVariableDeclare[] {
   const collection : decl.IRVariableDeclare[] = [];
   const IDs_of_available_irnodes = irnode_db.get_IRNodes_by_scope(cur_scope.value());
   for (let id of IDs_of_available_irnodes) {
@@ -119,15 +122,31 @@ function getAvailableIRVariableDeclareWithTypeConstraintWithForbiddenVardeclcs(t
       }
     }
   }
+
+  let type_range_narrows_down_the_type_range_of_forbidden_vardecls = (type_range : type.Type[]) : boolean => {
+    for (const vardecl of dominated_vardecls_by_dominator) {
+      if (isSuperSet(type_dag.solution_range.get(vardecl)!, type_range)
+        && !isEqualSet(type_dag.solution_range.get(vardecl)!, type_range)) return true;
+    }
+    return false;
+  }
+
   return collection.filter((irdecl) =>
     forbidden_vardecls.has(irdecl.id) ?
       isSuperSet(types, type_dag.solution_range.get(irdecl.id)!) :
-      // isSuperSet(type_dag.solution_range.get(irdecl.id)!, types) ||
-      isSuperSet(types, type_dag.solution_range.get(irdecl.id)!));
+      type_range_narrows_down_the_type_range_of_forbidden_vardecls(type_dag.solution_range.get(irdecl.id)!) ?
+        false :
+        isSuperSet(type_dag.solution_range.get(irdecl.id)!, types) ||
+        isSuperSet(types, type_dag.solution_range.get(irdecl.id)!));
 }
 
-function hasAvailableIRVariableDeclareWithTypeConstraintWithForbiddenVardeclcs(types : type.Type[], forbidden_vardecls : Set<number>) : boolean {
-  return getAvailableIRVariableDeclareWithTypeConstraintWithForbiddenVardeclcs(types, forbidden_vardecls).length > 0;
+function hasAvailableIRVariableDeclareWithTypeConstraintWithForbiddenVardeclcs(types : type.Type[],
+  forbidden_vardecls : Set<number>,
+  dominated_vardecls_by_dominator : Set<number>) :
+  boolean {
+  return getAvailableIRVariableDeclareWithTypeConstraintWithForbiddenVardeclcs(types,
+    forbidden_vardecls,
+    dominated_vardecls_by_dominator).length > 0;
 }
 
 // irnode1 dominates irnode2
@@ -230,7 +249,7 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
     for (let i = 0; i < return_count; i++) {
       //* Generate expr for return
       const expr_gen_prototype = pickRandomElement(all_expression_generators)!;
-      const expr_gen = new expr_gen_prototype(type.elementary_types, new Set<number>());
+      const expr_gen = new expr_gen_prototype(type.elementary_types, new Set<number>(), new Set<number>());
       if (config.debug) indent += 2;
       expr_gen.generate(0);
       if (config.debug) indent -= 2;
@@ -311,12 +330,18 @@ export abstract class ExpressionGenerator extends Generator {
     The operator << determines the type range of id1 is uinteger_types, resulting in the type range of id1 ^= id1 is uinteger_types, which arises a
     conflict since the type range of (id2 << id1) is integer_types.
     To eliminate this conflict, we introduce forbidden_vardecls to forbid the narrowing-down step of pre-decided type range.
+    To simplify, forbidden_vardecls is a set of vardecls that are used by the dominator of the current expr.
+    We also introduce dominated_vardecls_by_dominator to assist the support of forbidden_vardecls.
+    If there exists a dominated vardecl v of the dominator of the current expr that is in forbidden_vardecls,
+      then the type range of the current expr should not narrow down the type range of v.
   */
   forbidden_vardecls : Set<number>;
-  constructor(type_range : type.Type[], forbidden_vardecls : Set<number>) {
+  dominated_vardecls_by_dominator : Set<number>;
+  constructor(type_range : type.Type[], forbidden_vardecls : Set<number>, dominated_vardecls_by_dominator : Set<number>) {
     super();
     this.type_range = type_range;
     this.forbidden_vardecls = forbidden_vardecls;
+    this.dominated_vardecls_by_dominator = dominated_vardecls_by_dominator;
   }
   // If component is 0, the generator will generate a complete statement.
   // Otherwise, the generator will generate a component of a statement.
@@ -328,29 +353,29 @@ export abstract class ExpressionGenerator extends Generator {
 }
 
 export abstract class LValueGenerator extends ExpressionGenerator {
-  constructor(type_range : type.Type[], forbidden_vardecls : Set<number>) {
-    super(type_range, forbidden_vardecls);
+  constructor(type_range : type.Type[], forbidden_vardecls : Set<number>, dominated_vardecls_by_dominator : Set<number>) {
+    super(type_range, forbidden_vardecls, dominated_vardecls_by_dominator);
   }
   abstract generate(component : number) : void;
 }
 
 export abstract class RValueGenerator extends ExpressionGenerator {
-  constructor(type_range : type.Type[], forbidden_vardecls : Set<number>) {
-    super(type_range, forbidden_vardecls);
+  constructor(type_range : type.Type[], forbidden_vardecls : Set<number>, dominated_vardecls_by_dominator : Set<number>) {
+    super(type_range, forbidden_vardecls, dominated_vardecls_by_dominator);
   }
   abstract generate(component : number) : void;
 }
 
 export abstract class LRValueGenerator extends ExpressionGenerator {
-  constructor(type_range : type.Type[], forbidden_vardecls : Set<number>) {
-    super(type_range, forbidden_vardecls);
+  constructor(type_range : type.Type[], forbidden_vardecls : Set<number>, dominated_vardecls_by_dominator : Set<number>) {
+    super(type_range, forbidden_vardecls, dominated_vardecls_by_dominator);
   }
   abstract generate(component : number) : void;
 }
 
 export class LiteralGenerator extends RValueGenerator {
-  constructor(type_range : type.Type[], forbidden_vardecls : Set<number>) {
-    super(type_range, forbidden_vardecls);
+  constructor(type_range : type.Type[], forbidden_vardecls : Set<number>, dominated_vardecls_by_dominator : Set<number>) {
+    super(type_range, forbidden_vardecls, dominated_vardecls_by_dominator);
   }
   generate(component : number) : void {
     if (config.debug) {
@@ -370,27 +395,40 @@ export class LiteralGenerator extends RValueGenerator {
 }
 
 export class IdentifierGenerator extends LRValueGenerator {
-  constructor(type_range : type.Type[], forbidden_vardecls : Set<number>) {
-    super(type_range, forbidden_vardecls);
+  constructor(type_range : type.Type[], forbidden_vardecls : Set<number>, dominated_vardecls_by_dominator : Set<number>) {
+    super(type_range, forbidden_vardecls, dominated_vardecls_by_dominator);
   }
   generate(component : number) : void {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Identifier, type range is ${this.type_range.map(t => t.str())}`));
     }
-    // Generate a variable decl if there is no variable decl available.
-    if (!hasAvailableIRVariableDeclareWithTypeConstraintWithForbiddenVardeclcs(this.type_range, new Set<number>(this.forbidden_vardecls))) {
-      const variable_gen = new SingleVariableDeclareStatementGenerator(this.type_range, new Set<number>(this.forbidden_vardecls));
-      if (config.debug) indent += 2;
-      variable_gen.generate();
-      if (config.debug) indent -= 2;
-      unexpected_extra_stmt.push(variable_gen.irnode! as stmt.IRVariableDeclareStatement);
-    }
-    // generate an identifier
     let irdecl : decl.IRVariableDeclare;
-    const availableIRDecl = getAvailableIRVariableDeclareWithTypeConstraintWithForbiddenVardeclcs(this.type_range, new Set<number>(this.forbidden_vardecls));
-    assert(availableIRDecl !== undefined, "IdentifierGenerator: availableIRDecl is undefined");
-    assert(availableIRDecl.length > 0, "IdentifierGenerator: no available IR irnodes");
-    irdecl = pickRandomElement(availableIRDecl)!;
+    // Generate a variable decl if there is no variable decl available.
+    if (!hasAvailableIRVariableDeclareWithTypeConstraintWithForbiddenVardeclcs(this.type_range,
+      new Set<number>(this.forbidden_vardecls),
+      new Set<number>(this.dominated_vardecls_by_dominator))
+    ) {
+      const variable_stmt_gen = new SingleVariableDeclareStatementGenerator(this.type_range,
+        new Set<number>(this.forbidden_vardecls),
+        new Set<number>(this.dominated_vardecls_by_dominator),
+        true
+      );
+      if (config.debug) indent += 2;
+      variable_stmt_gen.generate();
+      if (config.debug) indent -= 2;
+      unexpected_extra_stmt.push(variable_stmt_gen.irnode! as stmt.IRVariableDeclareStatement);
+      irdecl = (variable_stmt_gen.irnode as stmt.IRVariableDeclareStatement).variable_declares[0] as decl.IRVariableDeclare;
+    }
+    else {
+      const availableIRDecl = getAvailableIRVariableDeclareWithTypeConstraintWithForbiddenVardeclcs(this.type_range,
+        new Set<number>(this.forbidden_vardecls),
+        new Set<number>(this.dominated_vardecls_by_dominator));
+      if (config.debug) {
+        assert(availableIRDecl !== undefined, "IdentifierGenerator: availableIRDecl is undefined");
+        assert(availableIRDecl.length > 0, "IdentifierGenerator: no available IR irnodes");
+      }
+      irdecl = pickRandomElement(availableIRDecl)!;
+    }
     this.irnode = new expr.IRIdentifier(global_id++, cur_scope.value(), field_flag, irdecl.name, irdecl.id);
     type_dag.insert(type_dag.newNode(this.irnode.id));
     type_dag.connect(this.irnode.id, irdecl.id);
@@ -411,8 +449,8 @@ type ASSIOP = "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | "&=" | "^
 export class AssignmentGenerator extends RValueGenerator {
   op : ASSIOP;
 
-  constructor(type_range : type.Type[], forbidden_vardecls : Set<number>, op ?: ASSIOP) {
-    super(type_range, forbidden_vardecls);
+  constructor(type_range : type.Type[], forbidden_vardecls : Set<number>, dominated_vardecls_by_dominator : Set<number>, op ?: ASSIOP) {
+    super(type_range, forbidden_vardecls, dominated_vardecls_by_dominator);
     if (op !== undefined) {
       this.op = op;
     }
@@ -451,7 +489,9 @@ export class AssignmentGenerator extends RValueGenerator {
       }
     }
     //! Generate the left-hand-side identifier
-    const identifier_gen = new IdentifierGenerator(type_range, new Set<number>(this.forbidden_vardecls));
+    const identifier_gen = new IdentifierGenerator(type_range,
+      new Set<number>(this.forbidden_vardecls),
+      new Set<number>(this.dominated_vardecls_by_dominator));
     if (config.debug) indent += 2;
     identifier_gen.generate(component + 1);
     if (config.debug) indent -= 2;
@@ -473,13 +513,21 @@ export class AssignmentGenerator extends RValueGenerator {
     }
     let right_expression_gen;
     const forbidden_vardecls_for_right = mergeSet(expr2used_vardecls.get(left_extracted_expression.id)!, this.forbidden_vardecls);
+    const dominated_vardecls_by_dominator_for_right = this.left_dominate_right() ?
+      mergeSet(expr2dominated_vardecls.get(left_extracted_expression.id)!,
+        this.dominated_vardecls_by_dominator) :
+      new Set<number>();
     if (!this.left_dominate_right()) {
-      right_expression_gen = new right_expression_gen_prototype(type.uinteger_types, forbidden_vardecls_for_right);
+      right_expression_gen = new right_expression_gen_prototype(type.uinteger_types,
+        forbidden_vardecls_for_right,
+        dominated_vardecls_by_dominator_for_right);
     }
     else {
-      right_expression_gen = new right_expression_gen_prototype(
-        isSuperSet(type_range, type_dag.solution_range.get(left_extracted_expression.id)!) ?
-          type_dag.solution_range.get(left_extracted_expression.id)! : type_range, forbidden_vardecls_for_right);
+      right_expression_gen = new right_expression_gen_prototype(isSuperSet(type_range,
+        type_dag.solution_range.get(left_extracted_expression.id)!) ?
+        type_dag.solution_range.get(left_extracted_expression.id)! :
+        type_range, forbidden_vardecls_for_right,
+        dominated_vardecls_by_dominator_for_right);
     }
     if (config.debug) indent += 2;
     right_expression_gen.generate(component + 1);
@@ -495,8 +543,14 @@ export class AssignmentGenerator extends RValueGenerator {
       const dominated_vardecls_of_right = expr2dominated_vardecls.get(right_extracted_expression.id)!;
       for (const left_vardecl of dominated_vardecls_of_left) {
         for (const right_vardecl of dominated_vardecls_of_right) {
-          vardecl2vardecls_of_the_same_type_range.set(left_vardecl, mergeSet(vardecl2vardecls_of_the_same_type_range.get(left_vardecl)!, dominated_vardecls_of_right));
-          vardecl2vardecls_of_the_same_type_range.set(right_vardecl, mergeSet(vardecl2vardecls_of_the_same_type_range.get(right_vardecl)!, dominated_vardecls_of_left));
+          vardecl2vardecls_of_the_same_type_range.set(left_vardecl,
+            mergeSet(vardecl2vardecls_of_the_same_type_range.get(left_vardecl)!,
+              dominated_vardecls_of_right)
+          );
+          vardecl2vardecls_of_the_same_type_range.set(right_vardecl,
+            mergeSet(vardecl2vardecls_of_the_same_type_range.get(right_vardecl)!,
+              dominated_vardecls_of_left)
+          );
         }
       }
       expr2dominated_vardecls.set(thisid, mergeSet(expr2dominated_vardecls.get(thisid)!, dominated_vardecls_of_right));
@@ -528,8 +582,8 @@ type BOP = "+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "<" | ">" | "<=" | ">=" |
 
 export class BinaryOpGenerator extends RValueGenerator {
   op : BOP;
-  constructor(type_range : type.Type[], forbidden_vardecls : Set<number>, op ?: BOP) {
-    super(type_range, forbidden_vardecls);
+  constructor(type_range : type.Type[], forbidden_vardecls : Set<number>, dominated_vardecls_by_dominator : Set<number>, op ?: BOP) {
+    super(type_range, forbidden_vardecls, dominated_vardecls_by_dominator);
     if (op !== undefined) {
       this.op = op;
     }
@@ -592,7 +646,12 @@ export class BinaryOpGenerator extends RValueGenerator {
       right_expression_gen_prototype = pickRandomElement(nonterminal_expression_generators)!;
     }
     //! Generate left-hand-side expression
-    left_expression_gen = new left_expression_gen_prototype(type_range, new Set<number>(this.forbidden_vardecls));
+    const dominated_vardecls_by_dominator_for_left = this.this_dominates_left() ?
+      new Set<number>(this.dominated_vardecls_by_dominator) :
+      new Set<number>();
+    left_expression_gen = new left_expression_gen_prototype(type_range,
+      new Set<number>(this.forbidden_vardecls),
+      dominated_vardecls_by_dominator_for_left);
     if (config.debug) indent += 2;
     left_expression_gen.generate(component + 1);
     if (config.debug) indent -= 2;
@@ -604,11 +663,19 @@ export class BinaryOpGenerator extends RValueGenerator {
       expr2dominated_vardecls.set(thisid, expr2dominated_vardecls.get(left_extracted_expression.id)!);
     //! Generate right-hand-side expression
     const forbidden_vardecls_for_right = mergeSet(expr2used_vardecls.get(left_extracted_expression.id)!, this.forbidden_vardecls);
+    const dominated_vardecls_by_dominator_for_right = this.left_dominate_right() ?
+      mergeSet(expr2dominated_vardecls.get(left_extracted_expression.id)!,
+        dominated_vardecls_by_dominator_for_left) :
+      new Set<number>();
     if (!this.left_dominate_right()) {
-      right_expression_gen = new right_expression_gen_prototype(type.uinteger_types, forbidden_vardecls_for_right);
+      right_expression_gen = new right_expression_gen_prototype(type.uinteger_types,
+        forbidden_vardecls_for_right,
+        dominated_vardecls_by_dominator_for_right);
     }
     else {
-      right_expression_gen = new right_expression_gen_prototype(type_dag.solution_range.get(left_extracted_expression.id)!, forbidden_vardecls_for_right);
+      right_expression_gen = new right_expression_gen_prototype(type_dag.solution_range.get(left_extracted_expression.id)!,
+        forbidden_vardecls_for_right,
+        dominated_vardecls_by_dominator_for_right);
     }
     if (config.debug) indent += 2;
     right_expression_gen.generate(component + 1);
@@ -656,8 +723,8 @@ type UOP = "!" | "-" | "~" | "++" | "--";
 //TODO: create a delete Statement Generator
 export class UnaryOpGenerator extends RValueGenerator {
   op : UOP;
-  constructor(type_range : type.Type[], forbidden_vardecls : Set<number>, op ?: UOP) {
-    super(type_range, forbidden_vardecls);
+  constructor(type_range : type.Type[], forbidden_vardecls : Set<number>, dominated_vardecls_by_dominator : Set<number>, op ?: UOP) {
+    super(type_range, forbidden_vardecls, dominated_vardecls_by_dominator);
     if (op !== undefined) {
       this.op = op;
     }
@@ -702,7 +769,9 @@ export class UnaryOpGenerator extends RValueGenerator {
       throw new Error(`UnaryOpGenerator constructor: type_range ${this.type_range.map(t => t.str())} is invalid`);
     }
     //! Generate identifier
-    const identifier_gen = new IdentifierGenerator(type_range, new Set<number>(this.forbidden_vardecls));
+    const identifier_gen = new IdentifierGenerator(type_range,
+      new Set<number>(this.forbidden_vardecls),
+      new Set<number>(this.dominated_vardecls_by_dominator));
     if (config.debug) indent += 2;
     identifier_gen.generate(component + 1);
     if (config.debug) indent -= 2;
@@ -727,8 +796,8 @@ export class UnaryOpGenerator extends RValueGenerator {
 }
 
 export class ConditionalGenerator extends RValueGenerator {
-  constructor(type_range : type.Type[], forbidden_vardecls : Set<number>) {
-    super(type_range, forbidden_vardecls);
+  constructor(type_range : type.Type[], forbidden_vardecls : Set<number>, dominated_vardecls_by_dominator : Set<number>) {
+    super(type_range, forbidden_vardecls, dominated_vardecls_by_dominator);
   }
   generate(component : number) : void {
     if (config.debug) {
@@ -745,7 +814,9 @@ export class ConditionalGenerator extends RValueGenerator {
       e1_gen_prototype = pickRandomElement(nonterminal_expression_generators)!;
     }
     //! Generate e1
-    const e1_gen = new e1_gen_prototype(type.bool_types, new Set<number>(this.forbidden_vardecls));
+    const e1_gen = new e1_gen_prototype(type.bool_types,
+      new Set<number>(this.forbidden_vardecls),
+      new Set<number>());
     if (config.debug) indent += 2;
     e1_gen.generate(component + 1);
     if (config.debug) indent -= 2;
@@ -764,7 +835,9 @@ export class ConditionalGenerator extends RValueGenerator {
     }
     //! Generate e2
     const forbidden_vardecl_for_e2 = mergeSet(expr2used_vardecls.get(extracted_e1.id)!, this.forbidden_vardecls);
-    const e2_gen = new e2_gen_prototype(this.type_range, forbidden_vardecl_for_e2);
+    const e2_gen = new e2_gen_prototype(this.type_range,
+      forbidden_vardecl_for_e2,
+      new Set<number>(this.dominated_vardecls_by_dominator));
     if (config.debug) indent += 2;
     e2_gen.generate(component + 1);
     if (config.debug) indent -= 2;
@@ -785,7 +858,11 @@ export class ConditionalGenerator extends RValueGenerator {
     }
     //! Generate e3
     const forbidden_vardecl_for_e3 = mergeSet(expr2used_vardecls.get(extracted_e2.id)!, forbidden_vardecl_for_e2);
-    const e3_gen = new e3_gen_prototype!(type_range_of_extracted_e2, forbidden_vardecl_for_e3);
+    const e3_gen = new e3_gen_prototype!(type_range_of_extracted_e2,
+      forbidden_vardecl_for_e3,
+      mergeSet(this.dominated_vardecls_by_dominator,
+        expr2dominated_vardecls.get(extracted_e2.id)!)
+    );
     if (config.debug) indent += 2;
     e3_gen.generate(component + 1);
     if (config.debug) indent -= 2;
@@ -824,8 +901,8 @@ export class ConditionalGenerator extends RValueGenerator {
 
 export class FunctionCallGenerator extends RValueGenerator {
   kind : FunctionCallKind | undefined;
-  constructor(type_range : type.Type[], forbidden_vardecls : Set<number>, kind ?: FunctionCallKind) {
-    super(type_range, forbidden_vardecls);
+  constructor(type_range : type.Type[], forbidden_vardecls : Set<number>, dominated_vardecls_by_dominator : Set<number>, kind ?: FunctionCallKind) {
+    super(type_range, forbidden_vardecls, dominated_vardecls_by_dominator);
     this.kind = kind;
     if (this.kind === undefined) {
       this.kind = FunctionCallKind.FunctionCall;
@@ -835,7 +912,9 @@ export class FunctionCallGenerator extends RValueGenerator {
     //! If component reaches the maximum, generate an terminal expression
     if (component >= config.expression_complex_level) {
       const expression_gen_prototype = pickRandomElement(terminal_expression_generators)!;
-      const expression_gen = new expression_gen_prototype(this.type_range, new Set<number>(this.forbidden_vardecls));
+      const expression_gen = new expression_gen_prototype(this.type_range,
+        new Set<number>(this.forbidden_vardecls),
+        new Set<number>(this.dominated_vardecls_by_dominator));
       expression_gen.generate(component);
       this.irnode = expression_gen.irnode;
       return;
@@ -867,7 +946,9 @@ export class FunctionCallGenerator extends RValueGenerator {
       else {
         expression_gen_prototype = pickRandomElement(non_funccall_expression_generators)!;
       }
-      const expression_gen = new expression_gen_prototype(this.type_range, new Set<number>(this.forbidden_vardecls));
+      const expression_gen = new expression_gen_prototype(this.type_range,
+        new Set<number>(this.forbidden_vardecls),
+        new Set<number>(this.dominated_vardecls_by_dominator));
       expression_gen.generate(component);
       this.irnode = expression_gen.irnode;
       return;
@@ -919,7 +1000,9 @@ export class FunctionCallGenerator extends RValueGenerator {
         else
           arg_gen_prototype = pickRandomElement(nonterminal_expression_generators)!;
       }
-      const arg_gen = new arg_gen_prototype(type_range, new Set<number>(this.forbidden_vardecls));
+      const arg_gen = new arg_gen_prototype(type_range,
+        new Set<number>(this.forbidden_vardecls),
+        new Set<number>(this.dominated_vardecls_by_dominator));
       if (config.debug) indent += 2;
       arg_gen.generate(component + 1);
       if (config.debug) indent -= 2;
@@ -952,7 +1035,9 @@ export class FunctionCallGenerator extends RValueGenerator {
       if (isSuperSet(type_range_for_identifier, this.type_range)) {
         type_range_for_identifier = this.type_range;
       }
-      const identifier_gen = new IdentifierGenerator(type_range_for_identifier, new Set<number>(this.forbidden_vardecls));
+      const identifier_gen = new IdentifierGenerator(type_range_for_identifier,
+        new Set<number>(this.forbidden_vardecls),
+        new Set<number>(this.dominated_vardecls_by_dominator));
       if (config.debug) indent += 2;
       identifier_gen.generate(component + 1);
       if (config.debug) indent -= 2;
@@ -1070,10 +1155,14 @@ export abstract class StatementGenerator extends Generator {
 export class SingleVariableDeclareStatementGenerator extends StatementGenerator {
   type_range : type.Type[] | undefined;
   forbidden_vardecls : Set<number> | undefined;
-  constructor(type_range ?: type.Type[], forbidden_vardecls ?: Set<number>) {
+  dominated_vardecls_by_dominator : Set<number> | undefined;
+  generate_literal : boolean = false;
+  constructor(type_range ?: type.Type[], forbidden_vardecls ?: Set<number>, dominated_vardecls_by_dominator ?: Set<number>, generate_literal ?: boolean) {
     super();
     this.type_range = type_range;
     this.forbidden_vardecls = forbidden_vardecls;
+    this.dominated_vardecls_by_dominator = dominated_vardecls_by_dominator;
+    if (generate_literal !== undefined) this.generate_literal = generate_literal;
   }
   generate() : void {
     if (this.type_range === undefined) this.type_range = type.elementary_types;
@@ -1082,13 +1171,16 @@ export class SingleVariableDeclareStatementGenerator extends StatementGenerator 
     }
     let expression_gen_prototype;
     let expression_gen;
-    if (
-      (
-        this.type_range === undefined && this.forbidden_vardecls === undefined && hasAvailableIRVariableDeclare() ||
-        this.type_range !== undefined && this.forbidden_vardecls === undefined && hasAvailableIRVariableDeclareWithTypeConstraint(this.type_range) ||
-        this.type_range !== undefined && this.forbidden_vardecls !== undefined && hasAvailableIRVariableDeclareWithTypeConstraintWithForbiddenVardeclcs(this.type_range, new Set<number>(this.forbidden_vardecls))
-      ) &&
-      Math.random() > config.literal_prob
+    if (!this.generate_literal &&
+      ((
+        this.type_range === undefined && hasAvailableIRVariableDeclare() ||
+        this.type_range !== undefined && this.forbidden_vardecls === undefined && this.dominated_vardecls_by_dominator === undefined &&
+        hasAvailableIRVariableDeclareWithTypeConstraint(this.type_range) ||
+        this.type_range !== undefined && this.forbidden_vardecls !== undefined && this.dominated_vardecls_by_dominator !== undefined &&
+        hasAvailableIRVariableDeclareWithTypeConstraintWithForbiddenVardeclcs(this.type_range,
+          new Set<number>(this.forbidden_vardecls),
+          new Set<number>(this.dominated_vardecls_by_dominator))
+      ) && Math.random() > config.literal_prob)
     ) {
       if (isEqualSet(this.type_range, type.address_types)) {
         expression_gen_prototype = pickRandomElement(all_expression_generators_for_address_types)!;
@@ -1096,10 +1188,10 @@ export class SingleVariableDeclareStatementGenerator extends StatementGenerator 
       else {
         expression_gen_prototype = pickRandomElement(all_expression_generators)!;
       }
-      expression_gen = new expression_gen_prototype(this.type_range, new Set<number>());
+      expression_gen = new expression_gen_prototype(this.type_range, new Set<number>(), new Set<number>());
     }
     else {
-      expression_gen = new LiteralGenerator(this.type_range, new Set<number>());
+      expression_gen = new LiteralGenerator(this.type_range, new Set<number>(), new Set<number>());
     }
     if (config.debug) indent += 2;
     expression_gen.generate(0);
@@ -1146,7 +1238,7 @@ export class MultipleVariableDeclareStatementGenerator extends StatementGenerato
       else {
         expression_gen_prototype = LiteralGenerator;
       }
-      const expression_gen = new expression_gen_prototype(type.elementary_types, new Set<number>());
+      const expression_gen = new expression_gen_prototype(type.elementary_types, new Set<number>(), new Set<number>());
       if (config.debug) indent += 2;
       expression_gen.generate(0);
       if (config.debug) indent -= 2;
@@ -1181,7 +1273,7 @@ export class AssignmentStatementGenerator extends ExpressionStatementGenerator {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating AssignmentStatement`));
     }
-    const assignment_gen = new AssignmentGenerator(type.elementary_types, new Set<number>());
+    const assignment_gen = new AssignmentGenerator(type.elementary_types, new Set<number>(), new Set<number>());
     if (config.debug) indent += 2;
     assignment_gen.generate(0);
     if (config.debug) indent -= 2;
@@ -1195,7 +1287,7 @@ export class BinaryOpStatementGenerator extends ExpressionStatementGenerator {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating BinaryOpStatement`));
     }
-    const assignment_gen = new BinaryOpGenerator(type.elementary_types, new Set<number>());
+    const assignment_gen = new BinaryOpGenerator(type.elementary_types, new Set<number>(), new Set<number>());
     if (config.debug) indent += 2;
     assignment_gen.generate(0);
     if (config.debug) indent -= 2;
@@ -1209,7 +1301,7 @@ export class UnaryOpStatementGenerator extends ExpressionStatementGenerator {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating UnaryOpStatement`));
     }
-    const assignment_gen = new UnaryOpGenerator(type.elementary_types, new Set<number>());
+    const assignment_gen = new UnaryOpGenerator(type.elementary_types, new Set<number>(), new Set<number>());
     if (config.debug) indent += 2;
     assignment_gen.generate(0);
     if (config.debug) indent -= 2;
@@ -1223,7 +1315,7 @@ export class ConditionalStatementGenerator extends StatementGenerator {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating ConditionalStatement`));
     }
-    const conditional_gen = new ConditionalGenerator(type.elementary_types, new Set<number>());
+    const conditional_gen = new ConditionalGenerator(type.elementary_types, new Set<number>(), new Set<number>());
     if (config.debug) indent += 2;
     conditional_gen.generate(0);
     if (config.debug) indent -= 2;
@@ -1243,7 +1335,7 @@ export class ReturnStatementGenerator extends StatementGenerator {
     }
     if (this.value === undefined) {
       const expression_gen_prototype = pickRandomElement(all_expression_generators)!;
-      const expression_gen = new expression_gen_prototype(type.elementary_types, new Set<number>());
+      const expression_gen = new expression_gen_prototype(type.elementary_types, new Set<number>(), new Set<number>());
       if (config.debug) indent += 2;
       expression_gen.generate(0);
       if (config.debug) indent -= 2;
