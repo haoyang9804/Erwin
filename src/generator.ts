@@ -910,6 +910,21 @@ export class FunctionCallGenerator extends RValueGenerator {
     }
   }
   generate(component : number) : void {
+    let type_range_narrows_down_the_type_range_of_dominated_vardecls = (type_range : type.Type[]) : boolean => {
+      for (const vardecl of this.dominated_vardecls_by_dominator) {
+        if (isSuperSet(type_dag.solution_range.get(vardecl)!, type_range)
+          && !isEqualSet(type_dag.solution_range.get(vardecl)!, type_range)) return true;
+      }
+      return false;
+    };
+    let return_is_good = (ret_decl : number) : boolean => {
+      return this.forbidden_vardecls.has(ret_decl) ?
+        isSuperSet(this.type_range, type_dag.solution_range.get(ret_decl)!) :
+        type_range_narrows_down_the_type_range_of_dominated_vardecls(this.type_range) ?
+          false :
+          isSuperSet(this.type_range, type_dag.solution_range.get(ret_decl)!)
+          || isSuperSet(type_dag.solution_range.get(ret_decl)!, this.type_range)
+    };
     //! If component reaches the maximum, generate an terminal expression
     if (component >= config.expression_complex_level) {
       const expression_gen_prototype = pickRandomElement(terminal_expression_generators)!;
@@ -929,8 +944,7 @@ export class FunctionCallGenerator extends RValueGenerator {
         let ret_decl_index = 0;
         for (const ret_decl of (irnodes.get(id)! as decl.IRFunctionDefinition).returns) {
           if (forbidden_funcs.has(id)) continue;
-          if (isSuperSet(this.type_range, type_dag.solution_range.get(ret_decl.id)!)
-            || isSuperSet(type_dag.solution_range.get(ret_decl.id)!, this.type_range)) {
+          if (return_is_good(ret_decl.id)) {
             available_funcdecls_ids.push(id);
             break;
           }
@@ -971,8 +985,7 @@ export class FunctionCallGenerator extends RValueGenerator {
     const ret_decls = funcdecl.returns;
     const available_ret_decls_index : number[] = [];
     for (let i = 0; i < ret_decls.length; i++) {
-      if (isSuperSet(this.type_range, type_dag.solution_range.get(ret_decls[i].id)!)
-        || isSuperSet(type_dag.solution_range.get(ret_decls[i].id)!, this.type_range)) {
+      if (return_is_good(ret_decls[i].id)) {
         available_ret_decls_index.push(i);
       }
     }
@@ -986,6 +999,7 @@ export class FunctionCallGenerator extends RValueGenerator {
     }
     //! Then generate expressions as arguments
     if (config.debug) {
+      indent += 2;
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating FunctionCall Arguments`));
     }
     const args_ids : number[] = [];
@@ -1021,6 +1035,7 @@ export class FunctionCallGenerator extends RValueGenerator {
     }
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}<<  Finish generating FunctionCall Arguments`));
+      indent -= 2;
     }
     //! Generate an function call and select which returned value will be used
     const func_call_node = new expr.IRFunctionCall(thisid, cur_scope.value(), field_flag, this.kind!,
@@ -1081,6 +1096,8 @@ export class FunctionCallGenerator extends RValueGenerator {
       this.irnode = new expr.IRTuple(global_id++, cur_scope.value(), field_flag, [this.irnode as expr.IRExpression]);
     }
     forbidden_funcs.delete(funcdecl_id);
+    if (config.debug)
+      console.log(color.yellowBG(`${" ".repeat(indent)}${thisid}: FunctionCall, id: ${thisid} scope: ${cur_scope.value()}, type: ${type_dag.solution_range.get(thisid)!.map(t => t.str())}`));
   }
 }
 
