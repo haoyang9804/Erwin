@@ -116,6 +116,12 @@ function getAvailableIRVariableDeclareWithTypeConstraintWithForbiddenVardeclcs(t
     if (vardecls.has(id)) collection.push(irnodes.get(id)! as decl.IRVariableDeclare);
   }
 
+  for (const dominated_vardecl of dominated_vardecls_by_dominator) {
+    for (const vardecl of vardecl2vardecls_of_the_same_type_range.get(dominated_vardecl)!) {
+      dominated_vardecls_by_dominator.add(vardecl);
+    }
+  }
+
   for (const vardecl of forbidden_vardecls) {
     for (const dominated_vardecl of vardecl2vardecls_of_the_same_type_range.get(vardecl)!) {
       if (!forbidden_vardecls.has(dominated_vardecl)) {
@@ -133,10 +139,10 @@ function getAvailableIRVariableDeclareWithTypeConstraintWithForbiddenVardeclcs(t
   }
 
   return collection.filter((irdecl) =>
-    forbidden_vardecls.has(irdecl.id) ?
-      isSuperSet(types, type_dag.solution_range.get(irdecl.id)!) :
-      type_range_narrows_down_the_type_range_of_forbidden_vardecls(type_dag.solution_range.get(irdecl.id)!) ?
-        false :
+    type_range_narrows_down_the_type_range_of_forbidden_vardecls(type_dag.solution_range.get(irdecl.id)!) ?
+      false :
+      forbidden_vardecls.has(irdecl.id) ?
+        isSuperSet(types, type_dag.solution_range.get(irdecl.id)!) :
         isSuperSet(type_dag.solution_range.get(irdecl.id)!, types) ||
         isSuperSet(types, type_dag.solution_range.get(irdecl.id)!));
 }
@@ -690,8 +696,12 @@ export class BinaryOpGenerator extends RValueGenerator {
       const dominated_vardecls_of_right = expr2dominated_vardecls.get(right_extracted_expression.id)!;
       for (const left_vardecl of dominated_vardecls_of_left) {
         for (const right_vardecl of dominated_vardecls_of_right) {
-          vardecl2vardecls_of_the_same_type_range.set(left_vardecl, mergeSet(vardecl2vardecls_of_the_same_type_range.get(left_vardecl)!, dominated_vardecls_of_right));
-          vardecl2vardecls_of_the_same_type_range.set(right_vardecl, mergeSet(vardecl2vardecls_of_the_same_type_range.get(right_vardecl)!, dominated_vardecls_of_left));
+          vardecl2vardecls_of_the_same_type_range.set(left_vardecl,
+            mergeSet(vardecl2vardecls_of_the_same_type_range.get(left_vardecl)!,
+              dominated_vardecls_of_right));
+          vardecl2vardecls_of_the_same_type_range.set(right_vardecl,
+            mergeSet(vardecl2vardecls_of_the_same_type_range.get(right_vardecl)!,
+              dominated_vardecls_of_left));
         }
       }
       expr2dominated_vardecls.set(thisid,
@@ -879,8 +889,12 @@ export class ConditionalGenerator extends RValueGenerator {
     const dominated_vardecls_of_right = expr2dominated_vardecls.get(extracted_e3.id)!;
     for (const left_vardecl of dominated_vardecls_of_left) {
       for (const right_vardecl of dominated_vardecls_of_right) {
-        vardecl2vardecls_of_the_same_type_range.set(left_vardecl, mergeSet(vardecl2vardecls_of_the_same_type_range.get(left_vardecl)!, dominated_vardecls_of_right));
-        vardecl2vardecls_of_the_same_type_range.set(right_vardecl, mergeSet(vardecl2vardecls_of_the_same_type_range.get(right_vardecl)!, dominated_vardecls_of_left));
+        vardecl2vardecls_of_the_same_type_range.set(left_vardecl,
+          mergeSet(vardecl2vardecls_of_the_same_type_range.get(left_vardecl)!,
+            dominated_vardecls_of_right));
+        vardecl2vardecls_of_the_same_type_range.set(right_vardecl,
+          mergeSet(vardecl2vardecls_of_the_same_type_range.get(right_vardecl)!,
+            dominated_vardecls_of_left));
       }
     }
     expr2dominated_vardecls.set(thisid, mergeSet(expr2dominated_vardecls.get(thisid)!, dominated_vardecls_of_right));
@@ -910,18 +924,24 @@ export class FunctionCallGenerator extends RValueGenerator {
     }
   }
   generate(component : number) : void {
+    const dominated_vardecls_by_dominator_copy = new Set<number>(this.dominated_vardecls_by_dominator);
+    for (const dominated_vardecl of dominated_vardecls_by_dominator_copy) {
+      for (const vardecl of vardecl2vardecls_of_the_same_type_range.get(dominated_vardecl)!) {
+        dominated_vardecls_by_dominator_copy.add(vardecl);
+      }
+    }
     let type_range_narrows_down_the_type_range_of_dominated_vardecls = (type_range : type.Type[]) : boolean => {
-      for (const vardecl of this.dominated_vardecls_by_dominator) {
+      for (const vardecl of dominated_vardecls_by_dominator_copy) {
         if (isSuperSet(type_dag.solution_range.get(vardecl)!, type_range)
           && !isEqualSet(type_dag.solution_range.get(vardecl)!, type_range)) return true;
       }
       return false;
     };
     let return_is_good = (ret_decl : number) : boolean => {
-      return this.forbidden_vardecls.has(ret_decl) ?
-        isSuperSet(this.type_range, type_dag.solution_range.get(ret_decl)!) :
-        type_range_narrows_down_the_type_range_of_dominated_vardecls(this.type_range) ?
-          false :
+      return type_range_narrows_down_the_type_range_of_dominated_vardecls(this.type_range) ?
+        false :
+        this.forbidden_vardecls.has(ret_decl) ?
+          isSuperSet(this.type_range, type_dag.solution_range.get(ret_decl)!) :
           isSuperSet(this.type_range, type_dag.solution_range.get(ret_decl)!)
           || isSuperSet(type_dag.solution_range.get(ret_decl)!, this.type_range)
     };
