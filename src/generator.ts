@@ -70,6 +70,7 @@ const forbidden_funcs : Set<number> = new Set<number>();
 let virtual_env = false;
 let override_env = false;
 let unexpected_extra_stmt : stmt.IRStatement[] = [];
+let state_variables: Set<number> = new Set<number>();
 // Record statements in each scope.
 export const scope2userDefinedTypes = new Map<number, number>();
 export const type_dag = new TypeDominanceDAG();
@@ -240,6 +241,7 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
       indent += 2;
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Parameters, ${parameter_count} in total`));
     }
+    //! Generate parameters
     for (let i = 0; i < parameter_count; i++) {
       const variable_gen = new VariableDeclareGenerator(type.elementary_types);
       if (config.debug) indent += 2;
@@ -247,20 +249,29 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
       if (config.debug) indent -= 2;
       parameters.push(variable_gen.irnode! as decl.IRVariableDeclare);
     }
+    //! Generate function body. Body includes exprstmts and the return stmt.
     let body : stmt.IRStatement[] = [];
+    // used_vardecls is a set that records the vardecls used by the body.
+    const used_vardecls : Set<number> = new Set<number>();
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Body, ${body_stmt_count} in total`));
     }
+    //! Here we generate exprstmts.
     for (let i = body.length; i < body_stmt_count; i++) {
-      const stmt_gen_prototype = pickRandomElement(statement_generators)!;
-      const stmt_gen = new stmt_gen_prototype();
+      const stmt_gen_prototype = pickRandomElement(expr_statement_generators)!;
+      const stmt_gen = new stmt_gen_prototype() as ExpressionStatementGenerator;
       if (config.debug) indent += 2;
       stmt_gen.generate();
       if (config.debug) indent -= 2;
       body = body.concat(unexpected_extra_stmt);
       unexpected_extra_stmt = [];
       body.push(stmt_gen.irnode! as stmt.IRStatement);
+      // update used_vardecls
+      for (const used_vardecl of expr2used_vardecls.get(stmt_gen.expr!.id)!) {
+        used_vardecls.add(used_vardecl);
+      }
     }
+    //! Then we generate return stmt and return_decls.
     const return_decls : decl.IRVariableDeclare[] = [];
     const return_values : expr.IRExpression[] = [];
     const return_count = randomInt(0, config.return_count_of_function_upperlimit);
@@ -277,6 +288,10 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
       const expr_for_return = expr.tupleExtraction(expr_gen.irnode! as expr.IRExpression);
       return_values.push(expr_for_return);
       let expression_extracted = expr.tupleExtraction(return_values[i]);
+      // update used_vardecls
+      for (const used_vardecl of expr2used_vardecls.get(expression_extracted.id)!) {
+        used_vardecls.add(used_vardecl);
+      }
       //* Generate the returned vardecl
       const variable_gen = new VariableDeclareGenerator(type.elementary_types);
       if (config.debug) indent += 2;
@@ -318,12 +333,34 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
       FunctionVisibility.Private,
       FunctionVisibility.Public
     ])
+    // Check whether function body uses any state variables and records the result into `use_state_variables`
+    let use_state_variables = false;
+    for (const used_vardecl of used_vardecls) {
+      if (state_variables.has(used_vardecl)) {
+        use_state_variables = true;
+        break;
+      }
+    }
     if (this.state_mutability_range === undefined) {
       if (visibility === FunctionVisibility.Internal ||
-        visibility === FunctionVisibility.Private)
-        this.state_mutability_range = funcstat.nonpayable_func_mutability_stats;
-      else
-        this.state_mutability_range = funcstat.all_func_mutability_stats;
+        visibility === FunctionVisibility.Private) {
+        // If the function body uses any state variables, then the function should not be view or pure.
+        if (use_state_variables) {
+          this.state_mutability_range = funcstat.empty_func_mutability_stats;
+        }
+        else {
+          this.state_mutability_range = funcstat.nonpayable_func_mutability_stats;
+        }
+      }
+      else {
+        // If the function body uses any state variables, then the function should not be view or pure.
+        if (use_state_variables) {
+          this.state_mutability_range = funcstat.nonview_nonpure_func_mutability_stats;
+        }
+        else {
+          this.state_mutability_range = funcstat.all_func_mutability_stats;
+        }
+      }
     }
     this.irnode = new decl.IRFunctionDefinition(global_id++, cur_scope.value(), field_flag, name,
       this.kind, virtual, overide, parameters, return_decls, body, modifiers, visibility);
@@ -348,6 +385,20 @@ export class ContractDeclareGenerator extends DeclarationGenerator {
     cur_scope = cur_scope.new();
     const body : IRNode[] = [];
     //TODO: Generate state variable
+    //! Generate state variables
+    const state_variable_count = randomInt(1, config.state_variable_count_upperlimit);
+    // Generate state variables and randomly assigns values to these variables
+    for (let i = 0; i < state_variable_count; i++) {
+      const variable_gen = new VariableDeclareGenerator(type.elementary_types);
+      if (config.debug) indent += 2;
+      variable_gen.generate();
+      if (config.debug) indent -= 2;
+      const variable_decl = variable_gen.irnode! as decl.IRVariableDeclare;
+      if (Math.random() < 0.5)
+        variable_decl.value = new expr.IRLiteral(global_id++, cur_scope.value(), field_flag);
+      body.push(variable_decl);
+      state_variables.add(variable_decl.id);
+    }
     //! Generate contract name
     const contract_name = generateVarName();
     //TODO: Generate struct declaration
@@ -362,7 +413,8 @@ export class ContractDeclareGenerator extends DeclarationGenerator {
       body.push(function_gen.irnode!);
     }
     cur_scope = cur_scope.rollback();
-    this.irnode = new decl.IRContractDefinition(global_id++, cur_scope.value(), field_flag, contract_name, ContractKind.Contract, false, false, body, [], [], []);
+    this.irnode = new decl.IRContractDefinition(global_id++, cur_scope.value(), field_flag, contract_name,
+      ContractKind.Contract, false, false, body, [], [], []);
     contractdecls.add(this.irnode.id);
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Finish generating contract`));
@@ -1353,6 +1405,7 @@ export class MultipleVariableDeclareStatementGenerator extends StatementGenerato
 }
 
 export abstract class ExpressionStatementGenerator extends StatementGenerator {
+  expr: expr.IRExpression | undefined;
   constructor() { super(); }
   generate() : void { }
 }
@@ -1367,7 +1420,8 @@ export class AssignmentStatementGenerator extends ExpressionStatementGenerator {
     if (config.debug) indent += 2;
     assignment_gen.generate(0);
     if (config.debug) indent -= 2;
-    this.irnode = new stmt.IRExpressionStatement(global_id++, cur_scope.value(), field_flag, assignment_gen.irnode! as expr.IRAssignment);
+    this.expr = assignment_gen.irnode! as expr.IRExpression;
+    this.irnode = new stmt.IRExpressionStatement(global_id++, cur_scope.value(), field_flag, this.expr);
   }
 }
 
@@ -1377,11 +1431,12 @@ export class BinaryOpStatementGenerator extends ExpressionStatementGenerator {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating BinaryOpStatement`));
     }
-    const assignment_gen = new BinaryOpGenerator(type.elementary_types, new Set<number>(), new Set<number>());
+    const binaryop_gen = new BinaryOpGenerator(type.elementary_types, new Set<number>(), new Set<number>());
     if (config.debug) indent += 2;
-    assignment_gen.generate(0);
+    binaryop_gen.generate(0);
     if (config.debug) indent -= 2;
-    this.irnode = new stmt.IRExpressionStatement(global_id++, cur_scope.value(), field_flag, assignment_gen.irnode! as expr.IRAssignment);
+    this.expr = binaryop_gen.irnode! as expr.IRExpression;
+    this.irnode = new stmt.IRExpressionStatement(global_id++, cur_scope.value(), field_flag, this.expr);
   }
 }
 
@@ -1391,15 +1446,16 @@ export class UnaryOpStatementGenerator extends ExpressionStatementGenerator {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating UnaryOpStatement`));
     }
-    const assignment_gen = new UnaryOpGenerator(type.elementary_types, new Set<number>(), new Set<number>());
+    const unaryop_gen = new UnaryOpGenerator(type.elementary_types, new Set<number>(), new Set<number>());
     if (config.debug) indent += 2;
-    assignment_gen.generate(0);
+    unaryop_gen.generate(0);
     if (config.debug) indent -= 2;
-    this.irnode = new stmt.IRExpressionStatement(global_id++, cur_scope.value(), field_flag, assignment_gen.irnode! as expr.IRAssignment);
+    this.expr = unaryop_gen.irnode! as expr.IRExpression;
+    this.irnode = new stmt.IRExpressionStatement(global_id++, cur_scope.value(), field_flag, this.expr);
   }
 }
 
-export class ConditionalStatementGenerator extends StatementGenerator {
+export class ConditionalStatementGenerator extends ExpressionStatementGenerator {
   constructor() { super(); }
   generate() : void {
     if (config.debug) {
@@ -1409,7 +1465,8 @@ export class ConditionalStatementGenerator extends StatementGenerator {
     if (config.debug) indent += 2;
     conditional_gen.generate(0);
     if (config.debug) indent -= 2;
-    this.irnode = new stmt.IRExpressionStatement(global_id++, cur_scope.value(), field_flag, conditional_gen.irnode! as expr.IRConditional);
+    this.expr = conditional_gen.irnode! as expr.IRExpression;
+    this.irnode = new stmt.IRExpressionStatement(global_id++, cur_scope.value(), field_flag, this.expr);
   }
 }
 
@@ -1435,7 +1492,7 @@ export class ReturnStatementGenerator extends StatementGenerator {
   }
 }
 
-const statement_generators = [
+const expr_statement_generators = [
   AssignmentStatementGenerator,
   BinaryOpStatementGenerator,
   UnaryOpStatementGenerator,

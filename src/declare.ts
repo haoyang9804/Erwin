@@ -17,6 +17,7 @@ import { TypeKind, Type, ElementaryType, UnionType, FunctionType } from "./type"
 import { constantLock } from "./constraint";
 import { IRNode, FieldFlag, factory } from "./node";
 import { IRStatement, IRPlaceholderStatement } from "./statement";
+import { IRExpression } from "./expression";
 
 export const name2declare = new Map<string, IRDeclare>();
 export const name2Event = new Map<string, IREventDefinition>();
@@ -38,7 +39,8 @@ export class IRVariableDeclare extends IRDeclare {
   visibility : StateVariableVisibility = StateVariableVisibility.Default;
   mutable : Mutability = Mutability.Mutable;
   type : Type | undefined;
-  constructor(id : number, scope : number, field_flag : FieldFlag, name : string) {
+  value : IRExpression | undefined;
+  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, value ?: IRExpression) {
     super(id, scope, field_flag, name);
     if (field_flag === FieldFlag.CONTRACT_GLOBAL) {
       this.state = true;
@@ -54,6 +56,7 @@ export class IRVariableDeclare extends IRDeclare {
       else this.indexed = false;
     }
     if (!this.state) this.constant = false;
+    this.value = value;
   }
   lower() : ASTNode {
     if (this.constant === undefined) {
@@ -82,7 +85,8 @@ export class IRVariableDeclare extends IRDeclare {
     //TODO: add support for mutability
     //TODO: add support for other types, firstly function type
     assert(typename !== undefined, "IRVariableDeclare: typename is not generated")
-    return factory.makeVariableDeclaration(this.constant, this.indexed, this.name, this.scope, this.state, this.memory, this.visibility, this.mutable, "", undefined, typename);
+    return factory.makeVariableDeclaration(this.constant, this.indexed, this.name, this.scope, this.state, this.memory,
+      this.visibility, this.mutable, "", undefined, typename, undefined, this.value?.lower());
   }
 }
 
