@@ -279,11 +279,11 @@ export class IRContractDefinition extends IRDeclare {
   kind : ContractKind;
   abstract : boolean;
   fullyImplemented : boolean;
-  body : IRStatement[];
+  body : IRNode[];
   linearizedBaseContracts : number[];
   usedErrors : number[];
   usedEvent : number[];
-  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, kind : ContractKind, abstract : boolean, fullyImplemented : boolean, body : IRStatement[], linearizedBaseContracts : number[], usedErrors : number[], usedEvent : number[]) {
+  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, kind : ContractKind, abstract : boolean, fullyImplemented : boolean, body : IRNode[], linearizedBaseContracts : number[], usedErrors : number[], usedEvent : number[]) {
     super(id, scope, field_flag, name);
     this.kind = kind;
     this.abstract = abstract;
