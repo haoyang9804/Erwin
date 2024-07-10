@@ -11,7 +11,7 @@ import { irnodes } from "./node";
 import { color } from "console-log-colors"
 import { isSuperSet, isEqualSet } from "./dominance";
 import * as funcstat from "./funcstat";
-import { FunctionCallKind, FunctionKind, FunctionVisibility } from "solc-typed-ast";
+import { ContractKind, FunctionCallKind, FunctionKind, FunctionVisibility } from "solc-typed-ast";
 import { LinkedListNode } from "./dataStructor";
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Global Variables
@@ -22,10 +22,21 @@ class ScopeList extends LinkedListNode<number> {
   constructor(value : number) {
     super(value);
   }
+
+  create(value : number) : ScopeList {
+    this.m_next = new ScopeList(value);
+    this.m_next.set_pre(this);
+    return this.m_next as ScopeList;
+  }
+
   new() : ScopeList {
     scope_id++;
     irnode_db.new_scope(scope_id, this.m_value!);
     return this.create(scope_id) as ScopeList;
+  }
+
+  rollback() : ScopeList {
+    return super.rollback() as ScopeList;
   }
 }
 let scope_id : number = 0;
@@ -42,6 +53,7 @@ const expr2dominated_vardecls : Map<number, Set<number>> = new Map<number, Set<n
 const vardecl2vardecls_of_the_same_type_range : Map<number, Set<number>> = new Map<number, Set<number>>();
 const vardecls : Set<number> = new Set<number>();
 const funcdecls : Set<number> = new Set<number>();
+const contractdecls : Set<number> = new Set<number>();
 /*
 Image a awkward situation:
 In a function call generation, one of the arguments is a function call to the same function.
@@ -220,7 +232,9 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
     const parameter_count = randomInt(0, config.param_count_of_function_upperlimit);
     const body_stmt_count = randomInt(0, config.body_stmt_count_of_function_upperlimit);
     const parameters : decl.IRVariableDeclare[] = [];
+    console.log(2, cur_scope.value());
     cur_scope = cur_scope.new();
+    console.log(3, cur_scope.value());
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Definition`));
       indent += 2;
@@ -292,7 +306,7 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
       if (config.debug) indent -= 2;
       body.push(return_gen.irnode!);
     }
-    cur_scope = cur_scope.rollback() as ScopeList;
+    cur_scope = cur_scope.rollback();
     const modifiers : decl.Modifier[] = [];
     //TODO: fill the modifiers
     const name = generateVarName();
@@ -317,11 +331,47 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
     funcstat_dag.solution_range.set(this.irnode.id, this.state_mutability_range);
     funcdecls.add(this.irnode.id);
     if (config.debug) {
-      console.log(color.redBG(`Finish generating function ${name}`));
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Finish generating function ${name}`));
       indent -= 2;
     }
   }
 }
+
+export class ContractDeclareGenerator extends DeclarationGenerator {
+  constructor() { super(); }
+  generate() : void {
+    if (config.debug) {
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Contract Definition`));
+      indent += 2;
+    }
+    //! Create the contract scope
+    cur_scope = cur_scope.new();
+    const body : IRNode[] = [];
+    //TODO: Generate state variable
+    //! Generate contract name
+    const contract_name = generateVarName();
+    //TODO: Generate struct declaration
+    //TODO: Generate events, errors, and mappings
+    //! Generate functions in contract
+    const function_count_per_contract = randomInt(1, config.function_count_per_contract);
+    for (let i = 0; i < function_count_per_contract; i++) {
+      const function_gen = new FunctionDeclareGenerator();
+      if (config.debug) indent += 2;
+      function_gen.generate();
+      if (config.debug) indent -= 2;
+      body.push(function_gen.irnode!);
+    }
+    cur_scope = cur_scope.rollback();
+    this.irnode = new decl.IRContractDefinition(global_id++, cur_scope.value(), field_flag, contract_name, ContractKind.Contract, false, false, body, [], [], []);
+    contractdecls.add(this.irnode.id);
+    if (config.debug) {
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Finish generating contract`));
+      indent -= 2;
+    }
+  }
+}
+
+//TODO: Generate library, interface, and abstract contract.
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Expression Generator
 
