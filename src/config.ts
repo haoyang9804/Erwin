@@ -13,5 +13,6 @@ export const config = {
   unit_test_mode: false,
   chunk_size: 100000,
   experimental: false,
-  contract_count: 2
+  contract_count: 2,
+  state_variable_count_upperlimit: 2,
 }

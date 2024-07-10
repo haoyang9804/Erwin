@@ -30,20 +30,21 @@ program
   .version(version, "-v, --version", "Print package version.")
   .helpOption("-h, --help", "Print help message.");
 program
-  .option("-exprimental", "Enable the exprimental mode.", `${config.experimental}`)
-  .option("-itn --int_types_num <number>", "The number of int types Erwin will consider in resolving type dominance.", `${config.int_num}`)
-  .option("-utn --uint_types_num <number>", "The number of uint types Erwin will consider in resolving type dominance.", `${config.uint_num}`)
-  .option("-bscf --body_stmt_count_of_function_upperlimit <number>", "The upper limit of the number of non-declaration statements of a function. This value is suggested to be bigger than tha value of var_count", `${config.body_stmt_count_of_function_upperlimit}`)
-  .option("-rcf --return_count_of_function_upperlimit <number>", "The upper limit of the number of return values of a function.", `${config.return_count_of_function_upperlimit}`)
-  .option("-pcf --param_count_of_function_upperlimit <number>", "The upper limit of the number of parameters of a function.", `${config.param_count_of_function_upperlimit}`)
-  .option("-fc --function_count_per_contract <number>", "The upper limit of the number of functions in a contract.", `${config.function_count_per_contract}`)
-  .option("-lp --literal_prob <float>", "The probability of generating a literal.", `${config.literal_prob}`)
-  .option("-mxt --maximum_type_resolution_for_heads <number>", "The maximum number of type resolutions for heads.", `${config.maximum_type_resolution_for_heads}`)
-  .option("-tp --tuple_prob <float>", "The probability of generating a tuple surrounding an expression.", `${config.tuple_prob}`)
-  .option("-ec --expression_complex_level <number>", "The complex level of the expression Erwin will generate.\nThe suggedted range is [1,2,3,4,5]. The bigger, the more complex.", `${config.expression_complex_level}`)
+  .option("-e --exprimental", "Enable the exprimental mode.", `${config.experimental}`)
+  .option("--int_types_num <number>", "The number of int types Erwin will consider in resolving type dominance.", `${config.int_num}`)
+  .option("--uint_types_num <number>", "The number of uint types Erwin will consider in resolving type dominance.", `${config.uint_num}`)
+  .option("--body_stmt_count_of_function_upperlimit <number>", "The upper limit of the number of non-declaration statements of a function. This value is suggested to be bigger than tha value of var_count", `${config.body_stmt_count_of_function_upperlimit}`)
+  .option("--return_count_of_function_upperlimit <number>", "The upper limit of the number of return values of a function.", `${config.return_count_of_function_upperlimit}`)
+  .option("--param_count_of_function_upperlimit <number>", "The upper limit of the number of parameters of a function.", `${config.param_count_of_function_upperlimit}`)
+  .option("--function_count_per_contract <number>", "The upper limit of the number of functions in a contract.", `${config.function_count_per_contract}`)
+  .option("--literal_prob <float>", "The probability of generating a literal.", `${config.literal_prob}`)
+  .option("--maximum_type_resolution_for_heads <number>", "The maximum number of type resolutions for heads.", `${config.maximum_type_resolution_for_heads}`)
+  .option("--tuple_prob <float>", "The probability of generating a tuple surrounding an expression.", `${config.tuple_prob}`)
+  .option("--expression_complex_level <number>", "The complex level of the expression Erwin will generate.\nThe suggedted range is [1,2,3,4,5]. The bigger, the more complex.", `${config.expression_complex_level}`)
   .option("-d --debug", "Enable the debug mode.", `${config.debug}`)
-  .option("-cs --chunk_size <number>", "The size of head solution chunk. The bigger the size is, the more resolutions Erwin will consider in a round.", `${config.chunk_size}`)
-  .option("-cc --contract_count <number>", "The upper limit of the number of contracts Erwin will generate.", `${config.contract_count}`);
+  .option("--chunk_size <number>", "The size of head solution chunk. The bigger the size is, the more resolutions Erwin will consider in a round.", `${config.chunk_size}`)
+  .option("--state_variable_count_upperlimit <number>", "The upper limit of the number of state variables in a contract.", `${config.state_variable_count_upperlimit}`)
+  .option("--contract_count <number>", "The upper limit of the number of contracts Erwin will generate.", `${config.contract_count}`);
 program.parse(process.argv);
 if (program.opts().experimental === true) config.experimental = true;
 config.int_num = parseInt(program.opts().int_types_num);
@@ -57,6 +58,7 @@ config.maximum_type_resolution_for_heads = parseInt(program.opts().maximum_type_
 config.tuple_prob = parseFloat(program.opts().tuple_prob);
 config.expression_complex_level = parseInt(program.opts().expression_complex_level);
 config.chunk_size = parseInt(program.opts().chunk_size);
+config.state_variable_count_upperlimit = parseInt(program.opts().state_variable_count_upperlimit);
 config.contract_count = parseInt(program.opts().contract_count);
 assert(config.int_num >= 0, "The number of int types must be not less than 0.");
 assert(config.uint_num >= 0, "The number of uint types must be not less than 0.");
@@ -69,7 +71,8 @@ assert(config.maximum_type_resolution_for_heads >= config.chunk_size, "The maxim
 assert(config.tuple_prob >= 0 && config.tuple_prob <= 1, "The probability of generating a tuple surrounding an expression must be in the range [0,1].");
 assert(config.expression_complex_level >= 1 && config.expression_complex_level <= 5, "The complex level of the expression must be in the range [1,2,3,4,5].");
 assert(config.chunk_size > 0, "The chunk size of the database must be greater than 0.");
-assert(config.contract_count >= 0, "The number of contracts must be not less than 0.");
+assert(config.state_variable_count_upperlimit >= 0, "state_variable_count_upperlimit must be not less than 0.");
+assert(config.contract_count >= 0, "contract_count must be not less than 0.");
 if (program.opts().debug === true) config.debug = true;
 // Generation
 const contract = new gen.ContractDeclareGenerator();

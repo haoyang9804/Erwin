@@ -223,3 +223,12 @@ export const nonpayable_func_mutability_stats = [
   FuncStatProvider.view(),
   FuncStatProvider.empty()
 ]
+
+export const empty_func_mutability_stats = [
+  FuncStatProvider.empty()
+]
+
+export const nonview_nonpure_func_mutability_stats = [
+  FuncStatProvider.payable(),
+  FuncStatProvider.empty()
+]
