@@ -70,7 +70,7 @@ const forbidden_funcs : Set<number> = new Set<number>();
 let virtual_env = false;
 let override_env = false;
 let unexpected_extra_stmt : stmt.IRStatement[] = [];
-let state_variables: Set<number> = new Set<number>();
+let state_variables : Set<number> = new Set<number>();
 // Record statements in each scope.
 export const scope2userDefinedTypes = new Map<number, number>();
 export const type_dag = new TypeDominanceDAG();
@@ -1405,7 +1405,7 @@ export class MultipleVariableDeclareStatementGenerator extends StatementGenerato
 }
 
 export abstract class ExpressionStatementGenerator extends StatementGenerator {
-  expr: expr.IRExpression | undefined;
+  expr : expr.IRExpression | undefined;
   constructor() { super(); }
   generate() : void { }
 }
