@@ -29,10 +29,11 @@ program
   .name("erwin")
   .description("Tools that can generate random Solidity code and mutate the given Solidity code.")
   .version(version, "-v, --version", "Print package version.")
-  .helpOption("-h, --help", "Print help message.");
+  .helpOption("-h, --help", "Print help message.")
 program
-  .command("mutate <>")
+  .command("mutate")
   .description("Mutate the given Solidity code.")
+  .option("-f, --file <file>", "The file to be mutated.", `${config.file}`)
 program
   .command("generate")
   .description("Generate random Solidity code.")
@@ -54,24 +55,24 @@ program
 program.parse(process.argv);
 // Set the configuration
 if (program.args[0] === "mutate") {
-  config.file = program.opts().file;
+  config.file = program.commands[0].opts().file;
 }
 else if (program.args[0] === "generate") {
-  if (program.opts().experimental === true) config.experimental = true;
-  config.int_num = parseInt(program.opts().int_types_num);
-  config.uint_num = parseInt(program.opts().uint_types_num);
-  config.body_stmt_count_of_function_upperlimit = parseInt(program.opts().body_stmt_count_of_function_upperlimit);
-  config.return_count_of_function_upperlimit = parseInt(program.opts().return_count_of_function_upperlimit);
-  config.param_count_of_function_upperlimit = parseInt(program.opts().param_count_of_function_upperlimit);
-  config.function_count_per_contract = parseInt(program.opts().function_count_per_contract);
-  config.literal_prob = parseFloat(program.opts().literal_prob);
-  config.maximum_type_resolution_for_heads = parseInt(program.opts().maximum_type_resolution_for_heads);
-  config.tuple_prob = parseFloat(program.opts().tuple_prob);
-  config.expression_complex_level = parseInt(program.opts().expression_complex_level);
-  config.chunk_size = parseInt(program.opts().chunk_size);
-  config.state_variable_count_upperlimit = parseInt(program.opts().state_variable_count_upperlimit);
-  config.contract_count = parseInt(program.opts().contract_count);
-  if (program.opts().debug === true) config.debug = true;
+  if (program.commands[1].opts().experimental === true) config.experimental = true;
+  config.int_num = parseInt(program.commands[1].opts().int_types_num);
+  config.uint_num = parseInt(program.commands[1].opts().uint_types_num);
+  config.body_stmt_count_of_function_upperlimit = parseInt(program.commands[1].opts().body_stmt_count_of_function_upperlimit);
+  config.return_count_of_function_upperlimit = parseInt(program.commands[1].opts().return_count_of_function_upperlimit);
+  config.param_count_of_function_upperlimit = parseInt(program.commands[1].opts().param_count_of_function_upperlimit);
+  config.function_count_per_contract = parseInt(program.commands[1].opts().function_count_per_contract);
+  config.literal_prob = parseFloat(program.commands[1].opts().literal_prob);
+  config.maximum_type_resolution_for_heads = parseInt(program.commands[1].opts().maximum_type_resolution_for_heads);
+  config.tuple_prob = parseFloat(program.commands[1].opts().tuple_prob);
+  config.expression_complex_level = parseInt(program.commands[1].opts().expression_complex_level);
+  config.chunk_size = parseInt(program.commands[1].opts().chunk_size);
+  config.state_variable_count_upperlimit = parseInt(program.commands[1].opts().state_variable_count_upperlimit);
+  config.contract_count = parseInt(program.commands[1].opts().contract_count);
+  if (program.commands[1].opts().debug === true) config.debug = true;
 }
 // Check the validity of the arguments
 if (program.args[0] === "mutate") {

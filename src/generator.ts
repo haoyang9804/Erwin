@@ -233,9 +233,7 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
     const parameter_count = randomInt(0, config.param_count_of_function_upperlimit);
     const body_stmt_count = randomInt(0, config.body_stmt_count_of_function_upperlimit);
     const parameters : decl.IRVariableDeclare[] = [];
-    console.log(2, cur_scope.value());
     cur_scope = cur_scope.new();
-    console.log(3, cur_scope.value());
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Definition`));
       indent += 2;
