@@ -298,3 +298,9 @@ export function max(a : number, b : number) : number {
 export function mergeSet<T>(a : Set<T>, b : Set<T>) : Set<T> {
   return new Set([...a, ...b]);
 }
+
+export function normalNumber2OrdinalNumber(num : number) : string {
+  const suffixes = ["th", "st", "nd", "rd", "th", "th", "th", "th", "th", "th"];
+  let suffix = num.toString().slice(-1);
+  return num.toString() + suffixes[parseInt(suffix)];
+}

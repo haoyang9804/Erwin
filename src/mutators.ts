@@ -1,4 +1,5 @@
 import * as ast from "solc-typed-ast";
+import { normalNumber2OrdinalNumber } from "./utility";
 
 export async function readSourceUnit(file_path : string) : Promise<ast.SourceUnit> {
   const result = await ast.compileSol(file_path, "auto");
@@ -27,6 +28,9 @@ export function typeMutateSourceUnit(source_unit : ast.SourceUnit) : string[] {
     "int64",
     "int128",
     "int256",
+    "bool",
+    "address",
+    "address payable"
   ];
   source_unit.getChildren().forEach((node) => {
     if (node instanceof ast.ElementaryTypeName) {
@@ -38,16 +42,19 @@ export function typeMutateSourceUnit(source_unit : ast.SourceUnit) : string[] {
       }
     }
   })
+  let type_id = 1;
   source_unit.getChildren().forEach((node) => {
     if (node instanceof ast.ElementaryTypeName && integer_types.includes((node as ast.ElementaryTypeName).name)) {
       const original_typename = (node as ast.ElementaryTypeName).name;
       integer_types.forEach((typename) => {
         if (typename !== original_typename) {
+          const annotation = `//Mutate the ${normalNumber2OrdinalNumber(type_id)} ${original_typename} into ${typename}.\n`;
           (node as ast.ElementaryTypeName).name = typename;
-          mutants.push(writer.write(source_unit));
+          mutants.push(annotation + writer.write(source_unit));
         }
       });
       (node as ast.ElementaryTypeName).name = original_typename;
+      type_id++;
     }
   });
   return mutants;
