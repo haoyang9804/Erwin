@@ -33,7 +33,8 @@ program
 program
   .command("mutate")
   .description("Mutate the given Solidity code.")
-  .option("-f, --file <file>", "The file to be mutated.", `${config.file}`)
+  .option("-f, --file <string>", "The file to be mutated.", `${config.file}`)
+  .option("--out_dir <string>", "The file to output the mutated code.", `${config.out_dir}`);
 program
   .command("generate")
   .description("Generate random Solidity code.")
@@ -56,6 +57,7 @@ program.parse(process.argv);
 // Set the configuration
 if (program.args[0] === "mutate") {
   config.file = program.commands[0].opts().file;
+  config.out_dir = program.commands[0].opts().out_dir;
 }
 else if (program.args[0] === "generate") {
   if (program.commands[1].opts().experimental === true) config.experimental = true;
@@ -110,8 +112,16 @@ else if (program.args[0] === "generate") {
 async function mutate() {
   const source_unit = await mut.readSourceUnit(config.file);
   const mutants = mut.typeMutateSourceUnit(source_unit);
+  let out_id = 1;
   for (let mutant of mutants) {
-    console.log(mutant);
+    if (config.out_dir !== "") {
+      const file_path = `${config.out_dir}/mutant_${out_id}.sol`;
+      mut.writeMutant(file_path, mutant);
+      out_id++;
+    }
+    else {
+      console.log(mutant);
+    }
   }
 }
 

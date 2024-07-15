@@ -15,5 +15,6 @@ export const config = {
   experimental: false,
   contract_count: 2,
   state_variable_count_upperlimit: 2,
-  file: ""
+  file: "",
+  out_dir: ""
 }
