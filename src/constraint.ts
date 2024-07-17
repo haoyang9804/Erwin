@@ -805,6 +805,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     let cnt : number = 0;
     let should_stop = false;
     let stop_until_find_solution_mode = false;
+    if (config.no_type_exploration) stop_until_find_solution_mode = true;
     for (let local_head_resolution_collection of this.allocate_solutions_for_heads_in_chunks()) {
       this.solutions.clear();
       if (should_stop) break;

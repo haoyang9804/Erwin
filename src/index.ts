@@ -7,6 +7,7 @@ import * as expr from "./expression";
 import * as decl from "./declare";
 import * as mut from "./mutators";
 import { config } from "./config";
+import * as fs from "fs";
 import { pickRandomElement, assert } from "./utility";
 import {
   PrettyFormatter,
@@ -52,7 +53,8 @@ program
   .option("--expression_complex_level <number>", "The complex level of the expression Erwin will generate.\nThe suggedted range is [1,2,3,4,5]. The bigger, the more complex.", `${config.expression_complex_level}`)
   .option("--chunk_size <number>", "The size of head solution chunk. The bigger the size is, the more resolutions Erwin will consider in a round.", `${config.chunk_size}`)
   .option("--state_variable_count_upperlimit <number>", "The upper limit of the number of state variables in a contract.", `${config.state_variable_count_upperlimit}`)
-  .option("--contract_count <number>", "The upper limit of the number of contracts Erwin will generate.", `${config.contract_count}`);
+  .option("--contract_count <number>", "The upper limit of the number of contracts Erwin will generate.", `${config.contract_count}`)
+  .option("--no_type_exploration", "Disable the type exploration.", `${config.no_type_exploration}`);
 program.parse(process.argv);
 // Set the configuration
 if (program.args[0] === "mutate") {
@@ -75,6 +77,7 @@ else if (program.args[0] === "generate") {
   config.state_variable_count_upperlimit = parseInt(program.commands[1].opts().state_variable_count_upperlimit);
   config.contract_count = parseInt(program.commands[1].opts().contract_count);
   if (program.commands[1].opts().debug === true) config.debug = true;
+  if (program.commands[1].opts().no_type_exploration === true) config.no_type_exploration = true;
 }
 // Check the validity of the arguments
 if (program.args[0] === "mutate") {
@@ -94,7 +97,6 @@ else if (program.args[0] === "generate") {
   assert(config.chunk_size > 0, "The chunk size of the database must be greater than 0.");
   assert(config.state_variable_count_upperlimit >= 0, "state_variable_count_upperlimit must be not less than 0.");
   assert(config.contract_count >= 0, "contract_count must be not less than 0.");
-
 }
 // Execute
 if (program.args[0] === "mutate") {
@@ -154,6 +156,7 @@ async function generate() {
       if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclare)
         (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclare).type = value;
     }
+    console.log(">>>>>>>>>> A Generated Example <<<<<<<<<<");
     let funcstat_solutions = pickRandomElement(gen.funcstat_dag.solutions_collection)!;
     for (let [key, value] of funcstat_solutions) {
       if (irnodes.get(key)! instanceof decl.IRFunctionDefinition)
@@ -162,28 +165,35 @@ async function generate() {
     for (let id of db.irnode_db.get_IRNodes_by_scope(0)!) {
       console.log(writer.write(irnodes.get(id)!.lower()));
     }
-    // for (let irnode of irnodes) {
-    //   if (irnode instanceof expr.IRLiteral) {
-    //     (irnode as expr.IRLiteral).kind = undefined;
-    //     (irnode as expr.IRLiteral).value = undefined;
-    //   }
-    // }
-    // let cnt = 0;
-    // for (let resolutions of gen.type_dag.resolutions_collection) {
-    //   console.log(`>>>>>>>>>> Resolution ${cnt++} <<<<<<<<<<`);
-    //   for (let [key, value] of resolutions) {
-    //     (irnodes.get(key)! as expr.IRExpression | decl.IRVariableDeclare).type = value;
-    //   }
-    //   for (let stmt of gen.scope_stmt.get(0)!) {
-    //     console.log(writer.write(stmt.lower()));
-    //   }
-    //   for (let irnode of irnodes) {
-    //     if (irnode instanceof expr.IRLiteral) {
-    //       (irnode as expr.IRLiteral).kind = undefined;
-    //       (irnode as expr.IRLiteral).value = undefined;
-    //     }
-    //   }
-    // }
+    // Store all the resolutions into storage
+    let cnt = 0;
+    for (let type_solutions of gen.type_dag.solutions_collection) {
+      for (let [key, value] of type_solutions) {
+        if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclare)
+          (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclare).type = value;
+      }
+      for (let [key, value] of funcstat_solutions) {
+        if (irnodes.get(key)! instanceof decl.IRFunctionDefinition)
+          (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability! = value.kind;
+      }
+      let program = "";
+      for (let id of db.irnode_db.get_IRNodes_by_scope(0)!) {
+        program += writer.write(irnodes.get(id)!.lower());
+      }
+      if (!fs.existsSync("./generated_programs")) {
+        fs.mkdirSync("./generated_programs");
+      }
+      let date = new Date();
+      let year = date.getFullYear();
+      let month = date.getMonth() + 1;
+      let day = date.getDate();
+      let hour = date.getHours();
+      let minute = date.getMinutes();
+      let second = date.getSeconds();
+      let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_${cnt}.sol`;
+      cnt++;
+      fs.writeFileSync(`./generated_programs/${program_name}`, program, "utf-8");
+    }
   }
   catch (error) {
     console.log(error)
