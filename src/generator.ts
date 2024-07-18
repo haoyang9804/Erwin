@@ -5,13 +5,12 @@ import * as decl from "./declare";
 import * as stmt from "./statement";
 import * as type from "./type";
 import { irnode_db } from "./db";
-import { TypeDominanceDAG, FuncStateMutabilityDominanceDAG } from "./constraint";
+import { TypeDominanceDAG } from "./constraint";
 import { config } from './config';
 import { irnodes } from "./node";
 import { color } from "console-log-colors"
 import { isSuperSet, isEqualSet } from "./dominance";
-import * as funcstat from "./funcstat";
-import { ContractKind, FunctionCallKind, FunctionKind, FunctionVisibility } from "solc-typed-ast";
+import { ContractKind, FunctionCallKind, FunctionKind, FunctionStateMutability, FunctionVisibility } from "solc-typed-ast";
 import { LinkedListNode } from "./dataStructor";
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Global Variables
@@ -74,7 +73,6 @@ let state_variables : Set<number> = new Set<number>();
 // Record statements in each scope.
 export const scope2userDefinedTypes = new Map<number, number>();
 export const type_dag = new TypeDominanceDAG();
-export const funcstat_dag = new FuncStateMutabilityDominanceDAG();
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Generator
 
 export abstract class Generator {
@@ -221,13 +219,11 @@ export class VariableDeclareGenerator extends DeclarationGenerator {
 }
 
 export class FunctionDeclareGenerator extends DeclarationGenerator {
-  state_mutability_range : funcstat.FuncStat[] | undefined;
   kind : FunctionKind = FunctionKind.Function;
-  constructor(kind ?: FunctionKind, state_mutability_range ?: funcstat.FuncStat[]) {
+  constructor(kind ?: FunctionKind) {
     super();
     if (kind !== undefined)
       this.kind = kind;
-    this.state_mutability_range = state_mutability_range;
   }
   generate() : void {
     const parameter_count = randomInt(0, config.param_count_of_function_upperlimit);
@@ -339,31 +335,43 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
         break;
       }
     }
-    if (this.state_mutability_range === undefined) {
-      if (visibility === FunctionVisibility.Internal ||
-        visibility === FunctionVisibility.Private) {
-        // If the function body uses any state variables, then the function should not be view or pure.
-        if (use_state_variables) {
-          this.state_mutability_range = funcstat.empty_func_mutability_stats;
-        }
-        else {
-          this.state_mutability_range = funcstat.nonpayable_func_mutability_stats;
-        }
+    let state_mutability_range : FunctionStateMutability[] = [];
+    if (visibility === FunctionVisibility.Internal ||
+      visibility === FunctionVisibility.Private) {
+      // If the function body uses any state variables, then the function should not be view or pure.
+      if (use_state_variables) {
+        state_mutability_range = [
+          FunctionStateMutability.NonPayable
+        ];
       }
       else {
-        // If the function body uses any state variables, then the function should not be view or pure.
-        if (use_state_variables) {
-          this.state_mutability_range = funcstat.nonview_nonpure_func_mutability_stats;
-        }
-        else {
-          this.state_mutability_range = funcstat.all_func_mutability_stats;
-        }
+        state_mutability_range = [
+          FunctionStateMutability.NonPayable,
+          FunctionStateMutability.Pure,
+          FunctionStateMutability.View
+        ]
       }
     }
+    else {
+      // If the function body uses any state variables, then the function should not be view or pure.
+      if (use_state_variables) {
+        state_mutability_range = [
+          FunctionStateMutability.Payable,
+          FunctionStateMutability.NonPayable
+        ]
+      }
+      else {
+        state_mutability_range = [
+          FunctionStateMutability.Payable,
+          FunctionStateMutability.NonPayable,
+          FunctionStateMutability.Pure,
+          FunctionStateMutability.View
+        ]
+      }
+    }
+    const state_mutability = pickRandomElement(state_mutability_range);
     this.irnode = new decl.IRFunctionDefinition(global_id++, cur_scope.value(), field_flag, name,
-      this.kind, virtual, overide, parameters, return_decls, body, modifiers, visibility);
-    funcstat_dag.insert(funcstat_dag.newNode(this.irnode.id));
-    funcstat_dag.solution_range.set(this.irnode.id, this.state_mutability_range);
+      this.kind, virtual, overide, parameters, return_decls, body, modifiers, visibility, state_mutability);
     funcdecls.add(this.irnode.id);
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Finish generating function ${name}`));
@@ -520,7 +528,7 @@ export class IdentifierGenerator extends LRValueGenerator {
       new Set<number>(this.forbidden_vardecls),
       new Set<number>(this.dominated_vardecls_by_dominator))
     ) {
-      const variable_stmt_gen = new SingleVariableDeclareStatementGenerator(this.type_range,
+      const variable_stmt_gen = new SingleElementaryTypeVariableDeclareStatementGenerator(this.type_range,
         new Set<number>(this.forbidden_vardecls),
         new Set<number>(this.dominated_vardecls_by_dominator),
         true
@@ -1297,7 +1305,11 @@ export abstract class StatementGenerator extends Generator {
   abstract generate() : void;
 }
 
-export class SingleVariableDeclareStatementGenerator extends StatementGenerator {
+/*
+A generator for a single variable declaration of which the type range is elementary.
+The RHS of the variable declaration is required and it can be any suitable expression.
+*/
+export class SingleElementaryTypeVariableDeclareStatementGenerator extends StatementGenerator {
   type_range : type.Type[] | undefined;
   forbidden_vardecls : Set<number> | undefined;
   dominated_vardecls_by_dominator : Set<number> | undefined;
@@ -1315,7 +1327,7 @@ export class SingleVariableDeclareStatementGenerator extends StatementGenerator 
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating SingleVariableDeclareStatement, type range is ${this.type_range!.map(t => t.str())}`));
     }
     let expression_gen_prototype;
-    let expression_gen;
+    let expression_gen = null;
     if (!this.generate_literal &&
       ((
         this.type_range === undefined && hasAvailableIRVariableDeclare() ||

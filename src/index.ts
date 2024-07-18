@@ -136,32 +136,23 @@ async function generate() {
     // resolve constraints
     if (config.debug) {
       gen.type_dag.draw("./type-constraint.svg");
-      gen.funcstat_dag.draw("./funcstat-constraint.svg");
     }
   })();
   try {
     const startTime = performance.now()
     gen.type_dag.resolve_by_chunk();
-    gen.funcstat_dag.resolve_by_chunk();
     const endTime = performance.now();
     console.log(`Time cost of resolving: ${endTime - startTime} ms`);
     if (config.debug) {
       gen.type_dag.verify();
-      gen.funcstat_dag.verify();
     }
     console.log(`${gen.type_dag.solutions_collection.length} type rsolutions`);
-    console.log(`${gen.funcstat_dag.solutions_collection.length} function state resolutions`);
     let type_solutions = pickRandomElement(gen.type_dag.solutions_collection)!;
     for (let [key, value] of type_solutions) {
       if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclare)
         (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclare).type = value;
     }
     console.log(">>>>>>>>>> A Generated Example <<<<<<<<<<");
-    let funcstat_solutions = pickRandomElement(gen.funcstat_dag.solutions_collection)!;
-    for (let [key, value] of funcstat_solutions) {
-      if (irnodes.get(key)! instanceof decl.IRFunctionDefinition)
-        (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability! = value.kind;
-    }
     for (let id of db.irnode_db.get_IRNodes_by_scope(0)!) {
       console.log(writer.write(irnodes.get(id)!.lower()));
     }
@@ -171,10 +162,6 @@ async function generate() {
       for (let [key, value] of type_solutions) {
         if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclare)
           (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclare).type = value;
-      }
-      for (let [key, value] of funcstat_solutions) {
-        if (irnodes.get(key)! instanceof decl.IRFunctionDefinition)
-          (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability! = value.kind;
       }
       let program = "";
       for (let id of db.irnode_db.get_IRNodes_by_scope(0)!) {
