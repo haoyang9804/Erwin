@@ -400,11 +400,12 @@ export class ContractDeclareGenerator extends DeclarationGenerator {
       if (config.debug) indent -= 2;
       const variable_decl = variable_gen.irnode! as decl.IRVariableDeclare;
       if (Math.random() < 0.5) {
-        variable_decl.value = new expr.IRLiteral(global_id++, cur_scope.id());
-        type_dag.insert(type_dag.newNode(variable_decl.value.id));
-        type_dag.solution_range.set(variable_decl.value.id, type.elementary_types);
-        expr2used_vardecls.set(variable_decl.value.id, new Set<number>());
-        expr2dominated_vardecls.set(variable_decl.value.id, new Set<number>());
+        const literal_gen = new LiteralGenerator(type.elementary_types, new Set<number>(), new Set<number>());
+        literal_gen.generate(0);
+        variable_decl.value = literal_gen.irnode! as expr.IRExpression;
+        let expression_gen_extracted = expr.tupleExtraction(literal_gen.irnode! as expr.IRExpression);
+        type_dag.connect(expression_gen_extracted.id, variable_gen.irnode!.id, "super_dominance");
+        typeRangeAlignment(expression_gen_extracted.id, variable_gen.irnode!.id);
       }
       body.push(variable_decl);
       state_variables.add(variable_decl.id);
@@ -535,6 +536,9 @@ export class IdentifierGenerator extends LRValueGenerator {
       variable_decl_gen.generate();
       literal_gen.generate(0);
       if (config.debug) indent -= 2;
+      let expression_gen_extracted = expr.tupleExtraction(literal_gen.irnode! as expr.IRExpression);
+        type_dag.connect(expression_gen_extracted.id, variable_decl_gen.irnode!.id, "super_dominance");
+        typeRangeAlignment(expression_gen_extracted.id, variable_decl_gen.irnode!.id);
       const variable_decl_stmt = new stmt.IRVariableDeclareStatement(
         global_id++, cur_scope.id(), [variable_decl_gen.irnode! as decl.IRVariableDeclare],
         literal_gen.irnode! as expr.IRExpression

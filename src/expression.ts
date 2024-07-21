@@ -64,13 +64,13 @@ export class IRLiteral extends IRExpression {
           }
           if (typename === "int256" || typename === "int128" || typename === "int64" ||
             typename === "int32" || typename === "int16" || typename === "int8") {
-            this.value = randomBigInt(0n, (1n << BigInt(bits) - 1n) + 1n).toString();
+            this.value = randomBigInt(0n, (1n << BigInt(bits) - 1n)).toString();
             if (this.value[0] === "-") {
               this.value = this.value.slice(1);
             }
           }
           else {
-            this.value = randomBigInt(0n, (1n << BigInt(bits)) + 1n).toString();
+            this.value = randomBigInt(0n, (1n << BigInt(bits))).toString();
             if (this.value[0] === "-") {
               this.value = this.value.slice(1);
             }

@@ -132,7 +132,7 @@ async function generate() {
   const contract = new gen.ContractDeclareGenerator();
   contract.generate();
 
-  (async () => {
+  await (async () => {
     // resolve constraints
     if (config.debug) {
       gen.type_dag.draw("./type-constraint.svg");
