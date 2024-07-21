@@ -537,8 +537,8 @@ export class IdentifierGenerator extends LRValueGenerator {
       literal_gen.generate(0);
       if (config.debug) indent -= 2;
       let expression_gen_extracted = expr.tupleExtraction(literal_gen.irnode! as expr.IRExpression);
-        type_dag.connect(expression_gen_extracted.id, variable_decl_gen.irnode!.id, "super_dominance");
-        typeRangeAlignment(expression_gen_extracted.id, variable_decl_gen.irnode!.id);
+      type_dag.connect(expression_gen_extracted.id, variable_decl_gen.irnode!.id, "super_dominance");
+      typeRangeAlignment(expression_gen_extracted.id, variable_decl_gen.irnode!.id);
       const variable_decl_stmt = new stmt.IRVariableDeclareStatement(
         global_id++, cur_scope.id(), [variable_decl_gen.irnode! as decl.IRVariableDeclare],
         literal_gen.irnode! as expr.IRExpression
