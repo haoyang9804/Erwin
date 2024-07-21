@@ -22,31 +22,31 @@ const writer = new ASTWriter(
     LatestCompilerVersion
 );
 
-const variable1 = new IRVariableDeclare(0, 0, 0, "x");
+const variable1 = new IRVariableDeclare(0, 0, "x");
 variable1.type = TypeProvider.uint256()
-const variable2 = new IRVariableDeclare(1, 0, 0, "y");
+const variable2 = new IRVariableDeclare(1, 0, "y");
 variable2.type = TypeProvider.uint128();
-const literal1 = new IRLiteral(2, 0, 0);
+const literal1 = new IRLiteral(2, 0);
 literal1.type = TypeProvider.uint256()
-const literal2 = new IRLiteral(3, 0, 0);
+const literal2 = new IRLiteral(3, 0);
 literal2.type = TypeProvider.uint128();
-const tuple = new IRTuple(5, 0, 0, [literal1, literal2]);
-const variable_declare_stmt = new IRVariableDeclareStatement(4, 0, 0, [variable1, variable2], tuple);
+const tuple = new IRTuple(5, 0, [literal1, literal2]);
+const variable_declare_stmt = new IRVariableDeclareStatement(4, 0, [variable1, variable2], tuple);
 
-const v2 = new IRVariableDeclare(6, 0, 0, "y");
+const v2 = new IRVariableDeclare(6, 0, "y");
 v2.type = TypeProvider.uint256()
-const v3 = new IRVariableDeclare(7, 0, 0, "z");
+const v3 = new IRVariableDeclare(7, 0, "z");
 v3.type = TypeProvider.uint256()
-const f_correct = new IRFunctionDefinition(8, 0, 0, "F", FunctionKind.Function,
+const f_correct = new IRFunctionDefinition(8, 0, "F", FunctionKind.Function,
 true, true,
 [v2], [v3], [variable_declare_stmt], [], FunctionVisibility.Private, FunctionStateMutability.View);
 
-const v4 = new IRVariableDeclare(9, 0, 0, "x");
+const v4 = new IRVariableDeclare(9, 0, "x");
 v4.type = TypeProvider.uint256()
-const id4 = new IRIdentifier(10, 0, 0).from(v4);
-const f_id = new IRIdentifier(11, 0, 0, f_correct.name, f_correct.id);
-const functioncall = new IRFunctionCall(12, 0, 0, FunctionCallKind.FunctionCall, f_id, [id4]);
-const contract = new IRContractDefinition(13, 0, 0, "C", ContractKind.Contract, false, false, [variable_declare_stmt, f_correct, v4, functioncall], [], [], []);
+const id4 = new IRIdentifier(10, 0).from(v4);
+const f_id = new IRIdentifier(11, 0, f_correct.name, f_correct.id);
+const functioncall = new IRFunctionCall(12, 0, FunctionCallKind.FunctionCall, f_id, [id4]);
+const contract = new IRContractDefinition(13, 0, "C", ContractKind.Contract, false, false, [variable_declare_stmt, f_correct, v4, functioncall], [], [], []);
 
 test("test contract",
 () => {
@@ -54,8 +54,8 @@ test("test contract",
 }
 )
 
-const new_expr = new IRNew(14, 0, 0, contract.name);
-const functioncall2 = new IRFunctionCall(15, 0, 0, FunctionCallKind.FunctionCall, new_expr, []);
+const new_expr = new IRNew(14, 0, contract.name);
+const functioncall2 = new IRFunctionCall(15, 0, FunctionCallKind.FunctionCall, new_expr, []);
 
 test("test new",
 () => {

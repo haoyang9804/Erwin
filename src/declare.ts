@@ -14,8 +14,7 @@ import {
 
 import { assert } from "./utility";
 import { TypeKind, Type, ElementaryType, UnionType, FunctionType } from "./type";
-import { constantLock } from "./constraint";
-import { IRNode, FieldFlag, factory } from "./node";
+import { IRNode, factory } from "./node";
 import { IRStatement, IRPlaceholderStatement } from "./statement";
 import { IRExpression } from "./expression";
 
@@ -24,8 +23,8 @@ export const name2Event = new Map<string, IREventDefinition>();
 
 export abstract class IRDeclare extends IRNode {
   name : string;
-  constructor(id : number, scope : number, field_flag : FieldFlag, name : string) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number, name : string) {
+    super(id, scope);
     this.name = name;
     name2declare.set(name, this);
   }
@@ -33,42 +32,22 @@ export abstract class IRDeclare extends IRNode {
 
 export class IRVariableDeclare extends IRDeclare {
   indexed : boolean = false;
-  constant : boolean | undefined; // duplicated with attribute `mutable`. but required by solc-typed-ast.
-  state : boolean;
+  constant : boolean = false; // duplicated with attribute `mutable`. but required by solc-typed-ast.
+  state : boolean = true;
   memory : DataLocation = DataLocation.Default;
   visibility : StateVariableVisibility = StateVariableVisibility.Default;
   mutable : Mutability = Mutability.Mutable;
   type : Type | undefined;
   value : IRExpression | undefined;
-  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, value ?: IRExpression) {
-    super(id, scope, field_flag, name);
-    if (field_flag === FieldFlag.CONTRACT_GLOBAL) {
-      this.state = true;
-    }
-    else {
-      this.state = false;
-    }
-    if (field_flag !== FieldFlag.EVENT) {
-      this.indexed = false;
-    }
-    else {
-      if (Math.random() > 0.5) this.indexed = true;
-      else this.indexed = false;
-    }
-    if (!this.state) this.constant = false;
+  constructor(id : number, scope : number, name : string, value ?: IRExpression, visibility ?: StateVariableVisibility) {
+    super(id, scope, name);
     this.value = value;
+    if (visibility !== undefined) {
+      this.visibility = visibility;
+    }
   }
   lower() : ASTNode {
-    if (this.constant === undefined) {
-      if (this.id in constantLock) this.constant = false;
-      else {
-        if (Math.random() > 0.5) this.constant = true;
-        else this.constant = false;
-      }
-    }
-    if (this.constant) this.mutable = Mutability.Constant;
     assert(this.type !== undefined, "IRVariableDeclare: type is not generated");
-
     let typename : TypeName | undefined = undefined;
     if (this.type.kind === TypeKind.ElementaryType) {
       const type = this.type as ElementaryType;
@@ -92,8 +71,8 @@ export class IRVariableDeclare extends IRDeclare {
 
 export class IREnumDefinition extends IRDeclare {
   values : string[] = [];
-  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, values : string[]) {
-    super(id, scope, field_flag, name);
+  constructor(id : number, scope : number, name : string, values : string[]) {
+    super(id, scope, name);
     assert(values.length > 0, "IREnumDefinition: values is empty");
     this.values = values;
   }
@@ -104,8 +83,8 @@ export class IREnumDefinition extends IRDeclare {
 
 export class IRUserDefinedTypeDefinition extends IRDeclare {
   type_name : string;
-  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, type_name : string) {
-    super(id, scope, field_flag, name);
+  constructor(id : number, scope : number, name : string, type_name : string) {
+    super(id, scope, name);
     this.type_name = type_name;
   }
   lower() : ASTNode {
@@ -116,8 +95,8 @@ export class IRUserDefinedTypeDefinition extends IRDeclare {
 
 export class IRErrorDefinition extends IRDeclare {
   parameters : IRVariableDeclare[];
-  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, parameters : IRVariableDeclare[]) {
-    super(id, scope, field_flag, name);
+  constructor(id : number, scope : number, name : string, parameters : IRVariableDeclare[]) {
+    super(id, scope, name);
     this.parameters = parameters;
   }
   lower() : ASTNode {
@@ -128,8 +107,8 @@ export class IRErrorDefinition extends IRDeclare {
 export class IREventDefinition extends IRDeclare {
   anonymous : boolean;
   parameters : IRVariableDeclare[];
-  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, anonymous : boolean, parameters : IRVariableDeclare[]) {
-    super(id, scope, field_flag, name);
+  constructor(id : number, scope : number, name : string, anonymous : boolean, parameters : IRVariableDeclare[]) {
+    super(id, scope, name);
     this.anonymous = anonymous;
     this.parameters = parameters;
   }
@@ -141,8 +120,8 @@ export class IREventDefinition extends IRDeclare {
 export class IRStructDefinition extends IRDeclare {
   visibility : string = "public";
   members : IRVariableDeclare[];
-  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, members : IRVariableDeclare[]) {
-    super(id, scope, field_flag, name);
+  constructor(id : number, scope : number, name : string, members : IRVariableDeclare[]) {
+    super(id, scope, name);
     assert(members.length > 0, "IRStructDefinition: members is empty")
     this.members = members;
   }
@@ -157,8 +136,8 @@ export class IRModifier extends IRDeclare {
   visibility : string;
   parameters : IRVariableDeclare[];
   body : IRStatement[];
-  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, virtual : boolean, override : boolean, visibility : string, parameters : IRVariableDeclare[], body : IRStatement[]) {
-    super(id, scope, field_flag, name);
+  constructor(id : number, scope : number, name : string, virtual : boolean, override : boolean, visibility : string, parameters : IRVariableDeclare[], body : IRStatement[]) {
+    super(id, scope, name);
     this.virtual = virtual;
     this.override = override;
     this.visibility = visibility;
@@ -199,10 +178,10 @@ export class IRFunctionDefinition extends IRDeclare {
   return_type : UnionType | undefined;
   parameter_type : UnionType | undefined;
   function_type : FunctionType | undefined;
-  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, kind : FunctionKind,
+  constructor(id : number, scope : number, name : string, kind : FunctionKind,
     virtual : boolean, override : boolean, parameters : IRVariableDeclare[], returns : IRVariableDeclare[],
     body : IRStatement[], modifier : Modifier[], visibility ?: FunctionVisibility, stateMutability ?: FunctionStateMutability) {
-    super(id, scope, field_flag, name);
+    super(id, scope, name);
     this.virtual = virtual;
     this.override = override;
     this.kind = kind;
@@ -287,8 +266,8 @@ export class IRContractDefinition extends IRDeclare {
   linearizedBaseContracts : number[];
   usedErrors : number[];
   usedEvent : number[];
-  constructor(id : number, scope : number, field_flag : FieldFlag, name : string, kind : ContractKind, abstract : boolean, fullyImplemented : boolean, body : IRNode[], linearizedBaseContracts : number[], usedErrors : number[], usedEvent : number[]) {
-    super(id, scope, field_flag, name);
+  constructor(id : number, scope : number, name : string, kind : ContractKind, abstract : boolean, fullyImplemented : boolean, body : IRNode[], linearizedBaseContracts : number[], usedErrors : number[], usedEvent : number[]) {
+    super(id, scope, name);
     this.kind = kind;
     this.abstract = abstract;
     this.fullyImplemented = fullyImplemented;

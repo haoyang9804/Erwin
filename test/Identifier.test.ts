@@ -16,7 +16,7 @@ const writer = new ASTWriter(
 
 test("test identifier",
 () => {
-  const ir = new IRIdentifier(0, 0, 0, "x", 0);
+  const ir = new IRIdentifier(0, 0, "x", 0);
   const result = writer.write(ir.lower());
   expect(result).toEqual(
     "x"

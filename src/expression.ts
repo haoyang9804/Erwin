@@ -6,13 +6,13 @@ import {
 
 import { assert, generateRandomString, str2hex, randomBigInt } from "./utility";
 import { TypeKind, Type, ElementaryType } from "./type";
-import { IRNode, FieldFlag, factory } from "./node";
+import { IRNode, factory } from "./node";
 import { IRVariableDeclare } from "./declare";
 import { config } from "./config";
 
 export abstract class IRExpression extends IRNode {
-  constructor(id : number, scope : number, field_flag : FieldFlag) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number) {
+    super(id, scope);
   }
   abstract lower() : Expression;
 }
@@ -24,9 +24,9 @@ export class IRLiteral extends IRExpression {
   str : string | undefined;
   mustBeNegaitive : boolean = false;
   mustHaveIntTypeConversion : boolean = false;
-  constructor(id : number, scope : number, field_flag : FieldFlag, value ?: string,
+  constructor(id : number, scope : number, value ?: string,
     mustBeNegaitive ?: boolean, mustHaveIntTypeConversion ?: boolean) {
-    super(id, scope, field_flag);
+    super(id, scope);
     this.value = value;
     if (mustBeNegaitive !== undefined)
       this.mustBeNegaitive = mustBeNegaitive;
@@ -173,8 +173,8 @@ export class IRIdentifier extends IRExpression {
   name : string | undefined;
   // The id of the referenced IRNode
   reference : number | undefined;
-  constructor(id : number, scope : number, field_flag : FieldFlag, name ?: string, reference ?: number) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number, name ?: string, reference ?: number) {
+    super(id, scope);
     this.name = name;
     this.reference = reference;
   }
@@ -196,8 +196,8 @@ export class IRAssignment extends IRExpression {
   left : IRExpression;
   right : IRExpression;
   operator : "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | "&=" | "^=" | "|=";
-  constructor(id : number, scope : number, field_flag : FieldFlag, left : IRExpression, right : IRExpression, operator : "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | "&=" | "^=" | "|=") {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number, left : IRExpression, right : IRExpression, operator : "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | "&=" | "^=" | "|=") {
+    super(id, scope);
     this.left = left;
     this.right = right;
     this.operator = operator;
@@ -211,8 +211,8 @@ export class IRBinaryOp extends IRExpression {
   left : IRExpression;
   right : IRExpression;
   operator : string | undefined;
-  constructor(id : number, scope : number, field_flag : FieldFlag, left : IRExpression, right : IRExpression, operator ?: string) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number, left : IRExpression, right : IRExpression, operator ?: string) {
+    super(id, scope);
     this.left = left;
     this.right = right;
     if (config.debug) {
@@ -236,8 +236,8 @@ export class IRUnaryOp extends IRExpression {
   operator : string;
   //TODO: support useFunction
   useFunction : number | undefined;
-  constructor(id : number, scope : number, field_flag : FieldFlag, prefix : boolean, expression : IRExpression, operator : string, useFunction ?: number) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number, prefix : boolean, expression : IRExpression, operator : string, useFunction ?: number) {
+    super(id, scope);
     this.prefix = prefix;
     this.expression = expression;
     if (config.debug) {
@@ -262,8 +262,8 @@ export class IRConditional extends IRExpression {
   condition : IRExpression;
   true_expression : IRExpression;
   false_expression : IRExpression;
-  constructor(id : number, scope : number, field_flag : FieldFlag, condition : IRExpression, true_expression : IRExpression, false_expression : IRExpression) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number, condition : IRExpression, true_expression : IRExpression, false_expression : IRExpression) {
+    super(id, scope);
     this.condition = condition;
     this.true_expression = true_expression;
     this.false_expression = false_expression;
@@ -280,8 +280,8 @@ export class IRFunctionCall extends IRExpression {
   //TODO: I think the type of function_expression can be further narrowed down
   function_expression : IRExpression;
   arguments : IRExpression[];
-  constructor(id : number, scope : number, field_flag : FieldFlag, kind : FunctionCallKind, function_expression : IRExpression, arguments_ : IRExpression[]) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number, kind : FunctionCallKind, function_expression : IRExpression, arguments_ : IRExpression[]) {
+    super(id, scope);
     this.kind = kind;
     this.function_expression = function_expression;
     this.arguments = arguments_;
@@ -294,8 +294,8 @@ export class IRFunctionCall extends IRExpression {
 export class IRTuple extends IRExpression {
   isInlineArray : boolean | undefined;
   components : (IRExpression | null)[];
-  constructor(id : number, scope : number, field_flag : FieldFlag, components : (IRExpression | null)[], isInlineArray ?: boolean) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number, components : (IRExpression | null)[], isInlineArray ?: boolean) {
+    super(id, scope);
     this.components = components;
     this.isInlineArray = isInlineArray;
   }
@@ -324,8 +324,8 @@ export class IRIndexedAccess extends IRExpression {
    * for example `abi.decode(data, uint[]);`.
    */
   indexed : IRExpression | undefined;
-  constructor(id : number, scope : number, field_flag : FieldFlag, base : IRExpression, indexed ?: IRExpression) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number, base : IRExpression, indexed ?: IRExpression) {
+    super(id, scope);
     this.base = base;
     this.indexed = indexed;
   }
@@ -338,8 +338,8 @@ export class IRMemberAccess extends IRExpression {
   member_name : string;
   referenced_id : number;
   expression : IRExpression;
-  constructor(id : number, scope : number, field_flag : FieldFlag, member_name : string, referenced_id : number, expression : IRExpression) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number, member_name : string, referenced_id : number, expression : IRExpression) {
+    super(id, scope);
     this.expression = expression;
     this.referenced_id = referenced_id;
     this.member_name = member_name;
@@ -351,8 +351,8 @@ export class IRMemberAccess extends IRExpression {
 
 export class IRNew extends IRExpression {
   type_name : string;
-  constructor(id : number, scope : number, field_flag : FieldFlag, type_name : string) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number, type_name : string) {
+    super(id, scope);
     this.type_name = type_name;
   }
   lower() {

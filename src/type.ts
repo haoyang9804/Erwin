@@ -4,15 +4,15 @@ import { DominanceNode } from "./dominance";
 import { config } from './config';
 
 export enum TypeKind {
-  ElementaryType, // uint256, address, boolean,
-  FunctionType, // function (uint256) pure external returns (uint256)
-  ArrayType, // uint256[2], address[2], boolean[2]
-  MappingType, // mapping(uint256 => address), mapping(uint256 => boolean)
-  UnionType,
-  EventType,
-  StructType,
-  ContractType,
-  ErrorType
+  ElementaryType = "TypeKind::ElementaryType", // uint256, address, boolean,
+  FunctionType = "TypeKind::FunctionType", // function (uint256) pure external returns (uint256)
+  ArrayType = "TypeKind::ArrayType", // uint256[2], address[2], boolean[2]
+  MappingType = "TypeKind::MappingType", // mapping(uint256 => address), mapping(uint256 => boolean)
+  UnionType = "TypeKind::UnionType",
+  EventType = "TypeKind::EventType",
+  StructType = "TypeKind::StructType",
+  ContractType = "TypeKind::ContractType",
+  ErrorType = "TypeKind::ErrorType"
 }
 
 export function upperType(t1 : Type, t2 : Type) {

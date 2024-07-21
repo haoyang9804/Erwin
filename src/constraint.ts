@@ -24,9 +24,6 @@ import { DominanceNode, isEqualSet, isSuperSet } from "./dominance";
 import { FunctionStateMutability } from "solc-typed-ast";
 import { FuncStat } from "./funcstat";
 
-// a set of IRNode ids that have backward constrants that cannot be constant
-export const constantLock = new Set<number>();
-
 interface toTail {
   tail_id : number;
   // sub_dominance/super_dominance = true if there exists a path from the node to tail with tail_id,

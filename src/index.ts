@@ -153,7 +153,7 @@ async function generate() {
         (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclare).type = value;
     }
     console.log(">>>>>>>>>> A Generated Example <<<<<<<<<<");
-    for (let id of db.irnode_db.get_IRNodes_by_scope(0)!) {
+    for (let id of db.decl_db.get_irnodes_ids_by_scope_id(0)!) {
       console.log(writer.write(irnodes.get(id)!.lower()));
     }
     // Store all the resolutions into storage
@@ -164,7 +164,7 @@ async function generate() {
           (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclare).type = value;
       }
       let program = "";
-      for (let id of db.irnode_db.get_IRNodes_by_scope(0)!) {
+      for (let id of db.decl_db.get_irnodes_ids_by_scope_id(0)!) {
         program += writer.write(irnodes.get(id)!.lower());
       }
       if (!fs.existsSync("./generated_programs")) {

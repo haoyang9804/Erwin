@@ -17,9 +17,9 @@ const writer = new ASTWriter(
 
 test("test struct",
 () => {
-  const variable1 = new IRVariableDeclare(0, 0, 0, "x")
+  const variable1 = new IRVariableDeclare(0, 0, "x")
   variable1.type = TypeProvider.uint256();
-  const error = new IRStructDefinition(1, 0, 0, "S", [variable1]);
+  const error = new IRStructDefinition(1, 0, "S", [variable1]);
   const result = writer.write(error.lower());
   expect(result).toEqual(
     "struct S {\n  uint256 x;\n}"

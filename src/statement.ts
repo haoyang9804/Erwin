@@ -9,20 +9,20 @@ import {
 } from "solc-typed-ast"
 
 import { assert, } from "./utility";
-import { IRNode, FieldFlag, factory } from "./node";
+import { IRNode, factory } from "./node";
 import { IRVariableDeclare } from "./declare";
 import { IRExpression, IRFunctionCall, IRTuple } from "./expression";
 
 export abstract class IRStatement extends IRNode {
-  constructor(id : number, scope : number, field_flag : FieldFlag) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number) {
+    super(id, scope);
   }
   abstract lower() : Statement;
 }
 
 export class IRPlaceholderStatement extends IRStatement {
-  constructor(id : number, scope : number, field_flag : FieldFlag) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number) {
+    super(id, scope);
   }
   lower() : Statement {
     return factory.makePlaceholderStatement();
@@ -32,8 +32,8 @@ export class IRPlaceholderStatement extends IRStatement {
 export class IRVariableDeclareStatement extends IRStatement {
   variable_declares : (IRVariableDeclare | null)[];
   value : IRExpression;
-  constructor(id : number, scope : number, field_flag : FieldFlag, variable_declares : (IRVariableDeclare | null)[], value : IRExpression) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number, variable_declares : (IRVariableDeclare | null)[], value : IRExpression) {
+    super(id, scope);
     this.variable_declares = variable_declares;
     this.value = value;
   }
@@ -49,8 +49,8 @@ export class IRVariableDeclareStatement extends IRStatement {
 }
 
 export class IRBreakStatement extends IRStatement {
-  constructor(id : number, scope : number, field_flag : FieldFlag) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number) {
+    super(id, scope);
   }
   lower() : Statement {
     return factory.makeBreak();
@@ -58,8 +58,8 @@ export class IRBreakStatement extends IRStatement {
 }
 
 export class IRContinueStatement extends IRStatement {
-  constructor(id : number, scope : number, field_flag : FieldFlag) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number) {
+    super(id, scope);
   }
   lower() : Statement {
     return factory.makeContinue();
@@ -67,8 +67,8 @@ export class IRContinueStatement extends IRStatement {
 }
 
 export class IRThrowStatement extends IRStatement {
-  constructor(id : number, scope : number, field_flag : FieldFlag) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number) {
+    super(id, scope);
   }
   lower() : Statement {
     return factory.makeThrow();
@@ -77,8 +77,8 @@ export class IRThrowStatement extends IRStatement {
 
 export class IRReturnStatement extends IRStatement {
   value : IRExpression | undefined;
-  constructor(id : number, scope : number, field_flag : FieldFlag, value ?: IRExpression) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number, value ?: IRExpression) {
+    super(id, scope);
     this.value = value;
   }
   lower() : Statement {
@@ -90,8 +90,8 @@ export class IRReturnStatement extends IRStatement {
 export class IREmitStatement extends IRStatement {
   event_call : IRExpression;
   arguments : IRExpression[];
-  constructor(id : number, scope : number, field_flag : FieldFlag, event_call : IRExpression, arguments_ : IRExpression[]) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number, event_call : IRExpression, arguments_ : IRExpression[]) {
+    super(id, scope);
     this.event_call = event_call;
     this.arguments = arguments_;
   }
@@ -105,8 +105,8 @@ export class IRIf extends IRStatement {
   condition : IRExpression;
   true_expression : IRStatement[];
   false_expression : IRStatement[];
-  constructor(id : number, scope : number, field_flag : FieldFlag, condition : IRExpression, true_expression : IRStatement[], false_expression : IRStatement[]) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number, condition : IRExpression, true_expression : IRStatement[], false_expression : IRStatement[]) {
+    super(id, scope);
     this.condition = condition;
     this.true_expression = true_expression;
     this.false_expression = false_expression;
@@ -127,8 +127,8 @@ export class IRFor extends IRStatement {
   condition : IRExpression | undefined;
   loop : IRExpression | undefined;
   body : IRStatement[];
-  constructor(id : number, scope : number, field_flag : FieldFlag, initial_stmt : IRVariableDeclareStatement | IRExpression | undefined, condition : IRExpression | undefined, loop : IRExpression | undefined, body : IRStatement[]) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number, initial_stmt : IRVariableDeclareStatement | IRExpression | undefined, condition : IRExpression | undefined, loop : IRExpression | undefined, body : IRStatement[]) {
+    super(id, scope);
     this.initial_stmt = initial_stmt;
     this.condition = condition;
     this.loop = loop;
@@ -148,8 +148,8 @@ export class IRFor extends IRStatement {
 export class IRDoWhile extends IRStatement {
   condition : IRExpression;
   body : IRStatement[];
-  constructor(id : number, scope : number, field_flag : FieldFlag, condition : IRExpression, body : IRStatement[]) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number, condition : IRExpression, body : IRStatement[]) {
+    super(id, scope);
     this.condition = condition;
     this.body = body;
   }
@@ -164,8 +164,8 @@ export class IRDoWhile extends IRStatement {
 export class IRWhile extends IRStatement {
   condition : IRExpression;
   body : IRStatement;
-  constructor(id : number, scope : number, field_flag : FieldFlag, condition : IRExpression, body : IRStatement) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number, condition : IRExpression, body : IRStatement) {
+    super(id, scope);
     this.condition = condition;
     this.body = body;
   }
@@ -178,8 +178,8 @@ export class IRWhile extends IRStatement {
 export class IRRevertStatement extends IRStatement {
   error_call : IRExpression;
   arguments : IRExpression[];
-  constructor(id : number, scope : number, field_flag : FieldFlag, error_call : IRExpression, arguments_ : IRExpression[]) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number, error_call : IRExpression, arguments_ : IRExpression[]) {
+    super(id, scope);
     this.error_call = error_call;
     this.arguments = arguments_;
   }
@@ -193,8 +193,8 @@ export class IRTryCatchClause extends IRStatement {
   error_name : string;
   parameters : IRVariableDeclare[];
   body : IRStatement[];
-  constructor(id : number, scope : number, field_flag : FieldFlag, error_name : string, parameters : IRVariableDeclare[], body : IRStatement[]) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number, error_name : string, parameters : IRVariableDeclare[], body : IRStatement[]) {
+    super(id, scope);
     this.error_name = error_name;
     this.parameters = parameters;
     this.body = body;
@@ -211,8 +211,8 @@ export class IRTryCatchClause extends IRStatement {
 export class IRTry extends IRStatement {
   call : IRFunctionCall;
   clauses : IRTryCatchClause[];
-  constructor(id : number, scope : number, field_flag : FieldFlag, call : IRFunctionCall, clauses : IRTryCatchClause[]) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number, call : IRFunctionCall, clauses : IRTryCatchClause[]) {
+    super(id, scope);
     this.call = call;
     this.clauses = clauses;
   }
@@ -224,8 +224,8 @@ export class IRTry extends IRStatement {
 
 export class IRExpressionStatement extends IRStatement {
   expression : IRExpression;
-  constructor(id : number, scope : number, field_flag : FieldFlag, expression : IRExpression) {
-    super(id, scope, field_flag);
+  constructor(id : number, scope : number, expression : IRExpression) {
+    super(id, scope);
     this.expression = expression;
   }
   lower() : Statement {

@@ -16,7 +16,7 @@ const writer = new ASTWriter(
 
 test("test user defined type",
 () => {
-  const ir = new IRUserDefinedTypeDefinition(0, 0, 0, "T", "uint256");
+  const ir = new IRUserDefinedTypeDefinition(0, 0, "T", "uint256");
   const result = writer.write(ir.lower());
   expect(result).toEqual(
     "type T is uint256;"
@@ -26,7 +26,7 @@ test("test user defined type",
 
 test("test enum",
 () => {
-  const ir = new IREnumDefinition(0, 0, 0, "E", [
+  const ir = new IREnumDefinition(0, 0, "E", [
     "A",
     "B"
   ]);

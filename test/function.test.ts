@@ -22,25 +22,25 @@ const writer = new ASTWriter(
 );
 
 
-const variable1 = new IRVariableDeclare(0, 0, 0, "x");
+const variable1 = new IRVariableDeclare(0, 0, "x");
 variable1.type = TypeProvider.uint256();
-const variable2 = new IRVariableDeclare(1, 0, 0, "y");
+const variable2 = new IRVariableDeclare(1, 0, "y");
 variable2.type = TypeProvider.uint256();
-const literal1 = new IRLiteral(2, 0, 0);
+const literal1 = new IRLiteral(2, 0);
 literal1.type = TypeProvider.uint256();
-const literal2 = new IRLiteral(3, 0, 0);
+const literal2 = new IRLiteral(3, 0);
 literal2.type = TypeProvider.uint256();
-const tuple = new IRTuple(5, 0, 0, [literal1, literal2]);
-const variable_declare_stmt = new IRVariableDeclareStatement(4, 0, 0, [variable1, variable2], tuple);
+const tuple = new IRTuple(5, 0, [literal1, literal2]);
+const variable_declare_stmt = new IRVariableDeclareStatement(4, 0, [variable1, variable2], tuple);
 
-const v1 = new IRVariableDeclare(1, 0, 0, "x");
+const v1 = new IRVariableDeclare(1, 0, "x");
 v1.type = TypeProvider.uint256();
-const id1 = new IRIdentifier(2,0,0).from(v1);
-const id2 = new IRIdentifier(3,0,0).from(v1);
-const op = new IRBinaryOp(4,0,0,id1,id2,"+");
-const op_stmt = new IRExpressionStatement(5,0,0,op);
+const id1 = new IRIdentifier(2,0).from(v1);
+const id2 = new IRIdentifier(3,0).from(v1);
+const op = new IRBinaryOp(4,0,id1,id2,"+");
+const op_stmt = new IRExpressionStatement(5,0,op);
 
-const modifier_error = new IRModifier(0, 0, 0, "M", true, true, "internal", [v1], [op_stmt]);
+const modifier_error = new IRModifier(0, 0, "M", true, true, "internal", [v1], [op_stmt]);
 test("test modifier 1",
 () => {
   expect(async() => {
@@ -49,22 +49,22 @@ test("test modifier 1",
 }
 )
 
-const modifier_correct = new IRModifier(0, 0, 0, "M", true, false, "intrnal", [v1], [op_stmt, new IRPlaceholderStatement(5,0,0)]);
+const modifier_correct = new IRModifier(0, 0, "M", true, false, "intrnal", [v1], [op_stmt, new IRPlaceholderStatement(5,0)]);
 test("test modifier 2",
 () => {
   expect(writer.write(modifier_correct.lower())).toBe("modifier M(uint256 x) virtual {\n  x + x;\n  _;\n}");
 }
 )
 
-const v2 = new IRVariableDeclare(5, 0, 0, "y");
+const v2 = new IRVariableDeclare(5, 0, "y");
 v2.type = TypeProvider.uint256()
 
-const v3 = new IRVariableDeclare(6, 0, 0, "z");
+const v3 = new IRVariableDeclare(6, 0, "z");
 v3.type = TypeProvider.uint256()
 
 
 
-const f_correct = new IRFunctionDefinition(7, 0, 0, "F", FunctionKind.Function,
+const f_correct = new IRFunctionDefinition(7, 0, "F", FunctionKind.Function,
 true, true, [v2], [v3], [variable_declare_stmt], [{name: "M", arg_names: ["x"]}], FunctionVisibility.Private, FunctionStateMutability.View);
 
 test("test function 1",
@@ -73,12 +73,12 @@ test("test function 1",
 }
 )
 
-const v4 = new IRVariableDeclare(8, 0, 0, "x");
+const v4 = new IRVariableDeclare(8, 0, "x");
 v4.type = TypeProvider.uint256()
-const id4 = new IRIdentifier(9,0,0).from(v4);
-const f_id = new IRIdentifier(11, 0, 0, f_correct.name, f_correct.id);
+const id4 = new IRIdentifier(9,0).from(v4);
+const f_id = new IRIdentifier(11, 0, f_correct.name, f_correct.id);
 
-const functioncall = new IRFunctionCall(10, 0, 0, FunctionCallKind.FunctionCall, f_id, [id4]);
+const functioncall = new IRFunctionCall(10, 0, FunctionCallKind.FunctionCall, f_id, [id4]);
 
 test("test function call",
 () => {

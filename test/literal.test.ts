@@ -17,7 +17,7 @@ const writer = new ASTWriter(
 );
 test("test literal 1",
 () => {
-  const l1 = new IRLiteral(0, 0, 0, "55555555555555555555555555555555555555555555555555555555555555555");
+  const l1 = new IRLiteral(0, 0, "55555555555555555555555555555555555555555555555555555555555555555");
   l1.type = TypeProvider.uint256();
   const lowered_value = l1.lower();
   expect(l1.value).toBeDefined();
@@ -27,7 +27,7 @@ test("test literal 1",
 
 test("test literal 2",
 () => {
-  const l1 = new IRLiteral(0, 0, 0, undefined, false, true);
+  const l1 = new IRLiteral(0, 0, undefined, false, true);
   l1.type = TypeProvider.int8();
   const lowered_value = l1.lower();
   expect(l1.value).toBeDefined();

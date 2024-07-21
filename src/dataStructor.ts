@@ -123,18 +123,6 @@ export class LinkedListNode<T> {
   constructor(value : T) {
     this.m_value = value;
   }
-  create(value : T) : LinkedListNode<T> {
-    this.m_next = new LinkedListNode<T>(value);
-    this.m_next.set_pre(this);
-    return this.m_next;
-  }
-  rollback() : LinkedListNode<T> {
-    if (config.debug) {
-      assert(this.m_pre !== undefined, "The previous node must exist.");
-    }
-    this.m_pre!.set_next(undefined);
-    return this.m_pre!;
-  }
   pre() : LinkedListNode<T> | undefined {
     return this.m_pre;
   }

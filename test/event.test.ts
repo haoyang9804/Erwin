@@ -19,23 +19,23 @@ const writer = new ASTWriter(
 
 test("test event and emit",
 () => {
-  const variable1 = new IRVariableDeclare(0, 0, 0, "x")
+  const variable1 = new IRVariableDeclare(0, 0, "x")
   variable1.type = TypeProvider.uint256();
-  const event = new IREventDefinition(1, 0, 0, "E", false, [variable1]);
+  const event = new IREventDefinition(1, 0, "E", false, [variable1]);
   const result = writer.write(event.lower());
   expect(result).toEqual(
     "event E(uint256 x);"
   );
-  const event2 = new IREventDefinition(2, 0, 0, "E", true, [variable1]);
+  const event2 = new IREventDefinition(2, 0, "E", true, [variable1]);
   const result2 = writer.write(event2.lower());
   expect(result2).toEqual(
     "event E(uint256 x) anonymous;"
   );
-  const variable2 = new IRVariableDeclare(3, 0, 0, "y");
+  const variable2 = new IRVariableDeclare(3, 0, "y");
   variable2.type = TypeProvider.uint256();
-  const variable2_id = new IRIdentifier(4, 0, 0, variable2.name, variable2.id);
-  const event_id = new IRIdentifier(5, 0, 0, event.name, event.id);
-  const emit = new IREmitStatement(6, 0, 0, event_id, [variable2_id]);
+  const variable2_id = new IRIdentifier(4, 0, variable2.name, variable2.id);
+  const event_id = new IRIdentifier(5, 0, event.name, event.id);
+  const emit = new IREmitStatement(6, 0, event_id, [variable2_id]);
   expect(writer.write(emit.lower())).toBe("emit E(y);")
 }
 )

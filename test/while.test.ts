@@ -19,14 +19,14 @@ const writer = new ASTWriter(
 
 test("test while",
 () => {
-  const v1 = new IRVariableDeclare(0, 0, 0, "x")
+  const v1 = new IRVariableDeclare(0, 0, "x")
   v1.type = TypeProvider.uint256();
-  const v2id = new IRIdentifier(5, 0, 0).from(v1);
-  const l2 = new IRLiteral(6, 0, 0, "100");
+  const v2id = new IRIdentifier(5, 0).from(v1);
+  const l2 = new IRLiteral(6, 0, "100");
   l2.type = TypeProvider.uint256();
-  const cond = new IRBinaryOp(7, 0, 0, v2id, l2, "<");
-  const body = new IRBreakStatement(8, 0, 0);
-  const doWhile = new IRWhile(9, 0, 0, cond, body);
+  const cond = new IRBinaryOp(7, 0, v2id, l2, "<");
+  const body = new IRBreakStatement(8, 0);
+  const doWhile = new IRWhile(9, 0, cond, body);
   const result = writer.write(doWhile.lower());
   expect(result).toEqual(
     `while (x < 100) break;`

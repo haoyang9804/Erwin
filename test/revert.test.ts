@@ -19,12 +19,12 @@ const writer = new ASTWriter(
 
 test("test revert",
 () => {
-  const variable1 = new IRVariableDeclare(0, 0, 0, "x")
+  const variable1 = new IRVariableDeclare(0, 0, "x")
   variable1.type = TypeProvider.uint256();
-  const error = new IRErrorDefinition(1, 0, 0, "E", [variable1]);
-  const error_id = new IRIdentifier(2, 0, 0, error.name, error.id);
-  const v1id = new IRIdentifier(3, 0, 0).from(variable1);
-  const revert = new IRRevertStatement(3, 0, 0, error_id, [v1id]);
+  const error = new IRErrorDefinition(1, 0, "E", [variable1]);
+  const error_id = new IRIdentifier(2, 0, error.name, error.id);
+  const v1id = new IRIdentifier(3, 0).from(variable1);
+  const revert = new IRRevertStatement(3, 0, error_id, [v1id]);
   const result = writer.write(revert.lower());
   expect(result).toEqual("revert E(x);")
 }
