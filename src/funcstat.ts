@@ -1,4 +1,3 @@
-//! Warning: FuncStat is deprecated since commit f2a18e67e056a5c897e07102b8bd93739ca96fa5
 import { FunctionStateMutability } from "solc-typed-ast";
 import { DominanceNode } from "./dominance";
 import { assert } from "./utility";

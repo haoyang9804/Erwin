@@ -5,13 +5,14 @@ import * as decl from "./declare";
 import * as stmt from "./statement";
 import * as type from "./type";
 import { decideFunctionVisibility, decideVariableVisibility, decl_db, visibility } from "./db";
-import { TypeDominanceDAG } from "./constraint";
+import { TypeDominanceDAG, FuncStateMutabilityDominanceDAG } from "./constraint";
 import { config } from './config';
 import { irnodes } from "./node";
 import { color } from "console-log-colors"
 import { isSuperSet, isEqualSet } from "./dominance";
 import { ContractKind, FunctionCallKind, FunctionKind, FunctionStateMutability, FunctionVisibility, StateVariableVisibility } from "solc-typed-ast";
 import { ScopeList, scopeKind, init_scope } from "./scope";
+import { FuncStat, FuncStatProvider } from "./funcstat";
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Global Variables
 
@@ -30,6 +31,7 @@ const vardecl2vardecls_of_the_same_type_range : Map<number, Set<number>> = new M
 const vardecls : Set<number> = new Set<number>();
 const funcdecls : Set<number> = new Set<number>();
 const contractdecls : Set<number> = new Set<number>();
+const called_function_decls_IDs : Set<number> = new Set<number>();
 /*
 Image a awkward situation:
 In a function call generation, one of the arguments is a function call to the same function.
@@ -50,6 +52,7 @@ let state_variables : Set<number> = new Set<number>();
 // Record statements in each scope.
 export const scope2userDefinedTypes = new Map<number, number>();
 export const type_dag = new TypeDominanceDAG();
+export const funcstat_dag = new FuncStateMutabilityDominanceDAG();
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Generator
 
 export abstract class Generator {
@@ -215,6 +218,81 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
     if (kind !== undefined)
       this.kind = kind;
   }
+
+  get_state_mutability_range(visibility : FunctionVisibility, use_state_variables : boolean) : FunctionStateMutability[] {
+    let state_mutability_range : FunctionStateMutability[] = [];
+    if (visibility === FunctionVisibility.Internal ||
+      visibility === FunctionVisibility.Private) {
+      // If the function body uses any state variables, then the function should not be view or pure.
+      if (use_state_variables) {
+        state_mutability_range = [
+          FunctionStateMutability.NonPayable
+        ];
+      }
+      else {
+        state_mutability_range = [
+          FunctionStateMutability.NonPayable,
+          FunctionStateMutability.Pure,
+          FunctionStateMutability.View
+        ]
+      }
+    }
+    else {
+      // If the function body uses any state variables, then the function should not be view or pure.
+      if (use_state_variables) {
+        state_mutability_range = [
+          FunctionStateMutability.Payable,
+          FunctionStateMutability.NonPayable
+        ]
+      }
+      else {
+        state_mutability_range = [
+          FunctionStateMutability.Payable,
+          FunctionStateMutability.NonPayable,
+          FunctionStateMutability.Pure,
+          FunctionStateMutability.View
+        ]
+      }
+    }
+    return state_mutability_range;
+  }
+
+  get_FuncStat_from_state_mutability(state_mutability : FunctionStateMutability) : FuncStat {
+    switch (state_mutability) {
+      case FunctionStateMutability.Pure:
+        return FuncStatProvider.pure();
+      case FunctionStateMutability.View:
+        return FuncStatProvider.view();
+      case FunctionStateMutability.Payable:
+        return FuncStatProvider.payable();
+      case FunctionStateMutability.NonPayable:
+        return FuncStatProvider.empty();
+      default:
+        throw new Error(`get_FuncStat_from_state_mutability: Improper state_mutability ${state_mutability}`);
+    }
+  }
+
+  get_FuncStats_from_state_mutabilitys(state_mutabilitys : FunctionStateMutability[]) : FuncStat[] {
+    const res : FuncStat[] = [];
+    for (const state_mutability of state_mutabilitys) {
+      res.push(this.get_FuncStat_from_state_mutability(state_mutability));
+    }
+    return res;
+  }
+
+  connect_from_caller_to_callee(callerID : number, calleeID : number) : void {
+    funcstat_dag.connect(callerID, calleeID, "sub");
+  }
+
+  build_connection_from_caller_to_callee(thisid: number) : void {
+    // This statement may contain function calls. Function calls inside a function
+    // can lead to a sub-super relation between the state mutability of the caller and the callee.
+    for (const called_function_decl_ID of called_function_decls_IDs) {
+      this.connect_from_caller_to_callee(thisid, called_function_decl_ID);
+    }
+    called_function_decls_IDs.clear();
+  }
+
   generate() : void {
     const parameter_count = randomInt(0, config.param_count_of_function_upperlimit);
     const body_stmt_count = randomInt(0, config.body_stmt_count_of_function_upperlimit);
@@ -264,6 +342,7 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
       for (const used_vardecl of expr2used_vardecls.get(stmt_gen.expr!.id)!) {
         used_vardecls.add(used_vardecl);
       }
+      this.build_connection_from_caller_to_callee(thisid);
     }
     //! Then we generate return stmt and return_decls.
     const return_decls : decl.IRVariableDeclare[] = [];
@@ -286,7 +365,10 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
       for (const used_vardecl of expr2used_vardecls.get(expression_extracted.id)!) {
         used_vardecls.add(used_vardecl);
       }
-      //* Generate the returned vardecl
+      this.build_connection_from_caller_to_callee(thisid);
+      //* Generate the returned vardecl. For instance, in the following code:
+      //* function f() returns (uint a, uint b) { return (1, 2); }
+      //* We generate two returned vardecls for a and b.
       const variable_gen = new ElementaryTypeVariableDeclareGenerator(type.elementary_types);
       if (config.debug) indent += 2;
       variable_gen.generate();
@@ -329,43 +411,11 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
         break;
       }
     }
-    let state_mutability_range : FunctionStateMutability[] = [];
-    if (visibility === FunctionVisibility.Internal ||
-      visibility === FunctionVisibility.Private) {
-      // If the function body uses any state variables, then the function should not be view or pure.
-      if (use_state_variables) {
-        state_mutability_range = [
-          FunctionStateMutability.NonPayable
-        ];
-      }
-      else {
-        state_mutability_range = [
-          FunctionStateMutability.NonPayable,
-          FunctionStateMutability.Pure,
-          FunctionStateMutability.View
-        ]
-      }
-    }
-    else {
-      // If the function body uses any state variables, then the function should not be view or pure.
-      if (use_state_variables) {
-        state_mutability_range = [
-          FunctionStateMutability.Payable,
-          FunctionStateMutability.NonPayable
-        ]
-      }
-      else {
-        state_mutability_range = [
-          FunctionStateMutability.Payable,
-          FunctionStateMutability.NonPayable,
-          FunctionStateMutability.Pure,
-          FunctionStateMutability.View
-        ]
-      }
-    }
-    const state_mutability = pickRandomElement(state_mutability_range);
+    const state_mutability_range = this.get_state_mutability_range(visibility, use_state_variables);
+    funcstat_dag.insert(funcstat_dag.newNode(thisid));
+    funcstat_dag.solution_range.set(thisid, this.get_FuncStats_from_state_mutabilitys(state_mutability_range));
     this.irnode = new decl.IRFunctionDefinition(thisid, cur_scope.id(), name,
-      this.kind, virtual, overide, parameters, return_decls, body, modifiers, visibility, state_mutability);
+      this.kind, virtual, overide, parameters, return_decls, body, modifiers, visibility);
     funcdecls.add(this.irnode.id);
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Finish generating function ${name}`));
@@ -1116,6 +1166,7 @@ export class FunctionCallGenerator extends RValueGenerator {
     type_dag.solution_range.set(thisid, this.type_range);
     type_dag.insert(type_dag.newNode(thisid));
     const funcdecl_id = pickRandomElement([...available_funcdecls_ids])!;
+    called_function_decls_IDs.add(funcdecl_id);
     const funcdecl = irnodes.get(funcdecl_id)! as decl.IRFunctionDefinition;
     //! Then generate an identifier for this function declaration
     const func_name = funcdecl.name;

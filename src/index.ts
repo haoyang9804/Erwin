@@ -141,16 +141,24 @@ async function generate() {
   try {
     const startTime = performance.now()
     gen.type_dag.resolve_by_chunk();
+    gen.funcstat_dag.resolve_by_chunk();
     const endTime = performance.now();
     console.log(`Time cost of resolving: ${endTime - startTime} ms`);
     if (config.debug) {
       gen.type_dag.verify();
+      gen.funcstat_dag.verify();
     }
-    console.log(`${gen.type_dag.solutions_collection.length} type rsolutions`);
+    console.log(`${gen.type_dag.solutions_collection.length} type solutions`);
     let type_solutions = pickRandomElement(gen.type_dag.solutions_collection)!;
     for (let [key, value] of type_solutions) {
       if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclare)
         (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclare).type = value;
+    }
+    console.log(`${gen.funcstat_dag.solutions_collection.length} function stat solutions`);
+    let funcstat_solutions = pickRandomElement(gen.funcstat_dag.solutions_collection)!;
+    for (let [key, value] of funcstat_solutions) {
+      if (irnodes.get(key)! instanceof decl.IRFunctionDefinition)
+        (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability = value;
     }
     console.log(">>>>>>>>>> A Generated Example <<<<<<<<<<");
     for (let id of db.decl_db.get_irnodes_ids_by_scope_id(0)!) {
@@ -158,28 +166,34 @@ async function generate() {
     }
     // Store all the resolutions into storage
     let cnt = 0;
-    for (let type_solutions of gen.type_dag.solutions_collection) {
-      for (let [key, value] of type_solutions) {
-        if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclare)
-          (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclare).type = value;
+    for (let funcstat_solutions of gen.funcstat_dag.solutions_collection) {
+      for (let [key, value] of funcstat_solutions) {
+        if (irnodes.get(key)! instanceof decl.IRFunctionDefinition)
+          (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability = value;
       }
-      let program = "";
-      for (let id of db.decl_db.get_irnodes_ids_by_scope_id(0)!) {
-        program += writer.write(irnodes.get(id)!.lower());
+      for (let type_solutions of gen.type_dag.solutions_collection) {
+        for (let [key, value] of type_solutions) {
+          if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclare)
+            (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclare).type = value;
+        }
+        let program = "";
+        for (let id of db.decl_db.get_irnodes_ids_by_scope_id(0)!) {
+          program += writer.write(irnodes.get(id)!.lower());
+        }
+        if (!fs.existsSync("./generated_programs")) {
+          fs.mkdirSync("./generated_programs");
+        }
+        let date = new Date();
+        let year = date.getFullYear();
+        let month = date.getMonth() + 1;
+        let day = date.getDate();
+        let hour = date.getHours();
+        let minute = date.getMinutes();
+        let second = date.getSeconds();
+        let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_${cnt}.sol`;
+        cnt++;
+        fs.writeFileSync(`./generated_programs/${program_name}`, program, "utf-8");
       }
-      if (!fs.existsSync("./generated_programs")) {
-        fs.mkdirSync("./generated_programs");
-      }
-      let date = new Date();
-      let year = date.getFullYear();
-      let month = date.getMonth() + 1;
-      let day = date.getDate();
-      let hour = date.getHours();
-      let minute = date.getMinutes();
-      let second = date.getSeconds();
-      let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_${cnt}.sol`;
-      cnt++;
-      fs.writeFileSync(`./generated_programs/${program_name}`, program, "utf-8");
     }
   }
   catch (error) {

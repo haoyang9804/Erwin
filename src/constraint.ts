@@ -71,8 +71,8 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   }
 
   /*
-  1. If node1 weakly dominates node2 in solution, then the solution of node2 is a sub_dominance of the solution of node1.
-  2. If node1 weakly and reversely dominates node2 in solution, then the solution of node2 is a super_dominance of the solution of node1.
+  1. If node1 weakly dominates node2 in solution, then the solution of node2 is sub of the solution of node1.
+  2. If node1 weakly and reversely dominates node2 in solution, then the solution of node2 is super to the solution of node1.
   */
   connect(from : number, to : number, rank ?: string) : void {
     if (config.debug) {
