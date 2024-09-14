@@ -32,6 +32,7 @@ const vardecls : Set<number> = new Set<number>();
 const funcdecls : Set<number> = new Set<number>();
 const contractdecls : Set<number> = new Set<number>();
 const called_function_decls_IDs : Set<number> = new Set<number>();
+let no_state_variable_in_function_body = false;
 /*
 Image a awkward situation:
 In a function call generation, one of the arguments is a function call to the same function.
@@ -114,7 +115,9 @@ function getAvailableIRVariableDeclareWithTypeConstraintWithForbiddenVardeclcs(t
   const collection : decl.IRVariableDeclare[] = [];
   const IDs_of_available_irnodes = decl_db.get_irnodes_ids_by_scope_id(cur_scope.id());
   for (let id of IDs_of_available_irnodes) {
-    if (vardecls.has(id)) collection.push(irnodes.get(id)! as decl.IRVariableDeclare);
+    if (vardecls.has(id) && !(no_state_variable_in_function_body && state_variables.has(id))) {
+      collection.push(irnodes.get(id)! as decl.IRVariableDeclare);
+    }
   }
 
   for (const dominated_vardecl of dominated_vardecls_by_dominator) {
@@ -284,13 +287,23 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
     funcstat_dag.connect(callerID, calleeID, "sub");
   }
 
-  build_connection_from_caller_to_callee(thisid: number) : void {
+  build_connection_from_caller_to_callee(thisid : number) : void {
     // This statement may contain function calls. Function calls inside a function
     // can lead to a sub-super relation between the state mutability of the caller and the callee.
     for (const called_function_decl_ID of called_function_decls_IDs) {
       this.connect_from_caller_to_callee(thisid, called_function_decl_ID);
     }
     called_function_decls_IDs.clear();
+  }
+
+  throw_no_state_variable_signal_at_random() : void {
+    if (Math.random() > 0.5) {
+      no_state_variable_in_function_body = true;
+    }
+  }
+
+  clear_no_state_variable_signal() : void {
+    no_state_variable_in_function_body = false;
   }
 
   generate() : void {
@@ -328,6 +341,7 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Body, ${body_stmt_count} in total`));
     }
+    this.throw_no_state_variable_signal_at_random();
     //! Here we generate exprstmts.
     for (let i = body.length; i < body_stmt_count; i++) {
       const stmt_gen_prototype = pickRandomElement(expr_statement_generators)!;
@@ -407,6 +421,7 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
     let use_state_variables = false;
     for (const used_vardecl of used_vardecls) {
       if (state_variables.has(used_vardecl)) {
+        assert(!no_state_variable_in_function_body, "no_state_variable_in_function_body should be false");
         use_state_variables = true;
         break;
       }
@@ -416,6 +431,7 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
     funcstat_dag.solution_range.set(thisid, this.get_FuncStats_from_state_mutabilitys(state_mutability_range));
     this.irnode = new decl.IRFunctionDefinition(thisid, cur_scope.id(), name,
       this.kind, virtual, overide, parameters, return_decls, body, modifiers, visibility);
+    this.clear_no_state_variable_signal();
     funcdecls.add(this.irnode.id);
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Finish generating function ${name}`));
