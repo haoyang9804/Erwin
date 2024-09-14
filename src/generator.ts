@@ -4,8 +4,8 @@ import * as expr from "./expression";
 import * as decl from "./declare";
 import * as stmt from "./statement";
 import * as type from "./type";
-import { decideFunctionVisibility, decideVariableVisibility, decl_db, visibility } from "./db";
-import { TypeDominanceDAG, FuncStateMutabilityDominanceDAG } from "./constraint";
+import { decideVariableVisibility, decl_db, erwin_visibility } from "./db";
+import { TypeDominanceDAG, FuncStateMutabilityDominanceDAG, FuncVisibilityDominanceDAG, StateVariableVisibilityDominanceDAG } from "./constraint";
 import { config } from './config';
 import { irnodes } from "./node";
 import { color } from "console-log-colors"
@@ -13,6 +13,7 @@ import { isSuperSet, isEqualSet } from "./dominance";
 import { ContractKind, FunctionCallKind, FunctionKind, FunctionStateMutability, FunctionVisibility, StateVariableVisibility } from "solc-typed-ast";
 import { ScopeList, scopeKind, init_scope } from "./scope";
 import { FuncStat, FuncStatProvider } from "./funcstat";
+import { FuncVisProvider, VarVisProvider } from "./visibility";
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Global Variables
 
@@ -54,22 +55,13 @@ let state_variables : Set<number> = new Set<number>();
 export const scope2userDefinedTypes = new Map<number, number>();
 export const type_dag = new TypeDominanceDAG();
 export const funcstat_dag = new FuncStateMutabilityDominanceDAG();
+export const func_visibility_dag = new FuncVisibilityDominanceDAG();
+export const state_variable_visibility_dag = new StateVariableVisibilityDominanceDAG();
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Generator
 
 export abstract class Generator {
-  irnode : IRNode | undefined;
+  irnode : IRNode | undefined
   constructor() { }
-}
-
-function randomVisibilityForStateVariable() : StateVariableVisibility {
-  // Check if the variable is a state variable
-  if (cur_scope.value().kind === scopeKind.CONTRACT) {
-    return pickRandomElement([
-      StateVariableVisibility.Private,
-      StateVariableVisibility.Public,
-      StateVariableVisibility.Internal])!
-  }
-  return StateVariableVisibility.Default;
 }
 
 function generateVarName() : string {
@@ -201,10 +193,22 @@ export class ElementaryTypeVariableDeclareGenerator extends DeclarationGenerator
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating vardecl, name is ${this.name}, type range is ${this.type_range.map(t => t.str())}`));
     }
-    const vis = randomVisibilityForStateVariable();
-    this.irnode = new decl.IRVariableDeclare(global_id++, cur_scope.id(),
-      generateVarName(), undefined, vis);
-    decl_db.insert(this.irnode.id, decideVariableVisibility(cur_scope.kind(), vis), cur_scope.id());
+    if (cur_scope.value().kind === scopeKind.CONTRACT) {
+      this.irnode = new decl.IRVariableDeclare(global_id++, cur_scope.id(),
+        generateVarName(), undefined);
+      decl_db.insert(this.irnode.id, erwin_visibility.INCONTRACT_UNKNOWN, cur_scope.id());
+      state_variable_visibility_dag.solution_range.set(this.irnode.id, [
+        VarVisProvider.private(),
+        VarVisProvider.internal(),
+        VarVisProvider.public(),
+        VarVisProvider.default()
+      ]);
+    }
+    else {
+      this.irnode = new decl.IRVariableDeclare(global_id++, cur_scope.id(),
+        generateVarName(), undefined, StateVariableVisibility.Default);
+      decl_db.insert(this.irnode.id, decideVariableVisibility(cur_scope.kind(), StateVariableVisibility.Default), cur_scope.id());
+    }
     type_dag.insert(type_dag.newNode(this.irnode.id));
     type_dag.solution_range.set(this.irnode.id, this.type_range);
     vardecls.add(this.irnode.id);
@@ -220,6 +224,25 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
     super();
     if (kind !== undefined)
       this.kind = kind;
+  }
+
+  get_state_mutability_range_v2(use_state_variables : boolean) : FunctionStateMutability[] {
+    let state_mutability_range : FunctionStateMutability[] = [];
+    if (use_state_variables) {
+      state_mutability_range = [
+        FunctionStateMutability.Payable,
+        FunctionStateMutability.NonPayable
+      ]
+    }
+    else {
+      state_mutability_range = [
+        FunctionStateMutability.Payable,
+        FunctionStateMutability.NonPayable,
+        FunctionStateMutability.Pure,
+        FunctionStateMutability.View
+      ]
+    }
+    return state_mutability_range;
   }
 
   get_state_mutability_range(visibility : FunctionVisibility, use_state_variables : boolean) : FunctionStateMutability[] {
@@ -284,14 +307,34 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
   }
 
   connect_from_caller_to_callee(callerID : number, calleeID : number) : void {
-    funcstat_dag.connect(callerID, calleeID, "sub");
+    funcstat_dag.connect(callerID, calleeID, "sub_dominance");
+  }
+
+  connect_from_callee_to_caller(calleeID : number, callerID : number) : void {
+    funcstat_dag.connect(calleeID, callerID, "super_dominance");
   }
 
   build_connection_from_caller_to_callee(thisid : number) : void {
-    // This statement may contain function calls. Function calls inside a function
-    // can lead to a sub-super relation between the state mutability of the caller and the callee.
     for (const called_function_decl_ID of called_function_decls_IDs) {
       this.connect_from_caller_to_callee(thisid, called_function_decl_ID);
+    }
+    called_function_decls_IDs.clear();
+  }
+
+  build_connection_between_caller_and_callee(thisid : number) : void {
+    /*
+      Follow the rule of DominanceDAG that if A dominates B, then the solution range of B
+      is a superset of the solution range of A.
+      //! Since we use brute force to resolve state mutatbility constraints, this 
+      //! function is not necessary.
+    */
+    for (const called_function_decl_ID of called_function_decls_IDs) {
+      if (isSuperSet(funcstat_dag.solution_range.get(thisid)!, funcstat_dag.solution_range.get(called_function_decl_ID)!)) {
+        this.connect_from_callee_to_caller(called_function_decl_ID, thisid);
+      }
+      else {
+        this.connect_from_caller_to_callee(thisid, called_function_decl_ID);
+      }
     }
     called_function_decls_IDs.clear();
   }
@@ -311,15 +354,13 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
     const body_stmt_count = randomInt(0, config.body_stmt_count_of_function_upperlimit);
     const parameters : decl.IRVariableDeclare[] = [];
     const thisid = global_id++;
-    const visibility = cur_scope.kind() === scopeKind.GLOBAL ?
-      FunctionVisibility.Default :
-      pickRandomElement([
-        FunctionVisibility.External,
-        FunctionVisibility.Internal,
-        FunctionVisibility.Private,
-        FunctionVisibility.Public
-      ])!
-    decl_db.insert(thisid, decideFunctionVisibility(cur_scope.kind(), visibility), cur_scope.id());
+    func_visibility_dag.solution_range.set(thisid, [
+      FuncVisProvider.external(),
+      FuncVisProvider.internal(),
+      FuncVisProvider.private(),
+      FuncVisProvider.public()
+    ]);
+    decl_db.insert(thisid, erwin_visibility.INCONTRACT_UNKNOWN, cur_scope.id());
     cur_scope = cur_scope.new(scopeKind.FUNC);
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Definition`));
@@ -356,7 +397,6 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
       for (const used_vardecl of expr2used_vardecls.get(stmt_gen.expr!.id)!) {
         used_vardecls.add(used_vardecl);
       }
-      this.build_connection_from_caller_to_callee(thisid);
     }
     //! Then we generate return stmt and return_decls.
     const return_decls : decl.IRVariableDeclare[] = [];
@@ -379,7 +419,6 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
       for (const used_vardecl of expr2used_vardecls.get(expression_extracted.id)!) {
         used_vardecls.add(used_vardecl);
       }
-      this.build_connection_from_caller_to_callee(thisid);
       //* Generate the returned vardecl. For instance, in the following code:
       //* function f() returns (uint a, uint b) { return (1, 2); }
       //* We generate two returned vardecls for a and b.
@@ -426,11 +465,12 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
         break;
       }
     }
-    const state_mutability_range = this.get_state_mutability_range(visibility, use_state_variables);
+    const state_mutability_range = this.get_state_mutability_range_v2(use_state_variables);
     funcstat_dag.insert(funcstat_dag.newNode(thisid));
     funcstat_dag.solution_range.set(thisid, this.get_FuncStats_from_state_mutabilitys(state_mutability_range));
+    this.build_connection_from_caller_to_callee(thisid);
     this.irnode = new decl.IRFunctionDefinition(thisid, cur_scope.id(), name,
-      this.kind, virtual, overide, parameters, return_decls, body, modifiers, visibility);
+      this.kind, virtual, overide, parameters, return_decls, body, modifiers);
     this.clear_no_state_variable_signal();
     funcdecls.add(this.irnode.id);
     if (config.debug) {
@@ -452,10 +492,9 @@ export class ContractDeclareGenerator extends DeclarationGenerator {
     if (config.debug) {
       assert(cur_scope.kind() === scopeKind.GLOBAL, "Contracts' scope must be global");
     }
-    decl_db.insert(thisid, visibility.GLOBAL, cur_scope.id());
+    decl_db.insert(thisid, erwin_visibility.GLOBAL, cur_scope.id());
     cur_scope = cur_scope.new(scopeKind.CONTRACT);
     const body : IRNode[] = [];
-    //TODO: Generate state variable
     //! Generate state variables
     const state_variable_count = randomInt(1, config.state_variable_count_upperlimit);
     // Generate state variables and randomly assigns values to these variables
@@ -481,7 +520,9 @@ export class ContractDeclareGenerator extends DeclarationGenerator {
     //TODO: Generate struct declaration
     //TODO: Generate events, errors, and mappings
     //! Generate functions in contract
-    const function_count_per_contract = randomInt(1, config.function_count_per_contract);
+    // const function_count_per_contract = randomInt(1, config.function_count_per_contract);
+    // haoyang
+    const function_count_per_contract = 3;
     for (let i = 0; i < function_count_per_contract; i++) {
       const function_gen = new FunctionDeclareGenerator();
       if (config.debug) indent += 2;
@@ -1109,6 +1150,7 @@ export class FunctionCallGenerator extends RValueGenerator {
       this.kind = FunctionCallKind.FunctionCall;
     }
   }
+
   generate(component : number) : void {
     const dominated_vardecls_by_dominator_copy = new Set<number>(this.dominated_vardecls_by_dominator);
     for (const dominated_vardecl of dominated_vardecls_by_dominator_copy) {
@@ -1182,6 +1224,12 @@ export class FunctionCallGenerator extends RValueGenerator {
     type_dag.solution_range.set(thisid, this.type_range);
     type_dag.insert(type_dag.newNode(thisid));
     const funcdecl_id = pickRandomElement([...available_funcdecls_ids])!;
+    //TODO: currently the function call is intra-contract, need to update this after introducing interconnection between contracts.
+    func_visibility_dag.solution_range.set(funcdecl_id, [
+      FuncVisProvider.internal(),
+      FuncVisProvider.private(),
+      FuncVisProvider.public()
+    ]);
     called_function_decls_IDs.add(funcdecl_id);
     const funcdecl = irnodes.get(funcdecl_id)! as decl.IRFunctionDefinition;
     //! Then generate an identifier for this function declaration
@@ -1570,9 +1618,27 @@ export class ReturnStatementGenerator extends StatementGenerator {
   }
 }
 
+export class FunctionCallStatementGenerator extends ExpressionStatementGenerator {
+  constructor() {
+    super();
+  }
+  generate() : void {
+    if (config.debug) {
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating FunctionCallStatement`));
+    }
+    const funcall_gen = new FunctionCallGenerator(type.elementary_types, new Set<number>(), new Set<number>(), FunctionCallKind.FunctionCall);
+    if (config.debug) indent += 2;
+    funcall_gen.generate(0);
+    if (config.debug) indent -= 2;
+    this.expr = expr.tupleExtraction(funcall_gen.irnode! as expr.IRExpression);
+    this.irnode = new stmt.IRExpressionStatement(global_id++, cur_scope.id(), this.expr);
+  }
+}
+
 const expr_statement_generators = [
-  AssignmentStatementGenerator,
-  BinaryOpStatementGenerator,
-  UnaryOpStatementGenerator,
-  ConditionalStatementGenerator,
+  // AssignmentStatementGenerator,
+  // BinaryOpStatementGenerator,
+  // UnaryOpStatementGenerator,
+  // ConditionalStatementGenerator,
+  FunctionCallStatementGenerator
 ]

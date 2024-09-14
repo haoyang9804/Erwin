@@ -4,7 +4,7 @@ export const config = {
   tuple_prob: 0.3,
   maximum_type_resolution_for_heads: 2000000,
   literal_prob: 0.3,
-  function_count_per_contract: 2,
+  function_count_per_contract: 3,
   param_count_of_function_upperlimit: 1,
   return_count_of_function_upperlimit: 2,
   body_stmt_count_of_function_upperlimit: 2,
@@ -17,5 +17,6 @@ export const config = {
   state_variable_count_upperlimit: 2,
   file: "",
   out_dir: "",
-  no_type_exploration: false
+  no_type_exploration: false,
+  mode: "type"
 }

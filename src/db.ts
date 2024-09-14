@@ -45,31 +45,32 @@ export class DeprecatedDB {
   }
 }
 
-export enum visibility {
-  INCONTRACT_INTERNAL = "visibility::INCONTRACT_INTERNAL",
-  INCONTRACT_EXTERNAL = "visibility::INCONTRACT_EXTERNAL",
-  INCONTRACT_PUBLIC = "visibility::INCONTRACT_PUBLIC",
-  INCONTRACT_PRIVATE = "visibility::INCONTRACT_PRIVATE",
-  GLOBAL = "visibility::GLOBAL",
-  INFUNCTION = "visibility::INFUNCTION"
+export enum erwin_visibility {
+  INCONTRACT_INTERNAL = "erwin_visibility::INCONTRACT_INTERNAL",
+  INCONTRACT_EXTERNAL = "erwin_visibility::INCONTRACT_EXTERNAL",
+  INCONTRACT_PUBLIC = "erwin_visibility::INCONTRACT_PUBLIC",
+  INCONTRACT_PRIVATE = "erwin_visibility::INCONTRACT_PRIVATE",
+  INCONTRACT_UNKNOWN = "erwin_visibility::INCONTRACT_UNKNOWN",
+  GLOBAL = "erwin_visibility::GLOBAL",
+  INFUNCTION = "erwin_visibility::INFUNCTION"
 }
 
-export function decideFunctionVisibility(kind : scopeKind, vis : FunctionVisibility) : visibility {
+export function decideFunctionVisibility(kind : scopeKind, vis : FunctionVisibility) : erwin_visibility {
   switch (kind) {
     case scopeKind.GLOBAL:
       if (config.debug)
-        assert(vis === FunctionVisibility.Default, "When the scope is global, the visibiliity is not FunctionVisibility.Defaul");
-      return visibility.GLOBAL;
+        assert(vis === FunctionVisibility.Default, "When the scope is global, the visibiliity is not FunctionVisibility.Default");
+      return erwin_visibility.GLOBAL;
     case scopeKind.CONTRACT:
       switch (vis) {
         case FunctionVisibility.External:
-          return visibility.INCONTRACT_EXTERNAL;
+          return erwin_visibility.INCONTRACT_EXTERNAL;
         case FunctionVisibility.Internal:
-          return visibility.INCONTRACT_INTERNAL;
+          return erwin_visibility.INCONTRACT_INTERNAL;
         case FunctionVisibility.Private:
-          return visibility.INCONTRACT_PRIVATE;
+          return erwin_visibility.INCONTRACT_PRIVATE;
         case FunctionVisibility.Public:
-          return visibility.INCONTRACT_PUBLIC;
+          return erwin_visibility.INCONTRACT_PUBLIC;
         default:
           throw new Error(`Unsupported FunctionVisibility: ${vis}`);
       }
@@ -78,21 +79,21 @@ export function decideFunctionVisibility(kind : scopeKind, vis : FunctionVisibil
   }
 }
 
-export function decideVariableVisibility(kind : scopeKind, vis : StateVariableVisibility) : visibility {
+export function decideVariableVisibility(kind : scopeKind, vis : StateVariableVisibility) : erwin_visibility {
   switch (kind) {
     case scopeKind.CONTRACT:
       switch (vis) {
         case StateVariableVisibility.Internal:
-          return visibility.INCONTRACT_INTERNAL;
+          return erwin_visibility.INCONTRACT_INTERNAL;
         case StateVariableVisibility.Private:
-          return visibility.INCONTRACT_PRIVATE;
+          return erwin_visibility.INCONTRACT_PRIVATE;
         case StateVariableVisibility.Public:
-          return visibility.INCONTRACT_PUBLIC;
+          return erwin_visibility.INCONTRACT_PUBLIC;
         default:
           throw new Error(`Unsupported StateVariableVisibility: ${vis}`);
       }
     case scopeKind.FUNC:
-      return visibility.INFUNCTION;
+      return erwin_visibility.INFUNCTION;
     default:
       throw new Error(`Unsupported scopeKind: ${kind}`);
   }
@@ -100,7 +101,7 @@ export function decideVariableVisibility(kind : scopeKind, vis : StateVariableVi
 
 type irnodeInfo = {
   id : number,
-  vis : visibility
+  vis : erwin_visibility
 }
 
 class DeclDB {
@@ -117,12 +118,12 @@ class DeclDB {
   new_scope(cur_scope_id : number, parent_scope_id : number) : void {
     this.scope_tree.insert(parent_scope_id, cur_scope_id);
   }
-  insert(node_id : number, visibility : visibility, scope_id : number) : void {
+  insert(node_id : number, erwin_visibility : erwin_visibility, scope_id : number) : void {
     if (this.scope2irnodeinfo.has(scope_id)) {
-      this.scope2irnodeinfo.set(scope_id, this.scope2irnodeinfo.get(scope_id)!.concat({ id: node_id, vis: visibility }));
+      this.scope2irnodeinfo.set(scope_id, this.scope2irnodeinfo.get(scope_id)!.concat({ id: node_id, vis: erwin_visibility }));
     }
     else {
-      this.scope2irnodeinfo.set(scope_id, [{ id: node_id, vis: visibility }]);
+      this.scope2irnodeinfo.set(scope_id, [{ id: node_id, vis: erwin_visibility }]);
     }
   }
   get_irnodes_ids_by_scope_id(scope_id : number) : number[] {

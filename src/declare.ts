@@ -17,7 +17,6 @@ import { TypeKind, Type, ElementaryType, UnionType, FunctionType } from "./type"
 import { IRNode, factory } from "./node";
 import { IRStatement, IRPlaceholderStatement } from "./statement";
 import { IRExpression } from "./expression";
-import { FuncStat } from "./funcstat";
 
 export const name2declare = new Map<string, IRDeclare>();
 export const name2Event = new Map<string, IREventDefinition>();
@@ -171,7 +170,7 @@ export class IRFunctionDefinition extends IRDeclare {
   virtual : boolean;
   override : boolean;
   visibility : FunctionVisibility | undefined;
-  stateMutability : FuncStat | undefined;
+  stateMutability : FunctionStateMutability | undefined;
   parameters : IRVariableDeclare[];
   returns : IRVariableDeclare[];
   modifier : Modifier[];
@@ -181,7 +180,7 @@ export class IRFunctionDefinition extends IRDeclare {
   function_type : FunctionType | undefined;
   constructor(id : number, scope : number, name : string, kind : FunctionKind,
     virtual : boolean, override : boolean, parameters : IRVariableDeclare[], returns : IRVariableDeclare[],
-    body : IRStatement[], modifier : Modifier[], visibility ?: FunctionVisibility, stateMutability ?: FuncStat) {
+    body : IRStatement[], modifier : Modifier[], visibility ?: FunctionVisibility, stateMutability ?: FunctionStateMutability) {
     super(id, scope, name);
     this.virtual = virtual;
     this.override = override;
@@ -224,7 +223,7 @@ export class IRFunctionDefinition extends IRDeclare {
     }
     let t_stateMutability : "pure" | "view" | "payable" | "nonpayable";
     assert(this.stateMutability !== undefined, "IRFunctionDefinition: stateMutability is not set");
-    switch (this.stateMutability.kind) {
+    switch (this.stateMutability) {
       case FunctionStateMutability.Pure: t_stateMutability = "pure"; break;
       case FunctionStateMutability.View: t_stateMutability = "view"; break;
       case FunctionStateMutability.Payable: t_stateMutability = "payable"; break;
@@ -239,7 +238,7 @@ export class IRFunctionDefinition extends IRDeclare {
     assert(this.stateMutability !== undefined, "IRFunctionDefinition: stateMutability is undefined");
     //WARNING: currently, we don't support visibility = default or stateMutability = constant
     assert(this.visibility !== FunctionVisibility.Default, "IRFunctionDefinition: visibility is default");
-    assert(this.stateMutability.kind !== FunctionStateMutability.Constant, "IRFunctionDefinition: stateMutability is constant");
+    assert(this.stateMutability !== FunctionStateMutability.Constant, "IRFunctionDefinition: stateMutability is constant");
     const modifier_invocation : ModifierInvocation[] = [];
     for (const modifier of this.modifier) {
       assert(name2declare.has(modifier.name), `IRFunctionDefinition: modifier ${modifier} is not declared`);
@@ -254,7 +253,7 @@ export class IRFunctionDefinition extends IRDeclare {
     const lowered_body = this.body.map(function(stmt) {
       return stmt.lower();
     });
-    return factory.makeFunctionDefinition(this.scope, this.kind, this.name, this.virtual, this.visibility, this.stateMutability.kind,
+    return factory.makeFunctionDefinition(this.scope, this.kind, this.name, this.virtual, this.visibility, this.stateMutability,
       this.kind == FunctionKind.Constructor, parameterList, returnParameterList, modifier_invocation,
       this.override ? factory.makeOverrideSpecifier([]) : undefined, factory.makeBlock(lowered_body));
   }

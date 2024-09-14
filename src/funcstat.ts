@@ -106,25 +106,18 @@ export class Payable extends FuncStat {
     return "payable";
   }
   subs() : FuncStat[] {
-    return [FuncStatProvider.payable()];
+    return [FuncStatProvider.payable(), FuncStatProvider.empty()];
   }
   sub_with_lowerbound(lower_bound : FuncStat) : FuncStat[] {
-    assert(lower_bound.kind === FunctionStateMutability.Payable);
-    return [FuncStatProvider.payable()];
+    assert(lower_bound.kind === FunctionStateMutability.Payable || lower_bound.kind === FunctionStateMutability.NonPayable);
+    return [FuncStatProvider.payable(), FuncStatProvider.empty()];
   }
   supers() : FuncStat[] {
     return [FuncStatProvider.payable(), FuncStatProvider.empty()];
   }
   super_with_upperbound(upper_bound : FuncStat) : FuncStat[] {
-    if (upper_bound instanceof Payable) {
-      return [FuncStatProvider.payable()];
-    }
-    else if (upper_bound instanceof EmptyStat) {
-      return [FuncStatProvider.payable(), FuncStatProvider.empty()];
-    }
-    else {
-      throw new Error(`Payable::super_with_upperbound: Improper upperbound type ${upper_bound.str()}`);
-    }
+    assert(upper_bound.kind === FunctionStateMutability.Payable || upper_bound.kind === FunctionStateMutability.NonPayable);
+    return [FuncStatProvider.payable(), FuncStatProvider.empty()];
   }
   same(t : FuncStat) : boolean {
     return t instanceof Payable;
@@ -168,11 +161,11 @@ export class EmptyStat extends FuncStat {
     }
   }
   supers() : FuncStat[] {
-    return [FuncStatProvider.empty()];
+    return [FuncStatProvider.empty(), FuncStatProvider.payable()];
   }
   super_with_upperbound(upper_bound : FuncStat) : FuncStat[] {
-    if (upper_bound instanceof EmptyStat) {
-      return [FuncStatProvider.empty()];
+    if (upper_bound.kind === FunctionStateMutability.NonPayable || upper_bound.kind === FunctionStateMutability.Payable) {
+      return [FuncStatProvider.empty(), FuncStatProvider.payable()];
     }
     else {
       throw new Error(`EmptyStat::super_with_upperbound: Improper upperbound type ${upper_bound.str()}`);
