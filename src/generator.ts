@@ -76,7 +76,7 @@ function generateVarName() : string {
 
 function getAvailableIRVariableDeclare() : decl.IRVariableDeclare[] {
   const collection : decl.IRVariableDeclare[] = [];
-  const IDs_of_available_irnodes = decl_db.get_irnodes_ids_by_scope_id(cur_scope.id());
+  const IDs_of_available_irnodes = decl_db.get_irnodes_ids_recursively(cur_scope.id());
   for (let id of IDs_of_available_irnodes) {
     if (vardecls.has(id)) collection.push(irnodes.get(id)! as decl.IRVariableDeclare);
   }
@@ -89,7 +89,7 @@ function hasAvailableIRVariableDeclare() : boolean {
 
 function getAvailableIRVariableDeclareWithTypeConstraint(types : type.Type[]) : decl.IRVariableDeclare[] {
   const collection : decl.IRVariableDeclare[] = [];
-  const IDs_of_available_irnodes = decl_db.get_irnodes_ids_by_scope_id(cur_scope.id());
+  const IDs_of_available_irnodes = decl_db.get_irnodes_ids_recursively(cur_scope.id());
   for (let id of IDs_of_available_irnodes) {
     if (vardecls.has(id)) collection.push(irnodes.get(id)! as decl.IRVariableDeclare);
   }
@@ -105,7 +105,7 @@ function getAvailableIRVariableDeclareWithTypeConstraintWithForbiddenVardeclcs(t
   dominated_vardecls_by_dominator : Set<number>) :
   decl.IRVariableDeclare[] {
   const collection : decl.IRVariableDeclare[] = [];
-  const IDs_of_available_irnodes = decl_db.get_irnodes_ids_by_scope_id(cur_scope.id());
+  const IDs_of_available_irnodes = decl_db.get_irnodes_ids_recursively(cur_scope.id());
   for (let id of IDs_of_available_irnodes) {
     if (vardecls.has(id) && !(no_state_variable_in_function_body && state_variables.has(id))) {
       collection.push(irnodes.get(id)! as decl.IRVariableDeclare);
@@ -1185,7 +1185,7 @@ export class FunctionCallGenerator extends RValueGenerator {
     }
     //! Find available function declarations
     const available_funcdecls_ids : number[] = [];
-    const IDs_of_available_irnodes = decl_db.get_irnodes_ids_by_scope_id(cur_scope.id());
+    const IDs_of_available_irnodes = decl_db.get_irnodes_ids_recursively(cur_scope.id());
     //TODO: update the following function definition candidates after introducing interconnection between contracts.
     for (let id of IDs_of_available_irnodes) {
       if (funcdecls.has(id) && (irnodes.get(id)! as decl.IRFunctionDefinition).visibility !== FunctionVisibility.External) {

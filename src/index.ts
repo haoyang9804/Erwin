@@ -179,7 +179,7 @@ function generate_type_mode() {
         (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclare).type = value;
     }
     let program = "";
-    for (let id of db.decl_db.get_irnodes_ids_by_scope_id(0)!) {
+    for (let id of db.decl_db.get_irnodes_ids_recursively(0)!) {
       program += writer.write(irnodes.get(id)!.lower());
     }
     if (!fs.existsSync("./generated_programs")) {
@@ -239,7 +239,7 @@ function generate_scope_mode() {
           (irnodes.get(key)! as decl.IRVariableDeclare).visibility = value.kind;
         }
         let program = "";
-        for (let id of db.decl_db.get_irnodes_ids_by_scope_id(0)!) {
+        for (let id of db.decl_db.get_irnodes_ids_recursively(0)!) {
           program += writer.write(irnodes.get(id)!.lower());
         }
         if (!fs.existsSync("./generated_programs")) {
