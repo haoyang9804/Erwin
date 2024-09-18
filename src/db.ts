@@ -5,7 +5,7 @@ import { scopeKind } from './scope';
 import { FunctionVisibility, StateVariableVisibility } from 'solc-typed-ast';
 import { assert } from 'console';
 import { config } from './config';
-import { IRIdentifier } from './expression';
+import { IRVariableDeclare } from './declare';
 
 // Deprecated Database
 export class DeprecatedDB {
@@ -116,7 +116,7 @@ class DeclDB {
   // It's records the scope that some node exposes to the outside world.
   // The nodes in the exposed scope are called `hidden nodes`.
   // The node that exposes the scope is called `scoper`.
-  private scopermap: Map<number, number>;
+  private scopermap : Map<number, number>;
   constructor() {
     this.scope_tree = new Tree();
     this.scope2irnodeinfo = new Map<number, irnodeInfo[]>();
@@ -132,7 +132,7 @@ class DeclDB {
   new_scope(cur_scope_id : number, parent_scope_id : number) : void {
     this.scope_tree.insert(parent_scope_id, cur_scope_id);
   }
-  insert_contract_ghost(scope_id: number): void {
+  insert_contract_ghost(scope_id : number) : void {
     if (this.scope2irnodeinfo.has(scope_id)) {
       // The contract ghost is private: it can be accessed by the contract itself but not the outside world
       // or the derived contracts.
@@ -144,8 +144,8 @@ class DeclDB {
       this.scope2irnodeinfo.set(scope_id, [{ id: this.ghost_ID, vis: erwin_visibility.INCONTRACT_PRIVATE }]);
     }
     this.scopermap.set(this.ghost_ID, scope_id);
-    new IRIdentifier(this.ghost_ID, scope_id, 'this', -1);
-    this.ghost_ID --;
+    new IRVariableDeclare(this.ghost_ID, scope_id, 'this');
+    this.ghost_ID--;
   }
   insert(node_id : number, erwin_visibility : erwin_visibility, scope_id : number) : void {
     if (this.scope2irnodeinfo.has(scope_id)) {
@@ -156,20 +156,20 @@ class DeclDB {
     }
   }
   // Get IRNodes from a scope but not its ancestors
-  //! It's used for extracting hidden nodes from a scoper
-  get_hidden_nodes_ids(scope_id : number) : number[] {
-    let irnodes_ids : number[] = [];
+  get_nonhidden_nodes_ids_nonrecursively(scope_id : number) : [number, number][] {
+    let irnodes_ids : [number, number][] = [];
     if (this.scope2irnodeinfo.has(scope_id))
-      irnodes_ids = this.scope2irnodeinfo.get(scope_id)!.map(x => x.id);
+      irnodes_ids = this.scope2irnodeinfo.get(scope_id)!.map(x => [-1, x.id]);
     return irnodes_ids;
   }
+
   // Get IRNodes from a scope, the scope's ancestors, but not scopers inside
-  get_irnodes_ids_recursively(scope_id : number) : number[] {
-    let irnodes_ids : number[] = [];
+  get_nonhidden_irnodes_ids_recursively(scope_id : number) : [number, number][] {
+    let irnodes_ids : [number, number][] = [];
     while (true) {
       if (this.scope2irnodeinfo.has(scope_id))
         irnodes_ids = irnodes_ids.concat(
-          this.scope2irnodeinfo.get(scope_id)!.map(x => x.id)
+          this.scope2irnodeinfo.get(scope_id)!.map(x => [-1, x.id])
         );
       if (this.scope_tree.hasParent(scope_id)) {
         scope_id = this.scope_tree.getParent(scope_id);
@@ -182,7 +182,7 @@ class DeclDB {
   }
 
   get_scoper(scope_id : number) : number[] {
-    const irnodes_ids: number[] = [];
+    const irnodes_ids : number[] = [];
     if (this.scope2irnodeinfo.has(scope_id)) {
       for (const irnode_info of this.scope2irnodeinfo.get(scope_id)!) {
         if (this.scopermap.has(irnode_info.id)) {
@@ -192,12 +192,14 @@ class DeclDB {
     }
     return irnodes_ids;
   }
-
-  get_irnodes_ids_from_scoper(scope_id : number) : number[] {
+  /*
+  From a scope, get all hidden nodes' IDs from the inside scopers.
+  */
+  get_hidden_irnodes_ids_from_scoper(scope_id : number) : [number, number][] {
     const scoper_ids = this.get_scoper(scope_id);
-    const irnodes_ids: number[] = [];
+    const irnodes_ids : [number, number][] = [];
     for (const scoper_id of scoper_ids) {
-      irnodes_ids.concat(this.get_hidden_nodes_ids(scoper_id));
+      irnodes_ids.concat(this.get_nonhidden_nodes_ids_nonrecursively(scoper_id).map(x => [scoper_id, x[1]]));
     }
     return irnodes_ids;
   }

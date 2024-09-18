@@ -9,10 +9,12 @@ export const irnodes = new Map<number, IRNode>();
 export abstract class IRNode {
   public id : number;
   public scope : number;
+  public typeName : string;
   constructor(id : number, scope : number) {
     this.id = id;
     this.scope = scope;
     irnodes.set(this.id, this);
+    this.typeName = this.constructor.name;
   }
   abstract lower() : ASTNode;
 }

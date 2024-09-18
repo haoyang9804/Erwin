@@ -57,7 +57,8 @@ program
   .option("--state_variable_count_upperlimit <number>", "The upper limit of the number of state variables in a contract.", `${config.state_variable_count_upperlimit}`)
   .option("--contract_count <number>", "The upper limit of the number of contracts Erwin will generate.", `${config.contract_count}`)
   .option("--no_type_exploration", "Disable the type exploration.", `${config.no_type_exploration}`)
-  .option("-m --mode <string>", "The mode of Erwin. The value can be 'type' or 'scope'.", `${config.mode}`);
+  .option("-m --mode <string>", "The mode of Erwin. The value can be 'type' or 'scope'.", `${config.mode}`)
+  .option("--vardecl_prob <float>", "The probability of generating a variable declaration.", `${config.vardecl_prob}`);
 program.parse(process.argv);
 // Set the configuration
 if (program.args[0] === "mutate") {
@@ -80,6 +81,7 @@ else if (program.args[0] === "generate") {
   config.state_variable_count_upperlimit = parseInt(program.commands[1].opts().state_variable_count_upperlimit);
   config.contract_count = parseInt(program.commands[1].opts().contract_count);
   config.mode = program.commands[1].opts().mode;
+  config.vardecl_prob = parseFloat(program.commands[1].opts().vardecl_prob);
   if (program.commands[1].opts().debug === true) config.debug = true;
   if (program.commands[1].opts().no_type_exploration === true) config.no_type_exploration = true;
 }
@@ -102,6 +104,7 @@ else if (program.args[0] === "generate") {
   assert(config.state_variable_count_upperlimit >= 0, "state_variable_count_upperlimit must be not less than 0.");
   assert(config.contract_count >= 0, "contract_count must be not less than 0.");
   assert(["type", "scope"].includes(config.mode), "The mode is not either 'type' or 'scope', instead it is " + config.mode);
+  assert(config.vardecl_prob < 1.0, "The probability of generating a variable declaration must be less than or equal to 1.");
 }
 // Execute
 if (program.args[0] === "mutate") {
@@ -179,7 +182,7 @@ function generate_type_mode() {
         (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclare).type = value;
     }
     let program = "";
-    for (let id of db.decl_db.get_irnodes_ids_recursively(0)!) {
+    for (let [_, id] of db.decl_db.get_nonhidden_irnodes_ids_recursively(0)!) {
       program += writer.write(irnodes.get(id)!.lower());
     }
     if (!fs.existsSync("./generated_programs")) {
@@ -239,7 +242,7 @@ function generate_scope_mode() {
           (irnodes.get(key)! as decl.IRVariableDeclare).visibility = value.kind;
         }
         let program = "";
-        for (let id of db.decl_db.get_irnodes_ids_recursively(0)!) {
+        for (let [_, id] of db.decl_db.get_nonhidden_irnodes_ids_recursively(0)!) {
           program += writer.write(irnodes.get(id)!.lower());
         }
         if (!fs.existsSync("./generated_programs")) {

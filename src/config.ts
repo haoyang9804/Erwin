@@ -18,5 +18,6 @@ export const config = {
   file: "",
   out_dir: "",
   no_type_exploration: false,
-  mode: "type"
+  mode: "type",
+  vardecl_prob: 0.2
 }
