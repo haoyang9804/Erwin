@@ -18,7 +18,8 @@ import { FuncVisProvider, VarVisProvider } from "./visibility";
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Global Variables
 
 const varnames = new Set<string>();
-let global_id = 0;
+let global_id = 1;
+const joke_id : number = 0;
 let cur_scope : ScopeList = init_scope();
 let indent = 0;
 // Record the vardecls used by each expression. If an expr contains an identifier of a vardecl, then this expr uses this vardecl.
@@ -29,11 +30,8 @@ const expr2used_vardecls : Map<number, Set<number>> = new Map<number, Set<number
 const expr2dominated_vardecls : Map<number, Set<number>> = new Map<number, Set<number>>();
 // For each key vardecl, record the vardecls that dominate or are dominated by it. These vardecls are of the same type range as the key vardecl.
 const vardecl2vardecls_of_the_same_type_range : Map<number, Set<number>> = new Map<number, Set<number>>();
-const vardecls : Set<number> = new Set<number>();
-const funcdecls : Set<number> = new Set<number>();
-const contractdecls : Set<number> = new Set<number>();
-const called_function_decls_IDs : Set<number> = new Set<number>();
 let no_state_variable_in_function_body = false;
+let allow_empty_return = false;
 /*
 Image a awkward situation:
 In a function call generation, one of the arguments is a function call to the same function.
@@ -80,11 +78,16 @@ function getAvailableIRVariableDeclare() : [number, decl.IRVariableDeclare][] {
     (x) => x[1]
   );
   for (let id of IDs_of_available_irnodes) {
-    if (vardecls.has(id)) collection.push([-1, irnodes.get(id)! as decl.IRVariableDeclare]);
+    if (decl_db.vardecls.has(id) && !(no_state_variable_in_function_body && state_variables.has(id))) {
+      collection.push([0, irnodes.get(id)! as decl.IRVariableDeclare]);
+    }
   }
-  for (const [scoper_id, irnode_id] of decl_db.get_hidden_irnodes_ids_from_scoper(cur_scope.id())) {
-    if (vardecls.has(irnode_id)) collection.push([scoper_id, irnodes.get(irnode_id)! as decl.IRVariableDeclare]);
-  }
+  //TODO: support the following code, which is used to extract function identifier from contract instance
+  // for (const [scoper_id, irnode_id] of decl_db.get_hidden_func_irnodes_ids_from_contract_instance(cur_scope.id())) {
+  //   if (decl_db.vardecls.has(irnode_id) && !(no_state_variable_in_function_body && state_variables.has(irnode_id))) {
+  //     collection.push([scoper_id, irnodes.get(irnode_id)! as decl.IRVariableDeclare]);
+  //   }
+  // }
   return collection;
 }
 
@@ -98,11 +101,16 @@ function getAvailableIRVariableDeclareWithTypeConstraint(types : type.Type[]) : 
     (x) => x[1]
   );
   for (let id of IDs_of_available_irnodes) {
-    if (vardecls.has(id)) collection.push([-1, irnodes.get(id)! as decl.IRVariableDeclare]);
+    if (decl_db.vardecls.has(id) && !(no_state_variable_in_function_body && state_variables.has(id))) {
+      collection.push([0, irnodes.get(id)! as decl.IRVariableDeclare]);
+    }
   }
-  for (const [scoper_id, irnode_id] of decl_db.get_hidden_irnodes_ids_from_scoper(cur_scope.id())) {
-    if (vardecls.has(irnode_id)) collection.push([scoper_id, irnodes.get(irnode_id)! as decl.IRVariableDeclare]);
-  }
+  //TODO: support the following code, which is used to extract function identifier from contract instance
+  // for (const [scoper_id, irnode_id] of decl_db.get_hidden_func_irnodes_ids_from_contract_instance(cur_scope.id())) {
+  //   if (decl_db.vardecls.has(irnode_id) && !(no_state_variable_in_function_body && state_variables.has(irnode_id))) {
+  //     collection.push([scoper_id, irnodes.get(irnode_id)! as decl.IRVariableDeclare]);
+  //   }
+  // }
   return collection.filter(([_, irdecl]) => isSuperSet(type_dag.solution_range.get(irdecl.id)!, types) || isSuperSet(types, type_dag.solution_range.get(irdecl.id)!));
 }
 
@@ -119,10 +127,16 @@ function getAvailableIRVariableDeclareWithTypeConstraintWithForbiddenVardeclcs(t
     (x) => x[1]
   );
   for (let id of IDs_of_available_irnodes) {
-    if (vardecls.has(id) && !(no_state_variable_in_function_body && state_variables.has(id))) {
-      collection.push([-1, irnodes.get(id)! as decl.IRVariableDeclare]);
+    if (decl_db.vardecls.has(id) && !(no_state_variable_in_function_body && state_variables.has(id))) {
+      collection.push([0, irnodes.get(id)! as decl.IRVariableDeclare]);
     }
   }
+  //TODO: support the following code, which is used to extract function identifier from contract instance
+  // for (const [scoper_id, irnode_id] of decl_db.get_hidden_func_irnodes_ids_from_contract_instance(cur_scope.id())) {
+  //   if (decl_db.vardecls.has(irnode_id) && !(no_state_variable_in_function_body && state_variables.has(irnode_id))) {
+  //     collection.push([scoper_id, irnodes.get(irnode_id)! as decl.IRVariableDeclare]);
+  //   }
+  // }
 
   for (const dominated_vardecl of dominated_vardecls_by_dominator) {
     for (const vardecl of vardecl2vardecls_of_the_same_type_range.get(dominated_vardecl)!) {
@@ -169,13 +183,13 @@ function typeRangeAlignment(irnode_id1 : number, irnode_id2 : number) : void {
   if (isEqualSet(type_dag.solution_range.get(irnode_id1)!, type_dag.solution_range.get(irnode_id2)!)) return;
   if (isSuperSet(type_dag.solution_range.get(irnode_id1)!, type_dag.solution_range.get(irnode_id2)!)) {
     type_dag.solution_range.set(irnode_id1, type_dag.solution_range.get(irnode_id2)!);
-    if (vardecls.has(irnode_id1)) type_dag.tighten_solution_range_from_a_tail(irnode_id1);
+    if (decl_db.vardecls.has(irnode_id1)) type_dag.tighten_solution_range_from_a_tail(irnode_id1);
     else type_dag.tighten_solution_range_from_a_head(irnode_id1);
     return;
   }
   if (isSuperSet(type_dag.solution_range.get(irnode_id2)!, type_dag.solution_range.get(irnode_id1)!)) {
     type_dag.solution_range.set(irnode_id2, type_dag.solution_range.get(irnode_id1)!);
-    if (vardecls.has(irnode_id2)) type_dag.tighten_solution_range_from_a_tail(irnode_id2);
+    if (decl_db.vardecls.has(irnode_id2)) type_dag.tighten_solution_range_from_a_tail(irnode_id2);
     else type_dag.tighten_solution_range_from_a_head(irnode_id2);
     return;
   }
@@ -223,7 +237,7 @@ export class ElementaryTypeVariableDeclareGenerator extends DeclarationGenerator
     }
     type_dag.insert(type_dag.newNode(this.irnode.id));
     type_dag.solution_range.set(this.irnode.id, this.type_range);
-    vardecls.add(this.irnode.id);
+    decl_db.vardecls.add(this.irnode.id);
     vardecl2vardecls_of_the_same_type_range.set(this.irnode.id, new Set<number>());
     if (config.debug)
       console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode!.id}: VarDecl, name: ${this.name}, scope: ${cur_scope.id()}, type: ${type_dag.solution_range.get(this.irnode!.id)!.map(t => t.str())}`));
@@ -327,10 +341,10 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
   }
 
   build_connection_from_caller_to_callee(thisid : number) : void {
-    for (const called_function_decl_ID of called_function_decls_IDs) {
+    for (const called_function_decl_ID of decl_db.called_function_decls_IDs) {
       this.connect_from_caller_to_callee(thisid, called_function_decl_ID);
     }
-    called_function_decls_IDs.clear();
+    decl_db.called_function_decls_IDs.clear();
   }
 
   build_connection_between_caller_and_callee(thisid : number) : void {
@@ -340,7 +354,7 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
       //! Since we use brute force to resolve state mutatbility constraints, this 
       //! function is not necessary.
     */
-    for (const called_function_decl_ID of called_function_decls_IDs) {
+    for (const called_function_decl_ID of decl_db.called_function_decls_IDs) {
       if (isSuperSet(funcstat_dag.solution_range.get(thisid)!, funcstat_dag.solution_range.get(called_function_decl_ID)!)) {
         this.connect_from_callee_to_caller(called_function_decl_ID, thisid);
       }
@@ -348,7 +362,7 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
         this.connect_from_caller_to_callee(thisid, called_function_decl_ID);
       }
     }
-    called_function_decls_IDs.clear();
+    decl_db.called_function_decls_IDs.clear();
   }
 
   throw_no_state_variable_signal_at_random() : void {
@@ -484,7 +498,7 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
     this.irnode = new decl.IRFunctionDefinition(thisid, cur_scope.id(), name,
       this.kind, virtual, overide, parameters, return_decls, body, modifiers);
     this.clear_no_state_variable_signal();
-    funcdecls.add(this.irnode.id);
+    decl_db.funcdecls.add(this.irnode.id);
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Finish generating function ${name}`));
       indent -= 2;
@@ -524,6 +538,9 @@ export class ContractDeclareGenerator extends DeclarationGenerator {
       }
       body.push(variable_decl);
       state_variables.add(variable_decl.id);
+      // For each state variable, generate a external view function with the same identifier name as the state variable.
+      new decl.IRFunctionDefinition(global_id++, cur_scope.id(), variable_decl.name, FunctionKind.Function,
+        false, false, [], [variable_decl], [], [], FunctionVisibility.External, FunctionStateMutability.View);
     }
     //! Generate contract name
     const contract_name = generateVarName();
@@ -545,7 +562,7 @@ export class ContractDeclareGenerator extends DeclarationGenerator {
     cur_scope = cur_scope.rollback();
     this.irnode = new decl.IRContractDefinition(thisid, cur_scope.id(), contract_name,
       ContractKind.Contract, false, false, body, [], [], []);
-    contractdecls.add(this.irnode.id);
+    decl_db.contractdecls.add(this.irnode.id);
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Finish generating contract`));
       indent -= 2;
@@ -642,7 +659,7 @@ export class IdentifierGenerator extends LRValueGenerator {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Identifier, type range is ${this.type_range.map(t => t.str())}`));
     }
     let irdecl : decl.IRVariableDeclare;
-    let scoper_id = -1;
+    let contract_instance_id = 0;
     // Generate a variable decl if there is no variable decl available.
     if (!hasAvailableIRVariableDeclareWithTypeConstraintWithForbiddenVardeclcs(this.type_range,
       new Set<number>(this.forbidden_vardecls),
@@ -668,33 +685,21 @@ export class IdentifierGenerator extends LRValueGenerator {
       irdecl = variable_decl_gen.irnode! as decl.IRVariableDeclare;
     }
     else {
-      const scoper_plus_availableIRDecl = getAvailableIRVariableDeclareWithTypeConstraintWithForbiddenVardeclcs(this.type_range,
+      const contract_instance_plus_availableIRDecl = getAvailableIRVariableDeclareWithTypeConstraintWithForbiddenVardeclcs(this.type_range,
         new Set<number>(this.forbidden_vardecls),
         new Set<number>(this.dominated_vardecls_by_dominator));
-      assert(scoper_plus_availableIRDecl !== undefined, "IdentifierGenerator: availableIRDecl is undefined");
-      assert(scoper_plus_availableIRDecl.length > 0, "IdentifierGenerator: no available IR irnodes");
-      [scoper_id, irdecl] = pickRandomElement(scoper_plus_availableIRDecl)!;
+      assert(contract_instance_plus_availableIRDecl !== undefined, "IdentifierGenerator: availableIRDecl is undefined");
+      assert(contract_instance_plus_availableIRDecl.length > 0, "IdentifierGenerator: no available IR irnodes");
+      [contract_instance_id, irdecl] = pickRandomElement(contract_instance_plus_availableIRDecl)!;
+      assert(contract_instance_id == 0, "IdentifierGenerator: contract_instance_id is not 0, but is " + contract_instance_id);
     }
-    if (scoper_id == -1) {
-      this.irnode = new expr.IRIdentifier(global_id++, cur_scope.id(), irdecl.name, irdecl.id);
-      type_dag.insert(type_dag.newNode(this.irnode.id));
-      type_dag.connect(this.irnode.id, irdecl.id);
-      type_dag.solution_range.set(this.irnode.id, this.type_range);
-      typeRangeAlignment(this.irnode.id, irdecl.id);
-    }
-    else {
-      const scoper : IRNode = irnodes.get(scoper_id)!;
-      assert(scoper instanceof decl.IRVariableDeclare,
-        "IdentifierGenerator: scoper is not a variable declaration, but is a " + scoper.typeName);
-      assert(irdecl instanceof decl.IRVariableDeclare,
-        "IdentifierGenerator: irdecl is not a variable declaration, but is a " + irdecl.typeName);
-      const identifier = new expr.IRIdentifier(global_id++, cur_scope.id(), (irdecl as decl.IRVariableDeclare).name, irdecl.id);
-      this.irnode = new expr.IRMemberAccess(global_id++, cur_scope.id(), irdecl.name, irdecl.id, identifier);
-      type_dag.insert(type_dag.newNode(identifier.id));
-      type_dag.connect(identifier.id, irdecl.id);
-      type_dag.solution_range.set(identifier.id, this.type_range);
-      typeRangeAlignment(identifier.id, irdecl.id);
-    }
+    assert(contract_instance_id === joke_id, "IdentifierGenerator: contract_instance_id is not joke_id, but is " + contract_instance_id);
+    this.irnode = new expr.IRIdentifier(global_id++, cur_scope.id(), irdecl.name, irdecl.id);
+
+    type_dag.insert(type_dag.newNode(this.irnode.id));
+    type_dag.connect(this.irnode.id, irdecl.id);
+    type_dag.solution_range.set(this.irnode.id, this.type_range);
+    typeRangeAlignment(this.irnode.id, irdecl.id);
     expr2used_vardecls.set(this.irnode.id, new Set<number>([irdecl.id]));
     expr2dominated_vardecls.set(this.irnode.id, new Set<number>([irdecl.id]));
     if (config.debug)
@@ -1210,38 +1215,28 @@ export class FunctionCallGenerator extends RValueGenerator {
       return;
     }
     //! Find available function declarations
-    const available_funcdecls_ids : number[] = [];
-    const IDs_of_available_irnodes = decl_db.get_nonhidden_irnodes_ids_recursively(cur_scope.id()).map(
-      (x) => x[1]
-    );
-    //TODO: update the following function definition candidates after introducing interconnection between contracts.
-    for (let id of IDs_of_available_irnodes) {
-      if (funcdecls.has(id) && (irnodes.get(id)! as decl.IRFunctionDefinition).visibility !== FunctionVisibility.External) {
-        let ret_decl_index = 0;
-        for (const ret_decl of (irnodes.get(id)! as decl.IRFunctionDefinition).returns) {
-          if (forbidden_funcs.has(id)) continue;
+    let contract_instance_id_plus_funcdecl_id : [number, number][] = [];
+    const contract_instance_id_to_irnode_id = decl_db.get_nonhidden_irnodes_ids_recursively(cur_scope.id());
+    for (let [contract_instance_id, irnode_id] of contract_instance_id_to_irnode_id) {
+      if (decl_db.funcdecls.has(irnode_id) &&
+        (allow_empty_return || (irnodes.get(irnode_id)! as decl.IRFunctionDefinition).returns.length > 0)) {
+        for (const ret_decl of (irnodes.get(irnode_id)! as decl.IRFunctionDefinition).returns) {
+          if (forbidden_funcs.has(irnode_id)) continue;
           if (return_is_good(ret_decl.id)) {
-            available_funcdecls_ids.push(id);
+            contract_instance_id_plus_funcdecl_id.push([contract_instance_id, irnode_id]);
             break;
           }
-          ret_decl_index++;
         }
       }
     }
 
-    const scoper_plus_available_funcirnodes = decl_db.get_hidden_irnodes_ids_from_scoper(cur_scope.id())
-      .filter(([scoper_id, irnode_id]) => funcdecls.has(irnode_id))  // Ensure this is filtering correctly
-      .map(([scoper_id, irnode_id]) => [scoper_id, irnodes.get(irnode_id)!] as [number, decl.IRVariableDeclare])
-      .filter(([scoper_id, irnode]) => scoper_id != -1);
+    contract_instance_id_plus_funcdecl_id = contract_instance_id_plus_funcdecl_id.concat(
+      decl_db.get_hidden_func_irnodes_ids_from_contract_instance(cur_scope.id())
+        .filter(([contract_instance_id, irnode_id]) => decl_db.funcdecls.has(irnode_id))
+        .filter(([contract_instance_id, irnode]) => contract_instance_id !== 0));
 
-    const funcirnodeid_to_scoperid = new Map<number, number>(
-      scoper_plus_available_funcirnodes.map(([scoper_id, irnode]) => [irnode.id, scoper_id])
-    );
-
-    available_funcdecls_ids.concat(scoper_plus_available_funcirnodes.map(([scoper_id, irnode]) => irnode.id));
-
-    //! If no available function declaration, generate a other expressions
-    if (available_funcdecls_ids.length === 0) {
+    //! If no available function declaration, generate other expressions
+    if (contract_instance_id_plus_funcdecl_id.length === 0) {
       let expression_gen_prototype;
       if (isEqualSet(this.type_range, type.address_types)) {
         expression_gen_prototype = pickRandomElement(non_funccall_expression_generators_for_address_type)!;
@@ -1263,14 +1258,21 @@ export class FunctionCallGenerator extends RValueGenerator {
     const thisid = global_id++;
     type_dag.solution_range.set(thisid, this.type_range);
     type_dag.insert(type_dag.newNode(thisid));
-    const funcdecl_id = pickRandomElement([...available_funcdecls_ids])!;
-    //TODO: currently the function call is intra-contract, need to update this after introducing interconnection between contracts.
-    func_visibility_dag.solution_range.set(funcdecl_id, [
-      FuncVisProvider.internal(),
-      FuncVisProvider.private(),
-      FuncVisProvider.public()
-    ]);
-    called_function_decls_IDs.add(funcdecl_id);
+    const [contract_instance_id, funcdecl_id] = pickRandomElement([...contract_instance_id_plus_funcdecl_id])!;
+    if (contract_instance_id === joke_id) {
+      func_visibility_dag.solution_range.set(funcdecl_id, [
+        FuncVisProvider.internal(),
+        FuncVisProvider.private(),
+        FuncVisProvider.public()
+      ]);
+    }
+    else {
+      func_visibility_dag.solution_range.set(funcdecl_id, [
+        FuncVisProvider.public(),
+        FuncVisProvider.external()
+      ]);
+    }
+    decl_db.called_function_decls_IDs.add(funcdecl_id);
     const funcdecl = irnodes.get(funcdecl_id)! as decl.IRFunctionDefinition;
     //! Then generate an identifier for this function declaration
     const func_name = funcdecl.name;
@@ -1283,12 +1285,17 @@ export class FunctionCallGenerator extends RValueGenerator {
         available_ret_decls_index.push(i);
       }
     }
-    const selected_ret_decls_index = pickRandomElement(available_ret_decls_index)!;
-    const selected_ret_decl = ret_decls[selected_ret_decls_index];
-    type_dag.connect(thisid, selected_ret_decl.id);
-    typeRangeAlignment(thisid, selected_ret_decl.id);
+    let selected_ret_decls_index = available_ret_decls_index.length == 0 ? -1 : pickRandomElement(available_ret_decls_index)!;
+    let selected_ret_decl : null | decl.IRVariableDeclare = null;
+    if (selected_ret_decls_index !== -1) selected_ret_decl = ret_decls[selected_ret_decls_index];
+
+    if (selected_ret_decl !== null) {
+      type_dag.connect(thisid, selected_ret_decl.id);
+      typeRangeAlignment(thisid, selected_ret_decl.id);
+    }
+
     forbidden_funcs.add(funcdecl_id);
-    if (config.debug) {
+    if (config.debug && selected_ret_decl !== null) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  The type range of the selected ret decl is ${selected_ret_decls_index}: ${type_dag.solution_range.get(selected_ret_decl.id)!.map(t => t.str())}`));
     }
     //! Then generate expressions as arguments
@@ -1333,28 +1340,22 @@ export class FunctionCallGenerator extends RValueGenerator {
     }
     //! Generate an function call and select which returned value will be used
     let func_call_node;
-    let func_call_node_id;
-    if (funcirnodeid_to_scoperid.has(funcdecl_id)) {
-      func_call_node_id = global_id++;
-      func_call_node = new expr.IRFunctionCall(func_call_node_id, cur_scope.id(), this.kind!,
-        func_identifier, args_ids.map(i => irnodes.get(i)! as expr.IRExpression));
-      const scoper_id = funcirnodeid_to_scoperid.get(funcdecl_id)!;
-      func_call_node = new expr.IRMemberAccess(thisid, cur_scope.id(),
-        (irnodes.get(scoper_id)! as decl.IRVariableDeclare).name, scoper_id, func_call_node
-      );
+    if (contract_instance_id != joke_id) {
+      func_call_node = new expr.IRFunctionCall(thisid, cur_scope.id(), this.kind!,
+        new expr.IRMemberAccess(global_id++, cur_scope.id(),
+          func_identifier.name!, contract_instance_id, new expr.IRIdentifier(global_id++, cur_scope.id(), "this", contract_instance_id),
+        ),
+        args_ids.map(i => irnodes.get(i)! as expr.IRExpression));
     }
     else {
-      func_call_node_id = thisid;
       func_call_node = new expr.IRFunctionCall(thisid, cur_scope.id(), this.kind!,
         func_identifier, args_ids.map(i => irnodes.get(i)! as expr.IRExpression));
     }
 
-    expr2used_vardecls.set(thisid, new Set<number>([selected_ret_decl.id]));
-    expr2dominated_vardecls.set(thisid, new Set<number>([selected_ret_decl.id]));
     //! If the function has more than one returns, we need to first generate a tuple of identifiers to
     //! relay the returned variables. And the irnode of this generation is the same as the one of the generated
     //! IRIdentifiers
-    if (funcdecl.returns.length > 1) {
+    if (funcdecl.returns.length > 1 && selected_ret_decl !== null) {
       //* generate an identifier
       let type_range_for_identifier = type_dag.solution_range.get(selected_ret_decl.id)!;
       if (isSuperSet(type_range_for_identifier, this.type_range)) {
@@ -1376,8 +1377,8 @@ export class FunctionCallGenerator extends RValueGenerator {
         vardecl2vardecls_of_the_same_type_range.set(selected_ret_decl.id,
           mergeSet(vardecl2vardecls_of_the_same_type_range.get(selected_ret_decl.id)!, new Set<number>([dominated_vardecl])));
       }
-      type_dag.connect(identifier_expr.id, func_call_node_id);
-      typeRangeAlignment(identifier_expr.id, func_call_node_id);
+      type_dag.connect(identifier_expr.id, thisid);
+      typeRangeAlignment(identifier_expr.id, thisid);
       //* 3. use a tuple to wrap around this identifier.
       const tuple_elements : (expr.IRExpression | null)[] = [];
       for (let i = 0; i < ret_decls.length; i++) {
@@ -1400,6 +1401,14 @@ export class FunctionCallGenerator extends RValueGenerator {
     }
     else {
       this.irnode = func_call_node;
+      if (selected_ret_decl !== null) {
+        expr2used_vardecls.set(thisid, new Set<number>([selected_ret_decl.id]));
+        expr2dominated_vardecls.set(thisid, new Set<number>([selected_ret_decl.id]));
+      }
+      else {
+        expr2used_vardecls.set(thisid, new Set<number>());
+        expr2dominated_vardecls.set(thisid, new Set<number>());
+      }
     }
     if (Math.random() < config.tuple_prob) {
       this.irnode = new expr.IRTuple(global_id++, cur_scope.id(), [this.irnode as expr.IRExpression]);
@@ -1420,13 +1429,13 @@ const nonterminal_expression_generators = [
   BinaryOpGenerator,
   UnaryOpGenerator,
   ConditionalGenerator,
-  FunctionCallGenerator
+  // FunctionCallGenerator
 ];
 
 const nonterminal_expression_generators_for_address_type = [
   AssignmentGenerator,
   ConditionalGenerator,
-  FunctionCallGenerator
+  // FunctionCallGenerator
 ];
 
 const non_funccall_expression_generators = [
@@ -1452,7 +1461,7 @@ const all_expression_generators = [
   BinaryOpGenerator,
   UnaryOpGenerator,
   ConditionalGenerator,
-  FunctionCallGenerator
+  // FunctionCallGenerator
 ];
 
 const all_expression_generators_for_address_types = [
@@ -1460,7 +1469,7 @@ const all_expression_generators_for_address_types = [
   IdentifierGenerator,
   AssignmentGenerator,
   ConditionalGenerator,
-  FunctionCallGenerator
+  // FunctionCallGenerator
 ];
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Statement Generator
@@ -1683,12 +1692,14 @@ export class FunctionCallStatementGenerator extends ExpressionStatementGenerator
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating FunctionCallStatement`));
     }
+    allow_empty_return = true;
     const funcall_gen = new FunctionCallGenerator(type.elementary_types, new Set<number>(), new Set<number>(), FunctionCallKind.FunctionCall);
     if (config.debug) indent += 2;
     funcall_gen.generate(0);
     if (config.debug) indent -= 2;
     this.expr = expr.tupleExtraction(funcall_gen.irnode! as expr.IRExpression);
     this.irnode = new stmt.IRExpressionStatement(global_id++, cur_scope.id(), this.expr);
+    allow_empty_return = false;
   }
 }
 

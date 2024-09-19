@@ -14,7 +14,8 @@ type scopeT = {
   kind : scopeKind
 };
 
-let scope_id : number = 0;
+export const global_scope : number = 1;
+let scope_id : number = global_scope;
 
 export class ScopeList extends LinkedListNode<scopeT> {
   constructor(value : scopeT) {

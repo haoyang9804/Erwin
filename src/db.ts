@@ -111,23 +111,25 @@ class DeclDB {
   // Each contract has a ghost ID, which is used to represent the contract itself.
   // Different from node ID which is larger than 0, ghost ID is below 0
   // It's mainly used for generating "this.function()" inside a contract.
-  private ghost_ID : number;
-  // scopermap is a map from node ID to scope ID
+  public contract_ghost_id : number;
+  // contract_instance_to_scope is a map from node ID to scope ID
   // It's records the scope that some node exposes to the outside world.
-  // The nodes in the exposed scope are called `hidden nodes`.
-  // The node that exposes the scope is called `scoper`.
-  private scopermap : Map<number, number>;
+  private contract_instance_to_scope : Map<number, number>;
+  public vardecls : Set<number> = new Set<number>();
+  public funcdecls : Set<number> = new Set<number>();
+  public contractdecls : Set<number> = new Set<number>();
+  public called_function_decls_IDs : Set<number> = new Set<number>();
   constructor() {
     this.scope_tree = new Tree();
     this.scope2irnodeinfo = new Map<number, irnodeInfo[]>();
-    this.ghost_ID = -1;
-    this.scopermap = new Map<number, number>();
+    this.contract_ghost_id = -1;
+    this.contract_instance_to_scope = new Map<number, number>();
   }
   init() {
     this.scope_tree = new Tree();
     this.scope2irnodeinfo = new Map<number, irnodeInfo[]>();
-    this.ghost_ID = -1;
-    this.scopermap = new Map<number, number>();
+    this.contract_ghost_id = -1;
+    this.contract_instance_to_scope = new Map<number, number>();
   }
   new_scope(cur_scope_id : number, parent_scope_id : number) : void {
     this.scope_tree.insert(parent_scope_id, cur_scope_id);
@@ -137,15 +139,15 @@ class DeclDB {
       // The contract ghost is private: it can be accessed by the contract itself but not the outside world
       // or the derived contracts.
       this.scope2irnodeinfo.set(scope_id, this.scope2irnodeinfo.get(scope_id)!.concat(
-        { id: this.ghost_ID, vis: erwin_visibility.INCONTRACT_PRIVATE })
+        { id: this.contract_ghost_id, vis: erwin_visibility.INCONTRACT_PRIVATE })
       );
     }
     else {
-      this.scope2irnodeinfo.set(scope_id, [{ id: this.ghost_ID, vis: erwin_visibility.INCONTRACT_PRIVATE }]);
+      this.scope2irnodeinfo.set(scope_id, [{ id: this.contract_ghost_id, vis: erwin_visibility.INCONTRACT_PRIVATE }]);
     }
-    this.scopermap.set(this.ghost_ID, scope_id);
-    new IRVariableDeclare(this.ghost_ID, scope_id, 'this');
-    this.ghost_ID--;
+    this.contract_instance_to_scope.set(this.contract_ghost_id, scope_id);
+    new IRVariableDeclare(this.contract_ghost_id, scope_id, 'this');
+    this.contract_ghost_id--;
   }
   insert(node_id : number, erwin_visibility : erwin_visibility, scope_id : number) : void {
     if (this.scope2irnodeinfo.has(scope_id)) {
@@ -159,7 +161,7 @@ class DeclDB {
   get_nonhidden_nodes_ids_nonrecursively(scope_id : number) : [number, number][] {
     let irnodes_ids : [number, number][] = [];
     if (this.scope2irnodeinfo.has(scope_id))
-      irnodes_ids = this.scope2irnodeinfo.get(scope_id)!.map(x => [-1, x.id]);
+      irnodes_ids = this.scope2irnodeinfo.get(scope_id)!.map(x => [0, x.id]);
     return irnodes_ids;
   }
 
@@ -169,7 +171,7 @@ class DeclDB {
     while (true) {
       if (this.scope2irnodeinfo.has(scope_id))
         irnodes_ids = irnodes_ids.concat(
-          this.scope2irnodeinfo.get(scope_id)!.map(x => [-1, x.id])
+          this.scope2irnodeinfo.get(scope_id)!.map(x => [0, x.id])
         );
       if (this.scope_tree.hasParent(scope_id)) {
         scope_id = this.scope_tree.getParent(scope_id);
@@ -181,27 +183,37 @@ class DeclDB {
     return irnodes_ids;
   }
 
-  get_scoper(scope_id : number) : number[] {
+  get_contract_instance(scope_id : number) : number[] {
     const irnodes_ids : number[] = [];
     if (this.scope2irnodeinfo.has(scope_id)) {
       for (const irnode_info of this.scope2irnodeinfo.get(scope_id)!) {
-        if (this.scopermap.has(irnode_info.id)) {
+        if (this.contract_instance_to_scope.has(irnode_info.id)) {
           irnodes_ids.push(irnode_info.id);
         }
       }
     }
     return irnodes_ids;
   }
-  /*
-  From a scope, get all hidden nodes' IDs from the inside scopers.
-  */
-  get_hidden_irnodes_ids_from_scoper(scope_id : number) : [number, number][] {
-    const scoper_ids = this.get_scoper(scope_id);
-    const irnodes_ids : [number, number][] = [];
-    for (const scoper_id of scoper_ids) {
-      irnodes_ids.concat(this.get_nonhidden_nodes_ids_nonrecursively(scoper_id).map(x => [scoper_id, x[1]]));
+
+  get_hidden_func_irnodes_ids_from_contract_instance(scope_id : number) : [number, number][] {
+    let contract_instance_id_plus_func_irnodes_id : [number, number][] = [];
+    while (true) {
+      const contract_instance_ids = this.get_contract_instance(scope_id);
+      for (const contract_instance_id of contract_instance_ids) {
+        contract_instance_id_plus_func_irnodes_id = contract_instance_id_plus_func_irnodes_id.concat(
+          this.get_nonhidden_nodes_ids_nonrecursively(this.contract_instance_to_scope.get(contract_instance_id)!)
+            .map(x => [contract_instance_id, x[1]]))
+          .filter(([_, irnode_id]) => this.funcdecls.has(irnode_id)
+          );
+      }
+      if (this.scope_tree.hasParent(scope_id)) {
+        scope_id = this.scope_tree.getParent(scope_id);
+      }
+      else {
+        break;
+      }
     }
-    return irnodes_ids;
+    return contract_instance_id_plus_func_irnodes_id;
   }
 }
 

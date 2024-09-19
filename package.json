@@ -21,7 +21,7 @@
     "figlet": "^1.7.0",
     "keccak": "^3.0.4",
     "sizeof": "^1.0.0",
-    "solc-typed-ast": "^18.1.0",
+    "solc-typed-ast": "^18.2.3",
     "sqlite3": "^5.1.7",
     "ts-graphviz": "^2.1.2",
     "typescript": "^5.4.5"

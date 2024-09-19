@@ -8,6 +8,7 @@ import * as decl from "./declare";
 import * as mut from "./mutators";
 import { config } from "./config";
 import * as fs from "fs";
+import { global_scope } from "./scope";
 import { assert, pickRandomElement } from "./utility";
 import {
   PrettyFormatter,
@@ -182,7 +183,7 @@ function generate_type_mode() {
         (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclare).type = value;
     }
     let program = "";
-    for (let [_, id] of db.decl_db.get_nonhidden_irnodes_ids_recursively(0)!) {
+    for (let [_, id] of db.decl_db.get_nonhidden_irnodes_ids_recursively(global_scope)!) {
       program += writer.write(irnodes.get(id)!.lower());
     }
     if (!fs.existsSync("./generated_programs")) {
@@ -242,7 +243,7 @@ function generate_scope_mode() {
           (irnodes.get(key)! as decl.IRVariableDeclare).visibility = value.kind;
         }
         let program = "";
-        for (let [_, id] of db.decl_db.get_nonhidden_irnodes_ids_recursively(0)!) {
+        for (let [_, id] of db.decl_db.get_nonhidden_irnodes_ids_recursively(global_scope)!) {
           program += writer.write(irnodes.get(id)!.lower());
         }
         if (!fs.existsSync("./generated_programs")) {
