@@ -32,6 +32,8 @@ const expr2dominated_vardecls : Map<number, Set<number>> = new Map<number, Set<n
 const vardecl2vardecls_of_the_same_type_range : Map<number, Set<number>> = new Map<number, Set<number>>();
 let no_state_variable_in_function_body = false;
 let allow_empty_return = false;
+// A signal to indicate whether there is an external function call in the current function body.
+let external_call = false;
 /*
 Image a awkward situation:
 In a function call generation, one of the arguments is a function call to the same function.
@@ -244,7 +246,7 @@ export class ElementaryTypeVariableDeclareGenerator extends DeclarationGenerator
   }
 }
 
-export class FunctionDeclareGenerator extends DeclarationGenerator {
+export class FunctionDeclarationGenerator extends DeclarationGenerator {
   kind : FunctionKind = FunctionKind.Function;
   constructor(kind ?: FunctionKind) {
     super();
@@ -258,6 +260,13 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
       state_mutability_range = [
         FunctionStateMutability.Payable,
         FunctionStateMutability.NonPayable
+      ]
+    }
+    else if (external_call) {
+      state_mutability_range = [
+        FunctionStateMutability.Payable,
+        FunctionStateMutability.NonPayable,
+        FunctionStateMutability.View
       ]
     }
     else {
@@ -402,6 +411,7 @@ export class FunctionDeclareGenerator extends DeclarationGenerator {
       parameters.push(variable_gen.irnode! as decl.IRVariableDeclare);
     }
     //! Generate function body. Body includes exprstmts and the return stmt.
+    external_call = false;
     let body : stmt.IRStatement[] = [];
     // used_vardecls is a set that records the vardecls used by the body.
     const used_vardecls : Set<number> = new Set<number>();
@@ -553,7 +563,7 @@ export class ContractDeclareGenerator extends DeclarationGenerator {
     // haoyang
     const function_count_per_contract = 3;
     for (let i = 0; i < function_count_per_contract; i++) {
-      const function_gen = new FunctionDeclareGenerator();
+      const function_gen = new FunctionDeclarationGenerator();
       if (config.debug) indent += 2;
       function_gen.generate();
       if (config.debug) indent -= 2;
@@ -1340,7 +1350,9 @@ export class FunctionCallGenerator extends RValueGenerator {
     }
     //! Generate an function call and select which returned value will be used
     let func_call_node;
+    // An external call, including "this": https://docs.soliditylang.org/en/latest/contracts.html#function-types
     if (contract_instance_id != joke_id) {
+      external_call = true;
       func_call_node = new expr.IRFunctionCall(thisid, cur_scope.id(), this.kind!,
         new expr.IRMemberAccess(global_id++, cur_scope.id(),
           func_identifier.name!, contract_instance_id, new expr.IRIdentifier(global_id++, cur_scope.id(), "this", contract_instance_id),
