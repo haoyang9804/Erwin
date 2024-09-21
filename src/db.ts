@@ -52,8 +52,7 @@ export enum erwin_visibility {
   INCONTRACT_PUBLIC = "erwin_visibility::INCONTRACT_PUBLIC",
   INCONTRACT_PRIVATE = "erwin_visibility::INCONTRACT_PRIVATE",
   INCONTRACT_UNKNOWN = "erwin_visibility::INCONTRACT_UNKNOWN",
-  GLOBAL = "erwin_visibility::GLOBAL",
-  INFUNCTION = "erwin_visibility::INFUNCTION"
+  NAV = "erwin_visibility::NAV", // visibility does not apply
 }
 
 export function decideFunctionVisibility(kind : scopeKind, vis : FunctionVisibility) : erwin_visibility {
@@ -61,7 +60,7 @@ export function decideFunctionVisibility(kind : scopeKind, vis : FunctionVisibil
     case scopeKind.GLOBAL:
       if (config.debug)
         assert(vis === FunctionVisibility.Default, "When the scope is global, the visibiliity is not FunctionVisibility.Default");
-      return erwin_visibility.GLOBAL;
+      return erwin_visibility.NAV;
     case scopeKind.CONTRACT:
       switch (vis) {
         case FunctionVisibility.External:
@@ -75,6 +74,10 @@ export function decideFunctionVisibility(kind : scopeKind, vis : FunctionVisibil
         default:
           throw new Error(`Unsupported FunctionVisibility: ${vis}`);
       }
+    case scopeKind.FUNC:
+    case scopeKind.IF_CONDITION:
+    case scopeKind.IF_BODY:
+      return erwin_visibility.NAV;
     default:
       throw new Error(`Unsupported scopeKind: ${kind}`);
   }
@@ -94,7 +97,10 @@ export function decideVariableVisibility(kind : scopeKind, vis : StateVariableVi
           throw new Error(`Unsupported StateVariableVisibility: ${vis}`);
       }
     case scopeKind.FUNC:
-      return erwin_visibility.INFUNCTION;
+    case scopeKind.GLOBAL:
+    case scopeKind.IF_CONDITION:
+    case scopeKind.IF_BODY:
+      return erwin_visibility.NAV;
     default:
       throw new Error(`Unsupported scopeKind: ${kind}`);
   }

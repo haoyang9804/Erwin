@@ -385,8 +385,9 @@ export class FunctionDeclarationGenerator extends DeclarationGenerator {
   }
 
   generate() : void {
-    const parameter_count = randomInt(0, config.param_count_of_function_upperlimit);
-    const body_stmt_count = randomInt(0, config.body_stmt_count_of_function_upperlimit);
+    const parameter_count = randomInt(config.param_count_of_function_lowerlimit, config.param_count_of_function_upperlimit);
+    // haoyang
+    const body_stmt_count = randomInt(config.body_stmt_count_of_function_lowerlimit, config.body_stmt_count_of_function_upperlimit);
     const parameters : decl.IRVariableDeclare[] = [];
     const thisid = global_id++;
     func_visibility_dag.solution_range.set(thisid, [
@@ -419,9 +420,11 @@ export class FunctionDeclarationGenerator extends DeclarationGenerator {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Body, ${body_stmt_count} in total`));
     }
     this.throw_no_state_variable_signal_at_random();
-    //! Here we generate exprstmts.
+    //! Here we generate stmts.
     for (let i = body.length; i < body_stmt_count; i++) {
-      const stmt_gen_prototype = pickRandomElement(expr_statement_generators)!;
+      // haoyang
+      statement_generators;
+      const stmt_gen_prototype = pickRandomElement(statement_generators)!;
       const stmt_gen = new stmt_gen_prototype() as ExpressionStatementGenerator;
       if (config.debug) indent += 2;
       stmt_gen.generate();
@@ -430,8 +433,10 @@ export class FunctionDeclarationGenerator extends DeclarationGenerator {
       unexpected_extra_stmt = [];
       body.push(stmt_gen.irnode! as stmt.IRStatement);
       // update used_vardecls
-      for (const used_vardecl of expr2used_vardecls.get(stmt_gen.expr!.id)!) {
-        used_vardecls.add(used_vardecl);
+      if (stmt_gen instanceof ExpressionStatementGenerator) {
+        for (const used_vardecl of expr2used_vardecls.get(stmt_gen.expr!.id)!) {
+          used_vardecls.add(used_vardecl);
+        }
       }
     }
     //! Then we generate return stmt and return_decls.
@@ -526,11 +531,11 @@ export class ContractDeclareGenerator extends DeclarationGenerator {
     //! Create the contract scope
     const thisid = global_id++;
     assert(cur_scope.kind() === scopeKind.GLOBAL, "Contracts' scope must be global");
-    decl_db.insert(thisid, erwin_visibility.GLOBAL, cur_scope.id());
+    decl_db.insert(thisid, erwin_visibility.NAV, cur_scope.id());
     cur_scope = cur_scope.new(scopeKind.CONTRACT);
     const body : IRNode[] = [];
     //! Generate state variables
-    const state_variable_count = randomInt(1, config.state_variable_count_upperlimit);
+    const state_variable_count = randomInt(config.state_variable_count_lowerlimit, config.state_variable_count_upperlimit);
     // Generate state variables and randomly assigns values to these variables
     for (let i = 0; i < state_variable_count; i++) {
       const variable_gen = new ElementaryTypeVariableDeclareGenerator(type.elementary_types);
@@ -559,9 +564,7 @@ export class ContractDeclareGenerator extends DeclarationGenerator {
     //! Generate ghost ID for the contract
     decl_db.insert_contract_ghost(cur_scope.id());
     //! Generate functions in contract
-    // const function_count_per_contract = randomInt(1, config.function_count_per_contract);
-    // haoyang
-    const function_count_per_contract = 3;
+    const function_count_per_contract = randomInt(1, config.function_count_per_contract);
     for (let i = 0; i < function_count_per_contract; i++) {
       const function_gen = new FunctionDeclarationGenerator();
       if (config.debug) indent += 2;
@@ -953,7 +956,23 @@ export class BinaryOpGenerator extends RValueGenerator {
         dominated_vardecls_by_dominator_for_right);
     }
     if (config.debug) indent += 2;
-    right_expression_gen.generate(component + 1);
+    /*
+    This while loop is used to avoid the situation that both left_expression and right_expression are literals.
+    In this case, we cannot control the value of the result.
+    For instance, (ZOwza %= (19421) * 50595) where ZOwza is uint16.
+    Then (19421) * 50595 overflows the uint16 range, leading to an invalid code.
+    */
+    while (true) {
+      right_expression_gen.generate(component + 1);
+
+      if (left_extracted_expression instanceof expr.IRLiteral &&
+        expr.tupleExtraction(right_expression_gen.irnode as expr.IRExpression) instanceof expr.IRLiteral) {
+        continue;
+      }
+      else {
+        break;
+      }
+    }
     if (config.debug) indent -= 2;
     right_expression = right_expression_gen.irnode as expr.IRExpression;
     let right_extracted_expression = expr.tupleExtraction(right_expression);
@@ -991,6 +1010,116 @@ export class BinaryOpGenerator extends RValueGenerator {
     }
     if (config.debug)
       console.log(color.yellowBG(`${" ".repeat(indent)}${thisid}: BinaryOp ${this.op}, scope: ${cur_scope.id()}, type: ${type_dag.solution_range.get(thisid)!.map(t => t.str())}`));
+    if (Math.random() < config.tuple_prob) {
+      this.irnode = new expr.IRTuple(global_id++, cur_scope.id(), [this.irnode as expr.IRExpression]);
+    }
+  }
+}
+
+type BINARYCOMPAREOP = "<" | ">" | "<=" | ">=" | "==" | "!=" | "&&" | "||";
+
+export class BinaryCompareOpGenerator extends RValueGenerator {
+  op : BINARYCOMPAREOP;
+  constructor(type_range : type.Type[], forbidden_vardecls : Set<number>, dominated_vardecls_by_dominator : Set<number>, op ?: BINARYCOMPAREOP) {
+    super(type_range, forbidden_vardecls, dominated_vardecls_by_dominator);
+    if (op !== undefined) {
+      this.op = op;
+    }
+    else if (isEqualSet(type_range, type.bool_types)) {
+      this.op = pickRandomElement(["&&", "||", ">", "<", "<=", ">=", "==", "!="])!;
+    }
+    else {
+      throw new Error(`BinaryCompareOpGenerator constructor: type_range ${type_range.map(t => t.str())} is invalid`);
+    }
+  }
+
+  this_dominates_left() : boolean {
+    return ["&&", "||"].filter((op) => op === this.op).length === 1;
+  }
+
+  generate(component : number) : void {
+    if (config.debug) {
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating BinaryCompareOpGenerator ${this.op}, type range is ${this.type_range.map(t => t.str())}`));
+    }
+    const thisid = global_id++;
+    //! Update type range of this node
+    let type_range;
+    if (["<", ">", "<=", ">=", "==", "!="].filter((op) => op === this.op).length === 1) {
+      type_range = type.all_integer_types;
+      this.type_range = type.bool_types;
+    }
+    else { // &&, ||
+      this.type_range = type_range = type.bool_types;
+    }
+    //! Select generators for the left-hand-side and right-hand-side expressions
+    let left_expression : expr.IRExpression;
+    let right_expression : expr.IRExpression;
+    let left_expression_gen_prototype, right_expression_gen_prototype;
+    let left_expression_gen, right_expression_gen;
+    if (component >= config.expression_complex_level) {
+      left_expression_gen_prototype = pickRandomElement(terminal_expression_generators)!;
+      right_expression_gen_prototype = pickRandomElement(terminal_expression_generators)!;
+    }
+    else {
+      left_expression_gen_prototype = pickRandomElement(nonterminal_expression_generators)!;
+      right_expression_gen_prototype = pickRandomElement(nonterminal_expression_generators)!;
+    }
+    //! Generate left-hand-side expression
+    const dominated_vardecls_by_dominator_for_left = this.this_dominates_left() ?
+      new Set<number>(this.dominated_vardecls_by_dominator) :
+      new Set<number>();
+    left_expression_gen = new left_expression_gen_prototype(type_range,
+      new Set<number>(this.forbidden_vardecls),
+      dominated_vardecls_by_dominator_for_left);
+    if (config.debug) indent += 2;
+    left_expression_gen.generate(component + 1);
+    if (config.debug) indent -= 2;
+    left_expression = left_expression_gen.irnode as expr.IRExpression;
+    let left_extracted_expression = expr.tupleExtraction(left_expression);
+    //! Update expr2used_vardecls, expr2dominated_vardecls
+    expr2used_vardecls.set(thisid, expr2used_vardecls.get(left_extracted_expression.id)!);
+    if (this.this_dominates_left())
+      expr2dominated_vardecls.set(thisid, expr2dominated_vardecls.get(left_extracted_expression.id)!);
+    //! Generate right-hand-side expression
+    const forbidden_vardecls_for_right = mergeSet(expr2used_vardecls.get(left_extracted_expression.id)!, this.forbidden_vardecls);
+
+    right_expression_gen = new right_expression_gen_prototype(type_dag.solution_range.get(left_extracted_expression.id)!,
+      forbidden_vardecls_for_right,
+      new Set<number>());
+    if (config.debug) indent += 2;
+    /*
+    This while loop is used to avoid the situation that both left_expression and right_expression are literals.
+    In this case, we cannot control the value of the result.
+    For instance, (ZOwza %= (19421) * 50595) where ZOwza is uint16.
+    Then (19421) * 50595 overflows the uint16 range, leading to an invalid code.
+    */
+    while (true) {
+      right_expression_gen.generate(component + 1);
+
+      if (left_extracted_expression instanceof expr.IRLiteral &&
+        expr.tupleExtraction(right_expression_gen.irnode as expr.IRExpression) instanceof expr.IRLiteral) {
+        continue;
+      }
+      else {
+        break;
+      }
+    }
+    if (config.debug) indent -= 2;
+    right_expression = right_expression_gen.irnode as expr.IRExpression;
+    let right_extracted_expression = expr.tupleExtraction(right_expression);
+    //! Update expr2used_vardecls, expr2dominated_vardecls, and vardecl2vardecls_of_the_same_type_range
+    expr2used_vardecls.set(thisid, mergeSet(expr2used_vardecls.get(thisid)!, (expr2used_vardecls.get(right_extracted_expression.id)!)));
+
+    //! Generate irnode
+    this.irnode = new expr.IRBinaryOp(thisid, cur_scope.id(), left_expression, right_expression, this.op);
+    type_dag.insert(type_dag.newNode(thisid));
+    type_dag.solution_range.set(thisid, this.type_range);
+    if (this.this_dominates_left()) {
+      type_dag.connect(thisid, left_extracted_expression.id);
+      typeRangeAlignment(thisid, left_extracted_expression.id);
+    }
+    if (config.debug)
+      console.log(color.yellowBG(`${" ".repeat(indent)}${thisid}: BinaryCompareOp ${this.op}, scope: ${cur_scope.id()}, type: ${type_dag.solution_range.get(thisid)!.map(t => t.str())}`));
     if (Math.random() < config.tuple_prob) {
       this.irnode = new expr.IRTuple(global_id++, cur_scope.id(), [this.irnode as expr.IRExpression]);
     }
@@ -1441,13 +1570,13 @@ const nonterminal_expression_generators = [
   BinaryOpGenerator,
   UnaryOpGenerator,
   ConditionalGenerator,
-  // FunctionCallGenerator
+  FunctionCallGenerator
 ];
 
 const nonterminal_expression_generators_for_address_type = [
   AssignmentGenerator,
   ConditionalGenerator,
-  // FunctionCallGenerator
+  FunctionCallGenerator
 ];
 
 const non_funccall_expression_generators = [
@@ -1473,7 +1602,7 @@ const all_expression_generators = [
   BinaryOpGenerator,
   UnaryOpGenerator,
   ConditionalGenerator,
-  // FunctionCallGenerator
+  FunctionCallGenerator
 ];
 
 const all_expression_generators_for_address_types = [
@@ -1481,7 +1610,7 @@ const all_expression_generators_for_address_types = [
   IdentifierGenerator,
   AssignmentGenerator,
   ConditionalGenerator,
-  // FunctionCallGenerator
+  FunctionCallGenerator
 ];
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Statement Generator
@@ -1715,10 +1844,53 @@ export class FunctionCallStatementGenerator extends ExpressionStatementGenerator
   }
 }
 
+export class IfStatementGenerator extends StatementGenerator {
+  constructor() {
+    super();
+  }
+  generate() : void {
+    if (config.debug) {
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating IfStatement`));
+    }
+    const condition_gen = new BinaryCompareOpGenerator(type.bool_types, new Set<number>(), new Set<number>());
+    if (config.debug) indent += 2;
+    cur_scope = cur_scope.new(scopeKind.IF_CONDITION);
+    condition_gen.generate(0);
+    cur_scope = cur_scope.rollback();
+    if (config.debug) indent -= 2;
+    const then_stmt_gen_prototype = pickRandomElement(expr_statement_generators)!;
+    const then_stmt_gen = new then_stmt_gen_prototype();
+    if (config.debug) indent += 2;
+    cur_scope = cur_scope.new(scopeKind.IF_BODY);
+    then_stmt_gen.generate();
+    cur_scope = cur_scope.rollback();
+    if (config.debug) indent -= 2;
+    if (Math.random() < config.else_prob) {
+      this.irnode = new stmt.IRIf(global_id++, cur_scope.id(), condition_gen.irnode! as expr.IRExpression, [then_stmt_gen.irnode!], []);
+      return;
+    }
+    const else_stmt_gen_prototype = pickRandomElement(expr_statement_generators)!;
+    const else_stmt_gen = new else_stmt_gen_prototype();
+    if (config.debug) indent += 2;
+    cur_scope = cur_scope.new(scopeKind.IF_BODY);
+    else_stmt_gen.generate();
+    cur_scope = cur_scope.rollback();
+    if (config.debug) indent -= 2;
+    this.irnode = new stmt.IRIf(global_id++, cur_scope.id(), condition_gen.irnode! as expr.IRExpression, [then_stmt_gen.irnode!], [else_stmt_gen.irnode!]);
+  }
+}
+
 const expr_statement_generators = [
-  // AssignmentStatementGenerator,
-  // BinaryOpStatementGenerator,
-  // UnaryOpStatementGenerator,
-  // ConditionalStatementGenerator,
+  AssignmentStatementGenerator,
+  BinaryOpStatementGenerator,
+  UnaryOpStatementGenerator,
+  ConditionalStatementGenerator,
   FunctionCallStatementGenerator
 ]
+
+const statement_generators = [
+  // AssignmentStatementGenerator,
+  // ConditionalStatementGenerator,
+  // FunctionCallStatementGenerator,
+  IfStatementGenerator
+];

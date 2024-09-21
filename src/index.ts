@@ -47,8 +47,11 @@ program
   .option("--int_types_num <number>", "The number of int types Erwin will consider in resolving type dominance.", `${config.int_num}`)
   .option("--uint_types_num <number>", "The number of uint types Erwin will consider in resolving type dominance.", `${config.uint_num}`)
   .option("--body_stmt_count_of_function_upperlimit <number>", "The upper limit of the number of non-declaration statements of a function. This value is suggested to be bigger than tha value of var_count", `${config.body_stmt_count_of_function_upperlimit}`)
+  .option("--body_stmt_count_of_function_lowerlimit <number>", "The lower limit of the number of non-declaration statements of a function.", `${config.body_stmt_count_of_function_lowerlimit}`)
   .option("--return_count_of_function_upperlimit <number>", "The upper limit of the number of return values of a function.", `${config.return_count_of_function_upperlimit}`)
+  .option("--return_count_of_function_lowerlimit <number>", "The lower limit of the number of return values of a function.", `${config.return_count_of_function_lowerlimit}`)
   .option("--param_count_of_function_upperlimit <number>", "The upper limit of the number of parameters of a function.", `${config.param_count_of_function_upperlimit}`)
+  .option("--param_count_of_function_lowerlimit <number>", "The lower limit of the number of parameters of a function.", `${config.param_count_of_function_lowerlimit}`)
   .option("--function_count_per_contract <number>", "The upper limit of the number of functions in a contract.", `${config.function_count_per_contract}`)
   .option("--literal_prob <float>", "The probability of generating a literal.", `${config.literal_prob}`)
   .option("--maximum_type_resolution_for_heads <number>", "The maximum number of type resolutions for heads.", `${config.maximum_type_resolution_for_heads}`)
@@ -56,10 +59,12 @@ program
   .option("--expression_complex_level <number>", "The complex level of the expression Erwin will generate.\nThe suggedted range is [1,2,3,4,5]. The bigger, the more complex.", `${config.expression_complex_level}`)
   .option("--chunk_size <number>", "The size of head solution chunk. The bigger the size is, the more resolutions Erwin will consider in a round.", `${config.chunk_size}`)
   .option("--state_variable_count_upperlimit <number>", "The upper limit of the number of state variables in a contract.", `${config.state_variable_count_upperlimit}`)
+  .option("--state_variable_count_lowerlimit <number>", "The lower limit of the number of state variables in a contract.", `${config.state_variable_count_lowerlimit}`)
   .option("--contract_count <number>", "The upper limit of the number of contracts Erwin will generate.", `${config.contract_count}`)
   .option("--no_type_exploration", "Disable the type exploration.", `${config.no_type_exploration}`)
   .option("-m --mode <string>", "The mode of Erwin. The value can be 'type' or 'scope'.", `${config.mode}`)
-  .option("--vardecl_prob <float>", "The probability of generating a variable declaration.", `${config.vardecl_prob}`);
+  .option("--vardecl_prob <float>", "The probability of generating a variable declaration.", `${config.vardecl_prob}`)
+  .option("--else_prob <float>", "The probability of generating an else statement.", `${config.else_prob}`);
 program.parse(process.argv);
 // Set the configuration
 if (program.args[0] === "mutate") {
@@ -71,8 +76,11 @@ else if (program.args[0] === "generate") {
   config.int_num = parseInt(program.commands[1].opts().int_types_num);
   config.uint_num = parseInt(program.commands[1].opts().uint_types_num);
   config.body_stmt_count_of_function_upperlimit = parseInt(program.commands[1].opts().body_stmt_count_of_function_upperlimit);
+  config.body_stmt_count_of_function_lowerlimit = parseInt(program.commands[1].opts().body_stmt_count_of_function_lowerlimit);
   config.return_count_of_function_upperlimit = parseInt(program.commands[1].opts().return_count_of_function_upperlimit);
+  config.return_count_of_function_lowerlimit = parseInt(program.commands[1].opts().return_count_of_function_lowerlimit);
   config.param_count_of_function_upperlimit = parseInt(program.commands[1].opts().param_count_of_function_upperlimit);
+  config.param_count_of_function_lowerlimit = parseInt(program.commands[1].opts().param_count_of_function_lowerlimit);
   config.function_count_per_contract = parseInt(program.commands[1].opts().function_count_per_contract);
   config.literal_prob = parseFloat(program.commands[1].opts().literal_prob);
   config.maximum_type_resolution_for_heads = parseInt(program.commands[1].opts().maximum_type_resolution_for_heads);
@@ -80,9 +88,11 @@ else if (program.args[0] === "generate") {
   config.expression_complex_level = parseInt(program.commands[1].opts().expression_complex_level);
   config.chunk_size = parseInt(program.commands[1].opts().chunk_size);
   config.state_variable_count_upperlimit = parseInt(program.commands[1].opts().state_variable_count_upperlimit);
+  config.state_variable_count_lowerlimit = parseInt(program.commands[1].opts().state_variable_count_lowerlimit);
   config.contract_count = parseInt(program.commands[1].opts().contract_count);
   config.mode = program.commands[1].opts().mode;
   config.vardecl_prob = parseFloat(program.commands[1].opts().vardecl_prob);
+  config.else_prob = parseFloat(program.commands[1].opts().else_prob);
   if (program.commands[1].opts().debug === true) config.debug = true;
   if (program.commands[1].opts().no_type_exploration === true) config.no_type_exploration = true;
 }
@@ -94,7 +104,10 @@ else if (program.args[0] === "generate") {
   assert(config.int_num >= 0, "The number of int types must be not less than 0.");
   assert(config.uint_num >= 0, "The number of uint types must be not less than 0.");
   assert(config.body_stmt_count_of_function_upperlimit >= 0, "The upper limit of the number of statements of a function must be not less than 0.");
+  assert(config.body_stmt_count_of_function_lowerlimit >= 0, "The lower limit of the number of statements of a function must be not less than 0.");
   assert(config.return_count_of_function_upperlimit >= 0, "The upper limit of the number of return values of a function must be not less than 0.");
+  assert(config.return_count_of_function_lowerlimit >= 0, "The lower limit of the number of return values of a function must be not less than 0.");
+  assert(config.param_count_of_function_lowerlimit >= 0, "The lower limit of the number of parameters of a function must be not less than 0.");
   assert(config.param_count_of_function_upperlimit >= 0, "The upper limit of the number of parameters of a function must be not less than 0.");
   assert(config.function_count_per_contract >= 0, "The number of functions must be not less than 0.");
   assert(config.literal_prob >= 0 && config.literal_prob <= 1, "The probability of generating a literal must be in the range [0,1].");
@@ -103,9 +116,15 @@ else if (program.args[0] === "generate") {
   assert(config.expression_complex_level >= 1 && config.expression_complex_level <= 5, "The complex level of the expression must be in the range [1,2,3,4,5].");
   assert(config.chunk_size > 0, "The chunk size of the database must be greater than 0.");
   assert(config.state_variable_count_upperlimit >= 0, "state_variable_count_upperlimit must be not less than 0.");
+  assert(config.state_variable_count_lowerlimit >= 0, "state_variable_count_lowerlimit must be not less than 0.");
   assert(config.contract_count >= 0, "contract_count must be not less than 0.");
   assert(["type", "scope"].includes(config.mode), "The mode is not either 'type' or 'scope', instead it is " + config.mode);
   assert(config.vardecl_prob < 1.0, "The probability of generating a variable declaration must be less than or equal to 1.");
+  assert(config.else_prob < 1.0, "The probability of generating an else statement must be less than or equal to 1.");
+  assert(config.body_stmt_count_of_function_lowerlimit <= config.body_stmt_count_of_function_upperlimit, "The lower limit of the number of statements of a function must be less than or equal to the upper limit.");
+  assert(config.return_count_of_function_lowerlimit <= config.return_count_of_function_upperlimit, "The lower limit of the number of return values of a function must be less than or equal to the upper limit.");
+  assert(config.param_count_of_function_lowerlimit <= config.param_count_of_function_upperlimit, "The lower limit of the number of parameters of a function must be less than or equal to the upper limit.");
+  assert(config.state_variable_count_lowerlimit <= config.state_variable_count_upperlimit, "state_variable_count_lowerlimit must be less than or equal to state_variable_count_upperlimit.");
 }
 // Execute
 if (program.args[0] === "mutate") {

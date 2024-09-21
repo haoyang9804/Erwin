@@ -6,7 +6,9 @@ import { assert } from './utility'
 export enum scopeKind {
   FUNC = "scopeKind::FUNC",
   CONTRACT = "scopeKind::CONTRACT",
-  GLOBAL = "scopeKind::GLOBAL"
+  GLOBAL = "scopeKind::GLOBAL",
+  IF_CONDITION = "scopeKind::IF_CONDITION",
+  IF_BODY = "scopeKind::IF_BODY",
 }
 
 type scopeT = {
