@@ -6,7 +6,10 @@ import { assert } from './utility'
 export enum scopeKind {
   FUNC = "scopeKind::FUNC",
   CONTRACT = "scopeKind::CONTRACT",
-  GLOBAL = "scopeKind::GLOBAL"
+  GLOBAL = "scopeKind::GLOBAL",
+  IF_CONDITION = "scopeKind::IF_CONDITION",
+  IF_BODY = "scopeKind::IF_BODY",
+  FOR = "scopeKind::FOR",
 }
 
 type scopeT = {
@@ -14,7 +17,8 @@ type scopeT = {
   kind : scopeKind
 };
 
-let scope_id : number = 0;
+export const global_scope : number = 1;
+let scope_id : number = global_scope;
 
 export class ScopeList extends LinkedListNode<scopeT> {
   constructor(value : scopeT) {

@@ -21,8 +21,9 @@ import { config } from './config'
 import { toFile } from "@ts-graphviz/adapter";
 import { color } from "console-log-colors"
 import { DominanceNode, isEqualSet, isSuperSet } from "./dominance";
-import { FunctionStateMutability } from "solc-typed-ast";
+import { FunctionStateMutability, FunctionVisibility, StateVariableVisibility } from "solc-typed-ast";
 import { FuncStat } from "./funcstat";
+import { FuncVis, VarVis } from "./visibility";
 
 interface toTail {
   tail_id : number;
@@ -59,8 +60,10 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   tailssub : Set<string> = new Set<string>();
   // If "tail1 tail2" is in tailssub, then the solution of tail2 equals to the solution of tail1.
   tailsequal : Set<string> = new Set<string>();
-
-  constructor() { }
+  name : string;
+  constructor() {
+    this.name = this.constructor.name;
+  }
 
   newNode(id : number) : ConstaintNode {
     return new ConstaintNode(id);
@@ -71,8 +74,8 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   }
 
   /*
-  1. If node1 weakly dominates node2 in solution, then the solution of node2 is a sub_dominance of the solution of node1.
-  2. If node1 weakly and reversely dominates node2 in solution, then the solution of node2 is a super_dominance of the solution of node1.
+  1. If node1 weakly dominates node2 in solution, then the solution of node2 is sub of the solution of node1.
+  2. If node1 weakly and reversely dominates node2 in solution, then the solution of node2 is super to the solution of node1.
   */
   connect(from : number, to : number, rank ?: string) : void {
     if (config.debug) {
@@ -406,14 +409,13 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   }
 
   allocate_solutions_for_heads_in_chunks() : Generator<Map<number, Node>[]> {
-    if (config.debug) {
-      let mul = 1n;
-      for (let head of this.heads) {
+    let mul = 1n;
+    for (let head of this.heads) {
+      if (config.debug)
         console.log(color.cyan(`head is ${head}, and this.solution_range.get(head)!.length is ${this.solution_range.get(head)!.length}`));
-        mul *= BigInt(this.solution_range.get(head)!.length)
-      }
-      console.log(color.cyan(`The size of of solution candidate of heads is ${mul}`))
+      mul *= BigInt(this.solution_range.get(head)!.length)
     }
+    console.log(color.cyan(`The size of of solution candidate of heads of ${this.name} is ${mul}`))
     for (let head of this.heads) this.solution_range.set(head, shuffle(this.solution_range.get(head)!));
     const head_array = shuffle(Array.from(this.heads));
     let cnt = 0;
@@ -798,7 +800,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         console.log(color.red(edge));
       }
     }
-    // !Assign types to heads
+    // !Assign solutions to heads
     let cnt : number = 0;
     let should_stop = false;
     let stop_until_find_solution_mode = false;
@@ -806,12 +808,13 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     for (let local_head_resolution_collection of this.allocate_solutions_for_heads_in_chunks()) {
       this.solutions.clear();
       if (should_stop) break;
-      // !Traverse each resolution for heads
+      // !Traverse each solution to heads
       for (const head_resolve of local_head_resolution_collection) {
         this.solutions.clear();
         if (should_stop) break;
         cnt++;
-        if (!stop_until_find_solution_mode && (cnt >= config.maximum_type_resolution_for_heads)) {
+        if (config.mode == 'scope' && this.name == "TypeDominanceDAG" ||
+          (!stop_until_find_solution_mode && (cnt >= config.maximum_type_resolution_for_heads))) {
           if (this.solutions_collection.length > 0) {
             should_stop = true;
             break;
@@ -1052,6 +1055,79 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     }
   }
 
+  resolve_by_brute_force(check : boolean) : void {
+    // !initialize the resolution
+    this.initialize_resolve();
+    const ids = [...this.solution_range.keys()];
+    let traverse_solution = (id : number, solution : Map<number, Node>) : void => {
+      if (id === ids.length) {
+        if (!check || this.check(solution)) {
+          this.solutions_collection.push(new Map(solution));
+        }
+        return;
+      }
+      for (let type of this.solution_range.get(ids[id])!) {
+        solution.set(ids[id], type);
+        traverse_solution(id + 1, solution);
+      }
+    }
+    traverse_solution(0, new Map<number, Node>());
+  }
+
+  check(solutions : Map<number, Node>) : boolean {
+    // 1. Verify that all nodes have been resolved.
+    for (let [id, _] of this.dag_nodes) {
+      if (!solutions.has(id)) {
+        return false;
+      }
+    }
+    // 2. Verify that all resolved types are one of the solution candidates of the node.
+    for (let [id, solution_candidates] of this.solution_range) {
+      let resolved_type = solutions.get(id)!;
+      let match = false;
+      for (let solution_candidate of solution_candidates) {
+        if (resolved_type.same(solution_candidate)) {
+          match = true;
+          break;
+        }
+      }
+      if (!match) return false;
+    }
+    // 3. Verify that all domination relations hold.
+    for (let [_, node] of this.dag_nodes) {
+      for (let child of node.outs) {
+        if (this.sub_dominance.has(`${node.id} ${child}`)) {
+          const subttypes = solutions.get(node.id)!.subs();
+          let typeofchild = solutions.get(child)!;
+          let match = false;
+          for (let sub_dominance of subttypes) {
+            if (typeofchild.same(sub_dominance)) {
+              match = true;
+              break;
+            }
+          }
+          if (!match) return false;
+        }
+        else if (this.super_dominance.has(`${node.id} ${child}`)) {
+          const supers = solutions.get(node.id)!.supers();
+          let typeofchild = solutions.get(child)!;
+          let match = false;
+          for (let sub_dominance of supers) {
+            if (typeofchild.same(sub_dominance)) {
+              match = true;
+              break;
+            }
+          }
+          if (!match) return false;
+        }
+        else {
+          if (!(solutions.get(node.id)!.same(solutions.get(child)!))) return false;
+        }
+      }
+    }
+    return true;
+  }
+
   verify() : void {
     for (const solutions of this.solutions_collection) {
       // 1. Verify that all nodes have been resolved.
@@ -1169,3 +1245,5 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
 
 export class TypeDominanceDAG extends DominanceDAG<TypeKind, Type> { }
 export class FuncStateMutabilityDominanceDAG extends DominanceDAG<FunctionStateMutability, FuncStat> { }
+export class FuncVisibilityDominanceDAG extends DominanceDAG<FunctionVisibility, FuncVis> { }
+export class StateVariableVisibilityDominanceDAG extends DominanceDAG<StateVariableVisibility, VarVis> { }

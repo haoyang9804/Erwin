@@ -222,6 +222,7 @@ export class IRFunctionDefinition extends IRDeclare {
       default: assert(false, "IRFunctionDefinition: visibility is not set");
     }
     let t_stateMutability : "pure" | "view" | "payable" | "nonpayable";
+    assert(this.stateMutability !== undefined, "IRFunctionDefinition: stateMutability is not set");
     switch (this.stateMutability) {
       case FunctionStateMutability.Pure: t_stateMutability = "pure"; break;
       case FunctionStateMutability.View: t_stateMutability = "view"; break;
