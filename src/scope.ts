@@ -7,9 +7,11 @@ export enum scopeKind {
   FUNC = "scopeKind::FUNC",
   CONTRACT = "scopeKind::CONTRACT",
   GLOBAL = "scopeKind::GLOBAL",
-  IF_CONDITION = "scopeKind::IF_CONDITION",
-  IF_BODY = "scopeKind::IF_BODY",
+  IF = "scopeKind::IF",
   FOR = "scopeKind::FOR",
+  WHILE = "scopeKind::WHILE",
+  DOWHILE_BODY = "scopeKind::DOWHILE_BODY",
+  DOWHILE_COND = "scopeKind::DOWHILE_COND",
 }
 
 type scopeT = {

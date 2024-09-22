@@ -75,9 +75,11 @@ export function decideFunctionVisibility(kind : scopeKind, vis : FunctionVisibil
           throw new Error(`Unsupported FunctionVisibility: ${vis}`);
       }
     case scopeKind.FUNC:
-    case scopeKind.IF_CONDITION:
-    case scopeKind.IF_BODY:
+    case scopeKind.IF:
     case scopeKind.FOR:
+    case scopeKind.WHILE:
+    case scopeKind.DOWHILE_BODY:
+    case scopeKind.DOWHILE_COND:
       return erwin_visibility.NAV;
     default:
       throw new Error(`Unsupported scopeKind: ${kind}`);
@@ -99,9 +101,11 @@ export function decideVariableVisibility(kind : scopeKind, vis : StateVariableVi
       }
     case scopeKind.FUNC:
     case scopeKind.GLOBAL:
-    case scopeKind.IF_CONDITION:
-    case scopeKind.IF_BODY:
+    case scopeKind.IF:
     case scopeKind.FOR:
+    case scopeKind.WHILE:
+    case scopeKind.DOWHILE_BODY:
+    case scopeKind.DOWHILE_COND:
       return erwin_visibility.NAV;
     default:
       throw new Error(`Unsupported scopeKind: ${kind}`);

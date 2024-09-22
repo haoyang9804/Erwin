@@ -26,10 +26,10 @@ test("test while",
   l2.type = TypeProvider.uint256();
   const cond = new IRBinaryOp(7, 0, v2id, l2, "<");
   const body = new IRBreakStatement(8, 0);
-  const doWhile = new IRWhile(9, 0, cond, body);
+  const doWhile = new IRWhile(9, 0, cond, [body]);
   const result = writer.write(doWhile.lower());
   expect(result).toEqual(
-    `while (x < 100) break;`
+    `while (x < 100) {\n  break;\n}`
   );
 }
 )

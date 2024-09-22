@@ -1,33 +1,58 @@
 export const config = {
-  expression_complex_level: 2,
-  statement_complex_level: 1,
-  debug: false,
-  tuple_prob: 0.3,
-  maximum_type_resolution_for_heads: 2000000,
-  literal_prob: 0.3,
-  function_count_per_contract: 2,
-  param_count_of_function_upperlimit: 1,
-  param_count_of_function_lowerlimit: 0,
-  return_count_of_function_upperlimit: 2,
-  return_count_of_function_lowerlimit: 0,
-  body_stmt_count_of_function_upperlimit: 2,
-  body_stmt_count_of_function_lowerlimit: 0,
-  state_variable_count_upperlimit: 2,
-  state_variable_count_lowerlimit: 1,
-  uint_num: 2,
-  int_num: 2,
-  unit_test_mode: false,
-  chunk_size: 100000,
-  experimental: false,
-  contract_count: 2,
   file: "",
   out_dir: "",
-  no_type_exploration: false,
+
+  experimental: false,
   mode: "type",
+  debug: false,
+
+  // Type 
+  uint_num: 2,
+  int_num: 2,
+  no_type_exploration: false,
+
+  // Dominance Constraint Solution
+  maximum_type_resolution_for_heads: 2000000,
+  chunk_size: 100000,
+
+  // Function
+  function_body_stmt_cnt_upper_limit: 2,
+  function_body_stmt_cnt_lower_limit: 0,
+  return_count_of_function_upperlimit: 2,
+  return_count_of_function_lowerlimit: 0,
+  param_count_of_function_upperlimit: 1,
+  param_count_of_function_lowerlimit: 0,
+  function_count_per_contract: 2,
+
+  // Contract
+  contract_count: 2,
+  state_variable_count_upperlimit: 2,
+  state_variable_count_lowerlimit: 1,
+
+  // Complexity
+  expression_complex_level: 2,
+  statement_complex_level: 1,
+
+  // Probability
+  nonstructured_statement_prob: 0.05,
+  literal_prob: 0.3,
+  tuple_prob: 0.3,
   vardecl_prob: 0.05,
   else_prob: 0.3,
   terminal_prob: 0.3,
-  nonstructured_statement_prob: 0.05,
-  for_init_cnt_upper_limit: 2,
-  for_init_cnt_lower_limit: 1
+
+  // Structured Statements
+  for_init_cnt_upper_limit: 1,
+  for_init_cnt_lower_limit: 0,
+  for_body_stmt_cnt_upper_limit: 1,
+  for_body_stmt_cnt_lower_limit: 0,
+  while_body_stmt_cnt_upper_limit: 1,
+  while_body_stmt_cnt_lower_limit: 0,
+  do_while_body_stmt_cnt_upper_limit: 1,
+  do_while_body_stmt_cnt_lower_limit: 0,
+  if_body_stmt_cnt_upper_limit: 1,
+  if_body_stmt_cnt_lower_limit: 0,
+
+  // Test
+  unit_test_mode: false,
 }

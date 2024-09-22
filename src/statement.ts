@@ -163,15 +163,17 @@ export class IRDoWhile extends IRStatement {
 
 export class IRWhile extends IRStatement {
   condition : IRExpression;
-  body : IRStatement;
-  constructor(id : number, scope : number, condition : IRExpression, body : IRStatement) {
+  body : IRStatement[];
+  constructor(id : number, scope : number, condition : IRExpression, body : IRStatement[]) {
     super(id, scope);
     this.condition = condition;
     this.body = body;
   }
   lower() : Statement {
-    return factory.makeWhileStatement(this.condition.lower(),
-      this.body.lower());
+    const lowered_body = factory.makeBlock(this.body.map(function(stmt) {
+      return stmt.lower();
+    }));
+    return factory.makeWhileStatement(this.condition.lower(), lowered_body);
   }
 }
 

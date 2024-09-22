@@ -390,7 +390,7 @@ export class FunctionDeclarationGenerator extends DeclarationGenerator {
   generate() : void {
     const parameter_count = randomInt(config.param_count_of_function_lowerlimit, config.param_count_of_function_upperlimit);
     // haoyang
-    const body_stmt_count = randomInt(config.body_stmt_count_of_function_lowerlimit, config.body_stmt_count_of_function_upperlimit);
+    const body_stmt_count = randomInt(config.function_body_stmt_cnt_lower_limit, config.function_body_stmt_cnt_upper_limit);
     const parameters : decl.IRVariableDeclare[] = [];
     const thisid = global_id++;
     func_visibility_dag.solution_range.set(thisid, [
@@ -1854,46 +1854,55 @@ export class IfStatementGenerator extends NonExpressionStatementGenerator {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating IfStatement`));
     }
+    cur_scope = cur_scope.new(scopeKind.IF);
+    //! Generate condition
     const condition_gen = new BinaryCompareOpGenerator(type.bool_types, new Set<number>(), new Set<number>());
     if (config.debug) indent += 2;
-    cur_scope = cur_scope.new(scopeKind.IF_CONDITION);
     condition_gen.generate(0);
-    cur_scope = cur_scope.rollback();
     if (config.debug) indent -= 2;
     this.exprs.push(expr.tupleExtraction(condition_gen.irnode as expr.IRExpression));
-    const then_stmt_gen_prototype = this.complex(cur_stmt_complex_level) ?
-      pickRandomElement(expr_statement_generators)! :
-      pickRandomElement(statement_generators)!;
-    const then_stmt_gen = new then_stmt_gen_prototype();
-    if (config.debug) indent += 2;
-    cur_scope = cur_scope.new(scopeKind.IF_BODY);
-    then_stmt_gen.generate(cur_stmt_complex_level + 1);
-    cur_scope = cur_scope.rollback();
-    if (config.debug) indent -= 2;
-    this.exprs = this.exprs.concat(
-      then_stmt_gen instanceof ExpressionStatementGenerator ?
-        [expr.tupleExtraction(then_stmt_gen.expr!)] :
-        then_stmt_gen.exprs
-    );
+    //! Generate true body
+    const true_body : stmt.IRStatement[] = [];
+    const true_stmt_cnt = randomInt(config.if_body_stmt_cnt_lower_limit, config.if_body_stmt_cnt_upper_limit);
+    for (let i = 0; i < true_stmt_cnt; i++) {
+      const then_stmt_gen_prototype = this.complex(cur_stmt_complex_level) ?
+        pickRandomElement(expr_statement_generators)! :
+        pickRandomElement(statement_generators)!;
+      const then_stmt_gen = new then_stmt_gen_prototype();
+      if (config.debug) indent += 2;
+      then_stmt_gen.generate(cur_stmt_complex_level + 1);
+      if (config.debug) indent -= 2;
+      true_body.push(then_stmt_gen.irnode!);
+      this.exprs = this.exprs.concat(
+        then_stmt_gen instanceof ExpressionStatementGenerator ?
+          [expr.tupleExtraction(then_stmt_gen.expr!)] :
+          then_stmt_gen.exprs
+      );
+    }
     if (Math.random() < config.else_prob) {
-      this.irnode = new stmt.IRIf(global_id++, cur_scope.id(), condition_gen.irnode! as expr.IRExpression, [then_stmt_gen.irnode!], []);
+      this.irnode = new stmt.IRIf(global_id++, cur_scope.id(), condition_gen.irnode! as expr.IRExpression, true_body, []);
       return;
     }
-    const else_stmt_gen_prototype = this.complex(cur_stmt_complex_level) ?
-      pickRandomElement(expr_statement_generators)! :
-      pickRandomElement(statement_generators)!;
-    const else_stmt_gen = new else_stmt_gen_prototype();
-    if (config.debug) indent += 2;
-    cur_scope = cur_scope.new(scopeKind.IF_BODY);
-    else_stmt_gen.generate(cur_stmt_complex_level + 1);
+    //! Generate false body
+    const false_body : stmt.IRStatement[] = [];
+    const false_stmt_cnt = randomInt(config.if_body_stmt_cnt_lower_limit, config.if_body_stmt_cnt_upper_limit);
+    for (let i = 0; i < false_stmt_cnt; i++) {
+      const else_stmt_gen_prototype = this.complex(cur_stmt_complex_level) ?
+        pickRandomElement(expr_statement_generators)! :
+        pickRandomElement(statement_generators)!;
+      const else_stmt_gen = new else_stmt_gen_prototype();
+      if (config.debug) indent += 2;
+      else_stmt_gen.generate(cur_stmt_complex_level + 1);
+      if (config.debug) indent -= 2;
+      false_body.push(else_stmt_gen.irnode!);
+      this.exprs = this.exprs.concat(
+        else_stmt_gen instanceof ExpressionStatementGenerator ?
+          [expr.tupleExtraction(else_stmt_gen.expr!)] :
+          else_stmt_gen.exprs
+      );
+    }
     cur_scope = cur_scope.rollback();
-    if (config.debug) indent -= 2;
-    this.exprs = this.exprs.concat(
-      else_stmt_gen instanceof ExpressionStatementGenerator ?
-        [expr.tupleExtraction(else_stmt_gen.expr!)] :
-        else_stmt_gen.exprs
-    );
-    this.irnode = new stmt.IRIf(global_id++, cur_scope.id(), condition_gen.irnode! as expr.IRExpression, [then_stmt_gen.irnode!], [else_stmt_gen.irnode!]);
+    this.irnode = new stmt.IRIf(global_id++, cur_scope.id(), condition_gen.irnode! as expr.IRExpression, true_body, false_body);
   }
 }
 
@@ -1945,24 +1954,104 @@ export class ForStatementGenerator extends NonExpressionStatementGenerator {
     if (config.debug) indent -= 2;
     this.exprs = this.exprs.concat([expr.tupleExtraction(loop_gen.irnode as expr.IRExpression)]);
     //! Generate the body statement
-    const body_stmt_gen_prototype = this.complex(cur_stmt_complex_level) ?
-      pickRandomElement(expr_statement_generators)! :
-      pickRandomElement(statement_generators)!;
-    const body_stmt_gen = new body_stmt_gen_prototype();
-    if (config.debug) indent += 2;
-    body_stmt_gen.generate(cur_stmt_complex_level + 1);
-    if (config.debug) indent -= 2;
-    this.exprs = this.exprs.concat(
-      body_stmt_gen instanceof ExpressionStatementGenerator ?
-        [expr.tupleExtraction(body_stmt_gen.expr!)] :
-        body_stmt_gen.exprs
-    );
+    const stmt_cnt = randomInt(config.for_body_stmt_cnt_lower_limit, config.for_body_stmt_cnt_upper_limit);
+    const body : stmt.IRStatement[] = [];
+    for (let i = 0; i < stmt_cnt; i++) {
+      const body_stmt_gen_prototype = this.complex(cur_stmt_complex_level) ?
+        pickRandomElement(expr_statement_generators)! :
+        pickRandomElement(statement_generators)!;
+      const body_stmt_gen = new body_stmt_gen_prototype();
+      if (config.debug) indent += 2;
+      body_stmt_gen.generate(cur_stmt_complex_level + 1);
+      if (config.debug) indent -= 2;
+      body.push(body_stmt_gen.irnode!);
+      this.exprs = this.exprs.concat(
+        body_stmt_gen instanceof ExpressionStatementGenerator ?
+          [expr.tupleExtraction(body_stmt_gen.expr!)] :
+          body_stmt_gen.exprs
+      );
+
+    }
 
     this.irnode = new stmt.IRFor(global_id++, cur_scope.id(), init_stmt_expr, conditional_gen.irnode! as expr.IRExpression,
-      loop_gen.irnode! as expr.IRExpression, [body_stmt_gen.irnode!]);
+      loop_gen.irnode! as expr.IRExpression, body);
     cur_scope = cur_scope.rollback();
   }
+}
 
+export class WhileStatementGenerator extends NonExpressionStatementGenerator {
+  constructor() {
+    super();
+  }
+
+  generate(cur_stmt_complex_level : number) : void {
+    //! Generate condition expression
+    const cond_gen_prototype = pickRandomElement(all_expression_generators)!;
+    const cond_gen = new cond_gen_prototype(type.bool_types, new Set<number>(), new Set<number>());
+    cur_scope = cur_scope.new(scopeKind.WHILE);
+    if (config.debug) indent += 2;
+    cond_gen.generate(0);
+    if (config.debug) indent -= 2;
+    this.exprs = this.exprs.concat([expr.tupleExtraction(cond_gen.irnode as expr.IRExpression)]);
+    //! Generate body statement
+    const stmt_cnt = randomInt(config.while_body_stmt_cnt_lower_limit, config.while_body_stmt_cnt_upper_limit);
+    const body : stmt.IRStatement[] = [];
+    for (let i = 0; i < stmt_cnt; i++) {
+      const body_stmt_gen_prototype = this.complex(cur_stmt_complex_level) ?
+        pickRandomElement(expr_statement_generators)! :
+        pickRandomElement(statement_generators)!;
+      const body_stmt_gen = new body_stmt_gen_prototype();
+      if (config.debug) indent += 2;
+      body_stmt_gen.generate(cur_stmt_complex_level + 1);
+      if (config.debug) indent -= 2;
+      this.exprs = this.exprs.concat(
+        body_stmt_gen instanceof ExpressionStatementGenerator ?
+          [expr.tupleExtraction(body_stmt_gen.expr!)] :
+          body_stmt_gen.exprs
+      );
+      body.push(body_stmt_gen.irnode!);
+    }
+    this.irnode = new stmt.IRWhile(global_id++, cur_scope.id(), cond_gen.irnode! as expr.IRExpression, body);
+    cur_scope = cur_scope.rollback();
+  }
+}
+
+export class DoWhileStatementGenerator extends NonExpressionStatementGenerator {
+  constructor() {
+    super();
+  }
+  generate(cur_stmt_complex_level : number) : void {
+    //! Generate condition expression
+    const cond_gen_prototype = pickRandomElement(all_expression_generators)!;
+    const cond_gen = new cond_gen_prototype(type.bool_types, new Set<number>(), new Set<number>());
+    cur_scope = cur_scope.new(scopeKind.DOWHILE_COND);
+    if (config.debug) indent += 2;
+    cond_gen.generate(0);
+    if (config.debug) indent -= 2;
+    cur_scope = cur_scope.rollback();
+    this.exprs = this.exprs.concat([expr.tupleExtraction(cond_gen.irnode as expr.IRExpression)]);
+    //! Generate body statement
+    cur_scope = cur_scope.new(scopeKind.DOWHILE_BODY);
+    const stmt_cnt = randomInt(config.while_body_stmt_cnt_lower_limit, config.while_body_stmt_cnt_upper_limit);
+    const body : stmt.IRStatement[] = [];
+    for (let i = 0; i < stmt_cnt; i++) {
+      const body_stmt_gen_prototype = this.complex(cur_stmt_complex_level) ?
+        pickRandomElement(expr_statement_generators)! :
+        pickRandomElement(statement_generators)!;
+      const body_stmt_gen = new body_stmt_gen_prototype();
+      if (config.debug) indent += 2;
+      body_stmt_gen.generate(cur_stmt_complex_level + 1);
+      if (config.debug) indent -= 2;
+      this.exprs = this.exprs.concat(
+        body_stmt_gen instanceof ExpressionStatementGenerator ?
+          [expr.tupleExtraction(body_stmt_gen.expr!)] :
+          body_stmt_gen.exprs
+      );
+      body.push(body_stmt_gen.irnode!);
+    }
+    cur_scope = cur_scope.rollback();
+    this.irnode = new stmt.IRDoWhile(global_id++, cur_scope.id(), cond_gen.irnode! as expr.IRExpression, body);
+  }
 }
 
 const expr_statement_generators = [
@@ -1980,5 +2069,7 @@ const statement_generators = [
   // ConditionalStatementGenerator,
   // FunctionCallStatementGenerator,
   // IfStatementGenerator,
-  ForStatementGenerator
+  // ForStatementGenerator
+  // WhileStatementGenerator
+  DoWhileStatementGenerator
 ]
