@@ -844,12 +844,21 @@ export let uinteger_types : Type[] = [
   TypeProvider.uint16(),
   TypeProvider.uint8()
 ]
-uinteger_types = pickRandomSubarray(uinteger_types, config.uint_num);
-integer_types = pickRandomSubarray(integer_types, config.int_num);
-export const all_integer_types : Type[] = integer_types.concat(uinteger_types);
+
+export let all_integer_types : Type[];
+export let elementary_types : Type[];
 export const bool_types : Type[] = [TypeProvider.bool()];
 export const address_types : Type[] = [TypeProvider.address(), TypeProvider.payable_address()];
-export const elementary_types : Type[] = all_integer_types.concat(bool_types).concat(address_types);
+export let size_of_type : number;
+
+export function init_types() : void {
+  integer_types = pickRandomSubarray(integer_types, config.int_num);
+  uinteger_types = pickRandomSubarray(uinteger_types, config.uint_num);
+  all_integer_types = integer_types.concat(uinteger_types);
+  elementary_types = all_integer_types.concat(bool_types).concat(address_types);
+  size_of_type = sizeof(elementary_types[0]);
+}
+
 
 export const type_range_collection : Type[][] = [
   integer_types,
@@ -909,5 +918,3 @@ export function generate_all_array_types() : Type[] {
   });
   return collection;
 }
-
-export const size_of_type = sizeof(elementary_types[0]);

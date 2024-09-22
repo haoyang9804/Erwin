@@ -1,5 +1,6 @@
 export const config = {
-  expression_complex_level: 3,
+  expression_complex_level: 2,
+  statement_complex_level: 1,
   debug: false,
   tuple_prob: 0.3,
   maximum_type_resolution_for_heads: 2000000,
@@ -23,6 +24,10 @@ export const config = {
   out_dir: "",
   no_type_exploration: false,
   mode: "type",
-  vardecl_prob: 0.2,
-  else_prob: 0.3
+  vardecl_prob: 0.05,
+  else_prob: 0.3,
+  terminal_prob: 0.3,
+  nonstructured_statement_prob: 0.05,
+  for_init_cnt_upper_limit: 2,
+  for_init_cnt_lower_limit: 1
 }

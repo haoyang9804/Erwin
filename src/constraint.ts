@@ -60,8 +60,10 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   tailssub : Set<string> = new Set<string>();
   // If "tail1 tail2" is in tailssub, then the solution of tail2 equals to the solution of tail1.
   tailsequal : Set<string> = new Set<string>();
-
-  constructor() { }
+  name : string;
+  constructor() {
+    this.name = this.constructor.name;
+  }
 
   newNode(id : number) : ConstaintNode {
     return new ConstaintNode(id);
@@ -407,14 +409,13 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   }
 
   allocate_solutions_for_heads_in_chunks() : Generator<Map<number, Node>[]> {
-    if (config.debug) {
-      let mul = 1n;
-      for (let head of this.heads) {
+    let mul = 1n;
+    for (let head of this.heads) {
+      if (config.debug)
         console.log(color.cyan(`head is ${head}, and this.solution_range.get(head)!.length is ${this.solution_range.get(head)!.length}`));
-        mul *= BigInt(this.solution_range.get(head)!.length)
-      }
-      console.log(color.cyan(`The size of of solution candidate of heads is ${mul}`))
+      mul *= BigInt(this.solution_range.get(head)!.length)
     }
+    console.log(color.cyan(`The size of of solution candidate of heads of ${this.name} is ${mul}`))
     for (let head of this.heads) this.solution_range.set(head, shuffle(this.solution_range.get(head)!));
     const head_array = shuffle(Array.from(this.heads));
     let cnt = 0;
@@ -812,7 +813,8 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         this.solutions.clear();
         if (should_stop) break;
         cnt++;
-        if (!stop_until_find_solution_mode && (cnt >= config.maximum_type_resolution_for_heads)) {
+        if (config.mode == 'scope' && this.name == "TypeDominanceDAG" ||
+          (!stop_until_find_solution_mode && (cnt >= config.maximum_type_resolution_for_heads))) {
           if (this.solutions_collection.length > 0) {
             should_stop = true;
             break;

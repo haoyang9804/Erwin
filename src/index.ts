@@ -10,6 +10,7 @@ import { config } from "./config";
 import * as fs from "fs";
 import { global_scope } from "./scope";
 import { assert, pickRandomElement } from "./utility";
+import { init_types } from './type';
 import {
   PrettyFormatter,
   ASTWriter,
@@ -64,7 +65,12 @@ program
   .option("--no_type_exploration", "Disable the type exploration.", `${config.no_type_exploration}`)
   .option("-m --mode <string>", "The mode of Erwin. The value can be 'type' or 'scope'.", `${config.mode}`)
   .option("--vardecl_prob <float>", "The probability of generating a variable declaration.", `${config.vardecl_prob}`)
-  .option("--else_prob <float>", "The probability of generating an else statement.", `${config.else_prob}`);
+  .option("--else_prob <float>", "The probability of generating an else statement.", `${config.else_prob}`)
+  .option("--terminal_prob <float>", "The probability of generating a terminal statement.", `${config.terminal_prob}`)
+  .option("--nonstructured_statement_prob <float>", "The probability of generating a nonstructured statement, such as AssignmentStatment or FunctionCallAssignment.", `${config.nonstructured_statement_prob}`)
+  .option("--for_init_cnt_upper_limit <number>", "The upper limit of the number of initialization in a for loop.", `${config.for_init_cnt_upper_limit}`)
+  .option("--for_init_cnt_lower_limit <number>", "The lower limit of the number of initialization in a for loop.", `${config.for_init_cnt_lower_limit}`)
+  .option("--statement_complex_level <number>", "The complex level of the statement Erwin will generate.\nThe suggedted range is [1,2]. The bigger, the more complex.", `${config.statement_complex_level}`)
 program.parse(process.argv);
 // Set the configuration
 if (program.args[0] === "mutate") {
@@ -93,8 +99,18 @@ else if (program.args[0] === "generate") {
   config.mode = program.commands[1].opts().mode;
   config.vardecl_prob = parseFloat(program.commands[1].opts().vardecl_prob);
   config.else_prob = parseFloat(program.commands[1].opts().else_prob);
+  config.terminal_prob = parseFloat(program.commands[1].opts().terminal_prob);
+  config.nonstructured_statement_prob = parseFloat(program.commands[1].opts().nonstructured_statement_prob);
+  config.for_init_cnt_upper_limit = parseInt(program.commands[1].opts().for_init_cnt_upper_limit);
+  config.for_init_cnt_lower_limit = parseInt(program.commands[1].opts().for_init_cnt_lower_limit);
+  config.statement_complex_level = parseInt(program.commands[1].opts().statement_complex_level);
   if (program.commands[1].opts().debug === true) config.debug = true;
   if (program.commands[1].opts().no_type_exploration === true) config.no_type_exploration = true;
+  if (config.mode == "scope") {
+    config.int_num = 1;
+    config.uint_num = 1;
+  }
+  init_types();
 }
 // Check the validity of the arguments
 if (program.args[0] === "mutate") {
@@ -113,7 +129,7 @@ else if (program.args[0] === "generate") {
   assert(config.literal_prob >= 0 && config.literal_prob <= 1, "The probability of generating a literal must be in the range [0,1].");
   assert(config.maximum_type_resolution_for_heads >= config.chunk_size, "The maximum number of type resolutions for heads must be not less than the size of chunk.");
   assert(config.tuple_prob >= 0 && config.tuple_prob <= 1, "The probability of generating a tuple surrounding an expression must be in the range [0,1].");
-  assert(config.expression_complex_level >= 1 && config.expression_complex_level <= 5, "The complex level of the expression must be in the range [1,2,3,4,5].");
+  assert(config.expression_complex_level >= 0, "The complex level of the expression must be not less than 0.");
   assert(config.chunk_size > 0, "The chunk size of the database must be greater than 0.");
   assert(config.state_variable_count_upperlimit >= 0, "state_variable_count_upperlimit must be not less than 0.");
   assert(config.state_variable_count_lowerlimit >= 0, "state_variable_count_lowerlimit must be not less than 0.");
@@ -121,10 +137,15 @@ else if (program.args[0] === "generate") {
   assert(["type", "scope"].includes(config.mode), "The mode is not either 'type' or 'scope', instead it is " + config.mode);
   assert(config.vardecl_prob < 1.0, "The probability of generating a variable declaration must be less than or equal to 1.");
   assert(config.else_prob < 1.0, "The probability of generating an else statement must be less than or equal to 1.");
+  assert(config.terminal_prob < 1.0, "The probability of generating a terminal statement must be less than or equal to 1.");
   assert(config.body_stmt_count_of_function_lowerlimit <= config.body_stmt_count_of_function_upperlimit, "The lower limit of the number of statements of a function must be less than or equal to the upper limit.");
   assert(config.return_count_of_function_lowerlimit <= config.return_count_of_function_upperlimit, "The lower limit of the number of return values of a function must be less than or equal to the upper limit.");
   assert(config.param_count_of_function_lowerlimit <= config.param_count_of_function_upperlimit, "The lower limit of the number of parameters of a function must be less than or equal to the upper limit.");
   assert(config.state_variable_count_lowerlimit <= config.state_variable_count_upperlimit, "state_variable_count_lowerlimit must be less than or equal to state_variable_count_upperlimit.");
+  assert(config.nonstructured_statement_prob < 1.0, "The probability of generating a nonstructured statement must be less than or equal to 1.");
+  assert(config.body_stmt_count_of_function_lowerlimit <= config.body_stmt_count_of_function_upperlimit, "The lower limit of the number of statements of a function must be less than or equal to the upper limit.");
+  assert(config.body_stmt_count_of_function_lowerlimit >= 0, "The lower limit of the number of statements of a function must be not less than 1.");
+  assert(config.statement_complex_level >= 0, "The complex level of the statement must be not less than 0.");
 }
 // Execute
 if (program.args[0] === "mutate") {
@@ -295,13 +316,16 @@ async function generate() {
     }
   })();
   try {
-    const startTime = performance.now()
+    let startTime = performance.now()
     gen.type_dag.resolve_by_chunk();
+    let endTime = performance.now();
+    console.log(`Time cost of resolving type constraints: ${endTime - startTime} ms`);
+    startTime = performance.now();
     gen.funcstat_dag.resolve_by_brute_force(true);
     gen.func_visibility_dag.resolve_by_brute_force(false);
     gen.state_variable_visibility_dag.resolve_by_brute_force(false);
-    const endTime = performance.now();
-    console.log(`Time cost of resolving: ${endTime - startTime} ms`);
+    endTime = performance.now();
+    console.log(`Time cost of resolving visibility and state mutability constraints: ${endTime - startTime} ms`);
     if (config.debug) {
       gen.type_dag.verify();
       gen.funcstat_dag.verify();

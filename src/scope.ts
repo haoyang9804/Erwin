@@ -9,6 +9,7 @@ export enum scopeKind {
   GLOBAL = "scopeKind::GLOBAL",
   IF_CONDITION = "scopeKind::IF_CONDITION",
   IF_BODY = "scopeKind::IF_BODY",
+  FOR = "scopeKind::FOR",
 }
 
 type scopeT = {
