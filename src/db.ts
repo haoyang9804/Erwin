@@ -125,10 +125,14 @@ class DeclDB {
   // It's mainly used for generating "this.function()" inside a contract.
   public contract_ghost_id : number;
   // contract_instance_to_scope is a map from node ID to scope ID
-  // It's records the scope that some node exposes to the outside world.
+  // It's records the scope that contract instance node exposes to the outside world.
   private contract_instance_to_scope : Map<number, number>;
   public vardecls : Set<number> = new Set<number>();
   public funcdecls : Set<number> = new Set<number>();
+  // ghost funcdecls are function decls playing the role of getter functions of member variables
+  public ghost_funcdecls : Set<number> = new Set<number>();
+  // vardecl_to_ghost_vardecls are used in collaboration with ghost funcdecls to avoid type resolution problems.
+  public ghost_vardecl_to_state_vardecl : Map<number, number> = new Map<number, number>();
   public contractdecls : Set<number> = new Set<number>();
   public called_function_decls_IDs : Set<number> = new Set<number>();
   constructor() {
@@ -143,9 +147,16 @@ class DeclDB {
     this.contract_ghost_id = -1;
     this.contract_instance_to_scope = new Map<number, number>();
   }
+
+  add_ghosts_for_state_variable(ghost_funcdecl_id : number, ghost_vardecl_id : number, state_vardecl_id : number) : void {
+    this.ghost_funcdecls.add(ghost_funcdecl_id);
+    this.ghost_vardecl_to_state_vardecl.set(ghost_vardecl_id, state_vardecl_id);
+  }
+
   new_scope(cur_scope_id : number, parent_scope_id : number) : void {
     this.scope_tree.insert(parent_scope_id, cur_scope_id);
   }
+
   insert_contract_ghost(scope_id : number) : void {
     if (this.scope2irnodeinfo.has(scope_id)) {
       // The contract ghost is private: it can be accessed by the contract itself but not the outside world
@@ -161,12 +172,27 @@ class DeclDB {
     new IRVariableDeclare(this.contract_ghost_id, scope_id, 'this');
     this.contract_ghost_id--;
   }
-  insert(node_id : number, erwin_visibility : erwin_visibility, scope_id : number) : void {
+  // insert_contract_instance(node_id : number, instance_name: string, ervis : erwin_visibility,
+  //   scope_id : number, contract_scope: number) : void {
+  //   if (this.scope2irnodeinfo.has(scope_id)) {
+  //     // The contract ghost is private: it can be accessed by the contract itself but not the outside world
+  //     // or the derived contracts.
+  //     this.scope2irnodeinfo.set(scope_id, this.scope2irnodeinfo.get(scope_id)!.concat(
+  //       { id: this.contract_ghost_id, vis: ervis })
+  //     );
+  //   }
+  //   else {
+  //     this.scope2irnodeinfo.set(scope_id, [{ id: this.contract_ghost_id, vis: ervis }]);
+  //   }
+  //   this.contract_instance_to_scope.set(node_id, contract_scope);
+  //   new IRVariableDeclare(node_id, scope_id, instance_name + );
+  // }
+  insert(node_id : number, ervis : erwin_visibility, scope_id : number) : void {
     if (this.scope2irnodeinfo.has(scope_id)) {
-      this.scope2irnodeinfo.set(scope_id, this.scope2irnodeinfo.get(scope_id)!.concat({ id: node_id, vis: erwin_visibility }));
+      this.scope2irnodeinfo.set(scope_id, this.scope2irnodeinfo.get(scope_id)!.concat({ id: node_id, vis: ervis }));
     }
     else {
-      this.scope2irnodeinfo.set(scope_id, [{ id: node_id, vis: erwin_visibility }]);
+      this.scope2irnodeinfo.set(scope_id, [{ id: node_id, vis: ervis }]);
     }
   }
   // Get IRNodes from a scope but not its ancestors
@@ -195,6 +221,7 @@ class DeclDB {
     return irnodes_ids;
   }
 
+  // Get contract instances from a scope without its ancestors
   get_contract_instance(scope_id : number) : number[] {
     const irnodes_ids : number[] = [];
     if (this.scope2irnodeinfo.has(scope_id)) {

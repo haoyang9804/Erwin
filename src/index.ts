@@ -340,7 +340,7 @@ function generate_scope_mode() {
 
 // Generation
 async function generate() {
-  const contract = new gen.ContractDeclareGenerator();
+  const contract = new gen.ContractDeclarationGenerator();
   contract.generate();
 
   await (async () => {

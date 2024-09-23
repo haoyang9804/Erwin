@@ -35,11 +35,11 @@ export const config = {
 
   // Probability
   nonstructured_statement_prob: 0.05,
-  literal_prob: 0.3,
+  literal_prob: 0.05,
   tuple_prob: 0.3,
   vardecl_prob: 0.05,
   else_prob: 0.3,
-  terminal_prob: 0.3,
+  terminal_prob: 0.05,
 
   // Structured Statements
   for_init_cnt_upper_limit: 1,
