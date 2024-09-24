@@ -940,6 +940,7 @@ export class BinaryOpGenerator extends RValueGenerator {
         right_expression_gen_prototype = pickRandomElement(all_expression_generators)!;
       }
     }
+
     //! Generate left-hand-side expression
     const dominated_vardecls_by_dominator_for_left = this.this_dominates_left() ?
       new Set<number>(this.dominated_vardecls_by_dominator) :
