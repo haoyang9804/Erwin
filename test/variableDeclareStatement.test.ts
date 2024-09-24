@@ -1,5 +1,5 @@
 import { TypeProvider } from "../src/type"
-import { IRVariableDeclare } from "../src/declare";
+import { IRVariableDeclaration } from "../src/declare";
 import { IRLiteral, IRTuple } from "../src/expression";
 import { IRVariableDeclareStatement } from "../src/statement";
 import {
@@ -19,9 +19,9 @@ const writer = new ASTWriter(
 
 test("test variableDeclareStatement",
 () => {
-  const variable1 = new IRVariableDeclare(0, 0, "x");
+  const variable1 = new IRVariableDeclaration(0, 0, "x");
   variable1.type = TypeProvider.uint256()
-  const variable2 = new IRVariableDeclare(1, 0, "y");
+  const variable2 = new IRVariableDeclaration(1, 0, "y");
   variable2.type = TypeProvider.uint128()
   const literal1 = new IRLiteral(2, 0);
   literal1.type = TypeProvider.uint256()

@@ -1,5 +1,5 @@
 import { TypeProvider } from "../src/type"
-import { IRStructDefinition, IRVariableDeclare } from "../src/declare";
+import { IRStructDefinition, IRVariableDeclaration } from "../src/declare";
 import {
   PrettyFormatter,
   ASTWriter,
@@ -17,7 +17,7 @@ const writer = new ASTWriter(
 
 test("test struct",
 () => {
-  const variable1 = new IRVariableDeclare(0, 0, "x")
+  const variable1 = new IRVariableDeclaration(0, 0, "x")
   variable1.type = TypeProvider.uint256();
   const error = new IRStructDefinition(1, 0, "S", [variable1]);
   const result = writer.write(error.lower());

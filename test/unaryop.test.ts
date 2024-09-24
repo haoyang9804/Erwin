@@ -1,5 +1,5 @@
 import { TypeProvider } from "../src/type"
-import { IRVariableDeclare } from "../src/declare";
+import { IRVariableDeclaration } from "../src/declare";
 import { IRIdentifier, IRUnaryOp } from "../src/expression";
 import {
   PrettyFormatter,
@@ -18,7 +18,7 @@ const writer = new ASTWriter(
 
 test("test binary op",
 () => {
-  const variable1 = new IRVariableDeclare(0, 0, "x")
+  const variable1 = new IRVariableDeclaration(0, 0, "x")
   variable1.type = TypeProvider.uint256();
   const v1id = new IRIdentifier(2, 0).from(variable1);
   const uop = new IRUnaryOp(2, 0, true, v1id, "++");

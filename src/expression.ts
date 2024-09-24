@@ -7,7 +7,7 @@ import {
 import { assert, generateRandomString, str2hex, randomBigInt } from "./utility";
 import { TypeKind, Type, ElementaryType } from "./type";
 import { IRNode, factory } from "./node";
-import { IRVariableDeclare } from "./declare";
+import { IRVariableDeclaration } from "./declare";
 import { config } from "./config";
 
 export abstract class IRExpression extends IRNode {
@@ -178,7 +178,7 @@ export class IRIdentifier extends IRExpression {
     this.name = name;
     this.reference = reference;
   }
-  from(node : IRVariableDeclare) {
+  from(node : IRVariableDeclaration) {
     this.name = node.name;
     this.reference = node.id;
     return this;

@@ -30,7 +30,7 @@ export abstract class IRDeclare extends IRNode {
   }
 }
 
-export class IRVariableDeclare extends IRDeclare {
+export class IRVariableDeclaration extends IRDeclare {
   indexed : boolean = false;
   constant : boolean = false; // duplicated with attribute `mutable`. but required by solc-typed-ast.
   state : boolean = true;
@@ -47,7 +47,7 @@ export class IRVariableDeclare extends IRDeclare {
     }
   }
   lower() : ASTNode {
-    assert(this.type !== undefined, "IRVariableDeclare: type is not generated");
+    assert(this.type !== undefined, "IRVariableDeclaration: type is not generated");
     let typename : TypeName | undefined = undefined;
     if (this.type.kind === TypeKind.ElementaryType) {
       const type = this.type as ElementaryType;
@@ -63,7 +63,7 @@ export class IRVariableDeclare extends IRDeclare {
     //TODO: add support for visibility
     //TODO: add support for mutability
     //TODO: add support for other types, firstly function type
-    assert(typename !== undefined, "IRVariableDeclare: typename is not generated")
+    assert(typename !== undefined, "IRVariableDeclaration: typename is not generated")
     return factory.makeVariableDeclaration(this.constant, this.indexed, this.name, this.scope, this.state, this.memory,
       this.visibility, this.mutable, "", undefined, typename, undefined, this.value?.lower());
   }
@@ -94,8 +94,8 @@ export class IRUserDefinedTypeDefinition extends IRDeclare {
 
 
 export class IRErrorDefinition extends IRDeclare {
-  parameters : IRVariableDeclare[];
-  constructor(id : number, scope : number, name : string, parameters : IRVariableDeclare[]) {
+  parameters : IRVariableDeclaration[];
+  constructor(id : number, scope : number, name : string, parameters : IRVariableDeclaration[]) {
     super(id, scope, name);
     this.parameters = parameters;
   }
@@ -106,8 +106,8 @@ export class IRErrorDefinition extends IRDeclare {
 
 export class IREventDefinition extends IRDeclare {
   anonymous : boolean;
-  parameters : IRVariableDeclare[];
-  constructor(id : number, scope : number, name : string, anonymous : boolean, parameters : IRVariableDeclare[]) {
+  parameters : IRVariableDeclaration[];
+  constructor(id : number, scope : number, name : string, anonymous : boolean, parameters : IRVariableDeclaration[]) {
     super(id, scope, name);
     this.anonymous = anonymous;
     this.parameters = parameters;
@@ -119,8 +119,8 @@ export class IREventDefinition extends IRDeclare {
 
 export class IRStructDefinition extends IRDeclare {
   visibility : string = "public";
-  members : IRVariableDeclare[];
-  constructor(id : number, scope : number, name : string, members : IRVariableDeclare[]) {
+  members : IRVariableDeclaration[];
+  constructor(id : number, scope : number, name : string, members : IRVariableDeclaration[]) {
     super(id, scope, name);
     assert(members.length > 0, "IRStructDefinition: members is empty")
     this.members = members;
@@ -134,9 +134,9 @@ export class IRModifier extends IRDeclare {
   virtual : boolean;
   override : boolean;
   visibility : string;
-  parameters : IRVariableDeclare[];
+  parameters : IRVariableDeclaration[];
   body : IRStatement[];
-  constructor(id : number, scope : number, name : string, virtual : boolean, override : boolean, visibility : string, parameters : IRVariableDeclare[], body : IRStatement[]) {
+  constructor(id : number, scope : number, name : string, virtual : boolean, override : boolean, visibility : string, parameters : IRVariableDeclaration[], body : IRStatement[]) {
     super(id, scope, name);
     this.virtual = virtual;
     this.override = override;
@@ -171,15 +171,15 @@ export class IRFunctionDefinition extends IRDeclare {
   override : boolean;
   visibility : FunctionVisibility | undefined;
   stateMutability : FunctionStateMutability | undefined;
-  parameters : IRVariableDeclare[];
-  returns : IRVariableDeclare[];
+  parameters : IRVariableDeclaration[];
+  returns : IRVariableDeclaration[];
   modifier : Modifier[];
   body : IRStatement[];
   return_type : UnionType | undefined;
   parameter_type : UnionType | undefined;
   function_type : FunctionType | undefined;
   constructor(id : number, scope : number, name : string, kind : FunctionKind,
-    virtual : boolean, override : boolean, parameters : IRVariableDeclare[], returns : IRVariableDeclare[],
+    virtual : boolean, override : boolean, parameters : IRVariableDeclaration[], returns : IRVariableDeclaration[],
     body : IRStatement[], modifier : Modifier[], visibility ?: FunctionVisibility, stateMutability ?: FunctionStateMutability) {
     super(id, scope, name);
     this.virtual = virtual;

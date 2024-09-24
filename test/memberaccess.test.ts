@@ -1,5 +1,5 @@
 import { TypeProvider } from "../src/type"
-import { IRStructDefinition, IRVariableDeclare } from "../src/declare";
+import { IRStructDefinition, IRVariableDeclaration } from "../src/declare";
 import { IRMemberAccess, IRIdentifier } from "../src/expression";
 import {
   PrettyFormatter,
@@ -18,9 +18,9 @@ const writer = new ASTWriter(
 
 test("test struct",
 () => {
-  const v1 = new IRVariableDeclare(0, 0, "x")
+  const v1 = new IRVariableDeclaration(0, 0, "x")
   v1.type = TypeProvider.uint256();
-  const v2 = new IRVariableDeclare(1, 0, "x")
+  const v2 = new IRVariableDeclaration(1, 0, "x")
   v2.type = TypeProvider.uint256();
   const S = new IRStructDefinition(2, 0, "S", [v1]);
   const Sid = new IRIdentifier(3, 0, "S", S.id);

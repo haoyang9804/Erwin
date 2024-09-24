@@ -78,6 +78,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   2. If node1 weakly and reversely dominates node2 in solution, then the solution of node2 is super to the solution of node1.
   */
   connect(from : number, to : number, rank ?: string) : void {
+    if (from === to) return;
     if (config.debug) {
       assert(this.dag_nodes.get(from)! !== undefined, `DominanceDAG::connect: node (from) ${from} is not in the DAG`)
       assert(this.dag_nodes.get(to)! !== undefined, `DominanceDAG::connect: node (to) ${to} is not in the DAG`)
@@ -283,7 +284,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     }
   }
 
-  tighten_solution_range_from_a_tail(tail : number) {
+  tighten_solution_range_middle_out(node : number) {
     let upwards = (node : number) : void => {
       if (this.dag_nodes.get(node)!.ins.length === 0) {
         if (this.dag_nodes.get(node)!.outs.length !== 0)
@@ -294,10 +295,10 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         if (isEqualSet(this.solution_range.get(parent)!, this.solution_range.get(node)!)) {
           continue;
         }
-        if (config.debug)
-          assert(isSuperSet(this.solution_range.get(parent)!, this.solution_range.get(node)!),
-            `tighten_solution_range_from_a_tail::upwards: the solution range of ${parent}:
-        ${this.solution_range.get(parent)!.map(t => t.str())} is not a superset of the solution
+        assert(isSuperSet(this.solution_range.get(parent)!, this.solution_range.get(node)!)
+          || isSuperSet(this.solution_range.get(node)!, this.solution_range.get(parent)!),
+          `tighten_solution_range_middle_out::upwards: the solution range of ${parent}:
+        ${this.solution_range.get(parent)!.map(t => t.str())} is not a superset/subset of the solution
         range of ${node}: ${this.solution_range.get(node)!.map(t => t.str())}`);
         this.solution_range.set(parent, this.solution_range.get(node)!);
         upwards(parent);
@@ -314,55 +315,18 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         if (isEqualSet(this.solution_range.get(child)!, this.solution_range.get(node)!)) {
           continue;
         }
-        assert(isSuperSet(this.solution_range.get(child)!, this.solution_range.get(node)!), `tighten_solution_range_from_a_tail::downwards: the solution range of ${child}: ${this.solution_range.get(child)!.map(t => t.str())} is not a superset of the solution range of ${node}: ${this.solution_range.get(node)!.map(t => t.str())}`);
-        this.solution_range.set(child, this.solution_range.get(node)!);
-        downwards(child);
-      }
-    }
-    upwards(tail);
-  }
-
-  tighten_solution_range_from_a_head(head : number) {
-    let upwards = (node : number) : void => {
-      if (this.dag_nodes.get(node)!.ins.length === 0) {
-        if (this.dag_nodes.get(node)!.outs.length !== 0)
-          downwards(node);
-        return;
-      }
-      for (let parent of this.dag_nodes.get(node)!.ins) {
-        if (isEqualSet(this.solution_range.get(parent)!, this.solution_range.get(node)!)) {
-          continue;
-        }
-        if (config.debug)
-          assert(isSuperSet(this.solution_range.get(parent)!, this.solution_range.get(node)!),
-            `tighten_solution_range_from_a_head::upwards: the solution range of ${parent}:
-        ${this.solution_range.get(parent)!.map(t => t.str())} is not a superset of the solution
-        range of ${node}: ${this.solution_range.get(node)!.map(t => t.str())}`);
-        this.solution_range.set(parent, this.solution_range.get(node)!);
-        upwards(parent);
-        downwards(parent);
-      }
-    }
-    let downwards = (node : number) : void => {
-      if (this.dag_nodes.get(node)!.outs.length === 0) {
-        if (this.dag_nodes.get(node)!.ins.length !== 0)
-          upwards(node);
-        return;
-      }
-      for (let child of this.dag_nodes.get(node)!.outs) {
-        if (isEqualSet(this.solution_range.get(child)!, this.solution_range.get(node)!)) {
-          continue;
-        }
-        if (config.debug)
-          assert(isSuperSet(this.solution_range.get(child)!, this.solution_range.get(node)!),
-            `tighten_solution_range_from_a_head::downwards: the solution range of ${child}:
-        ${this.solution_range.get(child)!.map(t => t.str())} is not a superset of the solution
+        assert(isSuperSet(this.solution_range.get(child)!, this.solution_range.get(node)!)
+          || isSuperSet(this.solution_range.get(node)!, this.solution_range.get(child)!),
+          `tighten_solution_range_middle_out::downwards: the solution range of ${child}:
+        ${this.solution_range.get(child)!.map(t => t.str())} is not a superset/subset of the solution
         range of ${node}: ${this.solution_range.get(node)!.map(t => t.str())}`);
         this.solution_range.set(child, this.solution_range.get(node)!);
         downwards(child);
+        upwards(child);
       }
     }
-    downwards(head);
+    upwards(node);
+    downwards(node);
   }
 
   tighten_solution_range() {
@@ -703,24 +667,22 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
 
   check_solution_range_after_tightening(node : number) : void {
     for (let child of this.dag_nodes.get(node)!.outs) {
-      if (config.debug)
-        assert(isEqualSet(this.solution_range.get(node)!, this.solution_range.get(child)!),
-          `check_solution_range_after_tightening: the solution range of ${node}:
-          ${this.solution_range.get(node)!.map(t => t.str())} is not the same as the solution
-          range of ${child}: ${this.solution_range.get(child)!.map(t => t.str())}`);
+      assert(isEqualSet(this.solution_range.get(node)!, this.solution_range.get(child)!),
+        `check_solution_range_after_tightening: the solution range of ${node}:
+        ${this.solution_range.get(node)!.map(t => t.str())} is not the same as the solution
+        range of ${child}: ${this.solution_range.get(child)!.map(t => t.str())}`);
       this.check_solution_range_after_tightening(child);
     }
   }
 
   check_solution_range_before_tightening(node : number) : void {
     for (let child of this.dag_nodes.get(node)!.outs) {
-      if (config.debug)
-        assert(isSuperSet(this.solution_range.get(child)!, this.solution_range.get(node)!),
-          `check_solution_range_before_tightening: the solution range of ${child}:
-          ${this.solution_range.get(child)!.map(t => t.str())} is not the superset of the solution
-          range of ${node}: ${this.solution_range.get(node)!.map(t => t.str())}.
-          \nBelow are solution ranges for all nodes:\n
-          ${[...this.solution_range.keys()].map(k => `${k}: ${this.solution_range.get(k)!.map(t => t.str())}`).join("\n")}`);
+      assert(isSuperSet(this.solution_range.get(child)!, this.solution_range.get(node)!),
+        `check_solution_range_before_tightening: the solution range of ${child}:
+        ${this.solution_range.get(child)!.map(t => t.str())} is not the superset of the solution
+        range of ${node}: ${this.solution_range.get(node)!.map(t => t.str())}.
+        \nBelow are solution ranges for all nodes:\n
+        ${[...this.solution_range.keys()].map(k => `${k}: ${this.solution_range.get(k)!.map(t => t.str())}`).join("\n")}`);
       this.check_solution_range_before_tightening(child);
     }
   }

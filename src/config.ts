@@ -22,7 +22,8 @@ export const config = {
   return_count_of_function_lowerlimit: 0,
   param_count_of_function_upperlimit: 1,
   param_count_of_function_lowerlimit: 0,
-  function_count_per_contract: 2,
+  function_count_per_contract_upper_limit: 2,
+  function_count_per_contract_lower_limit: 1,
 
   // Contract
   contract_count: 2,
@@ -35,11 +36,11 @@ export const config = {
 
   // Probability
   nonstructured_statement_prob: 0.05,
-  literal_prob: 0.3,
+  literal_prob: 0.05,
   tuple_prob: 0.3,
   vardecl_prob: 0.05,
   else_prob: 0.3,
-  terminal_prob: 0.3,
+  terminal_prob: 0.05,
 
   // Structured Statements
   for_init_cnt_upper_limit: 1,

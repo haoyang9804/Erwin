@@ -10,5 +10,6 @@ def test_validity():
     if p.returncode:
       print(f'Error in file {file_path}')
       print(p.stderr.decode('utf-8'))
+      break
   
 test_validity()

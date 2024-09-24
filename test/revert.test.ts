@@ -1,5 +1,5 @@
 import { TypeProvider } from "../src/type"
-import { IRErrorDefinition, IRVariableDeclare } from "../src/declare";
+import { IRErrorDefinition, IRVariableDeclaration } from "../src/declare";
 import { IRRevertStatement } from "../src/statement";
 import { IRIdentifier } from "../src/expression";
 import {
@@ -19,7 +19,7 @@ const writer = new ASTWriter(
 
 test("test revert",
 () => {
-  const variable1 = new IRVariableDeclare(0, 0, "x")
+  const variable1 = new IRVariableDeclaration(0, 0, "x")
   variable1.type = TypeProvider.uint256();
   const error = new IRErrorDefinition(1, 0, "E", [variable1]);
   const error_id = new IRIdentifier(2, 0, error.name, error.id);
