@@ -5,7 +5,7 @@ import { scopeKind } from './scope';
 import { FunctionVisibility, StateVariableVisibility } from 'solc-typed-ast';
 import { assert } from 'console';
 import { config } from './config';
-import { IRVariableDeclare } from './declare';
+import { IRVariableDeclaration } from './declare';
 
 // Deprecated Database
 export class DeprecatedDB {
@@ -169,7 +169,7 @@ class DeclDB {
       this.scope2irnodeinfo.set(scope_id, [{ id: this.contract_ghost_id, vis: erwin_visibility.INCONTRACT_PRIVATE }]);
     }
     this.contract_instance_to_scope.set(this.contract_ghost_id, scope_id);
-    new IRVariableDeclare(this.contract_ghost_id, scope_id, 'this');
+    new IRVariableDeclaration(this.contract_ghost_id, scope_id, 'this');
     this.contract_ghost_id--;
   }
   // insert_contract_instance(node_id : number, instance_name: string, ervis : erwin_visibility,
@@ -185,7 +185,7 @@ class DeclDB {
   //     this.scope2irnodeinfo.set(scope_id, [{ id: this.contract_ghost_id, vis: ervis }]);
   //   }
   //   this.contract_instance_to_scope.set(node_id, contract_scope);
-  //   new IRVariableDeclare(node_id, scope_id, instance_name + );
+  //   new IRVariableDeclaration(node_id, scope_id, instance_name + );
   // }
   insert(node_id : number, ervis : erwin_visibility, scope_id : number) : void {
     if (this.scope2irnodeinfo.has(scope_id)) {

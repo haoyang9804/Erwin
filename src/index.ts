@@ -60,7 +60,8 @@ program
   .option("--return_count_of_function_lowerlimit <number>", "The lower limit of the number of return values of a function.", `${config.return_count_of_function_lowerlimit}`)
   .option("--param_count_of_function_upperlimit <number>", "The upper limit of the number of parameters of a function.", `${config.param_count_of_function_upperlimit}`)
   .option("--param_count_of_function_lowerlimit <number>", "The lower limit of the number of parameters of a function.", `${config.param_count_of_function_lowerlimit}`)
-  .option("--function_count_per_contract <number>", "The upper limit of the number of functions in a contract.", `${config.function_count_per_contract}`)
+  .option("--function_count_per_contract_upper_limit <number>", "The upper limit of the number of functions in a contract.", `${config.function_count_per_contract_upper_limit}`)
+  .option("--function_count_per_contract_lower_limit <number>", "The lower limit of the number of functions in a contract.", `${config.function_count_per_contract_lower_limit}`)
   // Contract  
   .option("--contract_count <number>", "The upper limit of the number of contracts Erwin will generate.", `${config.contract_count}`)
   .option("--state_variable_count_upperlimit <number>", "The upper limit of the number of state variables in a contract.", `${config.state_variable_count_upperlimit}`)
@@ -102,7 +103,8 @@ else if (program.args[0] === "generate") {
   config.return_count_of_function_lowerlimit = parseInt(program.commands[1].opts().return_count_of_function_lowerlimit);
   config.param_count_of_function_upperlimit = parseInt(program.commands[1].opts().param_count_of_function_upperlimit);
   config.param_count_of_function_lowerlimit = parseInt(program.commands[1].opts().param_count_of_function_lowerlimit);
-  config.function_count_per_contract = parseInt(program.commands[1].opts().function_count_per_contract);
+  config.function_count_per_contract_upper_limit = parseInt(program.commands[1].opts().function_count_per_contract_upper_limit);
+  config.function_count_per_contract_lower_limit = parseInt(program.commands[1].opts().function_count_per_contract_lower_limit);
   config.literal_prob = parseFloat(program.commands[1].opts().literal_prob);
   config.maximum_type_resolution_for_heads = parseInt(program.commands[1].opts().maximum_type_resolution_for_heads);
   config.tuple_prob = parseFloat(program.commands[1].opts().tuple_prob);
@@ -148,7 +150,8 @@ else if (program.args[0] === "generate") {
   assert(config.return_count_of_function_lowerlimit >= 0, "The lower limit of the number of return values of a function must be not less than 0.");
   assert(config.param_count_of_function_lowerlimit >= 0, "The lower limit of the number of parameters of a function must be not less than 0.");
   assert(config.param_count_of_function_upperlimit >= 0, "The upper limit of the number of parameters of a function must be not less than 0.");
-  assert(config.function_count_per_contract >= 0, "The number of functions must be not less than 0.");
+  assert(config.function_count_per_contract_lower_limit <= config.function_count_per_contract_upper_limit, "The lower limit of the number of functions must be less than or equal to the upper limit.");
+  assert(config.function_count_per_contract_lower_limit >= 0, "The number of functions must be not less than 0.");
   assert(config.literal_prob >= 0 && config.literal_prob <= 1, "The probability of generating a literal must be in the range [0,1].");
   assert(config.maximum_type_resolution_for_heads >= config.chunk_size, "The maximum number of type resolutions for heads must be not less than the size of chunk.");
   assert(config.tuple_prob >= 0 && config.tuple_prob <= 1, "The probability of generating a tuple surrounding an expression must be in the range [0,1].");
@@ -161,7 +164,6 @@ else if (program.args[0] === "generate") {
   assert(config.vardecl_prob < 1.0, "The probability of generating a variable declaration must be less than or equal to 1.");
   assert(config.else_prob < 1.0, "The probability of generating an else statement must be less than or equal to 1.");
   assert(config.terminal_prob < 1.0, "The probability of generating a terminal statement must be less than or equal to 1.");
-  assert(config.function_body_stmt_cnt_lower_limit <= config.function_body_stmt_cnt_upper_limit, "The lower limit of the number of statements of a function must be less than or equal to the upper limit.");
   assert(config.return_count_of_function_lowerlimit <= config.return_count_of_function_upperlimit, "The lower limit of the number of return values of a function must be less than or equal to the upper limit.");
   assert(config.param_count_of_function_lowerlimit <= config.param_count_of_function_upperlimit, "The lower limit of the number of parameters of a function must be less than or equal to the upper limit.");
   assert(config.state_variable_count_lowerlimit <= config.state_variable_count_upperlimit, "state_variable_count_lowerlimit must be less than or equal to state_variable_count_upperlimit.");
@@ -246,15 +248,15 @@ function generate_type_mode() {
   const state_variable_visibility_solutions = pickRandomElement(gen.state_variable_visibility_dag.solutions_collection)!;
   // assign the visibility to the state variable
   for (let [key, value] of state_variable_visibility_solutions) {
-    assert(irnodes.get(key)! instanceof decl.IRVariableDeclare, "The node must be a variable declaration.");
-    (irnodes.get(key)! as decl.IRVariableDeclare).visibility = value.kind;
+    assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration, "The node must be a variable declaration.");
+    (irnodes.get(key)! as decl.IRVariableDeclaration).visibility = value.kind;
   }
   let cnt = 0;
   //! Traverse type solutions
   for (let type_solutions of gen.type_dag.solutions_collection) {
     for (let [key, value] of type_solutions) {
-      if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclare)
-        (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclare).type = value;
+      if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
+        (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
     }
     let program = "";
     for (let [_, id] of db.decl_db.get_nonhidden_irnodes_ids_recursively(global_scope)!) {
@@ -282,8 +284,8 @@ function generate_scope_mode() {
   console.log(`${gen.state_variable_visibility_dag.solutions_collection.length} state variable visibility solutions`);
   const type_solutions = pickRandomElement(gen.type_dag.solutions_collection)!;
   for (let [key, value] of type_solutions) {
-    if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclare)
-      (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclare).type = value;
+    if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
+      (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
   }
   let cnt = 0;
   //! Traverse function state mutability solutions
@@ -313,8 +315,8 @@ function generate_scope_mode() {
       for (let state_variable_visibility_solutions of gen.state_variable_visibility_dag.solutions_collection) {
         // assign the visibility to the state variable
         for (let [key, value] of state_variable_visibility_solutions) {
-          assert(irnodes.get(key)! instanceof decl.IRVariableDeclare, "The node must be a variable declaration.");
-          (irnodes.get(key)! as decl.IRVariableDeclare).visibility = value.kind;
+          assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration, "The node must be a variable declaration.");
+          (irnodes.get(key)! as decl.IRVariableDeclaration).visibility = value.kind;
         }
         let program = "";
         for (let [_, id] of db.decl_db.get_nonhidden_irnodes_ids_recursively(global_scope)!) {

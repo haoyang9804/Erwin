@@ -1,5 +1,5 @@
 import { ElementaryType, ArrayType } from "../src/type"
-import { IRVariableDeclare } from "../src/declare";
+import { IRVariableDeclaration } from "../src/declare";
 import { IRIndexedAccess, IRIdentifier, IRLiteral } from "../src/expression";
 import {
   PrettyFormatter,
@@ -18,7 +18,7 @@ const writer = new ASTWriter(
 
 test("test indexed access",
 () => {
-  const v1 = new IRVariableDeclare(0, 0, "x")
+  const v1 = new IRVariableDeclaration(0, 0, "x")
   //TODO: support ArrayType generation in TypeProvider
   v1.type = new ArrayType(new ElementaryType("uint256", "nonpayable"), 10);
   const v1id = new IRIdentifier(1, 0).from(v1);

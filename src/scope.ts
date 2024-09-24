@@ -40,6 +40,10 @@ export class ScopeList extends LinkedListNode<scopeT> {
     return this.m_next as ScopeList;
   }
 
+  snapshot() : ScopeList {
+    return this;
+  }
+
   // Roll back to the previous scope
   rollback() : ScopeList {
     if (config.debug) {
@@ -56,7 +60,6 @@ export class ScopeList extends LinkedListNode<scopeT> {
   kind() : scopeKind {
     return this.value().kind;
   }
-
 }
 
 export function init_scope() {

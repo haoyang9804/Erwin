@@ -10,7 +10,7 @@ import {
 
 import { assert, } from "./utility";
 import { IRNode, factory } from "./node";
-import { IRVariableDeclare } from "./declare";
+import { IRVariableDeclaration } from "./declare";
 import { IRExpression, IRFunctionCall, IRTuple } from "./expression";
 
 export abstract class IRStatement extends IRNode {
@@ -30,9 +30,9 @@ export class IRPlaceholderStatement extends IRStatement {
 }
 
 export class IRVariableDeclareStatement extends IRStatement {
-  variable_declares : (IRVariableDeclare | null)[];
+  variable_declares : (IRVariableDeclaration | null)[];
   value : IRExpression;
-  constructor(id : number, scope : number, variable_declares : (IRVariableDeclare | null)[], value : IRExpression) {
+  constructor(id : number, scope : number, variable_declares : (IRVariableDeclaration | null)[], value : IRExpression) {
     super(id, scope);
     this.variable_declares = variable_declares;
     this.value = value;
@@ -42,7 +42,7 @@ export class IRVariableDeclareStatement extends IRStatement {
     if (this.variable_declares.length > 1) {
       assert(this.value instanceof IRTuple, "IRVariableDeclareStatement: value is not IRTuple when there are more than one variable_declares");
     }
-    const lowered_variable_declares = (this.variable_declares.filter(v => v !== null) as IRVariableDeclare[]).map(v => v.lower() as VariableDeclaration);
+    const lowered_variable_declares = (this.variable_declares.filter(v => v !== null) as IRVariableDeclaration[]).map(v => v.lower() as VariableDeclaration);
     const assignments = lowered_variable_declares.map(v => v.id);
     return factory.makeVariableDeclarationStatement(assignments, lowered_variable_declares, this.value.lower());
   }
@@ -193,9 +193,9 @@ export class IRRevertStatement extends IRStatement {
 
 export class IRTryCatchClause extends IRStatement {
   error_name : string;
-  parameters : IRVariableDeclare[];
+  parameters : IRVariableDeclaration[];
   body : IRStatement[];
-  constructor(id : number, scope : number, error_name : string, parameters : IRVariableDeclare[], body : IRStatement[]) {
+  constructor(id : number, scope : number, error_name : string, parameters : IRVariableDeclaration[], body : IRStatement[]) {
     super(id, scope);
     this.error_name = error_name;
     this.parameters = parameters;

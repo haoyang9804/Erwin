@@ -1,5 +1,5 @@
 import { TypeProvider } from "../src/type"
-import { IREventDefinition, IRVariableDeclare } from "../src/declare";
+import { IREventDefinition, IRVariableDeclaration } from "../src/declare";
 import { IRIdentifier } from "../src/expression";
 import { IREmitStatement } from "../src/statement";
 import {
@@ -19,7 +19,7 @@ const writer = new ASTWriter(
 
 test("test event and emit",
 () => {
-  const variable1 = new IRVariableDeclare(0, 0, "x")
+  const variable1 = new IRVariableDeclaration(0, 0, "x")
   variable1.type = TypeProvider.uint256();
   const event = new IREventDefinition(1, 0, "E", false, [variable1]);
   const result = writer.write(event.lower());
@@ -31,7 +31,7 @@ test("test event and emit",
   expect(result2).toEqual(
     "event E(uint256 x) anonymous;"
   );
-  const variable2 = new IRVariableDeclare(3, 0, "y");
+  const variable2 = new IRVariableDeclaration(3, 0, "y");
   variable2.type = TypeProvider.uint256();
   const variable2_id = new IRIdentifier(4, 0, variable2.name, variable2.id);
   const event_id = new IRIdentifier(5, 0, event.name, event.id);

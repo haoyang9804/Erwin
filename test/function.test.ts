@@ -1,5 +1,5 @@
 import { TypeProvider } from "../src/type"
-import { IRModifier, IRVariableDeclare, IRFunctionDefinition } from "../src/declare";
+import { IRModifier, IRVariableDeclaration, IRFunctionDefinition } from "../src/declare";
 import { IRIdentifier, IRBinaryOp, IRLiteral, IRTuple, IRFunctionCall } from "../src/expression";
 import { IRPlaceholderStatement, IRVariableDeclareStatement, IRExpressionStatement } from "../src/statement";
 import {
@@ -22,9 +22,9 @@ const writer = new ASTWriter(
 );
 
 
-const variable1 = new IRVariableDeclare(0, 0, "x");
+const variable1 = new IRVariableDeclaration(0, 0, "x");
 variable1.type = TypeProvider.uint256();
-const variable2 = new IRVariableDeclare(1, 0, "y");
+const variable2 = new IRVariableDeclaration(1, 0, "y");
 variable2.type = TypeProvider.uint256();
 const literal1 = new IRLiteral(2, 0);
 literal1.type = TypeProvider.uint256();
@@ -33,7 +33,7 @@ literal2.type = TypeProvider.uint256();
 const tuple = new IRTuple(5, 0, [literal1, literal2]);
 const variable_declare_stmt = new IRVariableDeclareStatement(4, 0, [variable1, variable2], tuple);
 
-const v1 = new IRVariableDeclare(1, 0, "x");
+const v1 = new IRVariableDeclaration(1, 0, "x");
 v1.type = TypeProvider.uint256();
 const id1 = new IRIdentifier(2,0).from(v1);
 const id2 = new IRIdentifier(3,0).from(v1);
@@ -56,10 +56,10 @@ test("test modifier 2",
 }
 )
 
-const v2 = new IRVariableDeclare(5, 0, "y");
+const v2 = new IRVariableDeclaration(5, 0, "y");
 v2.type = TypeProvider.uint256()
 
-const v3 = new IRVariableDeclare(6, 0, "z");
+const v3 = new IRVariableDeclaration(6, 0, "z");
 v3.type = TypeProvider.uint256()
 
 
@@ -73,7 +73,7 @@ test("test function 1",
 }
 )
 
-const v4 = new IRVariableDeclare(8, 0, "x");
+const v4 = new IRVariableDeclaration(8, 0, "x");
 v4.type = TypeProvider.uint256()
 const id4 = new IRIdentifier(9,0).from(v4);
 const f_id = new IRIdentifier(11, 0, f_correct.name, f_correct.id);

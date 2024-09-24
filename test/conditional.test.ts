@@ -1,5 +1,5 @@
 import { TypeProvider } from "../src/type"
-import { IRVariableDeclare } from "../src/declare";
+import { IRVariableDeclaration } from "../src/declare";
 import { IRIdentifier, IRBinaryOp, IRConditional } from "../src/expression";
 import {
   PrettyFormatter,
@@ -18,9 +18,9 @@ const writer = new ASTWriter(
 
 test("test conditional",
 () => {
-  const variable1 = new IRVariableDeclare(0, 0, "x")
+  const variable1 = new IRVariableDeclaration(0, 0, "x")
   variable1.type = TypeProvider.uint256();
-  const variable2 = new IRVariableDeclare(1, 0, "y")
+  const variable2 = new IRVariableDeclaration(1, 0, "y")
   variable2.type = TypeProvider.uint256();
   const v1id = new IRIdentifier(2, 0).from(variable1);
   const v2id = new IRIdentifier(3, 0).from(variable2);
@@ -32,7 +32,7 @@ test("test conditional",
   expect(result).toEqual(
     "(x > y) ? (x + y) : (x - y)"
   );
-  const variable3 = new IRVariableDeclare(8, 0, "z");
+  const variable3 = new IRVariableDeclaration(8, 0, "z");
   variable3.type = TypeProvider.payable_address();
 }
 )

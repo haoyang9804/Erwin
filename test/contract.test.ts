@@ -1,5 +1,5 @@
 import { TypeProvider } from "../src/type"
-import { IRVariableDeclare, IRFunctionDefinition, IRContractDefinition } from "../src/declare";
+import { IRVariableDeclaration, IRFunctionDefinition, IRContractDefinition } from "../src/declare";
 import { IRIdentifier, IRLiteral, IRTuple, IRFunctionCall, IRNew } from "../src/expression";
 import { IRVariableDeclareStatement } from "../src/statement";
 import {
@@ -22,9 +22,9 @@ const writer = new ASTWriter(
     LatestCompilerVersion
 );
 
-const variable1 = new IRVariableDeclare(0, 0, "x");
+const variable1 = new IRVariableDeclaration(0, 0, "x");
 variable1.type = TypeProvider.uint256()
-const variable2 = new IRVariableDeclare(1, 0, "y");
+const variable2 = new IRVariableDeclaration(1, 0, "y");
 variable2.type = TypeProvider.uint128();
 const literal1 = new IRLiteral(2, 0);
 literal1.type = TypeProvider.uint256()
@@ -33,15 +33,15 @@ literal2.type = TypeProvider.uint128();
 const tuple = new IRTuple(5, 0, [literal1, literal2]);
 const variable_declare_stmt = new IRVariableDeclareStatement(4, 0, [variable1, variable2], tuple);
 
-const v2 = new IRVariableDeclare(6, 0, "y");
+const v2 = new IRVariableDeclaration(6, 0, "y");
 v2.type = TypeProvider.uint256()
-const v3 = new IRVariableDeclare(7, 0, "z");
+const v3 = new IRVariableDeclaration(7, 0, "z");
 v3.type = TypeProvider.uint256()
 const f_correct = new IRFunctionDefinition(8, 0, "F", FunctionKind.Function,
 true, true,
 [v2], [v3], [variable_declare_stmt], [], FunctionVisibility.Private, FunctionStateMutability.View);
 
-const v4 = new IRVariableDeclare(9, 0, "x");
+const v4 = new IRVariableDeclaration(9, 0, "x");
 v4.type = TypeProvider.uint256()
 const id4 = new IRIdentifier(10, 0).from(v4);
 const f_id = new IRIdentifier(11, 0, f_correct.name, f_correct.id);
