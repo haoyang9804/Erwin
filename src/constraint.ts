@@ -78,6 +78,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   2. If node1 weakly and reversely dominates node2 in solution, then the solution of node2 is super to the solution of node1.
   */
   connect(from : number, to : number, rank ?: string) : void {
+    if (from === to) return;
     if (config.debug) {
       assert(this.dag_nodes.get(from)! !== undefined, `DominanceDAG::connect: node (from) ${from} is not in the DAG`)
       assert(this.dag_nodes.get(to)! !== undefined, `DominanceDAG::connect: node (to) ${to} is not in the DAG`)

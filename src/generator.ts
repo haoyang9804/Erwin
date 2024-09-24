@@ -213,25 +213,6 @@ export abstract class DeclarationGenerator extends Generator {
   abstract generate() : void;
 }
 
-export class ContractTypeVariableDecarationGenerator extends DeclarationGenerator {
-  name : string | undefined;
-  constructor(name ?: string) {
-    super();
-    this.name = name;
-  }
-
-  // has_contract_declaration() : boolean {
-  //   for (const irnode)
-  // }
-
-  generate() : void {
-    if (this.name === undefined) {
-      this.name = generateVarName();
-    }
-
-  }
-}
-
 export class ElementaryTypeVariableDeclarationGenerator extends DeclarationGenerator {
   type_range : type.Type[];
   name : string | undefined;
@@ -273,11 +254,8 @@ export class ElementaryTypeVariableDeclarationGenerator extends DeclarationGener
 }
 
 export class FunctionDeclarationGenerator extends DeclarationGenerator {
-  kind : FunctionKind = FunctionKind.Function;
-  constructor(kind ?: FunctionKind) {
+  constructor() {
     super();
-    if (kind !== undefined)
-      this.kind = kind;
   }
 
   // get_state_mutability_range(use_state_variables : boolean) : FuncStat[] {
@@ -343,7 +321,8 @@ export class FunctionDeclarationGenerator extends DeclarationGenerator {
 
   build_connection_from_caller_to_callee(thisid : number) : void {
     for (const called_function_decl_ID of decl_db.called_function_decls_IDs) {
-      this.connect_from_caller_to_callee(thisid, called_function_decl_ID);
+      if (thisid != called_function_decl_ID)
+        this.connect_from_caller_to_callee(thisid, called_function_decl_ID);
     }
     decl_db.called_function_decls_IDs.clear();
   }
@@ -387,7 +366,11 @@ export class FunctionDeclarationGenerator extends DeclarationGenerator {
       FuncVisProvider.private(),
       FuncVisProvider.public()
     ]);
-    decl_db.insert(thisid, erwin_visibility.INCONTRACT_UNKNOWN, cur_scope.id());
+    const modifiers : decl.Modifier[] = [];
+    //TODO: fill the modifiers
+    const name = generateVarName();
+    const virtual = virtual_env;
+    const overide = override_env;
     cur_scope = cur_scope.new(scopeKind.FUNC);
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Definition`));
@@ -402,6 +385,26 @@ export class FunctionDeclarationGenerator extends DeclarationGenerator {
       if (config.debug) indent -= 2;
       parameters.push(variable_gen.irnode! as decl.IRVariableDeclare);
     }
+    //! Generate return_decls
+    const return_decls : decl.IRVariableDeclare[] = [];
+    const return_count = randomInt(0, config.return_count_of_function_upperlimit);
+    if (config.debug) {
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Return Decls, ${return_count} in total`));
+    }
+    for (let i = 0; i < return_count; i++) {
+      //* Generate the returned vardecl. For instance, in the following code:
+      //* function f() returns (uint a, uint b) { return (1, 2); }
+      //* We generate two returned vardecls for a and b.
+      const variable_gen = new ElementaryTypeVariableDeclarationGenerator(type.elementary_types);
+      if (config.debug) indent += 2;
+      variable_gen.generate();
+      if (config.debug) indent -= 2;
+      return_decls.push(variable_gen.irnode! as decl.IRVariableDeclare);
+    }
+    this.irnode = new decl.IRFunctionDefinition(thisid, cur_scope.id(), name,
+      FunctionKind.Function, virtual, overide, parameters, return_decls, [], modifiers);
+    decl_db.insert(thisid, erwin_visibility.INCONTRACT_UNKNOWN, cur_scope.id());
+    decl_db.funcdecls.add(this.irnode.id);
     //! Generate function body. Body includes exprstmts and the return stmt.
     external_call = false;
     let body : stmt.IRStatement[] = [];
@@ -435,17 +438,15 @@ export class FunctionDeclarationGenerator extends DeclarationGenerator {
         }
       }
     }
-    //! Then we generate return stmt and return_decls.
-    const return_decls : decl.IRVariableDeclare[] = [];
+    //! Then we generate return exprs.
     const return_values : expr.IRExpression[] = [];
-    const return_count = randomInt(0, config.return_count_of_function_upperlimit);
     if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Returns, ${return_count} in total`));
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Return Exprs, ${return_count} in total`));
     }
     for (let i = 0; i < return_count; i++) {
       //* Generate expr for return
       const expr_gen_prototype = pickRandomElement(all_expression_generators)!;
-      const expr_gen = new expr_gen_prototype(type.elementary_types, new Set<number>(), new Set<number>());
+      const expr_gen = new expr_gen_prototype(type_dag.solution_range.get(return_decls[i].id)!, new Set<number>(), new Set<number>());
       if (config.debug) indent += 2;
       expr_gen.generate(0);
       if (config.debug) indent -= 2;
@@ -456,22 +457,14 @@ export class FunctionDeclarationGenerator extends DeclarationGenerator {
       for (const used_vardecl of expr2used_vardecls.get(expression_extracted.id)!) {
         used_vardecls.add(used_vardecl);
       }
-      //* Generate the returned vardecl. For instance, in the following code:
-      //* function f() returns (uint a, uint b) { return (1, 2); }
-      //* We generate two returned vardecls for a and b.
-      const variable_gen = new ElementaryTypeVariableDeclarationGenerator(type.elementary_types);
-      if (config.debug) indent += 2;
-      variable_gen.generate();
-      if (config.debug) indent -= 2;
       //! Update vardecl2vardecls_of_the_same_type_range
       const dominated_vardecls = expr2dominated_vardecls.get(expression_extracted.id)!;
       for (const dominated_vardecl of dominated_vardecls) {
         vardecl2vardecls_of_the_same_type_range.set(dominated_vardecl,
           mergeSet(vardecl2vardecls_of_the_same_type_range.get(dominated_vardecl)!,
-            new Set<number>([variable_gen.irnode!.id])));
+            new Set<number>([return_decls[i].id])));
       }
-      vardecl2vardecls_of_the_same_type_range.set(variable_gen.irnode!.id, dominated_vardecls);
-      return_decls.push(variable_gen.irnode! as decl.IRVariableDeclare);
+      vardecl2vardecls_of_the_same_type_range.set(return_decls[i].id, dominated_vardecls);
       type_dag.connect(expression_extracted.id, return_decls[i].id, "super_dominance");
       typeRangeAlignment(expression_extracted.id, return_decls[i].id);
       body = body.concat(unexpected_extra_stmt);
@@ -488,11 +481,6 @@ export class FunctionDeclarationGenerator extends DeclarationGenerator {
       body.push(return_gen.irnode!);
     }
     cur_scope = cur_scope.rollback();
-    const modifiers : decl.Modifier[] = [];
-    //TODO: fill the modifiers
-    const name = generateVarName();
-    const virtual = virtual_env;
-    const overide = override_env;
     // Check whether function body uses any state variables and records the result into `use_state_variables`
     let use_state_variables = false;
     for (const used_vardecl of used_vardecls) {
@@ -507,10 +495,8 @@ export class FunctionDeclarationGenerator extends DeclarationGenerator {
     funcstat_dag.insert(funcstat_dag.newNode(thisid));
     funcstat_dag.solution_range.set(thisid, this.get_FuncStats_from_state_mutabilitys(state_mutability_range));
     this.build_connection_from_caller_to_callee(thisid);
-    this.irnode = new decl.IRFunctionDefinition(thisid, cur_scope.id(), name,
-      this.kind, virtual, overide, parameters, return_decls, body, modifiers);
+    (this.irnode as decl.IRFunctionDefinition).body = body;
     this.clear_no_state_variable_signal();
-    decl_db.funcdecls.add(this.irnode.id);
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Finish generating function ${name}`));
       indent -= 2;
@@ -574,6 +560,8 @@ export class ContractDeclarationGenerator extends DeclarationGenerator {
       new decl.IRFunctionDefinition(fid, cur_scope.id(), variable_decl.name, FunctionKind.Function,
         false, false, [], [ghost_state_vardecl], [], [], FunctionVisibility.External, FunctionStateMutability.View);
     }
+    //! Generate constructor
+
     //TODO: Generate struct declaration
     //TODO: Generate events, errors, and mappings
     //! Generate ghost ID for the contract
@@ -925,29 +913,31 @@ export class BinaryOpGenerator extends RValueGenerator {
     let left_expression_gen_prototype, right_expression_gen_prototype;
     let left_expression_gen, right_expression_gen;
     /*
-    This while loop is used to avoid the situation that both left_expression and right_expression are literals.
+    Avoid the situation that both left_expression and right_expression are literals.
     In this case, we cannot control the value of the result.
     For instance, (ZOwza %= (19421) * 50595) where ZOwza is uint16.
     Then (19421) * 50595 overflows the uint16 range, leading to an invalid code.
     */
-    while (true) {
+    if (cur_expression_complex_level >= config.expression_complex_level || Math.random() < config.terminal_prob) {
+      left_expression_gen_prototype = pickRandomElement(terminal_expression_generators)!;
+    }
+    else {
+      left_expression_gen_prototype = pickRandomElement(all_expression_generators)!;
+    }
+    if (["*", "+", "-", "<<", "|", "^"].includes(this.op) && left_expression_gen_prototype.name === "LiteralGenerator") {
       if (cur_expression_complex_level >= config.expression_complex_level || Math.random() < config.terminal_prob) {
-        left_expression_gen_prototype = pickRandomElement(terminal_expression_generators)!;
+        right_expression_gen_prototype = IdentifierGenerator;
+      }
+      else {
+        right_expression_gen_prototype = pickRandomElement(nonliteral_expression_generators)!;
+      }
+    }
+    else {
+      if (cur_expression_complex_level >= config.expression_complex_level || Math.random() < config.terminal_prob) {
         right_expression_gen_prototype = pickRandomElement(terminal_expression_generators)!;
       }
       else {
-        left_expression_gen_prototype = pickRandomElement(all_expression_generators)!;
         right_expression_gen_prototype = pickRandomElement(all_expression_generators)!;
-      }
-      if (
-        ["*", "+", "-", "<<", "|", "^"].includes(this.op) &&
-        left_expression_gen_prototype instanceof LiteralGenerator &&
-        right_expression_gen_prototype instanceof LiteralGenerator
-      ) {
-        continue;
-      }
-      else {
-        break;
       }
     }
     //! Generate left-hand-side expression
@@ -1495,7 +1485,7 @@ export class FunctionCallGenerator extends RValueGenerator {
           arg_gen_prototype = pickRandomElement(nonterminal_expression_generators)!;
       }
       const arg_gen = new arg_gen_prototype(type_range,
-        new Set<number>(this.forbidden_vardecls),
+        mergeSet(new Set<number>(this.forbidden_vardecls), new Set<number>([funcdecl.parameters[i].id])),
         new Set<number>(this.dominated_vardecls_by_dominator));
       if (config.debug) indent += 2;
       arg_gen.generate(cur_expression_complex_level + 1);
@@ -1598,6 +1588,26 @@ export class FunctionCallGenerator extends RValueGenerator {
   }
 }
 
+// export class NewContractDecarationGenerator extends ExpressionGenerator {
+//   name : string | undefined;
+//   constructor(name ?: string) {
+//     super();
+//     this.name = name;
+//   }
+
+//   generate() : void {
+//     if (this.name === undefined) {
+//       this.name = generateVarName();
+//     }
+//     assert (decl_db.contractdecls.size > 0, "No contract is declared");
+//     const contract_id = pickRandomElement([...decl_db.contractdecls])!;
+//     const contract_name = (irnodes.get(contract_id)! as decl.IRContractDefinition).name;
+//     const new_expr = new expr.IRNew(global_id++, cur_scope.id(), contract_name);
+//     const new_function_expr = new expr.IRFunctionCall(global_id++, cur_scope.id(), FunctionCallKind.FunctionCall, new_expr, []);
+
+//   }
+// }
+
 const terminal_expression_generators = [
   LiteralGenerator,
   IdentifierGenerator
@@ -1635,6 +1645,15 @@ const non_funccall_expression_generators_for_address_type = [
 
 const all_expression_generators = [
   LiteralGenerator,
+  IdentifierGenerator,
+  AssignmentGenerator,
+  BinaryOpGenerator,
+  UnaryOpGenerator,
+  ConditionalGenerator,
+  FunctionCallGenerator
+];
+
+const nonliteral_expression_generators = [
   IdentifierGenerator,
   AssignmentGenerator,
   BinaryOpGenerator,
@@ -2109,21 +2128,21 @@ export class DoWhileStatementGenerator extends NonExpressionStatementGenerator {
 }
 
 const expr_statement_generators = [
-  AssignmentStatementGenerator,
-  BinaryOpStatementGenerator,
-  UnaryOpStatementGenerator,
-  ConditionalStatementGenerator,
+  // AssignmentStatementGenerator,
+  // BinaryOpStatementGenerator,
+  // UnaryOpStatementGenerator,
+  // ConditionalStatementGenerator,
   FunctionCallStatementGenerator
 ]
 
 const statement_generators = [
-  AssignmentStatementGenerator,
-  BinaryOpStatementGenerator,
-  UnaryOpStatementGenerator,
-  ConditionalStatementGenerator,
-  FunctionCallStatementGenerator,
-  IfStatementGenerator,
-  ForStatementGenerator,
-  WhileStatementGenerator,
+  // AssignmentStatementGenerator,
+  // BinaryOpStatementGenerator,
+  // UnaryOpStatementGenerator,
+  // ConditionalStatementGenerator,
+  // FunctionCallStatementGenerator,
+  // IfStatementGenerator,
+  // ForStatementGenerator,
+  // WhileStatementGenerator,
   DoWhileStatementGenerator
 ]
