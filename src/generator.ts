@@ -2326,21 +2326,21 @@ export class DoWhileStatementGenerator extends NonExpressionStatementGenerator {
 }
 
 const expr_statement_generators = [
-  // AssignmentStatementGenerator,
-  // BinaryOpStatementGenerator,
-  // UnaryOpStatementGenerator,
-  // ConditionalStatementGenerator,
+  AssignmentStatementGenerator,
+  BinaryOpStatementGenerator,
+  UnaryOpStatementGenerator,
+  ConditionalStatementGenerator,
   FunctionCallStatementGenerator
 ]
 
 const statement_generators = [
-  // AssignmentStatementGenerator,
-  // BinaryOpStatementGenerator,
-  // UnaryOpStatementGenerator,
-  // ConditionalStatementGenerator,
-  // FunctionCallStatementGenerator,
-  // IfStatementGenerator,
-  // ForStatementGenerator,
-  // WhileStatementGenerator,
+  AssignmentStatementGenerator,
+  BinaryOpStatementGenerator,
+  UnaryOpStatementGenerator,
+  ConditionalStatementGenerator,
+  FunctionCallStatementGenerator,
+  IfStatementGenerator,
+  ForStatementGenerator,
+  WhileStatementGenerator,
   DoWhileStatementGenerator
 ]
