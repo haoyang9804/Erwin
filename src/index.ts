@@ -53,6 +53,7 @@ program
   // Dominance Constraint Solution
   .option("--maximum_type_resolution_for_heads <number>", "The maximum number of type resolutions for heads.", `${config.maximum_type_resolution_for_heads}`)
   .option("--chunk_size <number>", "The size of head solution chunk. The bigger the size is, the more resolutions Erwin will consider in a round.", `${config.chunk_size}`)
+  .option("--stream", "Enable the stream mode.", `${config.stream}`)
   // Function
   .option("--function_body_stmt_cnt_upper_limit <number>", "The upper limit of the number of non-declaration statements of a function. This value is suggested to be bigger than tha value of var_count", `${config.function_body_stmt_cnt_upper_limit}`)
   .option("--function_body_stmt_cnt_lower_limit <number>", "The lower limit of the number of non-declaration statements of a function.", `${config.function_body_stmt_cnt_lower_limit}`)
@@ -133,6 +134,7 @@ else if (program.args[0] === "generate") {
   config.if_body_stmt_cnt_upper_limit = parseInt(program.commands[1].opts().if_body_stmt_cnt_upper_limit);
   if (program.commands[1].opts().debug === true) config.debug = true;
   if (program.commands[1].opts().no_type_exploration === true) config.no_type_exploration = true;
+  if (program.commands[1].opts().stream === true) config.stream = true;
   if (config.mode == "scope") {
     config.int_num = 1;
     config.uint_num = 1;

@@ -14,6 +14,7 @@ export const config = {
   // Dominance Constraint Solution
   maximum_type_resolution_for_heads: 2000000,
   chunk_size: 100000,
+  stream: false,
 
   // Function
   function_body_stmt_cnt_upper_limit: 2,

@@ -41,6 +41,8 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   // If 'id1 id2' is installed in sub_dominance/super_dominance, then the solution of id2 is a sub_dominance/super_dominance of the solution of id1
   sub_dominance : Set<string> = new Set();
   super_dominance : Set<string> = new Set();
+  sub_dominance_among_heads : Set<string> = new Set();
+  super_dominance_among_heads : Set<string> = new Set();
   solutions = new Map<number, Node>();
   solution_range = new Map<number, Node[]>();
   solutions_collection : Map<number, Node>[] = [];
@@ -60,6 +62,8 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   tailssub : Set<string> = new Set<string>();
   // If "tail1 tail2" is in tailssub, then the solution of tail2 equals to the solution of tail1.
   tailsequal : Set<string> = new Set<string>();
+  headssub : Set<string> = new Set<string>();
+  headsequal : Set<string> = new Set<string>();
   name : string;
   constructor() {
     this.name = this.constructor.name;
@@ -107,6 +111,10 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     this.head_solution_collection = [];
     this.tailssub = new Set<string>();
     this.tailsequal = new Set<string>();
+    this.headssub = new Set<string>();
+    this.headsequal = new Set<string>();
+    this.sub_dominance_among_heads = new Set<string>();
+    this.super_dominance_among_heads = new Set<string>();
   }
 
   get_heads_and_tails() : void {
@@ -373,24 +381,54 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   }
 
   allocate_solutions_for_heads_in_chunks() : Generator<Map<number, Node>[]> {
-    let mul = 1n;
-    for (let head of this.heads) {
-      if (config.debug)
+    if (config.debug) {
+      let mul = 1n;
+      for (let head of this.heads) {
         console.log(color.cyan(`head is ${head}, and this.solution_range.get(head)!.length is ${this.solution_range.get(head)!.length}`));
-      mul *= BigInt(this.solution_range.get(head)!.length)
+        mul *= BigInt(this.solution_range.get(head)!.length)
+      }
+      console.log(color.cyan(`The size of of solution candidate of heads of ${this.name} is ${mul}`));
     }
-    console.log(color.cyan(`The size of of solution candidate of heads of ${this.name} is ${mul}`))
     for (let head of this.heads) this.solution_range.set(head, shuffle(this.solution_range.get(head)!));
     const head_array = shuffle(Array.from(this.heads));
     let cnt = 0;
     let local_head_resolution_collection : Map<number, Node>[] = [];
     const uplimit = head_array.reduce((acc, cur) => acc * this.solution_range.get(cur)!.length, 1);
     const solution_range_copy = this.solution_range;
+
+    let check_head_solution = (head_solution : Map<number, Node>) : boolean => {
+      const head_solution_array = Array.from(head_solution);
+      const head_solution_length = head_solution_array.length;
+      for (let i = 0; i < head_solution_length; i++) {
+        for (let j = i + 1; j < head_solution_length; j++) {
+          const i2j = `${head_solution_array[i][0]} ${head_solution_array[j][0]}`;
+          const j2i = `${head_solution_array[j][0]} ${head_solution_array[i][0]}`;
+          const inode = head_solution_array[i][1];
+          const jnode = head_solution_array[j][1];
+          if (this.headssub.has(i2j) && !inode.issuperof(jnode)) {
+            return false;
+          }
+          if (this.headssub.has(j2i) && !jnode.issuperof(inode)) {
+            return false;
+          }
+          if (this.headsequal.has(i2j) && !inode.same(jnode)) {
+            return false;
+          }
+          if (this.headsequal.has(j2i) && !jnode.same(inode)) {
+            return false;
+          }
+        }
+      }
+      return true;
+    }
+
     function* dfs(id : number, head_resolution : Map<number, Node>) : Generator<Map<number, Node>[]> {
       if (id === head_array.length) {
-        local_head_resolution_collection.push(new Map(head_resolution));
-        cnt++;
-        if (cnt % config.chunk_size === 0) {
+        if (check_head_solution(head_resolution)) {
+          local_head_resolution_collection.push(new Map(head_resolution));
+          cnt++;
+        }
+        if (config.stream || cnt % config.chunk_size === 0) {
           yield local_head_resolution_collection;
           local_head_resolution_collection = [];
         }
@@ -403,6 +441,10 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       else {
         for (let solution of solution_range_copy.get(head_array[id])!) {
           head_resolution.set(head_array[id], solution);
+          if (!check_head_solution(head_resolution)) {
+            head_resolution.delete(head_array[id]);
+            continue;
+          }
           yield* dfs(id + 1, head_resolution);
           head_resolution.delete(head_array[id]);
         }
@@ -463,6 +505,73 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       }
     }
     return tail_solution;
+  }
+
+  build_heads_relation() : void {
+    interface fromHead {
+      head_id : number;
+      sub_dominance : boolean; // the solution of head_id is a sub_dominance of the solution of the node
+      super_dominance : boolean; // the solution of head_id is a super_dominance of the solution of the node
+    }
+    const tail2headinfo = new Map<number, Set<fromHead>>();
+    //! Fill in tail2headinfo
+    for (let [nodeid, tail_infos] of this.node2tail) {
+      if (!this.heads.has(nodeid)) continue;
+      for (const tail_info of tail_infos) {
+        if (tail2headinfo.has(tail_info.tail_id)) {
+          tail2headinfo.get(tail_info.tail_id)!.add({ head_id: nodeid, sub_dominance: tail_info.sub_dominance, super_dominance: tail_info.super_dominance });
+        }
+        else {
+          tail2headinfo.set(tail_info.tail_id, new Set([{ head_id: nodeid, sub_dominance: tail_info.sub_dominance, super_dominance: tail_info.super_dominance }]));
+        }
+      }
+    }
+    //! build relation among heads
+    for (const [_, headinfos] of tail2headinfo) {
+      const head_infos_array = [...headinfos];
+      const head_infos_length = head_infos_array.length;
+      for (let i = 0; i < head_infos_length; i++) {
+        for (let j = i + 1; j < head_infos_length; j++) {
+          const head_info = head_infos_array[i];
+          const head_info2 = head_infos_array[j];
+          if (head_info.sub_dominance && (!head_info2.sub_dominance && !head_info2.super_dominance)) {
+            this.headssub.add(`${head_info.head_id} ${head_info2.head_id}`);
+          }
+          else if (head_info.super_dominance && (!head_info2.sub_dominance && !head_info2.super_dominance)) {
+            this.headssub.add(`${head_info2.head_id} ${head_info.head_id}`);
+          }
+          else if ((!head_info.sub_dominance && !head_info.super_dominance) && head_info2.sub_dominance) {
+            this.headssub.add(`${head_info2.head_id} ${head_info.head_id}`);
+          }
+          else if ((!head_info.sub_dominance && !head_info.super_dominance) && head_info2.super_dominance) {
+            this.headssub.add(`${head_info.head_id} ${head_info2.head_id}`);
+          }
+          else if ((!head_info.sub_dominance && !head_info.super_dominance) && (!head_info2.sub_dominance && !head_info2.super_dominance)) {
+            this.headsequal.add(`${head_info.head_id} ${head_info2.head_id}`);
+            this.headsequal.add(`${head_info2.head_id} ${head_info.head_id}`);
+          }
+          else if (head_info.sub_dominance && head_info2.super_dominance) {
+            this.headssub.add(`${head_info.head_id} ${head_info2.head_id}`);
+          }
+          else if (head_info.super_dominance && head_info2.sub_dominance) {
+            this.headssub.add(`${head_info2.head_id} ${head_info.head_id}`);
+          }
+        }
+      }
+      for (const key of this.headssub) {
+        const [head1, head2] = key.split(" ");
+        if (this.headssub.has(`${head2} ${head1}`)) {
+          this.headssub.delete(`${head2} ${head1}`);
+          this.headssub.delete(`${head1} ${head2}`);
+          this.headsequal.add(`${head1} ${head2}`);
+          this.headsequal.add(`${head2} ${head1}`);
+        }
+        else if (this.headsequal.has(`${head2} ${head1}`) ||
+          this.headsequal.has(`${head1} ${head2}`)) {
+          this.headssub.delete(key);
+        }
+      }
+    }
   }
 
   build_tails_relation() : void {
@@ -750,8 +859,19 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         console.log(color.green(`${key} -> ${this.solution_range.get(key)!.map(t => t.str())}`));
       }
     }
-    // !Build connection among tails.
+    // !Build connection among heads and tails.
+    this.build_heads_relation();
     this.build_tails_relation();
+    if (config.debug) {
+      console.log(color.green("===headssub==="));
+      for (const edge of this.headssub) {
+        console.log(color.green(edge));
+      }
+      console.log(color.red("===headsequal==="));
+      for (const edge of this.headsequal) {
+        console.log(color.red(edge));
+      }
+    }
     if (config.debug) {
       console.log(color.green("===tailssub==="));
       for (const edge of this.tailssub) {
@@ -792,8 +912,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         // Then check if there exists one tail whose solution candidates are empty.
         // If all this.tails have non-empty solution candidates, then resolve the types of this.tails.
         for (const tail of this.tails) {
-          if (config.debug)
-            assert(tail_solution.has(tail), `tail2type does not have ${tail}`);
+          assert(tail_solution.has(tail), `tail_solution does not have ${tail}`);
           if (tail_solution.get(tail)!.length === 0) {
             good_resolve = false;
             break;
@@ -805,7 +924,9 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
             tail_solution.set(tail, shuffle(tail_solution.get(tail)!))
           }
         }
-        if (!good_resolve) continue;
+        if (!good_resolve) {
+          continue;
+        }
         // !Resolve tails.
         const plausible_type_resolution_for_tails = this.resolve_tails(tail_solution);
         if (plausible_type_resolution_for_tails === false) continue;
