@@ -41,6 +41,7 @@ export const config = {
   vardecl_prob: 0.05,
   else_prob: 0.3,
   terminal_prob: 0.05,
+  init_state_var_in_constructor_prob: 0.3,
 
   // Structured Statements
   for_init_cnt_upper_limit: 1,
