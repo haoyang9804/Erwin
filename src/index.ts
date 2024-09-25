@@ -76,6 +76,7 @@ program
   .option("--vardecl_prob <float>", "The probability of generating a variable declaration.", `${config.vardecl_prob}`)
   .option("--else_prob <float>", "The probability of generating an else statement.", `${config.else_prob}`)
   .option("--terminal_prob <float>", "The probability of generating a terminal statement.", `${config.terminal_prob}`)
+  .option("--init_state_var_in_constructor_prob <float>", "The probability of initializing a state variable in the constructor.", `${config.init_state_var_in_constructor_prob}`)
   // Structured Statements
   .option("--for_init_cnt_upper_limit <number>", "The upper limit of the number of initialization in a for loop.", `${config.for_init_cnt_upper_limit}`)
   .option("--for_init_cnt_lower_limit <number>", "The lower limit of the number of initialization in a for loop.", `${config.for_init_cnt_lower_limit}`)
@@ -117,6 +118,7 @@ else if (program.args[0] === "generate") {
   config.vardecl_prob = parseFloat(program.commands[1].opts().vardecl_prob);
   config.else_prob = parseFloat(program.commands[1].opts().else_prob);
   config.terminal_prob = parseFloat(program.commands[1].opts().terminal_prob);
+  config.init_state_var_in_constructor_prob = parseFloat(program.commands[1].opts().init_state_var_in_constructor_prob);
   config.nonstructured_statement_prob = parseFloat(program.commands[1].opts().nonstructured_statement_prob);
   config.for_init_cnt_upper_limit = parseInt(program.commands[1].opts().for_init_cnt_upper_limit);
   config.for_init_cnt_lower_limit = parseInt(program.commands[1].opts().for_init_cnt_lower_limit);
@@ -155,19 +157,20 @@ else if (program.args[0] === "generate") {
   assert(config.literal_prob >= 0 && config.literal_prob <= 1, "The probability of generating a literal must be in the range [0,1].");
   assert(config.maximum_type_resolution_for_heads >= config.chunk_size, "The maximum number of type resolutions for heads must be not less than the size of chunk.");
   assert(config.tuple_prob >= 0 && config.tuple_prob <= 1, "The probability of generating a tuple surrounding an expression must be in the range [0,1].");
+  assert(config.init_state_var_in_constructor_prob >= 0 && config.init_state_var_in_constructor_prob <= 1, "The probability of initializing a state variable in the constructor must be in the range [0,1].");
   assert(config.expression_complex_level >= 0, "The complex level of the expression must be not less than 0.");
   assert(config.chunk_size > 0, "The chunk size of the database must be greater than 0.");
   assert(config.state_variable_count_upperlimit >= 0, "state_variable_count_upperlimit must be not less than 0.");
   assert(config.state_variable_count_lowerlimit >= 0, "state_variable_count_lowerlimit must be not less than 0.");
   assert(config.contract_count >= 0, "contract_count must be not less than 0.");
   assert(["type", "scope"].includes(config.mode), "The mode is not either 'type' or 'scope', instead it is " + config.mode);
-  assert(config.vardecl_prob < 1.0, "The probability of generating a variable declaration must be less than or equal to 1.");
-  assert(config.else_prob < 1.0, "The probability of generating an else statement must be less than or equal to 1.");
-  assert(config.terminal_prob < 1.0, "The probability of generating a terminal statement must be less than or equal to 1.");
+  assert(config.vardecl_prob >= 0 && config.vardecl_prob <= 1.0, "The probability of generating a variable declaration must be in the range [0,1].");
+  assert(config.else_prob >= 0.0 && config.else_prob <= 1.0, "The probability of generating an else statement must be in the range [0,1].");
+  assert(config.terminal_prob >= 0.0 && config.terminal_prob <= 1.0, "The probability of generating a terminal statement must be in the range [0,1].");
   assert(config.return_count_of_function_lowerlimit <= config.return_count_of_function_upperlimit, "The lower limit of the number of return values of a function must be less than or equal to the upper limit.");
   assert(config.param_count_of_function_lowerlimit <= config.param_count_of_function_upperlimit, "The lower limit of the number of parameters of a function must be less than or equal to the upper limit.");
   assert(config.state_variable_count_lowerlimit <= config.state_variable_count_upperlimit, "state_variable_count_lowerlimit must be less than or equal to state_variable_count_upperlimit.");
-  assert(config.nonstructured_statement_prob < 1.0, "The probability of generating a nonstructured statement must be less than or equal to 1.");
+  assert(config.nonstructured_statement_prob >= 0.0 && config.nonstructured_statement_prob <= 1.0, "The probability of generating a nonstructured statement must be in the range [0,1].");
   assert(config.function_body_stmt_cnt_lower_limit <= config.function_body_stmt_cnt_upper_limit, "The lower limit of the number of statements of a function must be less than or equal to the upper limit.");
   assert(config.function_body_stmt_cnt_lower_limit >= 0, "The lower limit of the number of statements of a function must be not less than 1.");
   assert(config.statement_complex_level >= 0, "The complex level of the statement must be not less than 0.");

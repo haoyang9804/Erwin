@@ -4,6 +4,7 @@ import { config } from './config'
 import { assert } from './utility'
 
 export enum scopeKind {
+  CONSTRUCTOR = "scopeKind::CONSTRUCTOR",
   FUNC = "scopeKind::FUNC",
   CONTRACT = "scopeKind::CONTRACT",
   GLOBAL = "scopeKind::GLOBAL",

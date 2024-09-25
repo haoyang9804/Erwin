@@ -227,10 +227,11 @@ export class ElementaryTypeVariableDeclarationGenerator extends DeclarationGener
     }
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating vardecl, name is ${this.name}, type range is ${this.type_range.map(t => t.str())}`));
+      indent += 2;
     }
     if (cur_scope.value().kind === scopeKind.CONTRACT) {
       this.irnode = new decl.IRVariableDeclaration(global_id++, cur_scope.id(),
-        generateVarName(), undefined);
+        this.name, undefined);
       decl_db.insert(this.irnode.id, erwin_visibility.INCONTRACT_UNKNOWN, cur_scope.id());
       state_variable_visibility_dag.solution_range.set(this.irnode.id, [
         VarVisProvider.private(),
@@ -248,8 +249,107 @@ export class ElementaryTypeVariableDeclarationGenerator extends DeclarationGener
     type_dag.solution_range.set(this.irnode.id, this.type_range);
     decl_db.vardecls.add(this.irnode.id);
     vardecl2vardecls_of_the_same_type_range.set(this.irnode.id, new Set<number>());
-    if (config.debug)
+    if (config.debug) {
+      indent -= 2;
       console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode!.id}: VarDecl, name: ${this.name}, scope: ${cur_scope.id()}, type: ${type_dag.solution_range.get(this.irnode!.id)!.map(t => t.str())}`));
+    }
+  }
+}
+
+export class ConstructorDeclarationGenerator extends DeclarationGenerator {
+  parameters : decl.IRVariableDeclaration[] = [];
+  function_scope : ScopeList;
+  fid : number;
+  has_body : boolean;
+  parameter_count : number;
+  state_variables_in_cur_contract_scope : number[] = [];
+  constructor(has_body : boolean = true) {
+    super();
+    this.fid = global_id++;
+    decl_db.insert(this.fid, erwin_visibility.INCONTRACT_UNKNOWN, cur_scope.id());
+    cur_scope = cur_scope.new(scopeKind.CONSTRUCTOR);
+    this.function_scope = cur_scope.snapshot();
+    cur_scope = cur_scope.rollback();
+    this.has_body = has_body;
+    this.parameter_count = randomInt(config.param_count_of_function_lowerlimit, config.param_count_of_function_upperlimit);
+    //! Find state variables in contract body scope
+    this.state_variables_in_cur_contract_scope = decl_db.get_nonhidden_nodes_ids_nonrecursively(cur_scope.id())
+      .filter(([_, nid]) => state_variables.has(nid))
+      .map(([_, nid]) => nid);
+  }
+
+  generate_body() : void {
+    assert(cur_scope.kind() === scopeKind.CONTRACT, `ConstructorDeclarationGenerator: scope kind should be CONTRACT, but is ${cur_scope.kind()}`);
+    //! Generate body
+    if (config.debug) {
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Constructor Body`));
+      indent += 2;
+    }
+    if (!this.has_body) cur_scope = this.function_scope.snapshot();
+    let body : stmt.IRStatement[] = [];
+    const body_stmt_count = randomInt(config.function_body_stmt_cnt_lower_limit, config.function_body_stmt_cnt_upper_limit);
+    for (let i = body.length; i < body_stmt_count; i++) {
+      if (this.state_variables_in_cur_contract_scope.length > 0 && Math.random() < config.init_state_var_in_constructor_prob) {
+        const vardecl = irnodes.get(pickRandomElement(this.state_variables_in_cur_contract_scope)!) as decl.IRVariableDeclaration;
+        const identifier = new expr.IRIdentifier(global_id++, cur_scope.id(), vardecl.name, vardecl.id);
+        const expr_gen_prototype = pickRandomElement(all_expression_generators)!;
+        const expr_gen = new expr_gen_prototype(type_dag.solution_range.get(vardecl.id)!, new Set<number>([vardecl.id]), new Set<number>([vardecl.id]));
+        expr_gen.generate(0);
+        const expression = expr_gen.irnode! as expr.IRExpression;
+        const assignment = new expr.IRAssignment(global_id++, cur_scope.id(), identifier, expression, "=");
+        const assignment_stmt = new stmt.IRExpressionStatement(global_id++, cur_scope.id(), assignment);
+        body.push(assignment_stmt);
+      }
+      else {
+        const stmt_gen_prototype = pickRandomElement(statement_generators)!;
+        const stmt_gen = new stmt_gen_prototype();
+        stmt_gen.generate(0);
+        body = body.concat(unexpected_extra_stmt);
+        unexpected_extra_stmt = [];
+        body.push(stmt_gen.irnode! as stmt.IRStatement);
+      }
+    }
+    if (config.debug) {
+      indent -= 2;
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Finish generating Constructor Body`));
+    }
+    if (!this.has_body) cur_scope = cur_scope.rollback();
+  }
+
+  generate() : void {
+    assert(cur_scope.kind() === scopeKind.CONTRACT, `ConstructorDeclarationGenerator: scope kind should be CONTRACT, but is ${cur_scope.kind()}`);
+    cur_scope = this.function_scope.snapshot();
+    if (config.debug) {
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Constructor Declaration: ${this.fid}`));
+      indent += 2;
+    }
+    //TODO: support modifiers
+    const modifiers : decl.Modifier[] = [];
+    //! Generate parameters
+    if (config.debug) {
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Parameters, ${this.parameter_count} in total`));
+      indent += 2;
+    }
+    for (let i = 0; i < this.parameter_count; i++) {
+      const variable_gen = new ElementaryTypeVariableDeclarationGenerator(type.elementary_types);
+      variable_gen.generate();
+      this.parameters.push(variable_gen.irnode! as decl.IRVariableDeclaration);
+    }
+    if (config.debug) {
+      indent -= 2;
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Finish generating Function Parameters`));
+    }
+    this.irnode = new decl.IRFunctionDefinition(this.fid, cur_scope.id(), "",
+      FunctionKind.Constructor, false, false, this.parameters, [], [], modifiers,
+      FunctionVisibility.Public, FunctionStateMutability.NonPayable);
+    if (this.has_body) {
+      this.generate_body();
+    }
+    cur_scope = cur_scope.rollback();
+    if (config.debug) {
+      indent -= 2;
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Finish generating Constructor Declaration`));
+    }
   }
 }
 
@@ -267,7 +367,7 @@ export class FunctionDeclarationGenerator extends DeclarationGenerator {
     decl_db.insert(this.fid, erwin_visibility.INCONTRACT_UNKNOWN, cur_scope.id());
     cur_scope = cur_scope.new(scopeKind.FUNC);
     this.function_scope = cur_scope.snapshot();
-    cur_scope.rollback();
+    cur_scope = cur_scope.rollback();
     this.has_body = has_body;
     this.return_count = randomInt(config.return_count_of_function_lowerlimit, config.return_count_of_function_upperlimit);
     this.parameter_count = randomInt(config.param_count_of_function_lowerlimit, config.param_count_of_function_upperlimit);
@@ -374,18 +474,16 @@ export class FunctionDeclarationGenerator extends DeclarationGenerator {
     const body_stmt_count = randomInt(config.function_body_stmt_cnt_lower_limit, config.function_body_stmt_cnt_upper_limit);
     // used_vardecls is a set that records the vardecls used by the body.
     const used_vardecls : Set<number> = new Set<number>();
-    if (config.debug) {
-      assert(this.irnode !== undefined, "this.irnode should not be undefined");
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Body for function ${this.irnode!.id}, ${body_stmt_count} in total`));
-    }
     this.throw_no_state_variable_signal_at_random();
     //! Here we generate stmts.
+    if (config.debug) {
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Body for ${this.fid}`));
+      indent += 2;
+    }
     for (let i = body.length; i < body_stmt_count; i++) {
       const stmt_gen_prototype = pickRandomElement(statement_generators)!;
       const stmt_gen = new stmt_gen_prototype();
-      if (config.debug) indent += 2;
       stmt_gen.generate(0);
-      if (config.debug) indent -= 2;
       body = body.concat(unexpected_extra_stmt);
       unexpected_extra_stmt = [];
       body.push(stmt_gen.irnode! as stmt.IRStatement);
@@ -405,16 +503,11 @@ export class FunctionDeclarationGenerator extends DeclarationGenerator {
     }
     //! Then we generate return exprs.
     const return_values : expr.IRExpression[] = [];
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Return Exprs, ${this.return_count} in total`));
-    }
     for (let i = 0; i < this.return_count; i++) {
       //* Generate expr for return
       const expr_gen_prototype = pickRandomElement(all_expression_generators)!;
       const expr_gen = new expr_gen_prototype(type_dag.solution_range.get(this.return_decls[i].id)!, new Set<number>([this.return_decls[i].id]), new Set<number>());
-      if (config.debug) indent += 2;
       expr_gen.generate(0);
-      if (config.debug) indent -= 2;
       const expr_for_return = expr.tupleExtraction(expr_gen.irnode! as expr.IRExpression);
       return_values.push(expr_for_return);
       let expression_extracted = expr.tupleExtraction(return_values[i]);
@@ -440,9 +533,7 @@ export class FunctionDeclarationGenerator extends DeclarationGenerator {
       const return_gen = new ReturnStatementGenerator(
         new expr.IRTuple(global_id++, cur_scope.id(), return_values)
       );
-      if (config.debug) indent += 2;
       return_gen.generate(0);
-      if (config.debug) indent -= 2;
       body.push(return_gen.irnode!);
     }
     // Check whether function body uses any state variables and records the result into `use_state_variables`
@@ -462,6 +553,10 @@ export class FunctionDeclarationGenerator extends DeclarationGenerator {
     (this.irnode as decl.IRFunctionDefinition).body = body;
     this.clear_no_state_variable_signal();
     if (!this.has_body) cur_scope = cur_scope.rollback();
+    if (config.debug) {
+      indent -= 2;
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Finish generating Function Body for ${this.fid}. funcstate range is ${funcstat_dag.solution_range.get(this.irnode!.id)!.map(f => f.str())}`));
+    }
   }
 
   generate() : void {
@@ -477,32 +572,36 @@ export class FunctionDeclarationGenerator extends DeclarationGenerator {
     const virtual = virtual_env;
     const overide = override_env;
     if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Definition ${this.fid}`));
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Definition ${this.fid} ${name}`));
       indent += 2;
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Parameters, ${this.parameter_count} in total`));
+      indent += 2;
     }
     cur_scope = this.function_scope.snapshot();
     //! Generate parameters
     for (let i = 0; i < this.parameter_count; i++) {
       const variable_gen = new ElementaryTypeVariableDeclarationGenerator(type.elementary_types);
-      if (config.debug) indent += 2;
       variable_gen.generate();
-      if (config.debug) indent -= 2;
       this.parameters.push(variable_gen.irnode! as decl.IRVariableDeclaration);
     }
     //! Generate return_decls
     if (config.debug) {
+      indent -= 2;
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Finish generating Function Parameters`));
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Return Decls, ${this.return_count} in total`));
+      indent += 2;
     }
     for (let i = 0; i < this.return_count; i++) {
       //* Generate the returned vardecl. For instance, in the following code:
       //* function f() returns (uint a, uint b) { return (1, 2); }
       //* We generate two returned vardecls for a and b.
       const variable_gen = new ElementaryTypeVariableDeclarationGenerator(type.elementary_types);
-      if (config.debug) indent += 2;
       variable_gen.generate();
-      if (config.debug) indent -= 2;
       this.return_decls.push(variable_gen.irnode! as decl.IRVariableDeclaration);
+    }
+    if (config.debug) {
+      indent -= 2;
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Finish generating Function Return Decls`));
     }
     this.irnode = new decl.IRFunctionDefinition(this.fid, cur_scope.id(), name,
       FunctionKind.Function, virtual, overide, this.parameters, this.return_decls, [], modifiers);
@@ -521,8 +620,8 @@ export class FunctionDeclarationGenerator extends DeclarationGenerator {
     }
     cur_scope = cur_scope.rollback();
     if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Finish generating function ${name}`));
       indent -= 2;
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Finish generating function ${name}, funcstate range is ${funcstat_dag.solution_range.get(this.irnode!.id)!.map(f => f.str())}`));
     }
   }
 }
@@ -530,12 +629,12 @@ export class FunctionDeclarationGenerator extends DeclarationGenerator {
 export class ContractDeclarationGenerator extends DeclarationGenerator {
   constructor() { super(); }
   generate() : void {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Contract Definition`));
-      indent += 2;
-    }
     //! Create the contract scope
     const thisid = global_id++;
+    if (config.debug) {
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Contract Definition: ${thisid}`));
+      indent += 2;
+    }
     assert(cur_scope.kind() === scopeKind.GLOBAL, "Contracts' scope must be global");
     decl_db.insert(thisid, erwin_visibility.NAV, cur_scope.id());
     cur_scope = cur_scope.new(scopeKind.CONTRACT);
@@ -547,9 +646,7 @@ export class ContractDeclarationGenerator extends DeclarationGenerator {
     // Generate state variables and randomly assigns values to these variables
     for (let i = 0; i < state_variable_count; i++) {
       const variable_gen = new ElementaryTypeVariableDeclarationGenerator(type.elementary_types);
-      if (config.debug) indent += 2;
       variable_gen.generate();
-      if (config.debug) indent -= 2;
       const variable_decl = variable_gen.irnode! as decl.IRVariableDeclaration;
       if (Math.random() < 0.5) {
         const literal_gen = new LiteralGenerator(type.elementary_types, new Set<number>(), new Set<number>());
@@ -563,6 +660,10 @@ export class ContractDeclarationGenerator extends DeclarationGenerator {
       state_variables.add(variable_decl.id);
       // For each state variable, generate a external view function with the same identifier name as the state variable.
       const fid = global_id++;
+      if (config.debug) {
+        console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating getter function for state variable ${variable_decl.name}, ID: ${fid}`));
+        indent += 2;
+      }
       decl_db.funcdecls.add(fid);
       decl_db.insert(fid, erwin_visibility.INCONTRACT_EXTERNAL, cur_scope.id());
       funcstat_dag.insert(funcstat_dag.newNode(fid));
@@ -582,13 +683,20 @@ export class ContractDeclarationGenerator extends DeclarationGenerator {
       decl_db.add_ghosts_for_state_variable(fid, ghost_state_vardecl.id, variable_decl.id);
       new decl.IRFunctionDefinition(fid, cur_scope.id(), variable_decl.name, FunctionKind.Function,
         false, false, [], [ghost_state_vardecl], [], [], FunctionVisibility.External, FunctionStateMutability.View);
+      if (config.debug) {
+        indent -= 2;
+        console.log(color.redBG(`${" ".repeat(indent)}>>  Finish generating getter function for state variable ${variable_decl.name}, ID: ${fid}`));
+      }
     }
-    //TODO: Generate constructor
     //TODO: Generate struct declaration
     //TODO: Generate events, errors, and mappings
     //! Generate ghost ID for the contract
     decl_db.insert_contract_ghost(cur_scope.id());
-    //! Generate functions in contract
+    //! Generator constructor declaration
+    const constructor_gen = new ConstructorDeclarationGenerator(false);
+    constructor_gen.generate();
+    body.push(constructor_gen.irnode!);
+    //! Generate function declarations in contract
     const function_count_per_contract_upper_limit = randomInt(config.function_count_per_contract_lower_limit,
       config.function_count_per_contract_upper_limit);
     //* To allow circular function calls, Erwin first generates function declarations and then generates function bodies.
@@ -596,12 +704,12 @@ export class ContractDeclarationGenerator extends DeclarationGenerator {
     for (let i = 0; i < function_count_per_contract_upper_limit; i++) {
       // Disallow generating function bodies for the first function declaration
       function_gens[i] = new FunctionDeclarationGenerator(false);
-      if (config.debug) indent += 2;
       function_gens[i].generate();
-      if (config.debug) indent -= 2;
       body.push(function_gens[i].irnode!);
     }
-    // Generate function bodies
+    //! Generate constructor body
+    constructor_gen.generate_body();
+    //! Generate function bodies
     for (let i = 0; i < function_count_per_contract_upper_limit; i++) {
       function_gens[i].generate_function_body();
     }
@@ -610,8 +718,8 @@ export class ContractDeclarationGenerator extends DeclarationGenerator {
       ContractKind.Contract, false, false, body, [], [], []);
     decl_db.contractdecls.add(this.irnode.id);
     if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Finish generating contract`));
       indent -= 2;
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Finish generating contract ${thisid}`));
     }
   }
 }
@@ -697,6 +805,7 @@ export class IdentifierGenerator extends LRValueGenerator {
   generate(cur_expression_complex_level : number) : void {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Identifier, type range is ${this.type_range.map(t => t.str())}`));
+      indent += 2;
     }
     let irdecl : decl.IRVariableDeclaration;
     let contract_instance_id = 0;
@@ -710,10 +819,8 @@ export class IdentifierGenerator extends LRValueGenerator {
       const literal_gen = new LiteralGenerator(this.type_range,
         new Set<number>(this.forbidden_vardecls),
         new Set<number>(this.dominated_vardecls_by_dominator),);
-      if (config.debug) indent += 2;
       variable_decl_gen.generate();
       literal_gen.generate(0);
-      if (config.debug) indent -= 2;
       let expression_gen_extracted = expr.tupleExtraction(literal_gen.irnode! as expr.IRExpression);
       type_dag.connect(expression_gen_extracted.id, variable_decl_gen.irnode!.id, "super_dominance");
       typeRangeAlignment(expression_gen_extracted.id, variable_decl_gen.irnode!.id);
@@ -742,8 +849,10 @@ export class IdentifierGenerator extends LRValueGenerator {
     typeRangeAlignment(this.irnode.id, irdecl.id);
     expr2used_vardecls.set(this.irnode.id, new Set<number>([irdecl.id]));
     expr2dominated_vardecls.set(this.irnode.id, new Set<number>([irdecl.id]));
-    if (config.debug)
+    if (config.debug) {
+      indent -= 2;
       console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode.id}: Identifier --> ${irdecl.id}, scope: ${cur_scope.id()}, type: ${type_dag.solution_range.get(this.irnode.id)!.map(t => t.str())}`));
+    }
     if (Math.random() < config.tuple_prob) {
       this.irnode = new expr.IRTuple(global_id++, cur_scope.id(), [this.irnode as expr.IRExpression]);
     }
@@ -781,6 +890,7 @@ export class AssignmentGenerator extends RValueGenerator {
   generate(cur_expression_complex_level : number) : void {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Assignment ${this.op}, type range is ${this.type_range.map(t => t.str())}`));
+      indent += 2;
     }
     const thisid = global_id++;
     //! Update type range of this node
@@ -798,9 +908,7 @@ export class AssignmentGenerator extends RValueGenerator {
     const identifier_gen = new IdentifierGenerator(type_range,
       new Set<number>(this.forbidden_vardecls),
       new Set<number>(this.dominated_vardecls_by_dominator));
-    if (config.debug) indent += 2;
     identifier_gen.generate(cur_expression_complex_level + 1);
-    if (config.debug) indent -= 2;
     let left_expression : expr.IRExpression = identifier_gen.irnode as expr.IRExpression;
     let left_extracted_expression = expr.tupleExtraction(left_expression);
     //! Update expr2used_vardecls, expr2dominated_vardecls
@@ -835,9 +943,7 @@ export class AssignmentGenerator extends RValueGenerator {
         type_range, forbidden_vardecls_for_right,
         dominated_vardecls_by_dominator_for_right);
     }
-    if (config.debug) indent += 2;
     right_expression_gen.generate(cur_expression_complex_level + 1);
-    if (config.debug) indent -= 2;
     let right_expression : expr.IRExpression = right_expression_gen.irnode as expr.IRExpression;
     let right_extracted_expression = expr.tupleExtraction(right_expression);
     assert(type_dag.solution_range.has(right_extracted_expression.id), `solution_range does not contain ${right_extracted_expression.id}`);
@@ -871,8 +977,10 @@ export class AssignmentGenerator extends RValueGenerator {
     type_dag.insert(type_dag.newNode(thisid));
     type_dag.connect(thisid, left_extracted_expression.id);
     typeRangeAlignment(thisid, left_extracted_expression.id);
-    if (config.debug)
+    if (config.debug) {
+      indent -= 2;
       console.log(color.yellowBG(`${" ".repeat(indent)}${thisid}: Assignment ${this.op}, scope: ${cur_scope.id()}, type: ${type_dag.solution_range.get(thisid)!.map(t => t.str())}`));
+    }
     //! Wrap the irnode with a tuple
     if (cur_expression_complex_level !== 0) {
       this.irnode = new expr.IRTuple(global_id++, cur_scope.id(), [this.irnode as expr.IRExpression]);
@@ -918,6 +1026,7 @@ export class BinaryOpGenerator extends RValueGenerator {
   generate(cur_expression_complex_level : number) : void {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating BinaryOp ${this.op}, type range is ${this.type_range.map(t => t.str())}`));
+      indent += 2;
     }
     const thisid = global_id++;
     //! Update type range of this node
@@ -942,17 +1051,33 @@ export class BinaryOpGenerator extends RValueGenerator {
     let right_expression : expr.IRExpression;
     let left_expression_gen_prototype, right_expression_gen_prototype;
     let left_expression_gen, right_expression_gen;
-    /*
-    Avoid the situation that both left_expression and right_expression are literals.
+    /* RULES
+    1. Avoid the situation that both left_expression and right_expression are literals.
     In this case, we cannot control the value of the result.
     For instance, (ZOwza %= (19421) * 50595) where ZOwza is uint16.
     Then (19421) * 50595 overflows the uint16 range, leading to an invalid code.
+    2. According to the following rule in https://docs.soliditylang.org/en/latest/types.html#rational-and-integer-literals,
+    "Shifts and exponentiation with literal numbers as left (or base) operand and integer types as the right (exponent)
+    operand are always performed in the uint256 (for non-negative literals) or int256 (for a negative literals) type,
+    regardless of the type of the right (exponent) operand.",
+    if the op is a shift op and the left expression is a literal, then the type of binary expression should be uint256/int256
+    since we don't allow there exist two literals in a binary expression according to rule 1.
     */
     if (cur_expression_complex_level >= config.expression_complex_level || Math.random() < config.terminal_prob) {
-      left_expression_gen_prototype = pickRandomElement(terminal_expression_generators)!;
+      if (this.op === "<<" || this.op === ">>") {
+        left_expression_gen_prototype = IdentifierGenerator;
+      }
+      else {
+        left_expression_gen_prototype = pickRandomElement(terminal_expression_generators)!;
+      }
     }
     else {
-      left_expression_gen_prototype = pickRandomElement(all_expression_generators)!;
+      if (this.op === "<<" || this.op === ">>") {
+        left_expression_gen_prototype = pickRandomElement(nonliteral_expression_generators)!;
+      }
+      else {
+        left_expression_gen_prototype = pickRandomElement(all_expression_generators)!;
+      }
     }
     if (["*", "+", "-", "<<", "|", "^"].includes(this.op) && left_expression_gen_prototype.name === "LiteralGenerator") {
       if (cur_expression_complex_level >= config.expression_complex_level || Math.random() < config.terminal_prob) {
@@ -977,9 +1102,7 @@ export class BinaryOpGenerator extends RValueGenerator {
     left_expression_gen = new left_expression_gen_prototype(type_range,
       new Set<number>(this.forbidden_vardecls),
       dominated_vardecls_by_dominator_for_left);
-    if (config.debug) indent += 2;
     left_expression_gen.generate(cur_expression_complex_level + 1);
-    if (config.debug) indent -= 2;
     left_expression = left_expression_gen.irnode as expr.IRExpression;
     let left_extracted_expression = expr.tupleExtraction(left_expression);
     //! Update expr2used_vardecls, expr2dominated_vardecls
@@ -1004,11 +1127,7 @@ export class BinaryOpGenerator extends RValueGenerator {
         dominated_vardecls_by_dominator_for_right
       );
     }
-    if (config.debug) indent += 2;
-
     right_expression_gen.generate(cur_expression_complex_level + 1);
-
-    if (config.debug) indent -= 2;
     right_expression = right_expression_gen.irnode as expr.IRExpression;
     let right_extracted_expression = expr.tupleExtraction(right_expression);
     //! Update expr2used_vardecls, expr2dominated_vardecls, and vardecl2vardecls_of_the_same_type_range
@@ -1043,8 +1162,10 @@ export class BinaryOpGenerator extends RValueGenerator {
       type_dag.connect(thisid, left_extracted_expression.id);
       typeRangeAlignment(thisid, left_extracted_expression.id);
     }
-    if (config.debug)
+    if (config.debug) {
+      indent -= 2;
       console.log(color.yellowBG(`${" ".repeat(indent)}${thisid}: BinaryOp ${this.op}, scope: ${cur_scope.id()}, type: ${type_dag.solution_range.get(thisid)!.map(t => t.str())}`));
+    }
     if (Math.random() < config.tuple_prob) {
       this.irnode = new expr.IRTuple(global_id++, cur_scope.id(), [this.irnode as expr.IRExpression]);
     }
@@ -1075,6 +1196,7 @@ export class BinaryCompareOpGenerator extends RValueGenerator {
   generate(cur_expression_complex_level : number) : void {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating BinaryCompareOpGenerator ${this.op}, type range is ${this.type_range.map(t => t.str())}`));
+      indent += 2;
     }
     const thisid = global_id++;
     //! Update type range of this node
@@ -1106,9 +1228,7 @@ export class BinaryCompareOpGenerator extends RValueGenerator {
     left_expression_gen = new left_expression_gen_prototype(type_range,
       new Set<number>(this.forbidden_vardecls),
       dominated_vardecls_by_dominator_for_left);
-    if (config.debug) indent += 2;
     left_expression_gen.generate(cur_expression_complex_level + 1);
-    if (config.debug) indent -= 2;
     left_expression = left_expression_gen.irnode as expr.IRExpression;
     let left_extracted_expression = expr.tupleExtraction(left_expression);
     //! Update expr2used_vardecls, expr2dominated_vardecls
@@ -1124,9 +1244,7 @@ export class BinaryCompareOpGenerator extends RValueGenerator {
       forbidden_vardecls_for_right,
       dominated_vardecls_by_dominator_for_right
     );
-    if (config.debug) indent += 2;
     right_expression_gen.generate(cur_expression_complex_level + 1);
-    if (config.debug) indent -= 2;
     right_expression = right_expression_gen.irnode as expr.IRExpression;
     let right_extracted_expression = expr.tupleExtraction(right_expression);
     //! Update expr2used_vardecls, expr2dominated_vardecls, and vardecl2vardecls_of_the_same_type_range
@@ -1157,8 +1275,10 @@ export class BinaryCompareOpGenerator extends RValueGenerator {
       type_dag.connect(thisid, left_extracted_expression.id);
       typeRangeAlignment(thisid, left_extracted_expression.id);
     }
-    if (config.debug)
+    if (config.debug) {
+      indent -= 2;
       console.log(color.yellowBG(`${" ".repeat(indent)}${thisid}: BinaryCompareOp ${this.op}, scope: ${cur_scope.id()}, type: ${type_dag.solution_range.get(thisid)!.map(t => t.str())}`));
+    }
     if (Math.random() < config.tuple_prob) {
       this.irnode = new expr.IRTuple(global_id++, cur_scope.id(), [this.irnode as expr.IRExpression]);
     }
@@ -1194,6 +1314,7 @@ export class UnaryOpGenerator extends RValueGenerator {
   generate(cur_expression_complex_level : number) : void {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating UnaryOp ${this.op}, type range is ${this.type_range.map(t => t.str())}`));
+      indent += 2;
     }
     let type_range;
     const thisid = global_id++;
@@ -1219,9 +1340,7 @@ export class UnaryOpGenerator extends RValueGenerator {
     const identifier_gen = new IdentifierGenerator(type_range,
       new Set<number>(this.forbidden_vardecls),
       new Set<number>(this.dominated_vardecls_by_dominator));
-    if (config.debug) indent += 2;
     identifier_gen.generate(cur_expression_complex_level + 1);
-    if (config.debug) indent -= 2;
     let expression : expr.IRExpression = identifier_gen.irnode! as expr.IRExpression;
     //! Generate irnode
     this.irnode = new expr.IRUnaryOp(thisid, cur_scope.id(), pickRandomElement([true, false])!, expression, this.op)!;
@@ -1234,8 +1353,10 @@ export class UnaryOpGenerator extends RValueGenerator {
     type_dag.solution_range.set(thisid, this.type_range);
     type_dag.connect(thisid, extracted_expression.id);
     typeRangeAlignment(thisid, extracted_expression.id);
-    if (config.debug)
+    if (config.debug) {
+      indent -= 2;
       console.log(color.yellowBG(`${" ".repeat(indent)}${thisid}: UnaryOp ${this.op}, scope: ${cur_scope.id()}, type: ${type_dag.solution_range.get(thisid)!.map(t => t.str())}`));
+    }
     if (Math.random() < config.tuple_prob) {
       this.irnode = new expr.IRTuple(global_id++, cur_scope.id(), [this.irnode as expr.IRExpression]);
     }
@@ -1249,6 +1370,7 @@ export class ConditionalGenerator extends RValueGenerator {
   generate(cur_expression_complex_level : number) : void {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Conditional, type range is ${this.type_range.map(t => t.str())}`));
+      indent += 2;
     }
     const thisid = global_id++;
     //! Suppose the conditional expression is e1 ? e2 : e3
@@ -1264,9 +1386,7 @@ export class ConditionalGenerator extends RValueGenerator {
     const e1_gen = new e1_gen_prototype(type.bool_types,
       new Set<number>(this.forbidden_vardecls),
       new Set<number>());
-    if (config.debug) indent += 2;
     e1_gen.generate(cur_expression_complex_level + 1);
-    if (config.debug) indent -= 2;
     let extracted_e1 = expr.tupleExtraction(e1_gen.irnode! as expr.IRExpression);
     expr2used_vardecls.set(thisid, expr2used_vardecls.get(extracted_e1.id)!);
     //! Then get a generator for e2.
@@ -1285,9 +1405,7 @@ export class ConditionalGenerator extends RValueGenerator {
     const e2_gen = new e2_gen_prototype(this.type_range,
       forbidden_vardecl_for_e2,
       new Set<number>(this.dominated_vardecls_by_dominator));
-    if (config.debug) indent += 2;
     e2_gen.generate(cur_expression_complex_level + 1);
-    if (config.debug) indent -= 2;
     let extracted_e2 = expr.tupleExtraction(e2_gen.irnode! as expr.IRExpression);
     expr2used_vardecls.set(thisid, mergeSet(expr2used_vardecls.get(thisid)!, expr2used_vardecls.get(extracted_e2.id)!));
     expr2dominated_vardecls.set(thisid, expr2dominated_vardecls.get(extracted_e2.id)!);
@@ -1310,9 +1428,7 @@ export class ConditionalGenerator extends RValueGenerator {
       mergeSet(this.dominated_vardecls_by_dominator,
         expr2dominated_vardecls.get(extracted_e2.id)!)
     );
-    if (config.debug) indent += 2;
     e3_gen.generate(cur_expression_complex_level + 1);
-    if (config.debug) indent -= 2;
     this.irnode = new expr.IRConditional(
       thisid, cur_scope.id(), e1_gen.irnode! as expr.IRExpression,
       e2_gen.irnode! as expr.IRExpression,
@@ -1342,8 +1458,10 @@ export class ConditionalGenerator extends RValueGenerator {
     type_dag.insert(type_dag.newNode(thisid));
     type_dag.connect(thisid, extracted_e2.id);
     typeRangeAlignment(thisid, extracted_e2.id);
-    if (config.debug)
+    if (config.debug) {
+      indent -= 2;
       console.log(color.yellowBG(`${" ".repeat(indent)}${thisid}: Conditional, scope: ${cur_scope.id()}, type: ${type_dag.solution_range.get(thisid)!.map(t => t.str())}`));
+    }
     if (Math.random() < config.tuple_prob) {
       this.irnode = new expr.IRTuple(global_id++, cur_scope.id(), [this.irnode as expr.IRExpression]);
     }
@@ -1363,6 +1481,12 @@ export class FunctionCallGenerator extends RValueGenerator {
   contains_available_funcdecls(contract_instance_id_plus_funcdecl_id : [number, number][]) : boolean {
     if (contract_instance_id_plus_funcdecl_id.length === 0) return false;
     for (const [contract_instance_id, funcdecl_id] of contract_instance_id_plus_funcdecl_id) {
+      if (decl_db.ghost_funcdecls.has(funcdecl_id)) {
+        if (contract_instance_id !== joke_id) {
+          return true;
+        }
+        continue;
+      }
       const visibility_range = func_visibility_dag.solution_range.get(funcdecl_id)!;
       if (contract_instance_id === joke_id &&
         (
@@ -1462,6 +1586,7 @@ export class FunctionCallGenerator extends RValueGenerator {
     //! Otherwise, first select a function declaration
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating FunctionCall, type range is ${this.type_range.map(t => t.str())}`));
+      indent += 2;
     }
     const thisid = global_id++;
     type_dag.solution_range.set(thisid, this.type_range);
@@ -1522,8 +1647,8 @@ export class FunctionCallGenerator extends RValueGenerator {
     }
     //! Then generate expressions as arguments
     if (config.debug) {
-      indent += 2;
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating FunctionCall Arguments`));
+      indent += 2;
     }
     const args_ids : number[] = [];
     for (let i = 0; i < funcdecl.parameters.length; i++) {
@@ -1541,13 +1666,15 @@ export class FunctionCallGenerator extends RValueGenerator {
       const arg_gen = new arg_gen_prototype(type_range,
         mergeSet(new Set<number>(this.forbidden_vardecls), new Set<number>([funcdecl.parameters[i].id])),
         new Set<number>(this.dominated_vardecls_by_dominator));
-      if (config.debug) indent += 2;
       arg_gen.generate(cur_expression_complex_level + 1);
-      if (config.debug) indent -= 2;
       let extracted_arg = expr.tupleExtraction(arg_gen.irnode! as expr.IRExpression);
       args_ids.push(extracted_arg.id);
       type_dag.connect(extracted_arg.id, funcdecl.parameters[i].id);
       typeRangeAlignment(extracted_arg.id, funcdecl.parameters[i].id);
+      expr2used_vardecls.set(thisid, new Set<number>());
+      for (const arg_id of args_ids) {
+        expr2used_vardecls.set(thisid, mergeSet(expr2used_vardecls.get(thisid)!, expr2used_vardecls.get(arg_id)!));
+      }
       const dominated_vardecls = expr2dominated_vardecls.get(extracted_arg.id)!;
       for (const dominated_vardecl of dominated_vardecls) {
         vardecl2vardecls_of_the_same_type_range.set(dominated_vardecl,
@@ -1557,8 +1684,8 @@ export class FunctionCallGenerator extends RValueGenerator {
       vardecl2vardecls_of_the_same_type_range.set(funcdecl.parameters[i].id, dominated_vardecls);
     }
     if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}<<  Finish generating FunctionCall Arguments`));
       indent -= 2;
+      console.log(color.redBG(`${" ".repeat(indent)}<<  Finish generating FunctionCall Arguments`));
     }
     //! Generate an function call and select which returned value will be used
     let func_call_node;
@@ -1587,12 +1714,10 @@ export class FunctionCallGenerator extends RValueGenerator {
       const identifier_gen = new IdentifierGenerator(type_range_for_identifier,
         new Set<number>(this.forbidden_vardecls),
         new Set<number>(this.dominated_vardecls_by_dominator));
-      if (config.debug) indent += 2;
       identifier_gen.generate(cur_expression_complex_level + 1);
-      if (config.debug) indent -= 2;
       const identifier_expr = expr.tupleExtraction(identifier_gen.irnode! as expr.IRExpression);
       //* 3. Update expr2used_vardecls, expr2dominated_vardecls, and vardecl2vardecls_of_the_same_type_range
-      expr2used_vardecls.set(thisid, mergeSet(this.forbidden_vardecls, expr2used_vardecls.get(identifier_expr.id)!));
+      // expr2used_vardecls.set(thisid, mergeSet(this.forbidden_vardecls, expr2used_vardecls.get(identifier_expr.id)!));
       const dominated_vardecls_of_identifier = expr2dominated_vardecls.get(identifier_expr.id)!;
       for (const dominated_vardecl of dominated_vardecls_of_identifier) {
         vardecl2vardecls_of_the_same_type_range.set(dominated_vardecl,
@@ -1637,22 +1762,19 @@ export class FunctionCallGenerator extends RValueGenerator {
       this.irnode = new expr.IRTuple(global_id++, cur_scope.id(), [this.irnode as expr.IRExpression]);
     }
     forbidden_funcs.delete(funcdecl_id);
-    if (config.debug)
+    if (config.debug) {
+      indent -= 2;
       console.log(color.yellowBG(`${" ".repeat(indent)}${thisid}: FunctionCall, id: ${thisid} scope: ${cur_scope.id()}, type: ${type_dag.solution_range.get(thisid)!.map(t => t.str())}`));
+    }
   }
 }
 
 // export class NewContractDecarationGenerator extends ExpressionGenerator {
-//   name : string | undefined;
-//   constructor(name ?: string) {
-//     super();
-//     this.name = name;
+//   constructor(type_range : type.Type[], forbidden_vardecls : Set<number>, dominated_vardecls_by_dominator : Set<number>) {
+//     super(type_range, forbidden_vardecls, dominated_vardecls_by_dominator);
 //   }
 
 //   generate() : void {
-//     if (this.name === undefined) {
-//       this.name = generateVarName();
-//     }
 //     assert (decl_db.contractdecls.size > 0, "No contract is declared");
 //     const contract_id = pickRandomElement([...decl_db.contractdecls])!;
 //     const contract_name = (irnodes.get(contract_id)! as decl.IRContractDefinition).name;
@@ -1753,6 +1875,7 @@ export class SingleElementaryTypeVariableDeclareStatementGenerator extends State
     if (this.type_range === undefined) this.type_range = type.elementary_types;
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating SingleVariableDeclareStatement, type range is ${this.type_range!.map(t => t.str())}`));
+      indent += 2;
     }
     let expression_gen_prototype;
     let expression_gen = null;
@@ -1778,13 +1901,9 @@ export class SingleElementaryTypeVariableDeclareStatementGenerator extends State
     else {
       expression_gen = new LiteralGenerator(this.type_range, new Set<number>(), new Set<number>());
     }
-    if (config.debug) indent += 2;
     expression_gen.generate(0);
-    if (config.debug) indent -= 2;
     const variable_gen = new ElementaryTypeVariableDeclarationGenerator(this.type_range);
-    if (config.debug) indent += 2;
     variable_gen.generate();
-    if (config.debug) indent -= 2;
     //! Update vardecl2vardecls_of_the_same_type_range
     const extracted_expression = expr.tupleExtraction(expression_gen.irnode! as expr.IRExpression);
     const dominated_vardecls = expr2dominated_vardecls.get(extracted_expression.id)!;
@@ -1800,6 +1919,10 @@ export class SingleElementaryTypeVariableDeclareStatementGenerator extends State
     let expression_gen_extracted = expr.tupleExtraction(expression_gen.irnode! as expr.IRExpression);
     type_dag.connect(expression_gen_extracted.id, variable_gen.irnode!.id, "super_dominance");
     typeRangeAlignment(expression_gen_extracted.id, variable_gen.irnode!.id);
+    if (config.debug) {
+      indent -= 2;
+      console.log(color.yellowBG(`${" ".repeat(indent)}${variable_gen.irnode!.id}: SingleVariableDeclareStatement`));
+    }
   }
 }
 
@@ -1814,13 +1937,16 @@ export class AssignmentStatementGenerator extends ExpressionStatementGenerator {
   generate(cur_stmt_complex_level : number) : void {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating AssignmentStatement`));
+      indent += 2;
     }
     const assignment_gen = new AssignmentGenerator(type.elementary_types, new Set<number>(), new Set<number>());
-    if (config.debug) indent += 2;
     assignment_gen.generate(0);
-    if (config.debug) indent -= 2;
     this.expr = expr.tupleExtraction(assignment_gen.irnode! as expr.IRExpression);
     this.irnode = new stmt.IRExpressionStatement(global_id++, cur_scope.id(), assignment_gen.irnode! as expr.IRExpression);
+    if (config.debug) {
+      indent -= 2;
+      console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode.id}: AssignmentStatement`));
+    }
   }
 }
 
@@ -1829,13 +1955,16 @@ export class BinaryOpStatementGenerator extends ExpressionStatementGenerator {
   generate(cur_stmt_complex_level : number) : void {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating BinaryOpStatement`));
+      indent += 2;
     }
     const binaryop_gen = new BinaryOpGenerator(type.elementary_types, new Set<number>(), new Set<number>());
-    if (config.debug) indent += 2;
     binaryop_gen.generate(0);
-    if (config.debug) indent -= 2;
     this.expr = expr.tupleExtraction(binaryop_gen.irnode! as expr.IRExpression);
     this.irnode = new stmt.IRExpressionStatement(global_id++, cur_scope.id(), binaryop_gen.irnode! as expr.IRExpression);
+    if (config.debug) {
+      indent -= 2;
+      console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode.id}: BinaryOpStatement`));
+    }
   }
 }
 
@@ -1844,13 +1973,16 @@ export class UnaryOpStatementGenerator extends ExpressionStatementGenerator {
   generate(cur_stmt_complex_level : number) : void {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating UnaryOpStatement`));
+      indent += 2;
     }
     const unaryop_gen = new UnaryOpGenerator(type.elementary_types, new Set<number>(), new Set<number>());
-    if (config.debug) indent += 2;
     unaryop_gen.generate(0);
-    if (config.debug) indent -= 2;
     this.expr = expr.tupleExtraction(unaryop_gen.irnode! as expr.IRExpression);
     this.irnode = new stmt.IRExpressionStatement(global_id++, cur_scope.id(), unaryop_gen.irnode! as expr.IRExpression);
+    if (config.debug) {
+      indent -= 2;
+      console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode.id}: UnaryOpStatement`));
+    }
   }
 }
 
@@ -1859,13 +1991,16 @@ export class ConditionalStatementGenerator extends ExpressionStatementGenerator 
   generate(cur_stmt_complex_level : number) : void {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating ConditionalStatement`));
+      indent += 2;
     }
     const conditional_gen = new ConditionalGenerator(type.elementary_types, new Set<number>(), new Set<number>());
-    if (config.debug) indent += 2;
     conditional_gen.generate(0);
-    if (config.debug) indent -= 2;
     this.expr = expr.tupleExtraction(conditional_gen.irnode! as expr.IRExpression);
     this.irnode = new stmt.IRExpressionStatement(global_id++, cur_scope.id(), conditional_gen.irnode! as expr.IRExpression);
+    if (config.debug) {
+      indent -= 2;
+      console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode.id}: ConditionalStatement`));
+    }
   }
 }
 
@@ -1876,15 +2011,18 @@ export class FunctionCallStatementGenerator extends ExpressionStatementGenerator
   generate(cur_stmt_complex_level : number) : void {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating FunctionCallStatement`));
+      indent += 2;
     }
     allow_empty_return = true;
     const funcall_gen = new FunctionCallGenerator(type.elementary_types, new Set<number>(), new Set<number>(), FunctionCallKind.FunctionCall);
-    if (config.debug) indent += 2;
     funcall_gen.generate(0);
-    if (config.debug) indent -= 2;
     this.expr = expr.tupleExtraction(funcall_gen.irnode! as expr.IRExpression);
     this.irnode = new stmt.IRExpressionStatement(global_id++, cur_scope.id(), funcall_gen.irnode! as expr.IRExpression);
     allow_empty_return = false;
+    if (config.debug) {
+      indent -= 2;
+      console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode.id}: FunctionCallStatement`));
+    }
   }
 }
 
@@ -1909,6 +2047,7 @@ export class MultipleVariableDeclareStatementGenerator extends NonExpressionStat
   generate(cur_stmt_complex_level : number) : void {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Assignment MultipleVariableDeclareStatement`));
+      indent += 2;
     }
     const ir_exps : expr.IRExpression[] = [];
     for (let i = 0; i < this.var_count; i++) {
@@ -1920,18 +2059,14 @@ export class MultipleVariableDeclareStatementGenerator extends NonExpressionStat
         expression_gen_prototype = LiteralGenerator;
       }
       const expression_gen = new expression_gen_prototype(type.elementary_types, new Set<number>(), new Set<number>());
-      if (config.debug) indent += 2;
       expression_gen.generate(0);
-      if (config.debug) indent -= 2;
       ir_exps.push(expression_gen.irnode! as expr.IRExpression);
       this.exprs = this.exprs.concat(expr.tupleExtraction(ir_exps[i]));
     }
     const ir_varnodes : decl.IRVariableDeclaration[] = [];
     for (let i = 0; i < this.var_count; i++) {
       const variable_gen = new ElementaryTypeVariableDeclarationGenerator(type.elementary_types);
-      if (config.debug) indent += 2;
       variable_gen.generate();
-      if (config.debug) indent -= 2;
       ir_varnodes.push(variable_gen.irnode! as decl.IRVariableDeclaration);
     }
     const ir_tuple_exp = new expr.IRTuple(global_id++, cur_scope.id(), ir_exps);
@@ -1940,6 +2075,10 @@ export class MultipleVariableDeclareStatementGenerator extends NonExpressionStat
       let extracted_ir = expr.tupleExtraction(ir_exps[i]);
       type_dag.connect(extracted_ir.id, ir_varnodes[i].id, "super_dominance");
       typeRangeAlignment(extracted_ir.id, ir_varnodes[i].id);
+    }
+    if (config.debug) {
+      indent -= 2;
+      console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode.id}: MultipleVariableDeclareStatement`));
     }
   }
 }
@@ -1953,17 +2092,20 @@ export class ReturnStatementGenerator extends NonExpressionStatementGenerator {
   generate(cur_stmt_complex_level : number) : void {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating ReturnStatement`));
+      indent += 2;
     }
     if (this.value === undefined) {
       const expression_gen_prototype = pickRandomElement(all_expression_generators)!;
       const expression_gen = new expression_gen_prototype(type.elementary_types, new Set<number>(), new Set<number>());
-      if (config.debug) indent += 2;
       expression_gen.generate(0);
-      if (config.debug) indent -= 2;
       this.value = expression_gen.irnode! as expr.IRExpression;
       this.exprs.push(expr.tupleExtraction(this.value));
     }
     this.irnode = new stmt.IRReturnStatement(global_id++, cur_scope.id(), this.value);
+    if (config.debug) {
+      indent -= 2;
+      console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode.id}: ReturnStatement`));
+    }
   }
 }
 
@@ -1975,13 +2117,12 @@ export class IfStatementGenerator extends NonExpressionStatementGenerator {
   generate(cur_stmt_complex_level : number) : void {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating IfStatement`));
+      indent += 2;
     }
     cur_scope = cur_scope.new(scopeKind.IF);
     //! Generate condition
     const condition_gen = new BinaryCompareOpGenerator(type.bool_types, new Set<number>(), new Set<number>());
-    if (config.debug) indent += 2;
     condition_gen.generate(0);
-    if (config.debug) indent -= 2;
     this.exprs.push(expr.tupleExtraction(condition_gen.irnode as expr.IRExpression));
     //! Generate true body
     const true_body : stmt.IRStatement[] = [];
@@ -1991,9 +2132,7 @@ export class IfStatementGenerator extends NonExpressionStatementGenerator {
         pickRandomElement(expr_statement_generators)! :
         pickRandomElement(statement_generators)!;
       const then_stmt_gen = new then_stmt_gen_prototype();
-      if (config.debug) indent += 2;
       then_stmt_gen.generate(cur_stmt_complex_level + 1);
-      if (config.debug) indent -= 2;
       true_body.push(then_stmt_gen.irnode!);
       this.exprs = this.exprs.concat(
         then_stmt_gen instanceof ExpressionStatementGenerator ?
@@ -2013,9 +2152,7 @@ export class IfStatementGenerator extends NonExpressionStatementGenerator {
         pickRandomElement(expr_statement_generators)! :
         pickRandomElement(statement_generators)!;
       const else_stmt_gen = new else_stmt_gen_prototype();
-      if (config.debug) indent += 2;
       else_stmt_gen.generate(cur_stmt_complex_level + 1);
-      if (config.debug) indent -= 2;
       false_body.push(else_stmt_gen.irnode!);
       this.exprs = this.exprs.concat(
         else_stmt_gen instanceof ExpressionStatementGenerator ?
@@ -2025,6 +2162,10 @@ export class IfStatementGenerator extends NonExpressionStatementGenerator {
     }
     cur_scope = cur_scope.rollback();
     this.irnode = new stmt.IRIf(global_id++, cur_scope.id(), condition_gen.irnode! as expr.IRExpression, true_body, false_body);
+    if (config.debug) {
+      indent -= 2;
+      console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode.id}: IfStatement`));
+    }
   }
 }
 
@@ -2036,6 +2177,7 @@ export class ForStatementGenerator extends NonExpressionStatementGenerator {
   generate(cur_stmt_complex_level : number) {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating ForStatement`));
+      indent += 2;
     }
     cur_scope = cur_scope.new(scopeKind.FOR);
     //! Generate the initialization statement
@@ -2043,9 +2185,7 @@ export class ForStatementGenerator extends NonExpressionStatementGenerator {
     const init_cnt = randomInt(config.for_init_cnt_lower_limit, config.for_init_cnt_upper_limit);
     if (Math.random() < config.vardecl_prob) {
       const mul_vardecl_gen = new MultipleVariableDeclareStatementGenerator(init_cnt);
-      if (config.debug) indent += 2;
       mul_vardecl_gen.generate(0);
-      if (config.debug) indent -= 2;
       init_stmt_expr = mul_vardecl_gen.irnode! as stmt.IRVariableDeclareStatement;
       this.exprs = this.exprs.concat(mul_vardecl_gen.exprs);
     }
@@ -2054,9 +2194,7 @@ export class ForStatementGenerator extends NonExpressionStatementGenerator {
       for (let i = 0; i < init_cnt; i++) {
         const init_expr_gen_prototype = pickRandomElement(all_expression_generators)!;
         const init_expr_gen = new init_expr_gen_prototype(type.elementary_types, new Set<number>(), new Set<number>());
-        if (config.debug) indent += 2;
         init_expr_gen.generate(0);
-        if (config.debug) indent -= 2;
         ir_exps.push(init_expr_gen.irnode! as expr.IRExpression);
       }
       if (init_cnt > 0) {
@@ -2070,16 +2208,12 @@ export class ForStatementGenerator extends NonExpressionStatementGenerator {
     }
     //! Generate the conditional expression
     const conditional_gen = new BinaryCompareOpGenerator(type.bool_types, new Set<number>(), new Set<number>());
-    if (config.debug) indent += 2;
     conditional_gen.generate(0);
-    if (config.debug) indent -= 2;
     this.exprs = this.exprs.concat([expr.tupleExtraction(conditional_gen.irnode as expr.IRExpression)]);
     //! Generate the loop generation expression
     const loop_gen_prototype = pickRandomElement(all_expression_generators);
     const loop_gen = new loop_gen_prototype!(type.elementary_types, new Set<number>(), new Set<number>());
-    if (config.debug) indent += 2;
     loop_gen.generate(0);
-    if (config.debug) indent -= 2;
     this.exprs = this.exprs.concat([expr.tupleExtraction(loop_gen.irnode as expr.IRExpression)]);
     //! Generate the body statement
     const stmt_cnt = randomInt(config.for_body_stmt_cnt_lower_limit, config.for_body_stmt_cnt_upper_limit);
@@ -2089,9 +2223,7 @@ export class ForStatementGenerator extends NonExpressionStatementGenerator {
         pickRandomElement(expr_statement_generators)! :
         pickRandomElement(statement_generators)!;
       const body_stmt_gen = new body_stmt_gen_prototype();
-      if (config.debug) indent += 2;
       body_stmt_gen.generate(cur_stmt_complex_level + 1);
-      if (config.debug) indent -= 2;
       body.push(body_stmt_gen.irnode!);
       this.exprs = this.exprs.concat(
         body_stmt_gen instanceof ExpressionStatementGenerator ?
@@ -2103,6 +2235,10 @@ export class ForStatementGenerator extends NonExpressionStatementGenerator {
     cur_scope = cur_scope.rollback();
     this.irnode = new stmt.IRFor(global_id++, cur_scope.id(), init_stmt_expr, conditional_gen.irnode! as expr.IRExpression,
       loop_gen.irnode! as expr.IRExpression, body);
+    if (config.debug) {
+      indent -= 2;
+      console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode.id}: ForStatement`));
+    }
   }
 }
 
@@ -2112,13 +2248,15 @@ export class WhileStatementGenerator extends NonExpressionStatementGenerator {
   }
 
   generate(cur_stmt_complex_level : number) : void {
+    if (config.debug) {
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating WhileStatement`));
+      indent += 2;
+    }
     //! Generate condition expression
     const cond_gen_prototype = pickRandomElement(all_expression_generators)!;
     const cond_gen = new cond_gen_prototype(type.bool_types, new Set<number>(), new Set<number>());
     cur_scope = cur_scope.new(scopeKind.WHILE);
-    if (config.debug) indent += 2;
     cond_gen.generate(0);
-    if (config.debug) indent -= 2;
     this.exprs = this.exprs.concat([expr.tupleExtraction(cond_gen.irnode as expr.IRExpression)]);
     //! Generate body statement
     const stmt_cnt = randomInt(config.while_body_stmt_cnt_lower_limit, config.while_body_stmt_cnt_upper_limit);
@@ -2128,9 +2266,7 @@ export class WhileStatementGenerator extends NonExpressionStatementGenerator {
         pickRandomElement(expr_statement_generators)! :
         pickRandomElement(statement_generators)!;
       const body_stmt_gen = new body_stmt_gen_prototype();
-      if (config.debug) indent += 2;
       body_stmt_gen.generate(cur_stmt_complex_level + 1);
-      if (config.debug) indent -= 2;
       this.exprs = this.exprs.concat(
         body_stmt_gen instanceof ExpressionStatementGenerator ?
           [expr.tupleExtraction(body_stmt_gen.expr!)] :
@@ -2140,6 +2276,10 @@ export class WhileStatementGenerator extends NonExpressionStatementGenerator {
     }
     cur_scope = cur_scope.rollback();
     this.irnode = new stmt.IRWhile(global_id++, cur_scope.id(), cond_gen.irnode! as expr.IRExpression, body);
+    if (config.debug) {
+      indent -= 2;
+      console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode.id}: WhileStatement`));
+    }
   }
 }
 
@@ -2148,13 +2288,15 @@ export class DoWhileStatementGenerator extends NonExpressionStatementGenerator {
     super();
   }
   generate(cur_stmt_complex_level : number) : void {
+    if (config.debug) {
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating DoWhileStatement`));
+      indent += 2;
+    }
     //! Generate condition expression
     const cond_gen_prototype = pickRandomElement(all_expression_generators)!;
     const cond_gen = new cond_gen_prototype(type.bool_types, new Set<number>(), new Set<number>());
     cur_scope = cur_scope.new(scopeKind.DOWHILE_COND);
-    if (config.debug) indent += 2;
     cond_gen.generate(0);
-    if (config.debug) indent -= 2;
     cur_scope = cur_scope.rollback();
     this.exprs = this.exprs.concat([expr.tupleExtraction(cond_gen.irnode as expr.IRExpression)]);
     //! Generate body statement
@@ -2166,9 +2308,7 @@ export class DoWhileStatementGenerator extends NonExpressionStatementGenerator {
         pickRandomElement(expr_statement_generators)! :
         pickRandomElement(statement_generators)!;
       const body_stmt_gen = new body_stmt_gen_prototype();
-      if (config.debug) indent += 2;
       body_stmt_gen.generate(cur_stmt_complex_level + 1);
-      if (config.debug) indent -= 2;
       this.exprs = this.exprs.concat(
         body_stmt_gen instanceof ExpressionStatementGenerator ?
           [expr.tupleExtraction(body_stmt_gen.expr!)] :
@@ -2178,6 +2318,10 @@ export class DoWhileStatementGenerator extends NonExpressionStatementGenerator {
     }
     cur_scope = cur_scope.rollback();
     this.irnode = new stmt.IRDoWhile(global_id++, cur_scope.id(), cond_gen.irnode! as expr.IRExpression, body);
+    if (config.debug) {
+      indent -= 2;
+      console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode.id}: DoWhileStatement`));
+    }
   }
 }
 
