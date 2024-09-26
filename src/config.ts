@@ -17,8 +17,8 @@ export const config = {
   stream: false,
 
   // Function
-  function_body_stmt_cnt_upper_limit: 2,
-  function_body_stmt_cnt_lower_limit: 0,
+  function_body_stmt_cnt_upper_limit: 1,
+  function_body_stmt_cnt_lower_limit: 1,
   return_count_of_function_upperlimit: 2,
   return_count_of_function_lowerlimit: 0,
   param_count_of_function_upperlimit: 1,
@@ -26,9 +26,10 @@ export const config = {
   function_count_per_contract_upper_limit: 2,
   function_count_per_contract_lower_limit: 1,
 
+
   // Contract
   contract_count: 2,
-  state_variable_count_upperlimit: 2,
+  state_variable_count_upperlimit: 1,
   state_variable_count_lowerlimit: 1,
 
   // Complexity

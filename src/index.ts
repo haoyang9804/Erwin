@@ -1,14 +1,12 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import * as gen from "./generator"
-import * as db from "./db"
 import { irnodes } from "./node";
 import * as expr from "./expression";
 import * as decl from "./declare";
 import * as mut from "./mutators";
 import { config } from "./config";
 import * as fs from "fs";
-import { global_scope } from "./scope";
 import { assert, pickRandomElement } from "./utility";
 import { init_types } from './type';
 import {
@@ -217,7 +215,7 @@ async function mutate() {
   }
 }
 
-function generate_type_mode() {
+function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
   console.log(`${gen.type_dag.solutions_collection.length} type solutions`);
   let good = false;
   //! Traverse function state mutability solutions
@@ -263,10 +261,7 @@ function generate_type_mode() {
       if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
         (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
     }
-    let program = "";
-    for (let id of db.decl_db.get_irnodes_ids_recursively_from_a_scope(global_scope)!) {
-      program += writer.write(irnodes.get(id)!.lower());
-    }
+    const program = writer.write(source_unit_gen.irnode!.lower());
     if (!fs.existsSync("./generated_programs")) {
       fs.mkdirSync("./generated_programs");
     }
@@ -283,7 +278,7 @@ function generate_type_mode() {
   }
 }
 
-function generate_scope_mode() {
+function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
   console.log(`${gen.funcstat_dag.solutions_collection.length} function stat solutions`);
   console.log(`${gen.func_visibility_dag.solutions_collection.length} function visibility solutions`);
   console.log(`${gen.state_variable_visibility_dag.solutions_collection.length} state variable visibility solutions`);
@@ -323,10 +318,7 @@ function generate_scope_mode() {
           assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration, "The node must be a variable declaration.");
           (irnodes.get(key)! as decl.IRVariableDeclaration).visibility = value.kind;
         }
-        let program = "";
-        for (let id of db.decl_db.get_irnodes_ids_recursively_from_a_scope(global_scope)!) {
-          program += writer.write(irnodes.get(id)!.lower());
-        }
+        let program = writer.write(source_unit_gen.irnode!.lower());
         if (!fs.existsSync("./generated_programs")) {
           fs.mkdirSync("./generated_programs");
         }
@@ -347,9 +339,8 @@ function generate_scope_mode() {
 
 // Generation
 async function generate() {
-  const contract = new gen.ContractDeclarationGenerator();
-  contract.generate();
-
+  const source_unit = new gen.SourceUnitGenerator();
+  source_unit.generate();
   await (async () => {
     // resolve constraints
     if (config.debug) {
@@ -372,10 +363,10 @@ async function generate() {
       gen.funcstat_dag.verify();
     }
     if (config.mode === "type") {
-      generate_type_mode();
+      generate_type_mode(source_unit);
     }
     else {
-      generate_scope_mode();
+      generate_scope_mode(source_unit);
     }
   }
   catch (error) {
