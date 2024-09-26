@@ -46,7 +46,7 @@ v4.type = TypeProvider.uint256()
 const id4 = new IRIdentifier(10, 0).from(v4);
 const f_id = new IRIdentifier(11, 0, f_correct.name, f_correct.id);
 const functioncall = new IRFunctionCall(12, 0, FunctionCallKind.FunctionCall, f_id, [id4]);
-const contract = new IRContractDefinition(13, 0, "C", ContractKind.Contract, false, false, [variable_declare_stmt, f_correct, v4, functioncall], [], [], []);
+const contract = new IRContractDefinition(13, 0, "C", ContractKind.Contract, false, false, [variable_declare_stmt, f_correct, v4, functioncall], [], [], [], []);
 
 test("test contract",
 () => {

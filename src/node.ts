@@ -18,3 +18,14 @@ export abstract class IRNode {
   }
   abstract lower() : ASTNode;
 }
+
+export class IRSourceUnit extends IRNode {
+  public children : IRNode[];
+  constructor(id : number, scope : number, children : IRNode[]) {
+    super(id, scope);
+    this.children = children;
+  }
+  lower() {
+    return factory.makeSourceUnit("", -1, "", new Map<string, number>(), this.children.map(x => x.lower()));
+  }
+}

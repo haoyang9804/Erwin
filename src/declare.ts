@@ -267,7 +267,10 @@ export class IRContractDefinition extends IRDeclare {
   linearizedBaseContracts : number[];
   usedErrors : number[];
   usedEvent : number[];
-  constructor(id : number, scope : number, name : string, kind : ContractKind, abstract : boolean, fullyImplemented : boolean, body : IRNode[], linearizedBaseContracts : number[], usedErrors : number[], usedEvent : number[]) {
+  constructor_parameters : IRVariableDeclaration[];
+  constructor(id : number, scope : number, name : string, kind : ContractKind, abstract : boolean, fullyImplemented : boolean,
+    body : IRNode[], linearizedBaseContracts : number[], usedErrors : number[], usedEvent : number[],
+    constructor_parameters : IRVariableDeclaration[]) {
     super(id, scope, name);
     this.kind = kind;
     this.abstract = abstract;
@@ -276,6 +279,7 @@ export class IRContractDefinition extends IRDeclare {
     this.linearizedBaseContracts = linearizedBaseContracts;
     this.usedErrors = usedErrors;
     this.usedEvent = usedEvent;
+    this.constructor_parameters = constructor_parameters;
   }
   lower() {
     const lowerecd_body = this.body.map(function(stmt) {
