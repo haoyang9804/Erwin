@@ -1106,7 +1106,7 @@ export class BinaryCompareOpGenerator extends RValueGenerator {
 
   generate(cur_expression_complex_level : number) : void {
     if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating BinaryCompareOpGenerator ${this.op}, type range is ${this.type_range.map(t => t.str())}`));
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating BinaryCompareOp ${this.op}, type range is ${this.type_range.map(t => t.str())}`));
       indent += 2;
     }
     const thisid = global_id++;
@@ -1666,7 +1666,6 @@ const nonterminal_expression_generators_for_address_type = [
 ];
 
 const non_funccall_expression_generators = [
-  LiteralGenerator,
   IdentifierGenerator,
   AssignmentGenerator,
   BinaryOpGenerator,
@@ -1675,14 +1674,12 @@ const non_funccall_expression_generators = [
 ];
 
 const non_funccall_expression_generators_for_address_type = [
-  LiteralGenerator,
   IdentifierGenerator,
   AssignmentGenerator,
   ConditionalGenerator,
 ];
 
 const all_expression_generators = [
-  LiteralGenerator,
   IdentifierGenerator,
   AssignmentGenerator,
   BinaryOpGenerator,
