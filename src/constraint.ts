@@ -96,9 +96,32 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     if (rank === "sub_dominance") {
       this.sub_dominance.add(`${from} ${to}`);
     }
-    if (rank === "super_dominance") {
+    else if (rank === "super_dominance") {
       this.super_dominance.add(`${from} ${to}`);
     }
+    this.typeRangeAlignment(from, to);
+  }
+
+  typeRangeAlignment(dominator_id : number, dominatee_id : number) : void {
+    if (isEqualSet(this.solution_range.get(dominator_id)!, this.solution_range.get(dominatee_id)!)) return;
+    if (isSuperSet(this.solution_range.get(dominator_id)!, this.solution_range.get(dominatee_id)!)) {
+      this.solution_range.set(dominator_id, this.solution_range.get(dominatee_id)!);
+      this.tighten_solution_range_middle_out(dominator_id);
+      // if (config.debug) {
+      //   console.log(`${[...this.solution_range.keys()].map(k => `${k}: ${this.solution_range.get(k)!.map(t => t.str())}`).join("\n")}`)
+      // }
+      return;
+    }
+    if (isSuperSet(this.solution_range.get(dominatee_id)!, this.solution_range.get(dominator_id)!)) {
+      this.solution_range.set(dominatee_id, this.solution_range.get(dominator_id)!);
+      this.tighten_solution_range_middle_out(dominatee_id);
+      // if (config.debug) {
+      //   console.log(`${[...this.solution_range.keys()].map(k => `${k}: ${this.solution_range.get(k)!.map(t => t.str())}`).join("\n")}`)
+      // }
+      return;
+    }
+    throw new Error(`typeRangeAlignment: type_range of ${dominator_id}: ${this.solution_range.get(dominator_id)!.map(t => t.str())}
+      and ${dominatee_id}: ${this.solution_range.get(dominatee_id)!.map(t => t.str())} cannot be aligned`);
   }
 
   initialize_resolve() : void {
@@ -144,22 +167,27 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         if (this.node2tail.has(parent)) {
           // presub_dominance = false if there exists a path from the parent to tail with tail_id on which no sub_dominance domination holds.
           let presub_dominance = true;
-          const pre_tail_info : toTail[] = [];
+          let presuper_dominance = true;
+          let pre_tail_info : toTail | undefined = undefined;
           let meet_this_tail_before = false;
           for (const tail_info of this.node2tail.get(parent)!) {
             if (tail_info.tail_id === tail_id) {
               meet_this_tail_before = true;
               presub_dominance &&= tail_info.sub_dominance;
-              pre_tail_info.push(tail_info);
+              presuper_dominance &&= tail_info.super_dominance;
+              pre_tail_info = tail_info;
+              break;
             }
           }
           if (meet_this_tail_before) {
-            if (presub_dominance === true && thissub_dominance == false) {
-              for (const tail_info of pre_tail_info)
-                this.node2tail.get(parent)!.delete(tail_info);
-              this.node2tail.get(parent)!.add({ tail_id: tail_id, sub_dominance: false, super_dominance: thissuper_dominance });
-            }
             thissub_dominance &&= presub_dominance;
+            thissuper_dominance &&= presuper_dominance
+            if (presub_dominance === true && thissub_dominance == false
+              || presuper_dominance === true && thissuper_dominance == false
+            ) {
+              this.node2tail.get(parent)!.delete(pre_tail_info!);
+              this.node2tail.get(parent)!.add({ tail_id: tail_id, sub_dominance: thissub_dominance, super_dominance: thissuper_dominance });
+            }
           }
           else {
             this.node2tail.get(parent)!.add({ tail_id: tail_id, sub_dominance: thissub_dominance, super_dominance: thissuper_dominance });
@@ -245,7 +273,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         for (const tail of this.edge2tail.get(edge)!) {
           const tail_info = [...this.node2tail.get(node)!].find(t => t.tail_id === tail);
           if (config.debug)
-            assert(tail_info !== undefined, `remove_removable_sub_dominance: tail_info of tail whose ID is ${tail} is undefined`);
+            assert(tail_info !== undefined, `remove_removable_super_dominance: tail_info of tail whose ID is ${tail} is undefined`);
           if (!tail_info!.super_dominance && this.super_dominance.has(edge)) {
             this.super_dominance.delete(edge);
           }
@@ -290,6 +318,56 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       }
       this.restrict_solution_range(parent);
     }
+  }
+
+  try_tighten_solution_range_middle_out(node : number, new_range : Node[]) : boolean {
+    const solution_range = new Map(this.solution_range);
+    solution_range.set(node, new_range);
+    let upwards = (node : number) : boolean => {
+      if (this.dag_nodes.get(node)!.ins.length === 0) {
+        if (this.dag_nodes.get(node)!.outs.length !== 0)
+          return downwards(node);
+      }
+      let res = true;
+      for (let parent of this.dag_nodes.get(node)!.ins) {
+        if (isEqualSet(solution_range.get(parent)!, solution_range.get(node)!)) {
+          continue;
+        }
+        if (!isSuperSet(solution_range.get(parent)!, solution_range.get(node)!)
+          && !isSuperSet(solution_range.get(node)!, solution_range.get(parent)!)) {
+          return false
+        }
+        solution_range.set(parent, solution_range.get(node)!);
+        res &&= upwards(parent)
+        if (!res) return false;
+        res &&= downwards(parent);
+        if (!res) return false;
+      }
+      return res;
+    }
+    let downwards = (node : number) : boolean => {
+      if (this.dag_nodes.get(node)!.outs.length === 0) {
+        if (this.dag_nodes.get(node)!.ins.length !== 0)
+          return upwards(node);
+      }
+      let res = true;
+      for (let child of this.dag_nodes.get(node)!.outs) {
+        if (isEqualSet(solution_range.get(child)!, solution_range.get(node)!)) {
+          continue;
+        }
+        if (!isSuperSet(solution_range.get(child)!, solution_range.get(node)!)
+          && !isSuperSet(solution_range.get(node)!, solution_range.get(child)!)) {
+          return false;
+        }
+        solution_range.set(child, solution_range.get(node)!);
+        res &&= downwards(child);
+        if (!res) return false;
+        res &&= upwards(child);
+        if (!res) return false;
+      }
+      return res;
+    }
+    return downwards(node) && upwards(node);
   }
 
   tighten_solution_range_middle_out(node : number) {
