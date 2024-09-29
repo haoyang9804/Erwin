@@ -28,19 +28,6 @@ let allow_empty_return = false;
 // A signal to indicate whether there is an external function call in the current function body.
 let external_call = false;
 let cur_contract_id = 0;
-/*
-Image a awkward situation:
-In a function call generation, one of the arguments is a function call to the same function.
-Then the type range decision of one of the returned variable may encounter a conflict.
-For instance, the first function call decides the first retured variable to be an integer while
-the second function call decides the first returned variable to be a boolean.
-The second advances in this race since we should generate the argument before the function call.
-Now the first function call believe the first returned variable is an integer while the second function call
-has made it a boolean. So we need to forbid this recursive function calls to the same function definition.
-To support function call as an argument of another function call to the same function, we need to introduce
-mutators after resolving domination constraints.
-*/
-const forbidden_funcs : Set<number> = new Set<number>();
 let virtual_env = false;
 let override_env = false;
 let unexpected_extra_stmt : stmt.IRStatement[] = [];
@@ -115,32 +102,6 @@ function getAvailableIRVariableDeclareWithTypeConstraint(types : type.Type[]) : 
 function hasAvailableIRVariableDeclareWithTypeConstraint(types : type.Type[]) : boolean {
   return getAvailableIRVariableDeclareWithTypeConstraint(types).length > 0;
 }
-
-// function getAvailableIRVariableDeclareWithTypeConstraintWithForbiddenVardeclcs(type_range : type.Type[], forbidden_vardecls : Set<number>) :
-//   decl.IRVariableDeclaration[] {
-//   const collection : decl.IRVariableDeclaration[] = [];
-//   const available_irnode_ids = decl_db.get_irnodes_ids_recursively_from_a_scope(cur_scope.id());
-//   for (let id of available_irnode_ids) {
-//     if (decl_db.vardecls.has(id) && !(no_state_variable_in_function_body && state_variables.has(id))) {
-//       collection.push(irnodes.get(id)! as decl.IRVariableDeclaration);
-//     }
-//   }
-
-//   let keep = (irdecl_id: number) : boolean => {
-//     if (!forbidden_vardecls.has(irdecl_id)) return true;
-//     const type_range = type_dag.solution_range.get(irdecl_id)!;
-//     return isSuperSet(type_range, type_dag.solution_range.get(irdecl_id)!);
-//   }
-
-//   return collection.filter((irdecl) => keep(irdecl.id));
-// }
-
-// function hasAvailableIRVariableDeclareWithTypeConstraintWithForbiddenVardeclcs(types : type.Type[],
-//   forbidden_vardecls : Set<number>,
-//   dominated_vardecls_by_dominatee : Set<number>) :
-//   boolean {
-//   return getAvailableIRVariableDeclareWithTypeConstraintWithForbiddenVardeclcs(types, forbidden_vardecls).length > 0;
-// }
 
 function dominatee_id_to_type_range(id : number) : type.Type[] {
   if (id === -1.5) {
@@ -1381,7 +1342,6 @@ export class FunctionCallGenerator extends RValueGenerator {
           if ((irnodes.get(irnode_id) as decl.IRFunctionDefinition).visibility != FunctionVisibility.External &&
             (allow_empty_return || (irnodes.get(irnode_id)! as decl.IRFunctionDefinition).returns.length > 0)) {
             for (const ret_decl of (irnodes.get(irnode_id)! as decl.IRFunctionDefinition).returns) {
-              if (forbidden_funcs.has(irnode_id)) continue;
               if (return_is_good(ret_decl.id)) {
                 contractdecl_id_plus_funcdecl_id.push([contract_id, irnode_id]);
                 break;
@@ -1397,7 +1357,6 @@ export class FunctionCallGenerator extends RValueGenerator {
             func_visibility_dag.solution_range.get(irnode_id)!.includes(FuncVisProvider.external())) &&
             (allow_empty_return || (irnodes.get(irnode_id)! as decl.IRFunctionDefinition).returns.length > 0)) {
             for (const ret_decl of (irnodes.get(irnode_id)! as decl.IRFunctionDefinition).returns) {
-              if (forbidden_funcs.has(irnode_id)) continue;
               if (return_is_good(ret_decl.id)) {
                 contractdecl_id_plus_funcdecl_id.push([contract_id, irnode_id]);
                 break;
@@ -1478,7 +1437,6 @@ export class FunctionCallGenerator extends RValueGenerator {
     if (selected_ret_decl !== null) {
       type_dag.connect(thisid, selected_ret_decl.id);
     }
-    forbidden_funcs.add(funcdecl_id);
     if (config.debug && selected_ret_decl !== null) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  The type range of the selected ret decl (ID: ${selected_ret_decl.id}) is ${selected_ret_decls_index}: ${type_dag.solution_range.get(selected_ret_decl.id)!.map(t => t.str())}`));
     }
@@ -1584,7 +1542,6 @@ export class FunctionCallGenerator extends RValueGenerator {
     if (Math.random() < config.tuple_prob) {
       this.irnode = new expr.IRTuple(global_id++, cur_scope.id(), [this.irnode as expr.IRExpression]);
     }
-    forbidden_funcs.delete(funcdecl_id);
     if (config.debug) {
       indent -= 2;
       console.log(color.yellowBG(`${" ".repeat(indent)}${thisid}: FunctionCall, id: ${thisid} scope: ${cur_scope.id()}, type: ${type_dag.solution_range.get(thisid)!.map(t => t.str())}`));
@@ -1613,6 +1570,7 @@ export class NewContractDecarationGenerator extends ExpressionGenerator {
     const new_expr = new expr.IRNew(global_id++, cur_scope.id(), contract_decl.name);
     //! Generate arguments for the constructor
     const args_ids : number[] = [];
+    const args : expr.IRExpression[] = [];
     for (let i = 0; i < contract_decl.constructor_parameters.length; i++) {
       const type_range = type_dag.solution_range.get(contract_decl.constructor_parameters[i].id)!;
       let arg_gen_prototype;
@@ -1627,6 +1585,7 @@ export class NewContractDecarationGenerator extends ExpressionGenerator {
       }
       const arg_gen = new arg_gen_prototype(contract_decl.constructor_parameters[i].id);
       arg_gen.generate(cur_expression_complex_level + 1);
+      args.push(arg_gen.irnode! as expr.IRExpression);
       let extracted_arg = expr.tupleExtraction(arg_gen.irnode! as expr.IRExpression);
       args_ids.push(extracted_arg.id);
       expr2used_vardecls.set(thisid, new Set<number>());
@@ -1634,7 +1593,7 @@ export class NewContractDecarationGenerator extends ExpressionGenerator {
         expr2used_vardecls.set(thisid, mergeSet(expr2used_vardecls.get(thisid)!, expr2used_vardecls.get(arg_id)!));
       }
     }
-    const new_function_expr = new expr.IRFunctionCall(thisid, cur_scope.id(), FunctionCallKind.FunctionCall, new_expr, []);
+    const new_function_expr = new expr.IRFunctionCall(thisid, cur_scope.id(), FunctionCallKind.FunctionCall, new_expr, args);
     this.irnode = new_function_expr;
     if (Math.random() < config.tuple_prob) {
       this.irnode = new expr.IRTuple(global_id++, cur_scope.id(), [this.irnode as expr.IRExpression]);
@@ -1652,16 +1611,16 @@ const terminal_expression_generators = [
 ];
 
 const nonterminal_expression_generators = [
-  AssignmentGenerator,
-  BinaryOpGenerator,
-  UnaryOpGenerator,
-  ConditionalGenerator,
+  // AssignmentGenerator,
+  // BinaryOpGenerator,
+  // UnaryOpGenerator,
+  // ConditionalGenerator,
   FunctionCallGenerator
 ];
 
 const nonterminal_expression_generators_for_address_type = [
-  AssignmentGenerator,
-  ConditionalGenerator,
+  // AssignmentGenerator,
+  // ConditionalGenerator,
   FunctionCallGenerator
 ];
 
@@ -1680,20 +1639,20 @@ const non_funccall_expression_generators_for_address_type = [
 ];
 
 const all_expression_generators = [
-  IdentifierGenerator,
-  AssignmentGenerator,
-  BinaryOpGenerator,
-  UnaryOpGenerator,
-  ConditionalGenerator,
+  // IdentifierGenerator,
+  // AssignmentGenerator,
+  // BinaryOpGenerator,
+  // UnaryOpGenerator,
+  // ConditionalGenerator,
   FunctionCallGenerator
 ];
 
 const nonliteral_expression_generators = [
-  IdentifierGenerator,
-  AssignmentGenerator,
-  BinaryOpGenerator,
-  UnaryOpGenerator,
-  ConditionalGenerator,
+  // IdentifierGenerator,
+  // AssignmentGenerator,
+  // BinaryOpGenerator,
+  // UnaryOpGenerator,
+  // ConditionalGenerator,
   FunctionCallGenerator
 ];
 
@@ -2103,21 +2062,21 @@ export class DoWhileStatementGenerator extends NonExpressionStatementGenerator {
 }
 
 const expr_statement_generators = [
-  AssignmentStatementGenerator,
-  BinaryOpStatementGenerator,
-  UnaryOpStatementGenerator,
-  ConditionalStatementGenerator,
+  // AssignmentStatementGenerator,
+  // BinaryOpStatementGenerator,
+  // UnaryOpStatementGenerator,
+  // ConditionalStatementGenerator,
   FunctionCallStatementGenerator
 ]
 
 const statement_generators = [
-  AssignmentStatementGenerator,
-  BinaryOpStatementGenerator,
-  UnaryOpStatementGenerator,
-  ConditionalStatementGenerator,
-  FunctionCallStatementGenerator,
-  IfStatementGenerator,
-  ForStatementGenerator,
-  WhileStatementGenerator,
+  // AssignmentStatementGenerator,
+  // BinaryOpStatementGenerator,
+  // UnaryOpStatementGenerator,
+  // ConditionalStatementGenerator,
+  // FunctionCallStatementGenerator,
+  // IfStatementGenerator,
+  // ForStatementGenerator,
+  // WhileStatementGenerator,
   DoWhileStatementGenerator
 ]
