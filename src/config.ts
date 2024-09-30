@@ -14,7 +14,7 @@ export const config = {
   // Dominance Constraint Solution
   maximum_type_resolution_for_heads: 2000000,
   chunk_size: 100000,
-  stream: false,
+  stream: true,
 
   // Function
   function_body_stmt_cnt_upper_limit: 1,
@@ -26,10 +26,13 @@ export const config = {
   function_count_per_contract_upper_limit: 2,
   function_count_per_contract_lower_limit: 1,
 
+  // Struct
+  struct_member_variable_count_lowerlimit: 1,
+  struct_member_variable_count_upperlimit: 2,
 
   // Contract
   contract_count: 2,
-  state_variable_count_upperlimit: 1,
+  state_variable_count_upperlimit: 2,
   state_variable_count_lowerlimit: 1,
 
   // Complexity
@@ -40,10 +43,13 @@ export const config = {
   nonstructured_statement_prob: 0.05,
   literal_prob: 0.05,
   tuple_prob: 0.3,
-  vardecl_prob: 0.05,
+  vardecl_prob: 0.1,
   else_prob: 0.3,
   terminal_prob: 0.05,
   init_state_var_in_constructor_prob: 0.3,
+  struct_prob: 0.5,
+  contract_instance_prob: 0.1,
+  initialization_prob: 0.3,
 
   // Structured Statements
   for_init_cnt_upper_limit: 1,

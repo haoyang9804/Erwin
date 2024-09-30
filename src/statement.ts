@@ -38,7 +38,7 @@ export class IRVariableDeclareStatement extends IRStatement {
     this.value = value;
   }
   lower() : Statement {
-    assert(this.variable_declares.length > 0, "IRVariableDeclareStatement: variable_declares is empty");
+    assert(this.variable_declares.length > 0, `IRVariableDeclareStatement ${this.id}: variable_declares is empty`);
     if (this.variable_declares.length > 1) {
       assert(this.value instanceof IRTuple, "IRVariableDeclareStatement: value is not IRTuple when there are more than one variable_declares");
     }

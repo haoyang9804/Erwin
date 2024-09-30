@@ -73,8 +73,14 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     return new ConstaintNode(id);
   }
 
-  insert(node : ConstaintNode) : void {
+  insert(node : ConstaintNode, range : Node[]) : void {
+    if (this.dag_nodes.has(node.id)) return;
     this.dag_nodes.set(node.id, node);
+    this.solution_range.set(node.id, range);
+  }
+
+  update(node : ConstaintNode, range : Node[]) : void {
+    this.solution_range.set(node.id, range);
   }
 
   /*
@@ -82,11 +88,11 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   2. If node1 weakly and reversely dominates node2 in solution, then the solution of node2 is super to the solution of node1.
   */
   connect(from : number, to : number, rank ?: string) : void {
-    if (from === to) return;
     if (config.debug) {
-      assert(this.dag_nodes.get(from)! !== undefined, `DominanceDAG::connect: node (from) ${from} is not in the DAG`)
-      assert(this.dag_nodes.get(to)! !== undefined, `DominanceDAG::connect: node (to) ${to} is not in the DAG`)
+      assert(this.dag_nodes.has(from), `DominanceDAG: node ${from} is not in the graph`);
+      assert(this.dag_nodes.has(to), `DominanceDAG: node ${to} is not in the graph`);
     }
+    if (from === to) return;
     this.dag_nodes.get(to)!.ins.push(from);
     this.dag_nodes.get(from)!.outs.push(to);
     this.dag_nodes.get(to)!.inbound++;
@@ -99,7 +105,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     else if (rank === "super_dominance") {
       this.super_dominance.add(`${from} ${to}`);
     }
-    this.typeRangeAlignment(from, to);
   }
 
   typeRangeAlignment(dominator_id : number, dominatee_id : number) : void {

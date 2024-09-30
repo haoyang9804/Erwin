@@ -61,6 +61,9 @@ program
   .option("--param_count_of_function_lowerlimit <number>", "The lower limit of the number of parameters of a function.", `${config.param_count_of_function_lowerlimit}`)
   .option("--function_count_per_contract_upper_limit <number>", "The upper limit of the number of functions in a contract.", `${config.function_count_per_contract_upper_limit}`)
   .option("--function_count_per_contract_lower_limit <number>", "The lower limit of the number of functions in a contract.", `${config.function_count_per_contract_lower_limit}`)
+  // Struct
+  .option("--struct_member_variable_count_upperlimit <number>", "The upper limit of the number of member variables in a struct.", `${config.struct_member_variable_count_upperlimit}`)
+  .option("--struct_member_variable_count_lowerlimit <number>", "The lower limit of the number of member variables in a struct.", `${config.struct_member_variable_count_lowerlimit}`)
   // Contract  
   .option("--contract_count <number>", "The upper limit of the number of contracts Erwin will generate.", `${config.contract_count}`)
   .option("--state_variable_count_upperlimit <number>", "The upper limit of the number of state variables in a contract.", `${config.state_variable_count_upperlimit}`)
@@ -76,6 +79,9 @@ program
   .option("--else_prob <float>", "The probability of generating an else statement.", `${config.else_prob}`)
   .option("--terminal_prob <float>", "The probability of generating a terminal statement.", `${config.terminal_prob}`)
   .option("--init_state_var_in_constructor_prob <float>", "The probability of initializing a state variable in the constructor.", `${config.init_state_var_in_constructor_prob}`)
+  .option("--struct_prob <float>", "The probability of generating a struct.", `${config.struct_prob}`)
+  .option("--contract_instance_prob <float>", "The probability of generating a contract instance.", `${config.contract_instance_prob}`)
+  .option("--initialization_prob <float>", "The probability of generating an initialization statement.", `${config.initialization_prob}`)
   // Structured Statements
   .option("--for_init_cnt_upper_limit <number>", "The upper limit of the number of initialization in a for loop.", `${config.for_init_cnt_upper_limit}`)
   .option("--for_init_cnt_lower_limit <number>", "The lower limit of the number of initialization in a for loop.", `${config.for_init_cnt_lower_limit}`)
@@ -112,6 +118,8 @@ else if (program.args[0] === "generate") {
   config.chunk_size = parseInt(program.commands[1].opts().chunk_size);
   config.state_variable_count_upperlimit = parseInt(program.commands[1].opts().state_variable_count_upperlimit);
   config.state_variable_count_lowerlimit = parseInt(program.commands[1].opts().state_variable_count_lowerlimit);
+  config.state_variable_count_lowerlimit = parseInt(program.commands[1].opts().state_variable_count_lowerlimit);
+  config.struct_member_variable_count_upperlimit = parseInt(program.commands[1].opts().struct_member_variable_count_upperlimit);
   config.contract_count = parseInt(program.commands[1].opts().contract_count);
   config.mode = program.commands[1].opts().mode;
   config.vardecl_prob = parseFloat(program.commands[1].opts().vardecl_prob);
@@ -119,6 +127,9 @@ else if (program.args[0] === "generate") {
   config.terminal_prob = parseFloat(program.commands[1].opts().terminal_prob);
   config.init_state_var_in_constructor_prob = parseFloat(program.commands[1].opts().init_state_var_in_constructor_prob);
   config.nonstructured_statement_prob = parseFloat(program.commands[1].opts().nonstructured_statement_prob);
+  config.struct_prob = parseFloat(program.commands[1].opts().struct_prob);
+  config.contract_instance_prob = parseFloat(program.commands[1].opts().contract_instance_prob);
+  config.initialization_prob = parseFloat(program.commands[1].opts().initialization_prob);
   config.for_init_cnt_upper_limit = parseInt(program.commands[1].opts().for_init_cnt_upper_limit);
   config.for_init_cnt_lower_limit = parseInt(program.commands[1].opts().for_init_cnt_lower_limit);
   config.statement_complex_level = parseInt(program.commands[1].opts().statement_complex_level);
@@ -185,6 +196,11 @@ else if (program.args[0] === "generate") {
   assert(config.do_while_body_stmt_cnt_lower_limit <= config.do_while_body_stmt_cnt_upper_limit, "The lower limit of the number of statements in the body of a do while loop must be less than or equal to the upper limit.");
   assert(config.do_while_body_stmt_cnt_lower_limit >= 0, "The lower limit of the number of statements in the body of a do while loop must be not less than 0.");
   assert(config.if_body_stmt_cnt_lower_limit <= config.if_body_stmt_cnt_upper_limit, "The lower limit of the number of statements in the body of an if statement must be less than or equal to the upper limit.");
+  assert(config.struct_member_variable_count_lowerlimit <= config.struct_member_variable_count_upperlimit, "The lower limit of the number of member variables in a struct must be less than or equal to the upper limit.");
+  assert(config.struct_member_variable_count_lowerlimit >= 0, "The lower limit of the number of member variables in a struct must be not less than 0.");
+  assert(config.struct_prob >= 0 && config.struct_prob <= 1, "The probability of generating a struct must be in the range [0,1].");
+  assert(config.initialization_prob >= 0 && config.initialization_prob <= 1, "The probability of generating an initialization statement must be in the range [0,1].");
+  assert(config.contract_instance_prob >= 0 && config.contract_instance_prob <= 1, "The probability of generating a contract instance must be in the range [0,1].");
 }
 // Execute
 if (program.args[0] === "mutate") {

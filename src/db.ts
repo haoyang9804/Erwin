@@ -80,6 +80,7 @@ export function decideFunctionVisibility(kind : scopeKind, vis : FunctionVisibil
     case scopeKind.DOWHILE_BODY:
     case scopeKind.DOWHILE_COND:
     case scopeKind.CONSTRUCTOR:
+    case scopeKind.STRUCT:
       return erwin_visibility.NAV;
     default:
       throw new Error(`Unsupported scopeKind: ${kind}`);
@@ -107,6 +108,7 @@ export function decideVariableVisibility(kind : scopeKind, vis : StateVariableVi
     case scopeKind.DOWHILE_BODY:
     case scopeKind.DOWHILE_COND:
     case scopeKind.CONSTRUCTOR:
+    case scopeKind.STRUCT:
       return erwin_visibility.NAV;
     default:
       throw new Error(`Unsupported scopeKind: ${kind}`);
@@ -125,6 +127,9 @@ class DeclDB {
   // It's records the scope that contract instance node exposes to the outside world.
   private contractdecl_id_to_scope : Map<number, number>;
   public vardecls : Set<number> = new Set<number>();
+  public contract_instances : Set<number> = new Set<number>();
+  public new_contract_expr : Set<number> = new Set<number>();
+  public contractdecl_to_contract_instance : Map<number, number[]> = new Map<number, number[]>();
   public funcdecls : Set<number> = new Set<number>();
   // ghost funcdecls are function decls playing the role of getter functions of member variables
   public ghost_funcdecls : Set<number> = new Set<number>();

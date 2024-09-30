@@ -13,6 +13,7 @@ export enum scopeKind {
   WHILE = "scopeKind::WHILE",
   DOWHILE_BODY = "scopeKind::DOWHILE_BODY",
   DOWHILE_COND = "scopeKind::DOWHILE_COND",
+  STRUCT = "scopeKind::STRUCT",
 }
 
 type scopeT = {

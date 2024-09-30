@@ -39,25 +39,33 @@ export class IRVariableDeclaration extends IRDeclare {
   mutable : Mutability = Mutability.Mutable;
   type : Type | undefined;
   value : IRExpression | undefined;
-  constructor(id : number, scope : number, name : string, value ?: IRExpression, visibility ?: StateVariableVisibility) {
+  typestr : string | undefined;
+  constructor(id : number, scope : number, name : string, value ?: IRExpression,
+    visibility ?: StateVariableVisibility, typestr ?: string) {
     super(id, scope, name);
     this.value = value;
     if (visibility !== undefined) {
       this.visibility = visibility;
     }
+    this.typestr = typestr;
   }
   lower() : ASTNode {
-    assert(this.type !== undefined, "IRVariableDeclaration: type is not generated");
     let typename : TypeName | undefined = undefined;
-    if (this.type.kind === TypeKind.ElementaryType) {
-      const type = this.type as ElementaryType;
-      typename = factory.makeElementaryTypeName("", type.str());
-      if (type.str() !== "string" && type.str() !== "bytes") {
+    if (this.type !== undefined) {
+      if (this.type.kind === TypeKind.ElementaryType) {
+        const type = this.type as ElementaryType;
+        typename = factory.makeElementaryTypeName("", type.str());
+        if (type.str() !== "string" && type.str() !== "bytes") {
+          this.memory = DataLocation.Default;
+        }
+      }
+      else {
         this.memory = DataLocation.Default;
       }
     }
     else {
-      this.memory = DataLocation.Default;
+      assert(this.typestr !== undefined, "IRVariableDeclaration: typestr is not generated")
+      typename = factory.makeElementaryTypeName("", this.typestr);
     }
     //TODO: add support for memory
     //TODO: add support for visibility
@@ -118,7 +126,6 @@ export class IREventDefinition extends IRDeclare {
 }
 
 export class IRStructDefinition extends IRDeclare {
-  visibility : string = "public";
   members : IRVariableDeclaration[];
   constructor(id : number, scope : number, name : string, members : IRVariableDeclaration[]) {
     super(id, scope, name);
@@ -126,7 +133,7 @@ export class IRStructDefinition extends IRDeclare {
     this.members = members;
   }
   lower() : ASTNode {
-    return factory.makeStructDefinition(this.name, this.scope, this.visibility, this.members.map((member) => member.lower() as VariableDeclaration));
+    return factory.makeStructDefinition(this.name, this.scope, "", this.members.map((member) => member.lower() as VariableDeclaration));
   }
 }
 
