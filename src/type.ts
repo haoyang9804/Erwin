@@ -859,14 +859,6 @@ export function init_types() : void {
   size_of_type = sizeof(elementary_types[0]);
 }
 
-
-export const type_range_collection : Type[][] = [
-  integer_types,
-  uinteger_types,
-  bool_types,
-  address_types
-];
-
 export let mapping_types : Type[] = [];
 export let function_types : Type[] = [];
 export let array_types : Type[] = [];

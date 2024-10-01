@@ -50,6 +50,7 @@ export const config = {
   struct_prob: 0.5,
   contract_instance_prob: 0.1,
   initialization_prob: 0.3,
+  constructor_prob: 0.5,
 
   // Structured Statements
   for_init_cnt_upper_limit: 1,

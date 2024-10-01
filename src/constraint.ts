@@ -326,6 +326,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   }
 
   try_tighten_solution_range_middle_out(node : number, new_range : Node[]) : boolean {
+    this.typeRangeAlignment(node, node);
     const solution_range = new Map(this.solution_range);
     solution_range.set(node, new_range);
     let upwards = (node : number) : boolean => {
@@ -467,7 +468,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     if (config.debug) {
       let mul = 1n;
       for (let head of this.heads) {
-        console.log(color.cyan(`head is ${head}, and this.solution_range.get(head)!.length is ${this.solution_range.get(head)!.length}`));
         mul *= BigInt(this.solution_range.get(head)!.length)
       }
       console.log(color.cyan(`The size of of solution candidate of heads of ${this.name} is ${mul}`));
@@ -540,10 +540,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     this.head_solution_collection.push(new Map<number, Node>());
     for (let head of this.heads) {
       const head_resolution_length = this.head_solution_collection.length;
-      if (config.debug)
-        console.log(color.cyan(`head is ${head}, and this.solution_range.get(head)!.length is ${this.solution_range.get(head)!.length}`));
-      if (config.debug)
-        assert(this.solution_range.has(head), `allocate_solutions_for_heads: head ${head} is not in this.solution_range`);
       this.head_solution_collection = extendArrayofMap(this.head_solution_collection, this.solution_range.get(head)!.length);
       let cnt = 1;
       for (let solution of this.solution_range.get(head)!) {

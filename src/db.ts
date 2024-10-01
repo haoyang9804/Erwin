@@ -127,6 +127,7 @@ class DeclDB {
   // It's records the scope that contract instance node exposes to the outside world.
   private contractdecl_id_to_scope : Map<number, number>;
   public vardecls : Set<number> = new Set<number>();
+  public state_variables : Set<number> = new Set<number>();
   public contract_instances : Set<number> = new Set<number>();
   public new_contract_expr : Set<number> = new Set<number>();
   public contractdecl_to_contract_instance : Map<number, number[]> = new Map<number, number[]>();

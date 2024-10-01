@@ -82,6 +82,7 @@ program
   .option("--struct_prob <float>", "The probability of generating a struct.", `${config.struct_prob}`)
   .option("--contract_instance_prob <float>", "The probability of generating a contract instance.", `${config.contract_instance_prob}`)
   .option("--initialization_prob <float>", "The probability of generating an initialization statement.", `${config.initialization_prob}`)
+  .option("--constructor_prob <float>", "The probability of generating a constructor.", `${config.constructor_prob}`)
   // Structured Statements
   .option("--for_init_cnt_upper_limit <number>", "The upper limit of the number of initialization in a for loop.", `${config.for_init_cnt_upper_limit}`)
   .option("--for_init_cnt_lower_limit <number>", "The lower limit of the number of initialization in a for loop.", `${config.for_init_cnt_lower_limit}`)
@@ -130,6 +131,7 @@ else if (program.args[0] === "generate") {
   config.struct_prob = parseFloat(program.commands[1].opts().struct_prob);
   config.contract_instance_prob = parseFloat(program.commands[1].opts().contract_instance_prob);
   config.initialization_prob = parseFloat(program.commands[1].opts().initialization_prob);
+  config.constructor_prob = parseFloat(program.commands[1].opts().constructor_prob);
   config.for_init_cnt_upper_limit = parseInt(program.commands[1].opts().for_init_cnt_upper_limit);
   config.for_init_cnt_lower_limit = parseInt(program.commands[1].opts().for_init_cnt_lower_limit);
   config.statement_complex_level = parseInt(program.commands[1].opts().statement_complex_level);
@@ -201,6 +203,7 @@ else if (program.args[0] === "generate") {
   assert(config.struct_prob >= 0 && config.struct_prob <= 1, "The probability of generating a struct must be in the range [0,1].");
   assert(config.initialization_prob >= 0 && config.initialization_prob <= 1, "The probability of generating an initialization statement must be in the range [0,1].");
   assert(config.contract_instance_prob >= 0 && config.contract_instance_prob <= 1, "The probability of generating a contract instance must be in the range [0,1].");
+  assert(config.constructor_prob >= 0 && config.constructor_prob <= 1, "The probability of generating a constructor must be in the range [0,1].");
 }
 // Execute
 if (program.args[0] === "mutate") {
