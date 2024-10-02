@@ -27,7 +27,7 @@ export function str2hex(str : string) : string {
   return res;
 }
 
-export function pickRandomElement<T>(array : T[]) : T | undefined {
+export function pick_random_element<T>(array : T[]) : T | undefined {
   if (array.length === 0) {
     return undefined;
   }
@@ -36,16 +36,16 @@ export function pickRandomElement<T>(array : T[]) : T | undefined {
   return array[randomIndex];
 }
 
-export function lazyPickRandomElement<T>(array : T[]) : T | undefined {
+export function lazy_pick_random_element<T>(array : T[]) : T | undefined {
   if (Math.random() < 0.1) {
     return undefined;
   }
-  return pickRandomElement(array);
+  return pick_random_element(array);
 }
 
 const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
-export function generateRandomString_fixedLength(length : number) : string {
+export function generate_random_string_fixed_length(length : number) : string {
   let result = '';
 
   for (let i = 0; i < length; i++) {
@@ -56,7 +56,7 @@ export function generateRandomString_fixedLength(length : number) : string {
   return result;
 }
 
-export function generateRandomString_randomLength(minLength : number, maxLength : number) : string {
+export function generate_random_string_random_length(minLength : number, maxLength : number) : string {
   const length = Math.floor(Math.random() * (maxLength - minLength + 1)) + minLength;
   let result = '';
 
@@ -69,8 +69,8 @@ export function generateRandomString_randomLength(minLength : number, maxLength 
 }
 
 //TODO: add a config to specify whether to generate a random string of fixed length
-export function generateRandomString() : string {
-  return generateRandomString_fixedLength(5);
+export function generate_random_string() : string {
+  return generate_random_string_fixed_length(5);
 }
 
 export function extendArray<T>(array : T[], n : number) : T[] {
@@ -83,17 +83,17 @@ export function extendArray<T>(array : T[], n : number) : T[] {
   return extendedArray;
 }
 
-export function extendArrayofMap<K, V>(array : Map<K, V>[], n : number) : Map<K, V>[] {
+export function extend_arrayofmap<K, V>(array : Map<K, V>[], n : number) : Map<K, V>[] {
   assert(n > 0, "extendArray: n must be greater than 0");
   let extendedArray : Map<K, V>[] = [];
   for (let i = 0; i < n; i++) {
     // shallow copy
-    extendedArray = extendedArray.concat(deepCopy_ArrayofMap(array));
+    extendedArray = extendedArray.concat(deepcopy_arrayofmap(array));
   }
   return extendedArray;
 }
 
-export function deepCopy_ArrayofMap<K, V>(array : Map<K, V>[]) : Map<K, V>[] {
+export function deepcopy_arrayofmap<K, V>(array : Map<K, V>[]) : Map<K, V>[] {
   const res : Map<K, V>[] = [];
   for (let map of array) {
     res.push(new Map(map));
@@ -101,7 +101,7 @@ export function deepCopy_ArrayofMap<K, V>(array : Map<K, V>[]) : Map<K, V>[] {
   return res;
 }
 
-export function cartesianProduct(arrays : any[][]) : any[][] {
+export function cartesian_product(arrays : any[][]) : any[][] {
   if (arrays.length === 0) {
     return [[]];
   }
@@ -110,7 +110,7 @@ export function cartesianProduct(arrays : any[][]) : any[][] {
   const currentArray = arrays[0];
   const remainingArrays = arrays.slice(1);
 
-  const remainingCombinations = cartesianProduct(remainingArrays);
+  const remainingCombinations = cartesian_product(remainingArrays);
 
   for (const value of currentArray) {
     for (const combination of remainingCombinations) {
@@ -121,7 +121,7 @@ export function cartesianProduct(arrays : any[][]) : any[][] {
   return results;
 }
 
-export function createCustomSet<T>(equalityFn : (a : T, b : T) => boolean) : Set<T> {
+export function create_custom_set<T>(equalityFn : (a : T, b : T) => boolean) : Set<T> {
   const set = new Set<T>();
 
   set.has = function(key : T) : boolean {
@@ -162,7 +162,7 @@ export function shuffle<T>(array : T[]) : T[] {
   return arrayCopy;
 }
 
-export function selectRandomElements<T>(array : T[], n : number) : T[] {
+export function select_random_elements<T>(array : T[], n : number) : T[] {
   if (n > array.length) {
     throw new Error("Cannot select more elements than available in the array.");
   }
@@ -180,7 +180,7 @@ export function selectRandomElements<T>(array : T[], n : number) : T[] {
   return selectedElements;
 }
 
-export function pickRandomSubarray<T>(array : T[], length : number) : T[] {
+export function pick_random_subarray<T>(array : T[], length : number) : T[] {
   const shuffled = array.slice();
   let i = array.length;
   let temp;
@@ -196,8 +196,8 @@ export function pickRandomSubarray<T>(array : T[], length : number) : T[] {
   return shuffled.slice(0, length);
 }
 
-export function randomBigInt(min : bigint | number | string, max ?: bigint | number | string) : bigint {
-  if (max === undefined) return randomBigInt(0n, min);
+export function random_bigInt(min : bigint | number | string, max ?: bigint | number | string) : bigint {
+  if (max === undefined) return random_bigInt(0n, min);
   // choose if you want to allow not-bigints yourself
   // this wrapper allows `bigint | number | string` (you may want to keep at least `bigint | number`
   min = BigInt(min);
@@ -206,9 +206,9 @@ export function randomBigInt(min : bigint | number | string, max ?: bigint | num
   // choose what happens when input order is invalid (e.g. throw error)
   // this wrapper keeps `min` in and `max` out of generatable numbers
   if (min <= max)
-    return min + _generateRandomBigInt(max - min);
+    return min + _generate_random_bigInt(max - min);
   else
-    return max - 1n - _generateRandomBigInt(min - max);
+    return max - 1n - _generate_random_bigInt(min - max);
 }
 
 /**
@@ -216,7 +216,7 @@ export function randomBigInt(min : bigint | number | string, max ?: bigint | num
  * @param max exclusive maximum
  * (c) <CC-BY-SA-4.0 or Unlicense> Dimava, 2023
  */
-function _generateRandomBigInt(max : bigint) : bigint {
+function _generate_random_bigInt(max : bigint) : bigint {
   if (max < 0) throw new Error("generateRandomBigInt cannot generate negative BigInt");
   if (max === 0n) return 0n;
 
@@ -251,17 +251,17 @@ function _generateRandomBigInt(max : bigint) : bigint {
 
   // 5. Check for failure (the random number being higher then max)
   // and retry if needed
-  if (rnd >= max) return _generateRandomBigInt(max);
+  if (rnd >= max) return _generate_random_bigInt(max);
   return rnd;
 }
 
-export function randomInt(min : number, max : number) : number {
+export function random_int(min : number, max : number) : number {
   assert(min <= max, `min ${min} must be less than or equal to max ${max}`);
   const array : number[] = [];
   for (let i = min; i <= max; i++) {
     array.push(i);
   }
-  return pickRandomElement(array)!;
+  return pick_random_element(array)!;
 }
 
 export function swap(a : any, b : any) {
@@ -295,7 +295,7 @@ export function max(a : number, b : number) : number {
   return a > b ? a : b;
 }
 
-export function mergeSet<T>(a : Set<T>, b : Set<T>) : Set<T> {
+export function merge_set<T>(a : Set<T>, b : Set<T>) : Set<T> {
   return new Set([...a, ...b]);
 }
 
@@ -303,7 +303,7 @@ export function intersection<T>(a : Set<T>, b : Set<T>) : Set<T> {
   return new Set([...a].filter(x => b.has(x)));
 }
 
-export function normalNumber2OrdinalNumber(num : number) : string {
+export function normal_number_2_ordinal_number(num : number) : string {
   const suffixes = ["th", "st", "nd", "rd", "th", "th", "th", "th", "th", "th"];
   let suffix = num.toString().slice(-1);
   return num.toString() + suffixes[parseInt(suffix)];

@@ -4,7 +4,7 @@ import {
   FunctionCallKind
 } from "solc-typed-ast"
 
-import { assert, generateRandomString, str2hex, randomBigInt } from "./utility";
+import { assert, generate_random_string, str2hex, random_bigInt } from "./utility";
 import { TypeKind, Type, ElementaryType } from "./type";
 import { IRNode, factory } from "./node";
 import { IRVariableDeclaration } from "./declare";
@@ -64,13 +64,13 @@ export class IRLiteral extends IRExpression {
           }
           if (typename === "int256" || typename === "int128" || typename === "int64" ||
             typename === "int32" || typename === "int16" || typename === "int8") {
-            this.value = randomBigInt(0n, (1n << BigInt(bits) - 1n)).toString();
+            this.value = random_bigInt(0n, (1n << BigInt(bits) - 1n)).toString();
             if (this.value[0] === "-") {
               this.value = this.value.slice(1);
             }
           }
           else {
-            this.value = randomBigInt(0n, (1n << BigInt(bits))).toString();
+            this.value = random_bigInt(0n, (1n << BigInt(bits))).toString();
             if (this.value[0] === "-") {
               this.value = this.value.slice(1);
             }
@@ -134,7 +134,7 @@ export class IRLiteral extends IRExpression {
         }
         break;
       case LiteralKind.String:
-        this.value = generateRandomString();
+        this.value = generate_random_string();
         break;
       default:
         assert(false, "IRLiteral: kind is not generated");
@@ -306,7 +306,7 @@ export class IRTuple extends IRExpression {
   }
 }
 
-export function tupleExtraction(tuple_expr : IRExpression) : IRExpression {
+export function tuple_extraction(tuple_expr : IRExpression) : IRExpression {
   let extracted_expression = tuple_expr;
   while (extracted_expression instanceof IRTuple) {
     assert(extracted_expression.components.length === 1, "BinaryGenerator: right_extracted_expression.components.length is not 1");

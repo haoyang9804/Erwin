@@ -64,6 +64,6 @@ export class ScopeList extends LinkedListNode<scopeT> {
   }
 }
 
-export function init_scope() {
+export function initScope() {
   return new ScopeList({ id: scope_id, kind: scopeKind.GLOBAL })
 }

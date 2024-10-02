@@ -1,4 +1,4 @@
-import { assert, pickRandomElement, lazyPickRandomElement, cartesianProduct, pickRandomSubarray } from "./utility";
+import { assert, cartesian_product, pick_random_subarray, merge_set } from "./utility";
 import { sizeof } from "sizeof";
 import { DominanceNode } from "./dominance";
 import { config } from './config';
@@ -28,6 +28,25 @@ export function lowerType(t1 : Type, t2 : Type) {
 }
 
 export abstract class Type extends DominanceNode<TypeKind> { }
+
+export abstract class UserDefinedType extends Type {
+  _subs : UserDefinedType[] = [];
+  _supers : UserDefinedType[] = [];
+  constructor(kind : TypeKind) {
+    super(kind);
+    this._subs = [this];
+    this._supers = [this];
+  }
+  add_sub(subs : UserDefinedType) : void {
+    this._subs.push(subs);
+  }
+  add_super(supers : UserDefinedType) : void {
+    this._supers.push(supers);
+  }
+  type_range() : UserDefinedType[] {
+    return [...merge_set(new Set<UserDefinedType>(this._subs), new Set<UserDefinedType>(this._supers))];
+  }
+}
 
 export class EventType extends Type {
   name : string;
@@ -99,73 +118,89 @@ export class ErrorType extends Type {
   }
 }
 
-export class StructType extends Type {
+export class StructType extends UserDefinedType {
   name : string;
-  constructor(name : string) {
+  id : number;
+  constructor(id : number, name : string) {
     super(TypeKind.StructType);
     this.name = name;
+    this.id = id;
   }
   str() : string {
-    return "struct";
+    return this.name;
   }
   subs() : Type[] {
-    throw new Error("No sub_dominance for StructType");
+    return this._subs;
   }
   sub_with_lowerbound(lower_bound : Type) : Type[] {
-    throw new Error("No sub_dominance for StructType");
+    return this.subs().filter(x => x.issuperof(lower_bound));
   }
   supers() : Type[] {
-    throw new Error("No super_dominance for StructType");
+    return this._supers;
   }
   super_with_upperbound(upper_bound : Type) : Type[] {
-    throw new Error("No super_dominance for StructType");
+    return this.supers().filter(x => x.issubof(upper_bound));
   }
   copy() : Type {
-    return new StructType(this.name);
+    return new StructType(this.id, this.name);
   }
   same(t : Type) : boolean {
-    return t.kind === TypeKind.StructType;
+    return t.kind === TypeKind.StructType && (t as StructType).name === this.name;
   }
   issubof(t : Type) : boolean {
-    return this.same(t);
+    for (let i = 0; i < this._subs.length; i++) {
+      if (this._supers[i].same(t)) return true;
+    }
+    return false;
   }
   issuperof(t : Type) : boolean {
-    return this.same(t);
+    for (let i = 0; i < this._supers.length; i++) {
+      if (this._subs[i].same(t)) return true;
+    }
+    return false;
   }
 }
 
-export class ContractType extends Type {
+export class ContractType extends UserDefinedType {
+  id : number;
   name : string;
-  constructor(name : string) {
+  constructor(id : number, name : string) {
     super(TypeKind.ContractType);
+    this.id = id;
     this.name = name;
   }
   str() : string {
-    return "contract";
+    return this.name;
   }
   subs() : Type[] {
-    throw new Error("No sub_dominance for ContractType");
+    return this._subs;
   }
   sub_with_lowerbound(lower_bound : Type) : Type[] {
-    throw new Error("No sub_dominance for ContractType");
+    return this.subs().filter(x => x.issuperof(lower_bound));
   }
   supers() : Type[] {
-    throw new Error("No super_dominance for ContractType");
+    return this._supers;
   }
   super_with_upperbound(upper_bound : Type) : Type[] {
-    throw new Error("No super_dominance for ContractType");
+    return this.supers().filter(x => x.issubof(upper_bound));
   }
   copy() : Type {
-    return new ContractType(this.name);
+    return new ContractType(this.id, this.name);
   }
   same(t : Type) : boolean {
-    return t.kind === TypeKind.ContractType;
+    return t.kind === TypeKind.ContractType && (t as ContractType).name === this.name;
   }
   issubof(t : Type) : boolean {
-    return this.same(t);
+    for (let i = 0; i < this._subs.length; i++) {
+      if (this._supers[i].same(t)) return true;
+    }
+    return false;
   }
   issuperof(t : Type) : boolean {
-    return this.same(t);
+    for (let i = 0; i < this._supers.length; i++) {
+      if (this._subs[i].same(t)) return true;
+    }
+    return false;
   }
 }
 
@@ -551,13 +586,13 @@ export class UnionType extends Type {
     return new UnionType(this.types.map(x => x.copy()));
   }
   subs() : Type[] {
-    return cartesianProduct(this.types.map(x => x.subs())).map(x => new UnionType(x));
+    return cartesian_product(this.types.map(x => x.subs())).map(x => new UnionType(x));
   }
   sub_with_lowerbound(lower_bound : Type) : Type[] {
     return this.subs().filter(x => x.issuperof(lower_bound));
   }
   supers() : Type[] {
-    return cartesianProduct(this.types.map(x => x.supers())).map(x => new UnionType(x));
+    return cartesian_product(this.types.map(x => x.supers())).map(x => new UnionType(x));
   }
   super_with_upperbound(upper_bound : Type) : Type[] {
     return this.supers().filter(x => x.issubof(upper_bound));
@@ -851,62 +886,10 @@ export const bool_types : Type[] = [TypeProvider.bool()];
 export const address_types : Type[] = [TypeProvider.address(), TypeProvider.payable_address()];
 export let size_of_type : number;
 
-export function init_types() : void {
-  integer_types = pickRandomSubarray(integer_types, config.int_num);
-  uinteger_types = pickRandomSubarray(uinteger_types, config.uint_num);
+export function initType() : void {
+  integer_types = pick_random_subarray(integer_types, config.int_num);
+  uinteger_types = pick_random_subarray(uinteger_types, config.uint_num);
   all_integer_types = integer_types.concat(uinteger_types);
   elementary_types = all_integer_types.concat(bool_types).concat(address_types);
   size_of_type = sizeof(elementary_types[0]);
-}
-
-export let mapping_types : Type[] = [];
-export let function_types : Type[] = [];
-export let array_types : Type[] = [];
-
-//TODO: need to be updated later
-export function generate_all_mapping_types() : Type[] {
-  const all_types_for_k = elementary_types;
-  const all_types_for_v = elementary_types.concat(function_types)
-    .concat(array_types)
-    .concat(mapping_types);
-  const collection : Type[] = new Array(all_types_for_k.length * all_types_for_v.length);
-  all_types_for_k.forEach((k, i) => {
-    all_types_for_v.forEach((v, j) => {
-      collection[i * all_types_for_v.length + j] = new MappingType(k, v);
-    });
-  });
-  return collection;
-}
-
-export function generate_all_function_types() : Type[] {
-  let collection : Type[] = [];
-  let all_visibility : ("public" | "internal" | "external" | "private")[] = ["public", "internal", "external", "private"];
-  let all_stateMutability : ("pure" | "view" | "payable" | "nonpayable")[] = ["pure", "view", "payable", "nonpayable"];
-  const all_available_types = elementary_types.concat(function_types)
-    .concat(array_types)
-    .concat(mapping_types);
-  for (let visibility of all_visibility) {
-    for (let stateMutability of all_stateMutability) {
-      const parameterTypes = lazyPickRandomElement(all_available_types);
-      const returnTypes = lazyPickRandomElement(all_available_types);
-      collection.push(new FunctionType(visibility, stateMutability,
-        new UnionType(parameterTypes === undefined ? [] : [parameterTypes]),
-        new UnionType(returnTypes === undefined ? [] : [returnTypes])));
-    }
-  }
-  return collection;
-}
-
-//TODO: need to be updated later
-export function generate_all_array_types() : Type[] {
-  const all_available_types = elementary_types.concat(function_types)
-    .concat(array_types)
-    .concat(mapping_types);
-  //TODO: allow super big length
-  const available_length = [1, 2, 3, 4, 5];
-  const collection : Type[] = new Array(all_available_types.length);
-  all_available_types.forEach((v, i) => {
-    collection[i] = new ArrayType(v, pickRandomElement(available_length));
-  });
-  return collection;
 }

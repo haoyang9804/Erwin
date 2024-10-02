@@ -3,11 +3,11 @@ import { color } from "console-log-colors"
 
 let indent = 0;
 
-export function increaseIndent() : void {
+export function increase_indent() : void {
   if (config.debug) indent += 2;
 }
 
-export function decreaseIndent() : void {
+export function decrease_indent() : void {
   if (config.debug) indent -= 2;
 }
 

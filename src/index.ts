@@ -7,8 +7,8 @@ import * as decl from "./declare";
 import * as mut from "./mutators";
 import { config } from "./config";
 import * as fs from "fs";
-import { assert, pickRandomElement } from "./utility";
-import { init_types } from './type';
+import { assert, pick_random_element } from "./utility";
+import { initType } from './type';
 import {
   PrettyFormatter,
   ASTWriter,
@@ -83,6 +83,7 @@ program
   .option("--contract_instance_prob <float>", "The probability of generating a contract instance.", `${config.contract_instance_prob}`)
   .option("--initialization_prob <float>", "The probability of generating an initialization statement.", `${config.initialization_prob}`)
   .option("--constructor_prob <float>", "The probability of generating a constructor.", `${config.constructor_prob}`)
+  .option("--return_prob <float>", "The probability of generating a return statement.", `${config.return_prob}`)
   // Structured Statements
   .option("--for_init_cnt_upper_limit <number>", "The upper limit of the number of initialization in a for loop.", `${config.for_init_cnt_upper_limit}`)
   .option("--for_init_cnt_lower_limit <number>", "The lower limit of the number of initialization in a for loop.", `${config.for_init_cnt_lower_limit}`)
@@ -132,6 +133,7 @@ else if (program.args[0] === "generate") {
   config.contract_instance_prob = parseFloat(program.commands[1].opts().contract_instance_prob);
   config.initialization_prob = parseFloat(program.commands[1].opts().initialization_prob);
   config.constructor_prob = parseFloat(program.commands[1].opts().constructor_prob);
+  config.return_prob = parseFloat(program.commands[1].opts().return_prob);
   config.for_init_cnt_upper_limit = parseInt(program.commands[1].opts().for_init_cnt_upper_limit);
   config.for_init_cnt_lower_limit = parseInt(program.commands[1].opts().for_init_cnt_lower_limit);
   config.statement_complex_level = parseInt(program.commands[1].opts().statement_complex_level);
@@ -150,7 +152,7 @@ else if (program.args[0] === "generate") {
     config.int_num = 1;
     config.uint_num = 1;
   }
-  init_types();
+  initType();
 }
 // Check the validity of the arguments
 if (program.args[0] === "mutate") {
@@ -204,6 +206,7 @@ else if (program.args[0] === "generate") {
   assert(config.initialization_prob >= 0 && config.initialization_prob <= 1, "The probability of generating an initialization statement must be in the range [0,1].");
   assert(config.contract_instance_prob >= 0 && config.contract_instance_prob <= 1, "The probability of generating a contract instance must be in the range [0,1].");
   assert(config.constructor_prob >= 0 && config.constructor_prob <= 1, "The probability of generating a constructor must be in the range [0,1].");
+  assert(config.return_prob >= 0 && config.return_prob <= 1, "The probability of generating a return statement must be in the range [0,1].");
 }
 // Execute
 if (program.args[0] === "mutate") {
@@ -219,13 +222,13 @@ else if (program.args[0] === "generate") {
 
 // Mutation
 async function mutate() {
-  const source_unit = await mut.readSourceUnit(config.file);
-  const mutants = mut.typeMutateSourceUnit(source_unit);
+  const source_unit = await mut.read_source_unit(config.file);
+  const mutants = mut.type_mutate_source_unit(source_unit);
   let out_id = 1;
   for (let mutant of mutants) {
     if (config.out_dir !== "") {
       const file_path = `${config.out_dir}/mutant_${out_id}.sol`;
-      mut.writeMutant(file_path, mutant);
+      mut.write_mutant(file_path, mutant);
       out_id++;
     }
     else {
@@ -267,7 +270,7 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
     if (good) break;
   }
   //! Traverse state variable visibility solutions
-  const state_variable_visibility_solutions = pickRandomElement(gen.state_variable_visibility_dag.solutions_collection)!;
+  const state_variable_visibility_solutions = pick_random_element(gen.state_variable_visibility_dag.solutions_collection)!;
   // assign the visibility to the state variable
   for (let [key, value] of state_variable_visibility_solutions) {
     assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration, "The node must be a variable declaration.");
@@ -301,7 +304,7 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
   console.log(`${gen.funcstat_dag.solutions_collection.length} function stat solutions`);
   console.log(`${gen.func_visibility_dag.solutions_collection.length} function visibility solutions`);
   console.log(`${gen.state_variable_visibility_dag.solutions_collection.length} state variable visibility solutions`);
-  const type_solutions = pickRandomElement(gen.type_dag.solutions_collection)!;
+  const type_solutions = pick_random_element(gen.type_dag.solutions_collection)!;
   for (let [key, value] of type_solutions) {
     if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
       (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;

@@ -82,18 +82,18 @@ export class Tree<T> {
     this.has_ins.add(child);
     this.node_set.add(parent);
   }
-  getChildren(parent : T) : T[] {
+  get_children(parent : T) : T[] {
     return this.children_map.get(parent)!;
   }
-  hasParent(child : T) : boolean {
+  has_parent(child : T) : boolean {
     return this.parent_map.has(child);
   }
-  getParent(child : T) : T {
+  get_parent(child : T) : T {
     if (config.debug)
       assert(this.parent_map.has(child), `The child must have a parent.`);
     return this.parent_map.get(child)!;
   }
-  getRoot() : T {
+  get_root() : T {
     if (this.root !== undefined) return this.root;
     if (config.debug) {
       let root_count = 0;

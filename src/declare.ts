@@ -13,7 +13,7 @@ import {
 } from "solc-typed-ast"
 
 import { assert } from "./utility";
-import { TypeKind, Type, ElementaryType, UnionType, FunctionType } from "./type";
+import { TypeKind, Type, ElementaryType, UnionType, FunctionType, ContractType } from "./type";
 import { IRNode, factory } from "./node";
 import { IRStatement, IRPlaceholderStatement } from "./statement";
 import { IRExpression } from "./expression";
@@ -59,8 +59,13 @@ export class IRVariableDeclaration extends IRDeclare {
           this.memory = DataLocation.Default;
         }
       }
-      else {
+      else if (this.type.kind === TypeKind.ContractType) {
+        const type = this.type as ContractType;
+        typename = factory.makeElementaryTypeName("", type.name);
         this.memory = DataLocation.Default;
+      }
+      else {
+        throw new Error(`IRVariableDeclaration: type ${this.type.kind} is not supported`);
       }
     }
     else {
@@ -71,7 +76,7 @@ export class IRVariableDeclaration extends IRDeclare {
     //TODO: add support for visibility
     //TODO: add support for mutability
     //TODO: add support for other types, firstly function type
-    assert(typename !== undefined, "IRVariableDeclaration: typename is not generated")
+    assert(typename !== undefined, `IRVariableDeclaration ${this.id}: typename is not generated`)
     return factory.makeVariableDeclaration(this.constant, this.indexed, this.name, this.scope, this.state, this.memory,
       this.visibility, this.mutable, "", undefined, typename, undefined, this.value?.lower());
   }

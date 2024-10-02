@@ -1,7 +1,9 @@
 export abstract class DominanceNode<T> {
   kind : T;
+  typeName : string;
   constructor(kind : T) {
     this.kind = kind;
+    this.typeName = this.constructor.name;
   }
   abstract str() : string;
   abstract subs() : DominanceNode<T>[];
@@ -23,7 +25,7 @@ export function includes<T>(arr : DominanceNode<T>[], item : DominanceNode<T>) :
   return false;
 }
 
-export function isSuperSet<T>(set : DominanceNode<T>[], subset : DominanceNode<T>[]) : boolean {
+export function is_super_set<T>(set : DominanceNode<T>[], subset : DominanceNode<T>[]) : boolean {
   for (const element of subset) {
     if (!includes(set, element)) {
       return false;
@@ -32,7 +34,7 @@ export function isSuperSet<T>(set : DominanceNode<T>[], subset : DominanceNode<T
   return true;
 }
 
-export function isEqualSet<T>(s1 : DominanceNode<T>[], s2 : DominanceNode<T>[]) : boolean {
+export function is_equal_set<T>(s1 : DominanceNode<T>[], s2 : DominanceNode<T>[]) : boolean {
   if (s1.length !== s2.length) {
     return false;
   }
