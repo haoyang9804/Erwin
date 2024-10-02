@@ -54,7 +54,7 @@ export enum erwin_visibility {
   NAV = "erwin_visibility::NAV", // visibility does not apply
 }
 
-export function decideFunctionVisibility(kind : scopeKind, vis : FunctionVisibility) : erwin_visibility {
+export function decide_function_visibility(kind : scopeKind, vis : FunctionVisibility) : erwin_visibility {
   switch (kind) {
     case scopeKind.GLOBAL:
       if (config.debug)
@@ -87,7 +87,7 @@ export function decideFunctionVisibility(kind : scopeKind, vis : FunctionVisibil
   }
 }
 
-export function decideVariableVisibility(kind : scopeKind, vis : StateVariableVisibility) : erwin_visibility {
+export function decide_variable_visibility(kind : scopeKind, vis : StateVariableVisibility) : erwin_visibility {
   switch (kind) {
     case scopeKind.CONTRACT:
       switch (vis) {
@@ -128,8 +128,6 @@ class DeclDB {
   private contractdecl_id_to_scope : Map<number, number>;
   public vardecls : Set<number> = new Set<number>();
   public state_variables : Set<number> = new Set<number>();
-  public contract_instances : Set<number> = new Set<number>();
-  public new_contract_expr : Set<number> = new Set<number>();
   public contractdecl_to_contract_instance : Map<number, number[]> = new Map<number, number[]>();
   public funcdecls : Set<number> = new Set<number>();
   // ghost funcdecls are function decls playing the role of getter functions of member variables
@@ -158,13 +156,15 @@ class DeclDB {
     this.scope_tree.insert(parent_scope_id, cur_scope_id);
   }
 
-  insert_contract(scope_id : number, contractdecl_id : number) : void {
+  insert_yin_contract(scope_id : number, contractdecl_id : number) : void {
+    this.contractdecls.add(-contractdecl_id);
+    this.contractdecl_id_to_scope.set(-contractdecl_id, scope_id);
+  }
+
+  insert_yang_contract(scope_id : number, contractdecl_id : number) : void {
     // Yang
     this.contractdecls.add(contractdecl_id);
     this.contractdecl_id_to_scope.set(contractdecl_id, scope_id);
-    // Yin
-    this.contractdecls.add(-contractdecl_id);
-    this.contractdecl_id_to_scope.set(-contractdecl_id, scope_id);
   }
 
   insert(node_id : number, ervis : erwin_visibility, scope_id : number) : void {
@@ -195,8 +195,8 @@ class DeclDB {
         irnodes_ids = irnodes_ids.concat(
           this.scope2irnodeinfo.get(scope_id)!.map(x => x.id)
         );
-      if (this.scope_tree.hasParent(scope_id)) {
-        scope_id = this.scope_tree.getParent(scope_id);
+      if (this.scope_tree.has_parent(scope_id)) {
+        scope_id = this.scope_tree.get_parent(scope_id);
       }
       else {
         break;

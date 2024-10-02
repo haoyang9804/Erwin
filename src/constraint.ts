@@ -13,14 +13,14 @@ export class ConstaintNode {
     this.id = id;
   }
 }
-import { assert, createCustomSet, extendArrayofMap, pickRandomElement, shuffle, selectRandomElements } from "./utility";
+import { assert, create_custom_set, extend_arrayofmap, pick_random_element, shuffle, select_random_elements } from "./utility";
 import { Type, TypeKind, size_of_type } from "./type"
 import * as dot from 'ts-graphviz';
 import { config } from './config'
 // debug
 import { toFile } from "@ts-graphviz/adapter";
 import { color } from "console-log-colors"
-import { DominanceNode, isEqualSet, isSuperSet } from "./dominance";
+import { DominanceNode, is_equal_set, is_super_set } from "./dominance";
 import { FunctionStateMutability, FunctionVisibility, StateVariableVisibility } from "solc-typed-ast";
 import { FuncStat } from "./funcstat";
 import { FuncVis, VarVis } from "./visibility";
@@ -107,9 +107,9 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     }
   }
 
-  typeRangeAlignment(dominator_id : number, dominatee_id : number) : void {
-    if (isEqualSet(this.solution_range.get(dominator_id)!, this.solution_range.get(dominatee_id)!)) return;
-    if (isSuperSet(this.solution_range.get(dominator_id)!, this.solution_range.get(dominatee_id)!)) {
+  type_range_alignment(dominator_id : number, dominatee_id : number) : void {
+    if (is_equal_set(this.solution_range.get(dominator_id)!, this.solution_range.get(dominatee_id)!)) return;
+    if (is_super_set(this.solution_range.get(dominator_id)!, this.solution_range.get(dominatee_id)!)) {
       this.solution_range.set(dominator_id, this.solution_range.get(dominatee_id)!);
       this.tighten_solution_range_middle_out(dominator_id);
       // if (config.debug) {
@@ -117,7 +117,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       // }
       return;
     }
-    if (isSuperSet(this.solution_range.get(dominatee_id)!, this.solution_range.get(dominator_id)!)) {
+    if (is_super_set(this.solution_range.get(dominatee_id)!, this.solution_range.get(dominator_id)!)) {
       this.solution_range.set(dominatee_id, this.solution_range.get(dominator_id)!);
       this.tighten_solution_range_middle_out(dominatee_id);
       // if (config.debug) {
@@ -125,7 +125,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       // }
       return;
     }
-    throw new Error(`typeRangeAlignment: type_range of ${dominator_id}: ${this.solution_range.get(dominator_id)!.map(t => t.str())}
+    throw new Error(`type_range_alignment: type_range of ${dominator_id}: ${this.solution_range.get(dominator_id)!.map(t => t.str())}
       and ${dominatee_id}: ${this.solution_range.get(dominatee_id)!.map(t => t.str())} cannot be aligned`);
   }
 
@@ -199,7 +199,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
           }
         }
         else {
-          const s = createCustomSet<toTail>(equal_toTail);
+          const s = create_custom_set<toTail>(equal_toTail);
           s.add({ tail_id: tail_id, sub_dominance: thissub_dominance, super_dominance: thissuper_dominance });
           this.node2tail.set(parent, s);
         }
@@ -310,8 +310,8 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
           }
         }
         if (!same) {
-          let parent_candidates_issuper_dominanceset_of_child_candidates = isSuperSet(parent_solution_candidates, child_solution_candidates);
-          let child_candidates_issuper_dominanceset_of_parent_candidates = isSuperSet(child_solution_candidates, parent_solution_candidates);
+          let parent_candidates_issuper_dominanceset_of_child_candidates = is_super_set(parent_solution_candidates, child_solution_candidates);
+          let child_candidates_issuper_dominanceset_of_parent_candidates = is_super_set(child_solution_candidates, parent_solution_candidates);
           if (config.debug)
             assert(parent_candidates_issuper_dominanceset_of_child_candidates || child_candidates_issuper_dominanceset_of_parent_candidates,
               `restrict_solution_range: the solution range of ${parent}: ${parent_solution_candidates.map(x => x.str())} is not a superset
@@ -326,7 +326,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   }
 
   try_tighten_solution_range_middle_out(node : number, new_range : Node[]) : boolean {
-    this.typeRangeAlignment(node, node);
+    this.type_range_alignment(node, node);
     const solution_range = new Map(this.solution_range);
     solution_range.set(node, new_range);
     let upwards = (node : number) : boolean => {
@@ -336,11 +336,11 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       }
       let res = true;
       for (let parent of this.dag_nodes.get(node)!.ins) {
-        if (isEqualSet(solution_range.get(parent)!, solution_range.get(node)!)) {
+        if (is_equal_set(solution_range.get(parent)!, solution_range.get(node)!)) {
           continue;
         }
-        if (!isSuperSet(solution_range.get(parent)!, solution_range.get(node)!)
-          && !isSuperSet(solution_range.get(node)!, solution_range.get(parent)!)) {
+        if (!is_super_set(solution_range.get(parent)!, solution_range.get(node)!)
+          && !is_super_set(solution_range.get(node)!, solution_range.get(parent)!)) {
           return false
         }
         solution_range.set(parent, solution_range.get(node)!);
@@ -358,11 +358,11 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       }
       let res = true;
       for (let child of this.dag_nodes.get(node)!.outs) {
-        if (isEqualSet(solution_range.get(child)!, solution_range.get(node)!)) {
+        if (is_equal_set(solution_range.get(child)!, solution_range.get(node)!)) {
           continue;
         }
-        if (!isSuperSet(solution_range.get(child)!, solution_range.get(node)!)
-          && !isSuperSet(solution_range.get(node)!, solution_range.get(child)!)) {
+        if (!is_super_set(solution_range.get(child)!, solution_range.get(node)!)
+          && !is_super_set(solution_range.get(node)!, solution_range.get(child)!)) {
           return false;
         }
         solution_range.set(child, solution_range.get(node)!);
@@ -384,11 +384,11 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         return;
       }
       for (let parent of this.dag_nodes.get(node)!.ins) {
-        if (isEqualSet(this.solution_range.get(parent)!, this.solution_range.get(node)!)) {
+        if (is_equal_set(this.solution_range.get(parent)!, this.solution_range.get(node)!)) {
           continue;
         }
-        assert(isSuperSet(this.solution_range.get(parent)!, this.solution_range.get(node)!)
-          || isSuperSet(this.solution_range.get(node)!, this.solution_range.get(parent)!),
+        assert(is_super_set(this.solution_range.get(parent)!, this.solution_range.get(node)!)
+          || is_super_set(this.solution_range.get(node)!, this.solution_range.get(parent)!),
           `tighten_solution_range_middle_out::upwards: the solution range of ${parent}:
         ${this.solution_range.get(parent)!.map(t => t.str())} is not a superset/subset of the solution
         range of ${node}: ${this.solution_range.get(node)!.map(t => t.str())}`);
@@ -404,11 +404,11 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         return;
       }
       for (let child of this.dag_nodes.get(node)!.outs) {
-        if (isEqualSet(this.solution_range.get(child)!, this.solution_range.get(node)!)) {
+        if (is_equal_set(this.solution_range.get(child)!, this.solution_range.get(node)!)) {
           continue;
         }
-        assert(isSuperSet(this.solution_range.get(child)!, this.solution_range.get(node)!)
-          || isSuperSet(this.solution_range.get(node)!, this.solution_range.get(child)!),
+        assert(is_super_set(this.solution_range.get(child)!, this.solution_range.get(node)!)
+          || is_super_set(this.solution_range.get(node)!, this.solution_range.get(child)!),
           `tighten_solution_range_middle_out::downwards: the solution range of ${child}:
         ${this.solution_range.get(child)!.map(t => t.str())} is not a superset/subset of the solution
         range of ${node}: ${this.solution_range.get(node)!.map(t => t.str())}`);
@@ -426,9 +426,9 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       for (let child of this.dag_nodes.get(node)!.outs) {
         let child_type_range = this.solution_range.get(child)!;
         let parent_type_range = this.solution_range.get(node)!;
-        if (!isEqualSet(child_type_range, parent_type_range)) {
+        if (!is_equal_set(child_type_range, parent_type_range)) {
           if (config.debug)
-            assert(isSuperSet(child_type_range, parent_type_range),
+            assert(is_super_set(child_type_range, parent_type_range),
               `tighten_solution_range::broadcast_the_tightest_type_range_downwards: the solution
               range of ${child}: ${child_type_range.map(t => t.str())} is not a superset of the
               solution range of ${node}: ${parent_type_range.map(t => t.str())}`);
@@ -540,7 +540,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     this.head_solution_collection.push(new Map<number, Node>());
     for (let head of this.heads) {
       const head_resolution_length = this.head_solution_collection.length;
-      this.head_solution_collection = extendArrayofMap(this.head_solution_collection, this.solution_range.get(head)!.length);
+      this.head_solution_collection = extend_arrayofmap(this.head_solution_collection, this.solution_range.get(head)!.length);
       let cnt = 1;
       for (let solution of this.solution_range.get(head)!) {
         for (let i = (cnt - 1) * head_resolution_length; i < cnt * head_resolution_length; i++) {
@@ -551,7 +551,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     }
     if (config.debug) console.log(color.cyan(`head_solution_collection.size is ${this.head_solution_collection.length}`));
     if (this.head_solution_collection.length > config.maximum_type_resolution_for_heads) {
-      this.head_solution_collection = selectRandomElements(this.head_solution_collection, config.maximum_type_resolution_for_heads);
+      this.head_solution_collection = select_random_elements(this.head_solution_collection, config.maximum_type_resolution_for_heads);
     }
     else {
       this.head_solution_collection = shuffle(this.head_solution_collection);
@@ -847,7 +847,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
           assert(solution_candidates.length > 0,
             `resolve_nonheads_and_nontails case 3: solution_candidates is empty when edge is ${edge}`);
         }
-        this.solutions.set(child, pickRandomElement(solution_candidates)! as Node);
+        this.solutions.set(child, pick_random_element(solution_candidates)! as Node);
         this.resolve_nonheads_and_nontails(child);
       }
     }
@@ -855,7 +855,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
 
   check_solution_range_after_tightening(node : number) : void {
     for (let child of this.dag_nodes.get(node)!.outs) {
-      assert(isEqualSet(this.solution_range.get(node)!, this.solution_range.get(child)!),
+      assert(is_equal_set(this.solution_range.get(node)!, this.solution_range.get(child)!),
         `check_solution_range_after_tightening: the solution range of ${node}:
         ${this.solution_range.get(node)!.map(t => t.str())} is not the same as the solution
         range of ${child}: ${this.solution_range.get(child)!.map(t => t.str())}`);
@@ -865,7 +865,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
 
   check_solution_range_before_tightening(node : number) : void {
     for (let child of this.dag_nodes.get(node)!.outs) {
-      assert(isSuperSet(this.solution_range.get(child)!, this.solution_range.get(node)!),
+      assert(is_super_set(this.solution_range.get(child)!, this.solution_range.get(node)!),
         `check_solution_range_before_tightening: the solution range of ${child}:
         ${this.solution_range.get(child)!.map(t => t.str())} is not the superset of the solution
         range of ${node}: ${this.solution_range.get(node)!.map(t => t.str())}.
