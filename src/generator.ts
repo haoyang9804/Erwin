@@ -46,7 +46,6 @@ enum IDENTIFIER {
   STRUCT_INSTANCE
 };
 // Record statements in each scope.
-export const scope2userDefinedTypes = new Map<number, number>();
 export const type_dag = new TypeDominanceDAG();
 export const funcstat_dag = new FuncStateMutabilityDominanceDAG();
 export const func_visibility_dag = new FuncVisibilityDominanceDAG();
@@ -130,7 +129,7 @@ function has_available_IRVariableDeclaration_with_type_constraint(types : type.T
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Generator
 
-export abstract class Generator {
+abstract class Generator {
   irnode : IRNode | undefined;
   generator_name : string;
   constructor() {
@@ -164,12 +163,12 @@ export class SourceUnitGenerator extends Generator {
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Declaration Generator
 
-export abstract class DeclarationGenerator extends Generator {
+abstract class DeclarationGenerator extends Generator {
   constructor() { super(); }
   abstract generate() : void;
 }
 
-export class ContractInstanceDeclarationGenerator extends DeclarationGenerator {
+class ContractInstanceDeclarationGenerator extends DeclarationGenerator {
   contract_id ? : number;
   no_initializer : boolean;
   type_range : type.Type[];
@@ -243,7 +242,7 @@ export class ContractInstanceDeclarationGenerator extends DeclarationGenerator {
   }
 }
 
-export class ElementaryTypeVariableDeclarationGenerator extends DeclarationGenerator {
+class ElementaryTypeVariableDeclarationGenerator extends DeclarationGenerator {
   type_range : type.Type[];
   name : string | undefined;
   no_initializer : boolean;
@@ -320,7 +319,7 @@ export class ElementaryTypeVariableDeclarationGenerator extends DeclarationGener
   }
 }
 
-export class VariableDeclarationGenerator extends DeclarationGenerator {
+class VariableDeclarationGenerator extends DeclarationGenerator {
   no_initializer : boolean;
   type_range : type.Type[];
   constructor(type_range : type.Type[], no_initializer : boolean = true) {
@@ -354,7 +353,7 @@ export class VariableDeclarationGenerator extends DeclarationGenerator {
   }
 }
 
-export class ConstructorDeclarationGenerator extends DeclarationGenerator {
+class ConstructorDeclarationGenerator extends DeclarationGenerator {
   parameters : decl.IRVariableDeclaration[] = [];
   function_scope : ScopeList;
   fid : number;
@@ -457,8 +456,8 @@ export class ConstructorDeclarationGenerator extends DeclarationGenerator {
     }
   }
 }
-
-export class StructGenerator extends DeclarationGenerator {
+// @ts-ignore
+class StructGenerator extends DeclarationGenerator {
   erwin_vis : erwin_visibility;
   constructor(erwin_vis : erwin_visibility) {
     super();
@@ -502,7 +501,7 @@ export class StructGenerator extends DeclarationGenerator {
   }
 }
 
-export class FunctionDeclarationGenerator extends DeclarationGenerator {
+class FunctionDeclarationGenerator extends DeclarationGenerator {
   has_body : boolean;
   return_count : number;
   parameter_count : number;
@@ -779,7 +778,7 @@ export class FunctionDeclarationGenerator extends DeclarationGenerator {
   }
 }
 
-export class ContractDeclarationGenerator extends DeclarationGenerator {
+class ContractDeclarationGenerator extends DeclarationGenerator {
   constructor() { super(); }
   generate() : void {
     //! Create the contract scope
@@ -917,7 +916,7 @@ export class ContractDeclarationGenerator extends DeclarationGenerator {
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Expression Generator
 
-export abstract class ExpressionGenerator extends Generator {
+abstract class ExpressionGenerator extends Generator {
   type_range : type.Type[];
   id : number;
   constructor(id : number) {
@@ -929,28 +928,29 @@ export abstract class ExpressionGenerator extends Generator {
   abstract generate(cur_expression_complex_level : number) : void;
 }
 
-export abstract class LValueGenerator extends ExpressionGenerator {
+// @ts-ignore
+abstract class LValueGenerator extends ExpressionGenerator {
   constructor(id : number) {
     super(id);
   }
   abstract generate(cur_expression_complex_level : number) : void;
 }
 
-export abstract class RValueGenerator extends ExpressionGenerator {
+abstract class RValueGenerator extends ExpressionGenerator {
   constructor(id : number) {
     super(id);
   }
   abstract generate(cur_expression_complex_level : number) : void;
 }
 
-export abstract class LRValueGenerator extends ExpressionGenerator {
+abstract class LRValueGenerator extends ExpressionGenerator {
   constructor(id : number) {
     super(id);
   }
   abstract generate(cur_expression_complex_level : number) : void;
 }
 
-export class LiteralGenerator extends RValueGenerator {
+class LiteralGenerator extends RValueGenerator {
   constructor(id : number) {
     super(id);
   }
@@ -969,7 +969,7 @@ export class LiteralGenerator extends RValueGenerator {
   }
 }
 
-export class IdentifierGenerator extends LRValueGenerator {
+class IdentifierGenerator extends LRValueGenerator {
   constructor(id : number) {
     super(id);
   }
@@ -1025,7 +1025,7 @@ export class IdentifierGenerator extends LRValueGenerator {
 
 type ASSIOP = "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<<=" | ">>=" | "&=" | "^=" | "|=";
 
-export class AssignmentGenerator extends RValueGenerator {
+class AssignmentGenerator extends RValueGenerator {
   op : ASSIOP;
 
   constructor(id : number, op ?: ASSIOP) {
@@ -1166,7 +1166,7 @@ export class AssignmentGenerator extends RValueGenerator {
 
 type BOP = "+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "<" | ">" | "<=" | ">=" | "==" | "!=" | "&" | "^" | "|" | "&&" | "||";
 
-export class BinaryOpGenerator extends RValueGenerator {
+class BinaryOpGenerator extends RValueGenerator {
   op : BOP;
   constructor(id : number, op ?: BOP) {
     super(id);
@@ -1331,7 +1331,7 @@ export class BinaryOpGenerator extends RValueGenerator {
 
 type BINARYCOMPAREOP = "<" | ">" | "<=" | ">=" | "==" | "!=" | "&&" | "||";
 
-export class BinaryCompareOpGenerator extends RValueGenerator {
+class BinaryCompareOpGenerator extends RValueGenerator {
   op : BINARYCOMPAREOP;
   constructor(id : number, op ?: BINARYCOMPAREOP) {
     super(id);
@@ -1420,7 +1420,7 @@ export class BinaryCompareOpGenerator extends RValueGenerator {
 type UOP = "!" | "-" | "~" | "++" | "--";
 
 //TODO: create a delete Statement Generator
-export class UnaryOpGenerator extends RValueGenerator {
+class UnaryOpGenerator extends RValueGenerator {
   op : UOP;
   constructor(id : number, op ?: UOP) {
     super(id);
@@ -1489,7 +1489,7 @@ export class UnaryOpGenerator extends RValueGenerator {
   }
 }
 
-export class ConditionalGenerator extends RValueGenerator {
+class ConditionalGenerator extends RValueGenerator {
   constructor(id : number) {
     super(id);
   }
@@ -1607,7 +1607,7 @@ export class ConditionalGenerator extends RValueGenerator {
   }
 }
 
-export class FunctionCallGenerator extends RValueGenerator {
+class FunctionCallGenerator extends RValueGenerator {
   kind : FunctionCallKind | undefined;
   constructor(id : number, kind ?: FunctionCallKind) {
     super(id);
@@ -1955,7 +1955,7 @@ export class FunctionCallGenerator extends RValueGenerator {
   }
 }
 
-export class NewContractDecarationGenerator extends ExpressionGenerator {
+class NewContractDecarationGenerator extends ExpressionGenerator {
   contract_id ? : number;
   constructor(id : number, contract_id ?: number) {
     super(id);
@@ -2115,19 +2115,19 @@ const nonnew_nonterminal_expression_generators = [
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Statement Generator
 
-export abstract class StatementGenerator extends Generator {
+abstract class StatementGenerator extends Generator {
   constructor() { super(); }
   abstract generate(cur_stmt_complex_level : number) : void;
 }
 
 
-export abstract class ExpressionStatementGenerator extends StatementGenerator {
+abstract class ExpressionStatementGenerator extends StatementGenerator {
   expr : expr.IRExpression | undefined;
   constructor() { super(); }
   generate(cur_stmt_complex_level : number) : void { }
 }
 
-export class AssignmentStatementGenerator extends ExpressionStatementGenerator {
+class AssignmentStatementGenerator extends ExpressionStatementGenerator {
   constructor() { super(); }
   generate(cur_stmt_complex_level : number) : void {
     if (config.debug) {
@@ -2147,7 +2147,7 @@ export class AssignmentStatementGenerator extends ExpressionStatementGenerator {
   }
 }
 
-export class BinaryOpStatementGenerator extends ExpressionStatementGenerator {
+class BinaryOpStatementGenerator extends ExpressionStatementGenerator {
   constructor() { super(); }
   generate(cur_stmt_complex_level : number) : void {
     if (config.debug) {
@@ -2167,7 +2167,7 @@ export class BinaryOpStatementGenerator extends ExpressionStatementGenerator {
   }
 }
 
-export class UnaryOpStatementGenerator extends ExpressionStatementGenerator {
+class UnaryOpStatementGenerator extends ExpressionStatementGenerator {
   constructor() { super(); }
   generate(cur_stmt_complex_level : number) : void {
     if (config.debug) {
@@ -2187,7 +2187,7 @@ export class UnaryOpStatementGenerator extends ExpressionStatementGenerator {
   }
 }
 
-export class ConditionalStatementGenerator extends ExpressionStatementGenerator {
+class ConditionalStatementGenerator extends ExpressionStatementGenerator {
   constructor() { super(); }
   generate(cur_stmt_complex_level : number) : void {
     if (config.debug) {
@@ -2207,7 +2207,7 @@ export class ConditionalStatementGenerator extends ExpressionStatementGenerator 
   }
 }
 
-export class FunctionCallStatementGenerator extends ExpressionStatementGenerator {
+class FunctionCallStatementGenerator extends ExpressionStatementGenerator {
   constructor() {
     super();
   }
@@ -2231,7 +2231,7 @@ export class FunctionCallStatementGenerator extends ExpressionStatementGenerator
   }
 }
 
-export abstract class NonExpressionStatementGenerator extends StatementGenerator {
+abstract class NonExpressionStatementGenerator extends StatementGenerator {
   exprs : expr.IRExpression[];
   constructor() {
     super();
@@ -2242,8 +2242,8 @@ export abstract class NonExpressionStatementGenerator extends StatementGenerator
   }
   abstract generate(cur_stmt_complex_level : number) : void;
 };
-
-export class SingleVariableDeclareStatementGenerator extends NonExpressionStatementGenerator {
+// @ts-ignore
+class SingleVariableDeclareStatementGenerator extends NonExpressionStatementGenerator {
   vardecl : decl.IRVariableDeclaration | undefined;
   expr : expr.IRExpression | undefined;
   constructor(vardecl ?: decl.IRVariableDeclaration, expr ?: expr.IRExpression) {
@@ -2286,7 +2286,7 @@ export class SingleVariableDeclareStatementGenerator extends NonExpressionStatem
   }
 }
 
-export class MultipleVariableDeclareStatementGenerator extends NonExpressionStatementGenerator {
+class MultipleVariableDeclareStatementGenerator extends NonExpressionStatementGenerator {
   var_count : number;
   vardecls : decl.IRVariableDeclaration[] = [];
   constructor(var_count : number) {
@@ -2332,7 +2332,7 @@ export class MultipleVariableDeclareStatementGenerator extends NonExpressionStat
   }
 }
 
-export class ReturnStatementGenerator extends NonExpressionStatementGenerator {
+class ReturnStatementGenerator extends NonExpressionStatementGenerator {
   value : expr.IRExpression | undefined;
   constructor(value ?: expr.IRExpression) {
     super();
@@ -2362,7 +2362,7 @@ export class ReturnStatementGenerator extends NonExpressionStatementGenerator {
   }
 }
 
-export class IfStatementGenerator extends NonExpressionStatementGenerator {
+class IfStatementGenerator extends NonExpressionStatementGenerator {
   constructor() {
     super();
   }
@@ -2425,7 +2425,7 @@ export class IfStatementGenerator extends NonExpressionStatementGenerator {
   }
 }
 
-export class ForStatementGenerator extends NonExpressionStatementGenerator {
+class ForStatementGenerator extends NonExpressionStatementGenerator {
   constructor() {
     super();
   }
@@ -2504,7 +2504,7 @@ export class ForStatementGenerator extends NonExpressionStatementGenerator {
   }
 }
 
-export class WhileStatementGenerator extends NonExpressionStatementGenerator {
+class WhileStatementGenerator extends NonExpressionStatementGenerator {
   constructor() {
     super();
   }
@@ -2547,7 +2547,7 @@ export class WhileStatementGenerator extends NonExpressionStatementGenerator {
   }
 }
 
-export class DoWhileStatementGenerator extends NonExpressionStatementGenerator {
+class DoWhileStatementGenerator extends NonExpressionStatementGenerator {
   constructor() {
     super();
   }

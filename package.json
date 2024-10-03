@@ -10,6 +10,7 @@
   "bin": {
     "erwin": "dist/index.js"
   },
+  "prepublish": "tsc",
   "dependencies": {
     "@ts-graphviz/adapter": "^2.0.3",
     "@types/figlet": "^1.5.8",
