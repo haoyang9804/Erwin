@@ -958,6 +958,8 @@ class LiteralGenerator extends RValueGenerator {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Literal ${this.id}: ${this.type_range.map(t => t.str())}`));
     }
+    this.type_range = [...intersection(new Set<type.Type>(this.type_range), new Set<type.Type>(type.elementary_types))];
+    assert(this.type_range.length > 0, `LiteralGenerator: type_range ${this.type_range.map(t => t.str())} is invalid`);
     type_dag.insert(type_dag.newNode(this.id), this.type_range);
     this.irnode = new expr.IRLiteral(this.id, cur_scope.id());
     expr2used_vardecls.set(this.irnode.id, new Set<number>());
@@ -1061,7 +1063,7 @@ class AssignmentGenerator extends RValueGenerator {
     if (this.op === "=") {
     }
     else {
-      this.type_range = [...intersection(new Set<type.Type>(this.type_range), new Set<type.Type>(type.all_integer_types))]
+      this.type_range = [...intersection(new Set<type.Type>(this.type_range), new Set<type.Type>(type.all_integer_types))];
       assert(this.type_range.length > 0, "AssignmentGenerator: type_range is empty");
     }
     if (this.op !== "=") {
@@ -1427,9 +1429,6 @@ class UnaryOpGenerator extends RValueGenerator {
     if (op !== undefined) {
       this.op = op;
     }
-    else if (is_equal_set(this.type_range, all_types)) {
-      this.op = pick_random_element(["!", "-", "~", "++", "--"])!;
-    }
     else if (is_equal_set(this.type_range, type.bool_types)) {
       this.op = "!";
     }
@@ -1440,7 +1439,7 @@ class UnaryOpGenerator extends RValueGenerator {
       this.op = pick_random_element(["~", "++", "--"])!;
     }
     else {
-      throw new Error(`UnaryOpGenerator constructor: type_range ${this.type_range.map(t => t.str())} is invalid`);
+      this.op = pick_random_element(["!", "-", "~", "++", "--"])!;
     }
   }
   generate(cur_expression_complex_level : number) : void {
