@@ -33,7 +33,7 @@ export abstract class IRDeclare extends IRNode {
 export class IRVariableDeclaration extends IRDeclare {
   indexed : boolean = false;
   constant : boolean = false; // duplicated with attribute `mutable`. but required by solc-typed-ast.
-  state : boolean = true;
+  state : boolean = false;
   memory : DataLocation = DataLocation.Default;
   visibility : StateVariableVisibility = StateVariableVisibility.Default;
   mutable : Mutability = Mutability.Mutable;
@@ -41,7 +41,7 @@ export class IRVariableDeclaration extends IRDeclare {
   value : IRExpression | undefined;
   typestr : string | undefined;
   constructor(id : number, scope : number, name : string, value ?: IRExpression,
-    visibility ?: StateVariableVisibility, typestr ?: string, mutable ?: Mutability,
+    visibility ?: StateVariableVisibility, state ?: boolean, typestr ?: string, mutable ?: Mutability,
     memory ?: DataLocation, constant ?: boolean, indexed ?: boolean) {
     super(id, scope, name);
     this.value = value;
@@ -67,15 +67,16 @@ export class IRVariableDeclaration extends IRDeclare {
     if (this.type !== undefined) {
       if (this.type.kind === TypeKind.ElementaryType) {
         const type = this.type as ElementaryType;
-        typename = factory.makeElementaryTypeName("", type.str());
+        typename = factory.makeElementaryTypeName(type.str(), type.str());
       }
       else if (this.type.kind === TypeKind.ContractType) {
         const type = this.type as ContractType;
-        typename = factory.makeElementaryTypeName("", type.name);
+        typename = factory.makeElementaryTypeName(type.name, type.name);
       }
       else if (this.type.kind === TypeKind.StructType) {
         const type = this.type as StructType;
-        typename = factory.makeElementaryTypeName("", type.name);
+        typename = factory.makeUserDefinedTypeName((type as StructType).type_str, type.name,
+          type.referece_id, factory.makeIdentifierPath(type.name, type.referece_id));
       }
       else {
         throw new Error(`IRVariableDeclaration: type ${this.type.kind} is not supported`);
@@ -85,7 +86,6 @@ export class IRVariableDeclaration extends IRDeclare {
       assert(this.typestr !== undefined, "IRVariableDeclaration: typestr is not generated")
       typename = factory.makeElementaryTypeName("", this.typestr);
     }
-    this.memory = DataLocation.Memory;
     //TODO: add support for memory
     //TODO: add support for other types, firstly function type
     assert(typename !== undefined, `IRVariableDeclaration ${this.id}: typename is not generated`)

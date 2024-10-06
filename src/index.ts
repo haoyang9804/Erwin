@@ -208,7 +208,7 @@ else if (program.args[0] === "generate") {
   assert(config.do_while_body_stmt_cnt_lower_limit >= 0, "The lower limit of the number of statements in the body of a do while loop must be not less than 0.");
   assert(config.if_body_stmt_cnt_lower_limit <= config.if_body_stmt_cnt_upper_limit, "The lower limit of the number of statements in the body of an if statement must be less than or equal to the upper limit.");
   assert(config.struct_member_variable_count_lowerlimit <= config.struct_member_variable_count_upperlimit, "The lower limit of the number of member variables in a struct must be less than or equal to the upper limit.");
-  assert(config.struct_member_variable_count_lowerlimit >= 0, "The lower limit of the number of member variables in a struct must be not less than 0.");
+  assert(config.struct_member_variable_count_lowerlimit >= 1, "The lower limit of the number of member variables in a struct must be not less than 1.");
   assert(config.struct_prob >= 0 && config.struct_prob <= 1, "The probability of generating a struct must be in the range [0,1].");
   assert(config.initialization_prob >= 0 && config.initialization_prob <= 1, "The probability of generating an initialization statement must be in the range [0,1].");
   assert(config.contract_instance_prob >= 0 && config.struct_instance_prob >= 0 && config.contract_instance_prob + config.struct_instance_prob < 1, "The probability of generating a contract/struct instance must be in the range [0,1).");

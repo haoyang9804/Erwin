@@ -1,4 +1,4 @@
-import { TypeProvider } from "../src/type"
+import { TypeProvider, StructType } from "../src/type"
 import { IRModifier, IRVariableDeclaration, IRFunctionDefinition } from "../src/declare";
 import { IRIdentifier, IRBinaryOp, IRLiteral, IRTuple, IRFunctionCall } from "../src/expression";
 import { IRPlaceholderStatement, IRVariableDeclareStatement, IRExpressionStatement } from "../src/statement";
@@ -10,7 +10,8 @@ import {
   FunctionKind,
   FunctionVisibility,
   FunctionStateMutability,
-  FunctionCallKind
+  FunctionCallKind,
+  DataLocation
 } from "solc-typed-ast"
 import { config } from '../src/config';
 config.unit_test_mode = true;
@@ -57,7 +58,8 @@ test("test modifier 2",
 )
 
 const v2 = new IRVariableDeclaration(5, 0, "y");
-v2.type = TypeProvider.uint256()
+v2.type = new StructType(100, "S", "struct S")
+v2.memory = DataLocation.Memory
 
 const v3 = new IRVariableDeclaration(6, 0, "z");
 v3.type = TypeProvider.uint256()
@@ -69,7 +71,7 @@ true, true, [v2], [v3], [variable_declare_stmt], [{name: "M", arg_names: ["x"]}]
 
 test("test function 1",
 () => {
-  expect(writer.write(f_correct.lower())).toBe("function F(uint256 y) virtual override private view M(x) returns (uint256 z) {\n  (uint256 x, uint256 y) = (" + literal1.value + ", " + literal2.value + ");\n}")
+  expect(writer.write(f_correct.lower())).toBe("function F(S y) virtual override private view M(x) returns (uint256 z) {\n  (uint256 x, uint256 y) = (" + literal1.value + ", " + literal2.value + ");\n}")
 }
 )
 
