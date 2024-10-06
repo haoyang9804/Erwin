@@ -13,7 +13,7 @@ import {
 } from "solc-typed-ast"
 
 import { assert } from "./utility";
-import { TypeKind, Type, ElementaryType, UnionType, FunctionType, ContractType } from "./type";
+import { TypeKind, Type, ElementaryType, UnionType, FunctionType, ContractType, StructType } from "./type";
 import { IRNode, factory } from "./node";
 import { IRStatement, IRPlaceholderStatement } from "./statement";
 import { IRExpression } from "./expression";
@@ -61,6 +61,11 @@ export class IRVariableDeclaration extends IRDeclare {
       }
       else if (this.type.kind === TypeKind.ContractType) {
         const type = this.type as ContractType;
+        typename = factory.makeElementaryTypeName("", type.name);
+        this.memory = DataLocation.Default;
+      }
+      else if (this.type.kind === TypeKind.StructType) {
+        const type = this.type as StructType;
         typename = factory.makeElementaryTypeName("", type.name);
         this.memory = DataLocation.Default;
       }

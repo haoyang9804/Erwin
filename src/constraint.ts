@@ -875,7 +875,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     }
   }
 
-  resolve_by_chunk() : void {
+  resolve_by_stream() : void {
     // !initialize the resolution
     this.initialize_resolve();
     // !Get heads and tails

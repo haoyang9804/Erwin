@@ -76,14 +76,17 @@ program
   .option("--literal_prob <float>", "The probability of generating a literal.", `${config.literal_prob}`)
   .option("--tuple_prob <float>", "The probability of generating a tuple surrounding an expression.", `${config.tuple_prob}`)
   .option("--vardecl_prob <float>", "The probability of generating a variable declaration.", `${config.vardecl_prob}`)
+  .option("--in_place_vardecl_prob <float>", "The probability of generating a variable declaration in place.", `${config.in_place_vardecl_prob}`)
   .option("--else_prob <float>", "The probability of generating an else statement.", `${config.else_prob}`)
   .option("--terminal_prob <float>", "The probability of generating a terminal statement.", `${config.terminal_prob}`)
   .option("--init_state_var_in_constructor_prob <float>", "The probability of initializing a state variable in the constructor.", `${config.init_state_var_in_constructor_prob}`)
   .option("--struct_prob <float>", "The probability of generating a struct.", `${config.struct_prob}`)
   .option("--contract_instance_prob <float>", "The probability of generating a contract instance.", `${config.contract_instance_prob}`)
+  .option("--struct_instance_prob <float>", "The probability of generating a struct instance.", `${config.struct_instance_prob}`)
   .option("--initialization_prob <float>", "The probability of generating an initialization statement.", `${config.initialization_prob}`)
   .option("--constructor_prob <float>", "The probability of generating a constructor.", `${config.constructor_prob}`)
   .option("--return_prob <float>", "The probability of generating a return statement.", `${config.return_prob}`)
+  .option("--reuse_name_prob <float>", "The probability of reusing a name.", `${config.reuse_name_prob}`)
   // Structured Statements
   .option("--for_init_cnt_upper_limit <number>", "The upper limit of the number of initialization in a for loop.", `${config.for_init_cnt_upper_limit}`)
   .option("--for_init_cnt_lower_limit <number>", "The lower limit of the number of initialization in a for loop.", `${config.for_init_cnt_lower_limit}`)
@@ -125,15 +128,18 @@ else if (program.args[0] === "generate") {
   config.contract_count = parseInt(program.commands[1].opts().contract_count);
   config.mode = program.commands[1].opts().mode;
   config.vardecl_prob = parseFloat(program.commands[1].opts().vardecl_prob);
+  config.in_place_vardecl_prob = parseFloat(program.commands[1].opts().in_place_vardecl_prob);
   config.else_prob = parseFloat(program.commands[1].opts().else_prob);
   config.terminal_prob = parseFloat(program.commands[1].opts().terminal_prob);
   config.init_state_var_in_constructor_prob = parseFloat(program.commands[1].opts().init_state_var_in_constructor_prob);
   config.nonstructured_statement_prob = parseFloat(program.commands[1].opts().nonstructured_statement_prob);
   config.struct_prob = parseFloat(program.commands[1].opts().struct_prob);
   config.contract_instance_prob = parseFloat(program.commands[1].opts().contract_instance_prob);
+  config.struct_instance_prob = parseFloat(program.commands[1].opts().struct_instance_prob);
   config.initialization_prob = parseFloat(program.commands[1].opts().initialization_prob);
   config.constructor_prob = parseFloat(program.commands[1].opts().constructor_prob);
   config.return_prob = parseFloat(program.commands[1].opts().return_prob);
+  config.reuse_name_prob = parseFloat(program.commands[1].opts().reuse_name_prob);
   config.for_init_cnt_upper_limit = parseInt(program.commands[1].opts().for_init_cnt_upper_limit);
   config.for_init_cnt_lower_limit = parseInt(program.commands[1].opts().for_init_cnt_lower_limit);
   config.statement_complex_level = parseInt(program.commands[1].opts().statement_complex_level);
@@ -170,7 +176,7 @@ else if (program.args[0] === "generate") {
   assert(config.function_count_per_contract_lower_limit <= config.function_count_per_contract_upper_limit, "The lower limit of the number of functions must be less than or equal to the upper limit.");
   assert(config.function_count_per_contract_lower_limit >= 0, "The number of functions must be not less than 0.");
   assert(config.literal_prob >= 0 && config.literal_prob <= 1, "The probability of generating a literal must be in the range [0,1].");
-  assert(config.maximum_type_resolution_for_heads >= config.chunk_size, "The maximum number of type resolutions for heads must be not less than the size of chunk.");
+  assert(config.stream || config.maximum_type_resolution_for_heads >= config.chunk_size, "The maximum number of type resolutions for heads must be not less than the size of chunk in nonstream mode.");
   assert(config.tuple_prob >= 0 && config.tuple_prob <= 1, "The probability of generating a tuple surrounding an expression must be in the range [0,1].");
   assert(config.init_state_var_in_constructor_prob >= 0 && config.init_state_var_in_constructor_prob <= 1, "The probability of initializing a state variable in the constructor must be in the range [0,1].");
   assert(config.expression_complex_level >= 0, "The complex level of the expression must be not less than 0.");
@@ -180,6 +186,7 @@ else if (program.args[0] === "generate") {
   assert(config.contract_count >= 0, "contract_count must be not less than 0.");
   assert(["type", "scope"].includes(config.mode), "The mode is not either 'type' or 'scope', instead it is " + config.mode);
   assert(config.vardecl_prob >= 0 && config.vardecl_prob <= 1.0, "The probability of generating a variable declaration must be in the range [0,1].");
+  assert(config.in_place_vardecl_prob >= 0 && config.in_place_vardecl_prob <= 1.0, "The probability of generating a variable declaration in place must be in the range [0,1].");
   assert(config.else_prob >= 0.0 && config.else_prob <= 1.0, "The probability of generating an else statement must be in the range [0,1].");
   assert(config.terminal_prob >= 0.0 && config.terminal_prob <= 1.0, "The probability of generating a terminal statement must be in the range [0,1].");
   assert(config.return_count_of_function_lowerlimit <= config.return_count_of_function_upperlimit, "The lower limit of the number of return values of a function must be less than or equal to the upper limit.");
@@ -204,9 +211,10 @@ else if (program.args[0] === "generate") {
   assert(config.struct_member_variable_count_lowerlimit >= 0, "The lower limit of the number of member variables in a struct must be not less than 0.");
   assert(config.struct_prob >= 0 && config.struct_prob <= 1, "The probability of generating a struct must be in the range [0,1].");
   assert(config.initialization_prob >= 0 && config.initialization_prob <= 1, "The probability of generating an initialization statement must be in the range [0,1].");
-  assert(config.contract_instance_prob >= 0 && config.contract_instance_prob <= 1, "The probability of generating a contract instance must be in the range [0,1].");
+  assert(config.contract_instance_prob >= 0 && config.struct_instance_prob >= 0 && config.contract_instance_prob + config.struct_instance_prob < 1, "The probability of generating a contract/struct instance must be in the range [0,1).");
   assert(config.constructor_prob >= 0 && config.constructor_prob <= 1, "The probability of generating a constructor must be in the range [0,1].");
   assert(config.return_prob >= 0 && config.return_prob <= 1, "The probability of generating a return statement must be in the range [0,1].");
+  assert(config.reuse_name_prob >= 0 && config.reuse_name_prob < 1, "The probability of reusing a name must be in the range [0,1).");
 }
 // Execute
 if (program.args[0] === "mutate") {
@@ -371,7 +379,7 @@ async function generate() {
   })();
   try {
     let startTime = performance.now()
-    gen.type_dag.resolve_by_chunk();
+    gen.type_dag.resolve_by_stream();
     let endTime = performance.now();
     console.log(`Time cost of resolving type constraints: ${endTime - startTime} ms`);
     startTime = performance.now();

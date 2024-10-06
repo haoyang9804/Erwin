@@ -12,7 +12,7 @@ export const config = {
   no_type_exploration: false,
 
   // Dominance Constraint Solution
-  maximum_type_resolution_for_heads: 2000000,
+  maximum_type_resolution_for_heads: 1000,
   chunk_size: 100000,
   stream: true,
 
@@ -44,14 +44,18 @@ export const config = {
   literal_prob: 0.05,
   tuple_prob: 0.3,
   vardecl_prob: 0.1,
+  // The probability of "new"ing a contract or a struct instance
+  in_place_vardecl_prob: 0.5,
   else_prob: 0.3,
   terminal_prob: 0.05,
   init_state_var_in_constructor_prob: 0.3,
   struct_prob: 0.5,
   contract_instance_prob: 0.1,
+  struct_instance_prob: 0.1,
   initialization_prob: 0.3,
   constructor_prob: 0.5,
   return_prob: 0.5,
+  reuse_name_prob: 0.3,
 
   // Structured Statements
   for_init_cnt_upper_limit: 1,
