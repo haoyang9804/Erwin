@@ -31,8 +31,8 @@ export class IRPlaceholderStatement extends IRStatement {
 
 export class IRVariableDeclareStatement extends IRStatement {
   variable_declares : (IRVariableDeclaration | null)[];
-  value : IRExpression;
-  constructor(id : number, scope : number, variable_declares : (IRVariableDeclaration | null)[], value : IRExpression) {
+  value : IRExpression | undefined;
+  constructor(id : number, scope : number, variable_declares : (IRVariableDeclaration | null)[], value ?: IRExpression) {
     super(id, scope);
     this.variable_declares = variable_declares;
     this.value = value;
@@ -44,7 +44,8 @@ export class IRVariableDeclareStatement extends IRStatement {
     }
     const lowered_variable_declares = (this.variable_declares.filter(v => v !== null) as IRVariableDeclaration[]).map(v => v.lower() as VariableDeclaration);
     const assignments = lowered_variable_declares.map(v => v.id);
-    return factory.makeVariableDeclarationStatement(assignments, lowered_variable_declares, this.value.lower());
+    return factory.makeVariableDeclarationStatement(assignments, lowered_variable_declares,
+      this.value !== undefined ? this.value.lower() : undefined);
   }
 }
 

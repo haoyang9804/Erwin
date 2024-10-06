@@ -127,14 +127,16 @@ class DeclDB {
   // It's records the scope that contract instance node exposes to the outside world.
   private contractdecl_id_to_scope : Map<number, number>;
   public vardecls : Set<number> = new Set<number>();
-  public state_variables : Set<number> = new Set<number>();
-  public contractdecl_to_contract_instance : Map<number, number[]> = new Map<number, number[]>();
+  public structdecls : Set<number> = new Set<number>();
   public funcdecls : Set<number> = new Set<number>();
+  public contractdecls : Set<number> = new Set<number>();
+  public state_variables : Set<number> = new Set<number>();
+  // public structdecl_to_struct_instance : Map<number, number[]> = new Map<number, number[]>();
+  // public contractdecl_to_contract_instance : Map<number, number[]> = new Map<number, number[]>();
   // ghost funcdecls are function decls playing the role of getter functions of member variables
   public ghost_funcdecls : Set<number> = new Set<number>();
   // vardecl_to_ghost_vardecls are used in collaboration with ghost funcdecls to avoid type resolution problems.
   public ghost_vardecl_to_state_vardecl : Map<number, number> = new Map<number, number>();
-  public contractdecls : Set<number> = new Set<number>();
   public called_function_decls_IDs : Set<number> = new Set<number>();
   constructor() {
     this.scope_tree = new Tree();
@@ -210,9 +212,19 @@ class DeclDB {
     return irnodes_ids.filter(x => this.funcdecls.has(x));
   }
 
+  get_structdecls_ids_recursively_from_a_scope(scope_id : number) : number[] {
+    let irnodes_ids = this.get_irnodes_ids_recursively_from_a_scope(scope_id);
+    return irnodes_ids.filter(x => this.structdecls.has(x));
+  }
+
   get_funcdecls_ids_recursively_from_a_contract(contract_id : number) : number[] {
     let scope_id = this.contractdecl_id_to_scope.get(contract_id);
     return this.get_funcdecls_ids_recursively_from_a_scope(scope_id!);
+  }
+
+  get_structdecls_ids_recursively_from_a_contract(contract_id : number) : number[] {
+    let scope_id = this.contractdecl_id_to_scope.get(contract_id);
+    return this.get_structdecls_ids_recursively_from_a_scope(scope_id!);
   }
 }
 

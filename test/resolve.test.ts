@@ -20,7 +20,7 @@ test("test type dominance dag 1",
   type_dag.connect(4, 5);
   type_dag.connect(1, 3);
   type_dag.connect(3, 5, "sub_dominance");
-  type_dag.resolve_by_chunk();
+  type_dag.resolve_by_stream();
   type_dag.verify();
 }
 )
@@ -49,7 +49,7 @@ test("test type dominance dag 2",
   type_dag.connect(1, 5);
   type_dag.connect(5, 6, "sub_dominance");
   type_dag.connect(6, 4);
-  type_dag.resolve_by_chunk();
+  type_dag.resolve_by_stream();
   type_dag.verify();
 }
 )
@@ -91,7 +91,7 @@ test("test type dominance dag 3",
   type_dag.connect(10, 7);
   type_dag.connect(11, 10, "sub_dominance");
   type_dag.connect(11, 9);
-  type_dag.resolve_by_chunk();
+  type_dag.resolve_by_stream();
   type_dag.verify();
 }
 )
@@ -136,7 +136,7 @@ test("test type dominance dag 4",
   type_dag.connect(10, 11);
   type_dag.connect(11, 3);
   type_dag.connect(11, 12, "sub_dominance");
-  type_dag.resolve_by_chunk();
+  type_dag.resolve_by_stream();
   type_dag.verify();
 }
 )
@@ -156,7 +156,7 @@ test("test address supers solution",
   type_dag.connect(1, 2, "super_dominance");
   type_dag.connect(3, 2);
   type_dag.connect(3, 4, "super_dominance");
-  type_dag.resolve_by_chunk();
+  type_dag.resolve_by_stream();
   type_dag.verify();
 }
 )
