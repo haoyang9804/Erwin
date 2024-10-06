@@ -8,9 +8,12 @@ export enum scopeKind {
   FUNC = "scopeKind::FUNC",
   CONTRACT = "scopeKind::CONTRACT",
   GLOBAL = "scopeKind::GLOBAL",
-  IF = "scopeKind::IF",
-  FOR = "scopeKind::FOR",
-  WHILE = "scopeKind::WHILE",
+  IF_CONDITION = "scopeKind::IF_CONDITION",
+  IF_BODY = "scopeKind::IF_BODY",
+  FOR_CONDITION = "scopeKind::FOR_CONDITION",
+  FOR_BODY = "scopeKind::FOR_BODY",
+  WHILE_CONDITION = "scopeKind::WHILE_CONDITION",
+  WHILE_BODY = "scopeKind::WHILE_BODY",
   DOWHILE_BODY = "scopeKind::DOWHILE_BODY",
   DOWHILE_COND = "scopeKind::DOWHILE_COND",
   STRUCT = "scopeKind::STRUCT",
@@ -61,6 +64,10 @@ export class ScopeList extends LinkedListNode<scopeT> {
 
   kind() : scopeKind {
     return this.value().kind;
+  }
+
+  pre() : ScopeList {
+    return this.m_pre! as ScopeList;
   }
 }
 

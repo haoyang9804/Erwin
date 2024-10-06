@@ -12,7 +12,8 @@ export enum TypeKind {
   EventType = "TypeKind::EventType",
   StructType = "TypeKind::StructType",
   ContractType = "TypeKind::ContractType",
-  ErrorType = "TypeKind::ErrorType"
+  ErrorType = "TypeKind::ErrorType",
+  StringType = "TypeKind::StringType",
 }
 
 export function upperType(t1 : Type, t2 : Type) {

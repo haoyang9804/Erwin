@@ -41,13 +41,26 @@ export class IRVariableDeclaration extends IRDeclare {
   value : IRExpression | undefined;
   typestr : string | undefined;
   constructor(id : number, scope : number, name : string, value ?: IRExpression,
-    visibility ?: StateVariableVisibility, typestr ?: string) {
+    visibility ?: StateVariableVisibility, typestr ?: string, mutable ?: Mutability,
+    memory ?: DataLocation, constant ?: boolean, indexed ?: boolean) {
     super(id, scope, name);
     this.value = value;
     if (visibility !== undefined) {
       this.visibility = visibility;
     }
     this.typestr = typestr;
+    if (mutable !== undefined) {
+      this.mutable = mutable;
+    }
+    if (memory !== undefined) {
+      this.memory = memory;
+    }
+    if (constant !== undefined) {
+      this.constant = constant;
+    }
+    if (indexed !== undefined) {
+      this.indexed = indexed;
+    }
   }
   lower() : ASTNode {
     let typename : TypeName | undefined = undefined;
@@ -55,19 +68,14 @@ export class IRVariableDeclaration extends IRDeclare {
       if (this.type.kind === TypeKind.ElementaryType) {
         const type = this.type as ElementaryType;
         typename = factory.makeElementaryTypeName("", type.str());
-        if (type.str() !== "string" && type.str() !== "bytes") {
-          this.memory = DataLocation.Default;
-        }
       }
       else if (this.type.kind === TypeKind.ContractType) {
         const type = this.type as ContractType;
         typename = factory.makeElementaryTypeName("", type.name);
-        this.memory = DataLocation.Default;
       }
       else if (this.type.kind === TypeKind.StructType) {
         const type = this.type as StructType;
         typename = factory.makeElementaryTypeName("", type.name);
-        this.memory = DataLocation.Default;
       }
       else {
         throw new Error(`IRVariableDeclaration: type ${this.type.kind} is not supported`);
@@ -77,9 +85,8 @@ export class IRVariableDeclaration extends IRDeclare {
       assert(this.typestr !== undefined, "IRVariableDeclaration: typestr is not generated")
       typename = factory.makeElementaryTypeName("", this.typestr);
     }
+    this.memory = DataLocation.Memory;
     //TODO: add support for memory
-    //TODO: add support for visibility
-    //TODO: add support for mutability
     //TODO: add support for other types, firstly function type
     assert(typename !== undefined, `IRVariableDeclaration ${this.id}: typename is not generated`)
     return factory.makeVariableDeclaration(this.constant, this.indexed, this.name, this.scope, this.state, this.memory,

@@ -975,7 +975,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         if (should_stop) break;
         cnt++;
         if (config.mode == 'scope' && this.name == "TypeDominanceDAG" ||
-          (!stop_until_find_solution_mode && (cnt >= config.maximum_type_resolution_for_heads))) {
+          (!stop_until_find_solution_mode && (cnt > config.maximum_type_resolution_for_heads))) {
           if (this.solutions_collection.length > 0) {
             should_stop = true;
             break;
