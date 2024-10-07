@@ -74,13 +74,17 @@ export function decide_function_visibility(kind : scopeKind, vis : FunctionVisib
           throw new Error(`Unsupported FunctionVisibility: ${vis}`);
       }
     case scopeKind.FUNC:
-    case scopeKind.IF:
-    case scopeKind.FOR:
-    case scopeKind.WHILE:
+    case scopeKind.IF_CONDITION:
+    case scopeKind.IF_BODY:
+    case scopeKind.FOR_CONDITION:
+    case scopeKind.FOR_BODY:
+    case scopeKind.WHILE_CONDITION:
+    case scopeKind.WHILE_BODY:
     case scopeKind.DOWHILE_BODY:
     case scopeKind.DOWHILE_COND:
     case scopeKind.CONSTRUCTOR:
     case scopeKind.STRUCT:
+    case scopeKind.FUNC_PARAMETER:
       return erwin_visibility.NAV;
     default:
       throw new Error(`Unsupported scopeKind: ${kind}`);
@@ -102,13 +106,17 @@ export function decide_variable_visibility(kind : scopeKind, vis : StateVariable
       }
     case scopeKind.FUNC:
     case scopeKind.GLOBAL:
-    case scopeKind.IF:
-    case scopeKind.FOR:
-    case scopeKind.WHILE:
+    case scopeKind.IF_BODY:
+    case scopeKind.IF_CONDITION:
+    case scopeKind.FOR_BODY:
+    case scopeKind.FOR_CONDITION:
+    case scopeKind.WHILE_BODY:
+    case scopeKind.WHILE_CONDITION:
     case scopeKind.DOWHILE_BODY:
     case scopeKind.DOWHILE_COND:
     case scopeKind.CONSTRUCTOR:
     case scopeKind.STRUCT:
+    case scopeKind.FUNC_PARAMETER:
       return erwin_visibility.NAV;
     default:
       throw new Error(`Unsupported scopeKind: ${kind}`);

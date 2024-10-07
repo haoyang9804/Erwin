@@ -5,7 +5,7 @@ import { DominanceNode } from "./dominance";
 
 export abstract class FuncVis extends DominanceNode<FunctionVisibility> { }
 
-export class FuncInternal extends FuncVis {
+class FuncInternal extends FuncVis {
   constructor() {
     super(FunctionVisibility.Internal);
   }
@@ -38,7 +38,7 @@ export class FuncInternal extends FuncVis {
   }
 }
 
-export class FuncExternal extends FuncVis {
+class FuncExternal extends FuncVis {
   constructor() {
     super(FunctionVisibility.External);
   }
@@ -71,7 +71,7 @@ export class FuncExternal extends FuncVis {
   }
 }
 
-export class FuncPublic extends FuncVis {
+class FuncPublic extends FuncVis {
   constructor() {
     super(FunctionVisibility.Public);
   }
@@ -104,7 +104,7 @@ export class FuncPublic extends FuncVis {
   }
 }
 
-export class FuncPrivate extends FuncVis {
+class FuncPrivate extends FuncVis {
   constructor() {
     super(FunctionVisibility.Private);
   }
@@ -137,7 +137,8 @@ export class FuncPrivate extends FuncVis {
   }
 }
 
-export class FuncDefault extends FuncVis {
+// @ts-ignore
+class FuncDefault extends FuncVis {
   constructor() {
     super(FunctionVisibility.Default);
   }
@@ -195,7 +196,7 @@ export class FuncVisProvider {
 
 export abstract class VarVis extends DominanceNode<StateVariableVisibility> { }
 
-export class VarInternal extends VarVis {
+class VarInternal extends VarVis {
   constructor() {
     super(StateVariableVisibility.Internal);
   }
@@ -228,7 +229,7 @@ export class VarInternal extends VarVis {
   }
 }
 
-export class VarPublic extends VarVis {
+class VarPublic extends VarVis {
   constructor() {
     super(StateVariableVisibility.Public);
   }
@@ -261,7 +262,7 @@ export class VarPublic extends VarVis {
   }
 }
 
-export class VarPrivate extends VarVis {
+class VarPrivate extends VarVis {
   constructor() {
     super(StateVariableVisibility.Private);
   }
@@ -294,7 +295,7 @@ export class VarPrivate extends VarVis {
   }
 }
 
-export class VarDefault extends VarVis {
+class VarDefault extends VarVis {
   constructor() {
     super(StateVariableVisibility.Default);
   }

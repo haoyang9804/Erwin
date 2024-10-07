@@ -19,8 +19,6 @@ import { IRStatement, IRPlaceholderStatement } from "./statement";
 import { IRExpression } from "./expression";
 
 export const name2declare = new Map<string, IRDeclare>();
-export const name2Event = new Map<string, IREventDefinition>();
-
 export abstract class IRDeclare extends IRNode {
   name : string;
   constructor(id : number, scope : number, name : string) {
@@ -33,41 +31,50 @@ export abstract class IRDeclare extends IRNode {
 export class IRVariableDeclaration extends IRDeclare {
   indexed : boolean = false;
   constant : boolean = false; // duplicated with attribute `mutable`. but required by solc-typed-ast.
-  state : boolean = true;
-  memory : DataLocation = DataLocation.Default;
+  state : boolean = false;
+  loc : DataLocation | undefined;
   visibility : StateVariableVisibility = StateVariableVisibility.Default;
   mutable : Mutability = Mutability.Mutable;
   type : Type | undefined;
   value : IRExpression | undefined;
   typestr : string | undefined;
   constructor(id : number, scope : number, name : string, value ?: IRExpression,
-    visibility ?: StateVariableVisibility, typestr ?: string) {
+    visibility ?: StateVariableVisibility, state ?: boolean, typestr ?: string, mutable ?: Mutability,
+    loc ?: DataLocation, constant ?: boolean, indexed ?: boolean) {
     super(id, scope, name);
     this.value = value;
     if (visibility !== undefined) {
       this.visibility = visibility;
     }
     this.typestr = typestr;
+    if (mutable !== undefined) {
+      this.mutable = mutable;
+    }
+    this.loc = loc;
+    if (constant !== undefined) {
+      this.constant = constant;
+    }
+    if (indexed !== undefined) {
+      this.indexed = indexed;
+    }
   }
   lower() : ASTNode {
     let typename : TypeName | undefined = undefined;
     if (this.type !== undefined) {
       if (this.type.kind === TypeKind.ElementaryType) {
         const type = this.type as ElementaryType;
-        typename = factory.makeElementaryTypeName("", type.str());
-        if (type.str() !== "string" && type.str() !== "bytes") {
-          this.memory = DataLocation.Default;
-        }
+        typename = factory.makeElementaryTypeName(type.str(), type.str());
+        this.loc = DataLocation.Default;
       }
       else if (this.type.kind === TypeKind.ContractType) {
         const type = this.type as ContractType;
-        typename = factory.makeElementaryTypeName("", type.name);
-        this.memory = DataLocation.Default;
+        typename = factory.makeElementaryTypeName(type.name, type.name);
+        this.loc = DataLocation.Default;
       }
       else if (this.type.kind === TypeKind.StructType) {
         const type = this.type as StructType;
-        typename = factory.makeElementaryTypeName("", type.name);
-        this.memory = DataLocation.Default;
+        typename = factory.makeUserDefinedTypeName((type as StructType).type_str, type.name,
+          type.referece_id, factory.makeIdentifierPath(type.name, type.referece_id));
       }
       else {
         throw new Error(`IRVariableDeclaration: type ${this.type.kind} is not supported`);
@@ -76,13 +83,12 @@ export class IRVariableDeclaration extends IRDeclare {
     else {
       assert(this.typestr !== undefined, "IRVariableDeclaration: typestr is not generated")
       typename = factory.makeElementaryTypeName("", this.typestr);
+      this.loc = DataLocation.Default;
     }
-    //TODO: add support for memory
-    //TODO: add support for visibility
-    //TODO: add support for mutability
+    assert(this.loc !== undefined, "IRVariableDeclaration: loc is not generated");
     //TODO: add support for other types, firstly function type
     assert(typename !== undefined, `IRVariableDeclaration ${this.id}: typename is not generated`)
-    return factory.makeVariableDeclaration(this.constant, this.indexed, this.name, this.scope, this.state, this.memory,
+    return factory.makeVariableDeclaration(this.constant, this.indexed, this.name, this.scope, this.state, this.loc,
       this.visibility, this.mutable, "", undefined, typename, undefined, this.value?.lower());
   }
 }

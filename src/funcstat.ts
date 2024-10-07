@@ -4,7 +4,7 @@ import { assert } from "./utility";
 
 export abstract class FuncStat extends DominanceNode<FunctionStateMutability> { }
 
-export class Pure extends FuncStat {
+class Pure extends FuncStat {
   constructor() {
     super(FunctionStateMutability.Pure);
   }
@@ -49,7 +49,7 @@ export class Pure extends FuncStat {
   }
 }
 
-export class View extends FuncStat {
+class View extends FuncStat {
   constructor() {
     super(FunctionStateMutability.View);
   }
@@ -98,7 +98,7 @@ export class View extends FuncStat {
   }
 }
 
-export class Payable extends FuncStat {
+class Payable extends FuncStat {
   constructor() {
     super(FunctionStateMutability.Payable);
   }
@@ -133,7 +133,7 @@ export class Payable extends FuncStat {
   }
 }
 
-export class EmptyStat extends FuncStat {
+class EmptyStat extends FuncStat {
   constructor() {
     super(FunctionStateMutability.NonPayable);
   }
@@ -203,25 +203,3 @@ export class FuncStatProvider {
   private static m_payable = new Payable();
   private static m_empty = new EmptyStat();
 }
-
-export const all_func_mutability_stats = [
-  FuncStatProvider.pure(),
-  FuncStatProvider.view(),
-  FuncStatProvider.payable(),
-  FuncStatProvider.empty()
-]
-
-export const nonpayable_func_mutability_stats = [
-  FuncStatProvider.pure(),
-  FuncStatProvider.view(),
-  FuncStatProvider.empty()
-]
-
-export const empty_func_mutability_stats = [
-  FuncStatProvider.empty()
-]
-
-export const nonview_nonpure_func_mutability_stats = [
-  FuncStatProvider.payable(),
-  FuncStatProvider.empty()
-]

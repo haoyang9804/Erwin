@@ -12,7 +12,8 @@ export enum TypeKind {
   EventType = "TypeKind::EventType",
   StructType = "TypeKind::StructType",
   ContractType = "TypeKind::ContractType",
-  ErrorType = "TypeKind::ErrorType"
+  ErrorType = "TypeKind::ErrorType",
+  StringType = "TypeKind::StringType",
 }
 
 export function upperType(t1 : Type, t2 : Type) {
@@ -32,8 +33,10 @@ export abstract class Type extends DominanceNode<TypeKind> { }
 export abstract class UserDefinedType extends Type {
   _subs : UserDefinedType[] = [];
   _supers : UserDefinedType[] = [];
-  constructor(kind : TypeKind) {
+  referece_id : number;
+  constructor(reference_id : number, kind : TypeKind) {
     super(kind);
+    this.referece_id = reference_id;
     this._subs = [this];
     this._supers = [this];
   }
@@ -120,11 +123,11 @@ export class ErrorType extends Type {
 
 export class StructType extends UserDefinedType {
   name : string;
-  id : number;
-  constructor(id : number, name : string) {
-    super(TypeKind.StructType);
+  type_str : string
+  constructor(reference_id : number, name : string, type_str : string) {
+    super(reference_id, TypeKind.StructType);
     this.name = name;
-    this.id = id;
+    this.type_str = type_str;
   }
   str() : string {
     return this.name;
@@ -142,7 +145,7 @@ export class StructType extends UserDefinedType {
     return this.supers().filter(x => x.issubof(upper_bound));
   }
   copy() : Type {
-    return new StructType(this.id, this.name);
+    return new StructType(this.referece_id, this.name, this.type_str);
   }
   same(t : Type) : boolean {
     return t.kind === TypeKind.StructType && (t as StructType).name === this.name;
@@ -162,11 +165,9 @@ export class StructType extends UserDefinedType {
 }
 
 export class ContractType extends UserDefinedType {
-  id : number;
   name : string;
-  constructor(id : number, name : string) {
-    super(TypeKind.ContractType);
-    this.id = id;
+  constructor(reference_id : number, name : string) {
+    super(reference_id, TypeKind.ContractType);
     this.name = name;
   }
   str() : string {
@@ -185,7 +186,7 @@ export class ContractType extends UserDefinedType {
     return this.supers().filter(x => x.issubof(upper_bound));
   }
   copy() : Type {
-    return new ContractType(this.id, this.name);
+    return new ContractType(this.referece_id, this.name);
   }
   same(t : Type) : boolean {
     return t.kind === TypeKind.ContractType && (t as ContractType).name === this.name;
@@ -204,7 +205,7 @@ export class ContractType extends UserDefinedType {
   }
 }
 
-type elementary_type_name = "uint256" | "uint128" | "uint64" | "uint32" | "uint16" | "uint8" | "address" | "bool" | "string" | "bytes" | "int256" | "int128" | "int64" | "int32" | "int16" | "int8";
+type elementary_type_name = "uint256" | "uint128" | "uint64" | "uint32" | "uint16" | "uint8" | "address" | "bool" | "int256" | "int128" | "int64" | "int32" | "int16" | "int8";
 
 export class ElementaryType extends Type {
   // uint256, address, boolean, etc
@@ -322,10 +323,6 @@ export class ElementaryType extends Type {
         }
       case "bool":
         return [TypeProvider.bool()];
-      case "string":
-        return [new ElementaryType("string", this.stateMutability)];
-      case "bytes":
-        return [new ElementaryType("bytes", this.stateMutability)];
     }
   }
 
@@ -425,10 +422,6 @@ export class ElementaryType extends Type {
         }
       case "bool":
         return [TypeProvider.bool()];
-      case "string":
-        return [new ElementaryType("string", this.stateMutability)];
-      case "bytes":
-        return [new ElementaryType("bytes", this.stateMutability)];
     }
   }
 
@@ -501,12 +494,6 @@ export class ElementaryType extends Type {
         }
       case "bool":
         if (this.name === "bool") return true;
-        return false
-      case "string":
-        if (this.name === "string") return true;
-        return false;
-      case "bytes":
-        if (this.name === "bytes") return true;
         return false;
     }
   }
@@ -562,12 +549,6 @@ export class ElementaryType extends Type {
         }
       case "bool":
         if (this.name === "bool") return true;
-        return false
-      case "string":
-        if (this.name === "string") return true;
-        return false;
-      case "bytes":
-        if (this.name === "bytes") return true;
         return false;
     }
   }

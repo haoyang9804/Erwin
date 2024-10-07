@@ -143,7 +143,7 @@ export class IRLiteral extends IRExpression {
   lower() : Expression {
     if (config.debug) {
       assert(this.type !== undefined, "IRLiteral: type is not generated");
-      assert(this.type.kind === TypeKind.ElementaryType, "IRLiteral: type is not ElementaryType")
+      assert(this.type.kind === TypeKind.ElementaryType, `IRLiteral ${this.id}: type is not ElementaryType, but ${this.type.kind}`);
     }
     this.generateKind();
     if (this.value === undefined) this.generateVal();

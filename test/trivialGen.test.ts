@@ -198,3 +198,17 @@ test("test tuple",
   expect(writer.write(tuple)).toBe("(333, )");
 }
 )
+
+test("test memory",
+() => {
+  const variable_type = factory.makeElementaryTypeName("??", "uint256")
+  let variable_node = factory.makeVariableDeclaration(false, false, "x", 1, false, DataLocation.Storage, StateVariableVisibility.Default, Mutability.Mutable, "any type", undefined, variable_type);
+  expect(writer.write(variable_node)).toBe("uint256 storage x");
+  variable_node = factory.makeVariableDeclaration(false, false, "x", 1, true, DataLocation.Storage, StateVariableVisibility.Default, Mutability.Mutable, "any type", undefined, variable_type);
+  expect(writer.write(variable_node)).toBe("uint256 x");
+  variable_node = factory.makeVariableDeclaration(false, false, "x", 1, false, DataLocation.Memory, StateVariableVisibility.Default, Mutability.Mutable, "any type", undefined, variable_type);
+  expect(writer.write(variable_node)).toBe("uint256 memory x");
+  variable_node = factory.makeVariableDeclaration(false, false, "x", 1, true, DataLocation.Memory, StateVariableVisibility.Default, Mutability.Mutable, "any type", undefined, variable_type);
+  expect(writer.write(variable_node)).toBe("uint256 x");
+}
+)
