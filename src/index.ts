@@ -308,6 +308,7 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
     (irnodes.get(key)! as decl.IRVariableDeclaration).visibility = value.kind;
   }
   let cnt = 0;
+  let pre_program = "";
   //! Traverse type solutions
   for (let type_solutions of gen.type_dag.solutions_collection) {
     for (let [key, value] of type_solutions) {
@@ -315,6 +316,8 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
         (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
     }
     const program = writer.write(source_unit_gen.irnode!.lower());
+    if (program === pre_program) continue;
+    pre_program = program;
     if (!fs.existsSync("./generated_programs")) {
       fs.mkdirSync("./generated_programs");
     }
@@ -348,6 +351,7 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
     (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
   }
   let cnt = 0;
+  let pre_program = "";
   //! Traverse function state mutability solutions
   for (let funcstat_solutions of gen.funcstat_dag.solutions_collection) {
     // assign the state mutability to the function
@@ -379,6 +383,8 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
           (irnodes.get(key)! as decl.IRVariableDeclaration).visibility = value.kind;
         }
         let program = writer.write(source_unit_gen.irnode!.lower());
+        if (program === pre_program) continue;
+        pre_program = program;
         if (!fs.existsSync("./generated_programs")) {
           fs.mkdirSync("./generated_programs");
         }
@@ -392,6 +398,7 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
         let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_${cnt}.sol`;
         cnt++;
         fs.writeFileSync(`./generated_programs/${program_name}`, program, "utf-8");
+        if (cnt > config.maximum_type_resolution_for_heads) return;
       }
     }
   }
@@ -443,12 +450,15 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
   }
   //! Traverse storage location solutions
   let cnt = 0;
+  let pre_program = "";
   for (let storage_location_solutions of gen.storage_location_dag.solutions_collection) {
     for (let [key, value] of storage_location_solutions) {
       if (irnodes.get(key)!.typeName !== "IRVariableDeclaration") continue;
       (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
     }
     let program = writer.write(source_unit_gen.irnode!.lower());
+    if (program === pre_program) continue;
+    pre_program = program;
     if (!fs.existsSync("./generated_programs")) {
       fs.mkdirSync("./generated_programs");
     }
@@ -462,6 +472,7 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
     let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_${cnt}.sol`;
     cnt++;
     fs.writeFileSync(`./generated_programs/${program_name}`, program, "utf-8");
+    if (cnt > config.maximum_type_resolution_for_heads) return;
   }
 }
 

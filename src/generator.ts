@@ -363,6 +363,9 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
     }
     else if (cur_scope.kind() === scopeKind.STRUCT) {
       (this.irnode as decl.IRVariableDeclaration).loc = DataLocation.Default;
+      storage_location_dag.insert(storage_location_dag.newNode(this.irnode.id), [
+        StorageLocationProvider.memory_default(),
+      ]);
       decl_db.insert(this.irnode.id, decide_variable_visibility(cur_scope.kind(), StateVariableVisibility.Default), cur_scope.id());
     }
     else {
@@ -374,7 +377,7 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
         ]);
       }
       else {
-        // If there is no intializer, make the storage location non-calldata, referring to 
+        // If there is no initializer, make the storage location non-calldata, referring to 
         // https://github.com/ethereum/solidity/issues/15483#issuecomment-2396563287
         storage_location_dag.insert(storage_location_dag.newNode(this.irnode.id), [
           StorageLocationProvider.memory(),
@@ -384,7 +387,7 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
       decl_db.insert(this.irnode.id, decide_variable_visibility(cur_scope.kind(), StateVariableVisibility.Default), cur_scope.id());
     }
     if (initializer !== undefined) {
-      storage_location_dag.connect(expr.tuple_extraction(initializer).id, this.irnode.id, "sub_dominance");
+      storage_location_dag.connect(expr.tuple_extraction(initializer).id, this.irnode.id, "super_dominance");
     }
     if (cur_scope.kind() === scopeKind.CONTRACT) {
       decl_db.state_variables.add(this.irnode.id);
@@ -443,12 +446,6 @@ class ContractInstanceDeclarationGenerator extends DeclarationGenerator {
     else {
       decl_db.insert(this.irnode.id, decide_variable_visibility(cur_scope.kind(), StateVariableVisibility.Default), cur_scope.id());
     }
-    // if (decl_db.contractdecl_to_contract_instance.has(this.contract_id)) {
-    //   decl_db.contractdecl_to_contract_instance.get(this.contract_id)!.push(this.irnode.id);
-    // }
-    // else {
-    //   decl_db.contractdecl_to_contract_instance.set(this.contract_id, [this.irnode.id]);
-    // }
     if (cur_scope.kind() === scopeKind.CONTRACT) {
       decl_db.state_variables.add(this.irnode.id);
     }
@@ -649,7 +646,7 @@ class ConstructorDeclarationGenerator extends DeclarationGenerator {
       if (this.state_variables_in_cur_contract_scope.length > 0 && Math.random() < config.init_state_var_in_constructor_prob) {
         const vardecl = irnodes.get(pick_random_element(this.state_variables_in_cur_contract_scope)!) as decl.IRVariableDeclaration;
         const identifier = new expr.IRIdentifier(global_id++, cur_scope.id(), vardecl.name, vardecl.id);
-        const expr_gen_prototype = pick_random_element(all_expression_generators)!;
+        const expr_gen_prototype = get_generator(type_dag.solution_range.get(vardecl.id)!);
         const expr_id = global_id++;
         type_dag.insert(type_dag.newNode(expr_id), type_dag.solution_range.get(vardecl.id)!);
         type_dag.connect(expr_id, vardecl.id, "super_dominance");
@@ -949,7 +946,7 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
         body = body.concat(unexpected_extra_stmt.has(cur_scope.id()) ? unexpected_extra_stmt.get(cur_scope.id())! : []);
         unexpected_extra_stmt.delete(cur_scope.id());
         if (storage_location_dag.solution_range.has(this.return_decls[i].id)) {
-          assert (storage_location_dag.solution_range.has(expression_extracted.id),
+          assert(storage_location_dag.solution_range.has(expression_extracted.id),
             `storage_location_dag.solution_range should have ${expression_extracted.id}`);
           storage_location_dag.connect(expression_extracted.id, this.return_decls[i].id, "super_dominance");
         }
@@ -2146,6 +2143,12 @@ class FunctionCallGenerator extends RValueGenerator {
     }
     if (selected_ret_decl !== null) {
       type_dag.type_range_alignment(this.id, selected_ret_decl!.id);
+      if (storage_location_dag.solution_range.has(selected_ret_decl.id)) {
+        storage_location_dag.insert(storage_location_dag.newNode(this.id),
+          storage_location_dag.solution_range.get(selected_ret_decl.id)!
+        );
+        storage_location_dag.connect(this.id, selected_ret_decl.id);
+      }
     }
     //! If the function has more than one returns, we need to first generate a tuple of identifiers to
     //! relay the returned variables. And the irnode of this generation is the same as the one of the generated
@@ -2191,6 +2194,12 @@ class FunctionCallGenerator extends RValueGenerator {
       }
       //* 5. This irnode is the same as the identifier irnode which relays the selected returned value
       this.irnode = identifier_gen.irnode!;
+      if (storage_location_dag.solution_range.has(this.id)) {
+        storage_location_dag.insert(storage_location_dag.newNode(this.irnode.id),
+          storage_location_dag.solution_range.get(this.id)!
+        );
+        storage_location_dag.connect(this.irnode.id, this.id);
+      }
       expr2read_variables.set(this.irnode.id, expr2read_variables.get(this.id)!);
     }
     else {

@@ -459,7 +459,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     dfs(0, new Map<number, Node>());
   }
 
-  allocate_solutions_for_heads_in_chunks() : Generator<Map<number, Node>[]> {
+  allocate_solutions_for_heads_in_stream() : Generator<Map<number, Node>[]> {
     if (config.debug) {
       let mul = 1n;
       for (let head of this.heads) {
@@ -953,7 +953,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     let should_stop = false;
     let stop_until_find_solution_mode = false;
     if (config.no_type_exploration) stop_until_find_solution_mode = true;
-    for (let local_head_resolution_collection of this.allocate_solutions_for_heads_in_chunks()) {
+    for (let local_head_resolution_collection of this.allocate_solutions_for_heads_in_stream()) {
       this.solutions.clear();
       if (should_stop) break;
       // !Traverse each solution to heads
@@ -961,6 +961,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         this.solutions.clear();
         if (should_stop) break;
         cnt++;
+        console.log(`>> ${cnt} <<`);
         if (config.mode == 'scope' && this.name == "TypeDominanceDAG" ||
           (!stop_until_find_solution_mode && (cnt > config.maximum_type_resolution_for_heads))) {
           if (this.solutions_collection.length > 0) {
@@ -1215,8 +1216,9 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         }
         return;
       }
-      for (let type of this.solution_range.get(ids[id])!) {
-        solution.set(ids[id], type);
+      assert(this.solution_range.has(ids[id]), `resolve_by_brute_force: solution_range does not have ${ids[id]}`);
+      for (let solu of this.solution_range.get(ids[id])!) {
+        solution.set(ids[id], solu);
         traverse_solution(id + 1, solution);
       }
     }

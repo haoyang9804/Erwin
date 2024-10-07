@@ -163,11 +163,55 @@ export class Calldata extends StorageLocation {
   }
 }
 
+// A special memory. Used to describe the location of struct instance
+// inside a struct declaration.
+export class MemoryDefault extends StorageLocation {
+  constructor() {
+    super(DataLocation.Default);
+  }
+  str() : string {
+    throw new Error("Method not implemented.");
+  }
+  subs() : StorageLocation[] {
+    return [
+      StorageLocationProvider.memory(),
+      StorageLocationProvider.storage_ref(),
+      StorageLocationProvider.calldata(),
+      StorageLocationProvider.storage_pointer()
+    ];
+  }
+  sub_with_lowerbound(lower_bound : StorageLocation) : StorageLocation[] {
+    throw new Error("Method not implemented.");
+  }
+  supers() : StorageLocation[] {
+    return [
+      StorageLocationProvider.memory(),
+      StorageLocationProvider.storage_ref(),
+    ];
+  }
+  super_with_upperbound(upper_bound : StorageLocation) : StorageLocation[] {
+    throw new Error("Method not implemented.");
+  }
+  same(t : StorageLocation) : boolean {
+    return t instanceof Memory;
+  }
+  copy() : StorageLocation {
+    return new Memory();
+  }
+  issubof(t : StorageLocation) : boolean {
+    return this.supers().includes(t) && !this.same(t);
+  }
+  issuperof(t : StorageLocation) : boolean {
+    return this.subs().includes(t) && !this.same(t);
+  }
+}
+
 export class StorageLocationProvider {
   private static m_storage_pointer : StorageLocation = new StoragePointer();
   private static m_storage_ref : StorageLocation = new StorageRef();
   private static m_memory_location : StorageLocation = new Memory();
   private static m_calldata_location : StorageLocation = new Calldata();
+  private static m_memory_default_lcoation : StorageLocation = new MemoryDefault();
   static storage_pointer() : StorageLocation {
     return this.m_storage_pointer;
   }
@@ -179,5 +223,8 @@ export class StorageLocationProvider {
   }
   static calldata() : StorageLocation {
     return this.m_calldata_location;
+  }
+  static memory_default() : StorageLocation {
+    return this.m_memory_default_lcoation;
   }
 }
