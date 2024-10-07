@@ -263,15 +263,15 @@ async function mutate() {
 
 function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
   console.log(`${gen.type_dag.solutions_collection.length} type solutions`);
-  let good = false;
   //! Select one function state mutability solution
+  let good = false;
   for (let funcstat_solutions of gen.funcstat_dag.solutions_collection) {
     // assign the state mutability to the function
     for (let [key, value] of funcstat_solutions) {
       assert(irnodes.get(key)! instanceof decl.IRFunctionDefinition, "The node must be a function definition.");
       (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability = value.kind;
     }
-    //! Traverse function visibility solutions
+    //! Select one function visibility solution
     for (let func_visibility_solutions of gen.func_visibility_dag.solutions_collection) {
       let no_conflict_with_funcstat = true;
       // assign the visibility to the function
@@ -293,14 +293,14 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
     }
     if (good) break;
   }
-  //! Traverse storage location solutions
+  //! Select one storage location solution
   for (let storage_location_solutions of gen.storage_location_dag.solutions_collection) {
     for (let [key, value] of storage_location_solutions) {
       assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration, "The node must be a variable declaration.");
       (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
     }
   }
-  //! Traverse state variable visibility solutions
+  //! Select one state variable visibility solution
   const state_variable_visibility_solutions = pick_random_element(gen.state_variable_visibility_dag.solutions_collection)!;
   // assign the visibility to the state variable
   for (let [key, value] of state_variable_visibility_solutions) {
@@ -413,7 +413,7 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
       assert(irnodes.get(key)! instanceof decl.IRFunctionDefinition, "The node must be a function definition.");
       (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability = value.kind;
     }
-    //! Traverse function visibility solutions
+    //! Select one function visibility solution
     for (let func_visibility_solutions of gen.func_visibility_dag.solutions_collection) {
       let no_conflict_with_funcstat = true;
       // assign the visibility to the function
@@ -435,7 +435,14 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
     }
     if (good) break;
   }
+  //! Select one state variable visibility solution
+  const state_variable_visibility_solutions = pick_random_element(gen.state_variable_visibility_dag.solutions_collection)!;
+  for (let [key, value] of state_variable_visibility_solutions) {
+    assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration, "The node must be a variable declaration.");
+    (irnodes.get(key)! as decl.IRVariableDeclaration).visibility = value.kind;
+  }
   //! Traverse storage location solutions
+  let cnt = 0;
   for (let storage_location_solutions of gen.storage_location_dag.solutions_collection) {
     for (let [key, value] of storage_location_solutions) {
       if (irnodes.get(key)!.typeName !== "IRVariableDeclaration") continue;
@@ -452,7 +459,8 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
     let hour = date.getHours();
     let minute = date.getMinutes();
     let second = date.getSeconds();
-    let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}.sol`;
+    let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_${cnt}.sol`;
+    cnt++;
     fs.writeFileSync(`./generated_programs/${program_name}`, program, "utf-8");
   }
 }
@@ -476,9 +484,12 @@ async function generate() {
     gen.funcstat_dag.resolve_by_brute_force(true);
     gen.func_visibility_dag.resolve_by_brute_force(false);
     gen.state_variable_visibility_dag.resolve_by_brute_force(false);
-    gen.storage_location_dag.resolve_by_brute_force(false);
     endTime = performance.now();
     console.log(`Time cost of resolving visibility and state mutability constraints: ${endTime - startTime} ms`);
+    startTime = performance.now();
+    gen.storage_location_dag.resolve_by_brute_force(false);
+    endTime = performance.now();
+    console.log(`Time cost of resolving storage location constraints: ${endTime - startTime} ms`);
     if (config.debug) {
       gen.type_dag.verify();
       gen.funcstat_dag.verify();

@@ -84,6 +84,7 @@ export function decide_function_visibility(kind : scopeKind, vis : FunctionVisib
     case scopeKind.DOWHILE_COND:
     case scopeKind.CONSTRUCTOR:
     case scopeKind.STRUCT:
+    case scopeKind.FUNC_PARAMETER:
       return erwin_visibility.NAV;
     default:
       throw new Error(`Unsupported scopeKind: ${kind}`);
@@ -115,6 +116,7 @@ export function decide_variable_visibility(kind : scopeKind, vis : StateVariable
     case scopeKind.DOWHILE_COND:
     case scopeKind.CONSTRUCTOR:
     case scopeKind.STRUCT:
+    case scopeKind.FUNC_PARAMETER:
       return erwin_visibility.NAV;
     default:
       throw new Error(`Unsupported scopeKind: ${kind}`);

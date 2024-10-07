@@ -6,6 +6,7 @@ import { assert } from './utility'
 export enum scopeKind {
   CONSTRUCTOR = "scopeKind::CONSTRUCTOR",
   FUNC = "scopeKind::FUNC",
+  FUNC_PARAMETER = "scopeKind::FUNC_PARAMETER",
   CONTRACT = "scopeKind::CONTRACT",
   GLOBAL = "scopeKind::GLOBAL",
   IF_CONDITION = "scopeKind::IF_CONDITION",

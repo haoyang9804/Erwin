@@ -10,7 +10,7 @@ import { config } from './config';
 import { irnodes } from "./node";
 import { color } from "console-log-colors"
 import { is_super_set, is_equal_set } from "./dominance";
-import { ContractKind, FunctionCallKind, FunctionKind, FunctionStateMutability, FunctionVisibility, StateVariableVisibility } from "solc-typed-ast";
+import { ContractKind, DataLocation, FunctionCallKind, FunctionKind, FunctionStateMutability, FunctionVisibility, StateVariableVisibility } from "solc-typed-ast";
 import { ScopeList, scopeKind, initScope } from "./scope";
 import { FuncStat, FuncStatProvider } from "./funcstat";
 import { FuncVis, FuncVisProvider, VarVisProvider } from "./visibility";
@@ -147,41 +147,40 @@ function generate_name(identifier : IDENTIFIER) : string {
   }
 }
 
-function get_generator(type_range : type.Type[], nofunccall : boolean = true, cur_expression_complex_level ?: number) : any {
+function get_generator(type_range : type.Type[], nofunccall : boolean = true, cur_expression_complex_level : number = 0) : any {
   let arg_gen_prototype;
   let generator_candidates = new Set<any>();
   const contain_user_defined_types = type_range.some(t => t instanceof type.UserDefinedType);
   if (contain_user_defined_types) {
     if (type_range.some(t => t.typeName === "ContractType")) {
       generator_candidates.add(NewContractGenerator);
-      generator_candidates.add(AssignmentGenerator);
-      generator_candidates.add(FunctionCallGenerator);
-      generator_candidates.add(ConditionalGenerator);
+      if (cur_expression_complex_level < config.expression_complex_level) {
+        generator_candidates.add(AssignmentGenerator);
+        generator_candidates.add(FunctionCallGenerator);
+        generator_candidates.add(ConditionalGenerator);
+      }
     }
     if (type_range.some(t => t.typeName === "StructType")) {
       generator_candidates.add(NewStructGenerator);
-      generator_candidates.add(AssignmentGenerator);
-      generator_candidates.add(FunctionCallGenerator);
-      generator_candidates.add(ConditionalGenerator);
+      if (cur_expression_complex_level < config.expression_complex_level) {
+        generator_candidates.add(AssignmentGenerator);
+        generator_candidates.add(FunctionCallGenerator);
+        generator_candidates.add(ConditionalGenerator);
+      }
     }
   }
   const contain_element_types = type_range.some(t => t.typeName === "ElementaryType");
   if (contain_element_types) {
-    if (cur_expression_complex_level !== undefined) {
-      if (cur_expression_complex_level >= config.expression_complex_level || Math.random() < config.terminal_prob) {
-        generator_candidates = merge_set(generator_candidates, new Set<any>([...terminal_expression_generators]));
-      }
-      else {
-        if (is_equal_set(type_range, type.address_types)) {
-          generator_candidates = merge_set(generator_candidates, new Set<any>([...nonterminal_expression_generators_for_address_type]));
-        }
-        else {
-          generator_candidates = merge_set(generator_candidates, new Set<any>([...nonterminal_expression_generators]));
-        }
-      }
+    if (cur_expression_complex_level >= config.expression_complex_level || Math.random() < config.terminal_prob) {
+      generator_candidates = merge_set(generator_candidates, new Set<any>([...terminal_expression_generators]));
     }
     else {
-      generator_candidates = merge_set(generator_candidates, new Set<any>([...all_expression_generators]));
+      if (is_equal_set(type_range, type.address_types)) {
+        generator_candidates = merge_set(generator_candidates, new Set<any>([...nonterminal_expression_generators_for_address_type]));
+      }
+      else {
+        generator_candidates = merge_set(generator_candidates, new Set<any>([...nonterminal_expression_generators]));
+      }
     }
   }
   if (nofunccall) {
@@ -355,16 +354,37 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
         StorageLocationProvider.storage_ref()
       ])
     }
-    else {
+    else if (cur_scope.kind() === scopeKind.FUNC_PARAMETER) {
       storage_location_dag.insert(storage_location_dag.newNode(this.irnode.id), [
         StorageLocationProvider.calldata(),
         StorageLocationProvider.memory(),
-        StorageLocationProvider.storage_pointer()
-      ])
+      ]);
+      decl_db.insert(this.irnode.id, decide_variable_visibility(cur_scope.kind(), StateVariableVisibility.Default), cur_scope.id());
+    }
+    else if (cur_scope.kind() === scopeKind.STRUCT) {
+      (this.irnode as decl.IRVariableDeclaration).loc = DataLocation.Default;
+      decl_db.insert(this.irnode.id, decide_variable_visibility(cur_scope.kind(), StateVariableVisibility.Default), cur_scope.id());
+    }
+    else {
+      if (initializer !== undefined) {
+        storage_location_dag.insert(storage_location_dag.newNode(this.irnode.id), [
+          StorageLocationProvider.calldata(),
+          StorageLocationProvider.memory(),
+          StorageLocationProvider.storage_pointer()
+        ]);
+      }
+      else {
+        // If there is no intializer, make the storage location non-calldata, referring to 
+        // https://github.com/ethereum/solidity/issues/15483#issuecomment-2396563287
+        storage_location_dag.insert(storage_location_dag.newNode(this.irnode.id), [
+          StorageLocationProvider.memory(),
+          StorageLocationProvider.storage_pointer()
+        ]);
+      }
       decl_db.insert(this.irnode.id, decide_variable_visibility(cur_scope.kind(), StateVariableVisibility.Default), cur_scope.id());
     }
     if (initializer !== undefined) {
-      storage_location_dag.connect(initializer.id, this.irnode.id, "sub_dominance");
+      storage_location_dag.connect(expr.tuple_extraction(initializer).id, this.irnode.id, "sub_dominance");
     }
     if (cur_scope.kind() === scopeKind.CONTRACT) {
       decl_db.state_variables.add(this.irnode.id);
@@ -674,11 +694,13 @@ class ConstructorDeclarationGenerator extends DeclarationGenerator {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Parameters, ${this.parameter_count} in total`));
       indent += 2;
     }
+    cur_scope = cur_scope.new(scopeKind.FUNC_PARAMETER);
     for (let i = 0; i < this.parameter_count; i++) {
       const variable_gen = new VariableDeclarationGenerator(all_types);
       variable_gen.generate();
       this.parameters.push(variable_gen.irnode! as decl.IRVariableDeclaration);
     }
+    cur_scope = cur_scope.rollback();
     if (config.debug) {
       indent -= 2;
       console.log(color.yellowBG(`${" ".repeat(indent)}Function Parameters`));
@@ -926,6 +948,11 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
         }
         body = body.concat(unexpected_extra_stmt.has(cur_scope.id()) ? unexpected_extra_stmt.get(cur_scope.id())! : []);
         unexpected_extra_stmt.delete(cur_scope.id());
+        if (storage_location_dag.solution_range.has(this.return_decls[i].id)) {
+          assert (storage_location_dag.solution_range.has(expression_extracted.id),
+            `storage_location_dag.solution_range should have ${expression_extracted.id}`);
+          storage_location_dag.connect(expression_extracted.id, this.return_decls[i].id, "super_dominance");
+        }
       }
       if (return_values.length === 0 && Math.random() > 0.5) { }
       else {
@@ -1001,6 +1028,7 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
       indent += 2;
     }
     cur_scope = this.function_scope.snapshot();
+    cur_scope = cur_scope.new(scopeKind.FUNC_PARAMETER);
     //! Generate parameters
     for (let i = 0; i < this.parameter_count; i++) {
       const variable_gen = new VariableDeclarationGenerator(all_types);
@@ -1022,6 +1050,7 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
       variable_gen.generate();
       this.return_decls.push(variable_gen.irnode! as decl.IRVariableDeclaration);
     }
+    cur_scope = cur_scope.rollback();
     if (config.debug) {
       indent -= 2;
       console.log(color.yellowBG(`${" ".repeat(indent)}Function Return Decls`));
@@ -1465,8 +1494,8 @@ class AssignmentGenerator extends RValueGenerator {
       storage_location_dag.insert(storage_location_dag.newNode(this.id),
         storage_location_dag.solution_range.get(identifier_gen.irnode!.id)!
       );
-      storage_location_dag.connect(this.id, identifier_gen.irnode!.id);
-      storage_location_dag.connect(identifier_gen.irnode!.id, right_extracted_expression.id, "sub_dominance");
+      storage_location_dag.connect(this.id, left_extracted_expression.id);
+      storage_location_dag.connect(left_extracted_expression.id, right_extracted_expression.id, "sub_dominance");
     }
     //! Update expr2read_variables
     expr2read_variables.set(this.id,
@@ -1865,14 +1894,14 @@ class ConditionalGenerator extends RValueGenerator {
     //! Build dominations
     type_dag.type_range_alignment(e2id, e3id);
     type_dag.type_range_alignment(this.id, e2id);
-    if (storage_location_dag.solution_range.has(e2_gen.irnode!.id)) {
-      assert(storage_location_dag.solution_range.has(e3_gen.irnode!.id),
-        `ConditionalGenerator: e3_gen.irnode!.id ${e3_gen.irnode!.id} is not in storage_location_dag.solution_range`);
+    if (storage_location_dag.solution_range.has(extracted_e2.id)) {
+      assert(storage_location_dag.solution_range.has(extracted_e3.id),
+        `ConditionalGenerator: extracted_e3.id ${extracted_e3!.id} is not in storage_location_dag.solution_range`);
       storage_location_dag.insert(storage_location_dag.newNode(this.id),
-        storage_location_dag.solution_range.get(e2_gen.irnode!.id)!
+        storage_location_dag.solution_range.get(extracted_e2.id)!
       );
-      storage_location_dag.connect(this.id, e2_gen.irnode!.id);
-      storage_location_dag.connect(e2_gen.irnode!.id, e3_gen.irnode!.id, "sub_dominance");
+      storage_location_dag.connect(this.id, extracted_e2.id);
+      storage_location_dag.connect(extracted_e2.id, extracted_e3.id, "sub_dominance");
     }
     if (config.debug) {
       indent -= 2;
@@ -1976,27 +2005,6 @@ class FunctionCallGenerator extends RValueGenerator {
     //! If no available function declaration, generate other expressions
     if (!this.contains_available_funcdecls(contractdecl_id_plus_funcdecl_id)) {
       let expression_gen_prototype = get_generator(this.type_range, true, cur_expression_complex_level);
-      // if (is_equal_set(this.type_range, type.address_types)) {
-      //   expression_gen_prototype = pick_random_element(non_funccall_expression_generators_for_address_type)!;
-      // }
-      // else {
-      //   const only_contract_type = this.type_range.every(t => t.typeName === "ContractType");
-      //   if (only_contract_type) {
-      //     expression_gen_prototype = NewContractGenerator;
-      //   }
-      //   else {
-      //     const generator_candidates = [...non_funccall_expression_generators];
-      //     const no_contract_type = this.type_range.every(t => t.typeName !== "ContractType");
-      //     const no_struct_type = this.type_range.every(t => t.typeName !== "StructType");
-      //     if (!no_contract_type) {
-      //       generator_candidates.push(NewContractGenerator);
-      //     }
-      //     if (!no_struct_type) {
-      //       generator_candidates.push(NewStructGenerator);
-      //     }
-      //     expression_gen_prototype = pick_random_element(generator_candidates)!;
-      //   }
-      // }
       const expression_gen = new expression_gen_prototype(this.id);
       expression_gen.generate(cur_expression_complex_level);
       this.irnode = expression_gen.irnode;
@@ -2070,6 +2078,7 @@ class FunctionCallGenerator extends RValueGenerator {
     }
     const args_ids : number[] = [];
     expr2read_variables.set(this.id, new Set<number>());
+    //! Generate arguments
     for (let i = 0; i < funcdecl.parameters.length; i++) {
       const type_range = type_dag.solution_range.get(funcdecl.parameters[i].id)!;
       let arg_gen_prototype = get_generator(type_range, false, cur_expression_complex_level);
@@ -2081,6 +2090,11 @@ class FunctionCallGenerator extends RValueGenerator {
       let extracted_arg = expr.tuple_extraction(arg_gen.irnode! as expr.IRExpression);
       args_ids.push(extracted_arg.id);
       type_dag.type_range_alignment(argid, funcdecl.parameters[i].id);
+      if (storage_location_dag.solution_range.has(funcdecl.parameters[i].id)) {
+        assert(storage_location_dag.solution_range.has(argid),
+          `FunctionCallGenerator: storage_location_dag.solution_range has no argid ${argid}`);
+        storage_location_dag.connect(argid, funcdecl.parameters[i].id, "super_dominance");
+      }
     }
     for (const arg_id of args_ids) {
       expr2read_variables.set(this.id, merge_set(expr2read_variables.get(this.id)!, expr2read_variables.get(arg_id)!));
@@ -2225,6 +2239,11 @@ class NewStructGenerator extends ExpressionGenerator {
       for (const arg_id of args_ids) {
         expr2read_variables.set(this.id, merge_set(expr2read_variables.get(this.id)!, expr2read_variables.get(arg_id)!));
       }
+      if (storage_location_dag.solution_range.has(member.id)) {
+        assert(storage_location_dag.solution_range.has(argid),
+          `NewStructGenerator: storage_location_dag.solution_range has no argid ${argid}`);
+        storage_location_dag.connect(argid, member.id, "super_dominance");
+      }
     }
     let identifier_name = struct_type.name;
     const function_call_expr = new expr.IRFunctionCall(this.id, cur_scope.id(), FunctionCallKind.FunctionCall,
@@ -2279,6 +2298,11 @@ class NewContractGenerator extends ExpressionGenerator {
       args_ids.push(extracted_arg.id);
       for (const arg_id of args_ids) {
         expr2read_variables.set(this.id, merge_set(expr2read_variables.get(this.id)!, expr2read_variables.get(arg_id)!));
+      }
+      if (storage_location_dag.solution_range.has(contract_decl.constructor_parameters[i].id)) {
+        assert(storage_location_dag.solution_range.has(argid),
+          `NewContractGenerator: storage_location_dag.solution_range has no argid ${argid}`);
+        storage_location_dag.connect(argid, contract_decl.constructor_parameters[i].id, "super_dominance");
       }
     }
     const new_function_expr = new expr.IRFunctionCall(this.id, cur_scope.id(), FunctionCallKind.FunctionCall, new_expr, args);
