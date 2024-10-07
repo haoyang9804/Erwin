@@ -59,7 +59,7 @@ test("test modifier 2",
 
 const v2 = new IRVariableDeclaration(5, 0, "y");
 v2.type = new StructType(100, "S", "struct S")
-v2.memory = DataLocation.Memory
+v2.loc= DataLocation.Memory
 
 const v3 = new IRVariableDeclaration(6, 0, "z");
 v3.type = TypeProvider.uint256()

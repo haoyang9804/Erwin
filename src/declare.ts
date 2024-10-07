@@ -19,8 +19,6 @@ import { IRStatement, IRPlaceholderStatement } from "./statement";
 import { IRExpression } from "./expression";
 
 export const name2declare = new Map<string, IRDeclare>();
-export const name2Event = new Map<string, IREventDefinition>();
-
 export abstract class IRDeclare extends IRNode {
   name : string;
   constructor(id : number, scope : number, name : string) {
@@ -34,7 +32,7 @@ export class IRVariableDeclaration extends IRDeclare {
   indexed : boolean = false;
   constant : boolean = false; // duplicated with attribute `mutable`. but required by solc-typed-ast.
   state : boolean = false;
-  memory : DataLocation = DataLocation.Default;
+  loc : DataLocation | undefined;
   visibility : StateVariableVisibility = StateVariableVisibility.Default;
   mutable : Mutability = Mutability.Mutable;
   type : Type | undefined;
@@ -42,7 +40,7 @@ export class IRVariableDeclaration extends IRDeclare {
   typestr : string | undefined;
   constructor(id : number, scope : number, name : string, value ?: IRExpression,
     visibility ?: StateVariableVisibility, state ?: boolean, typestr ?: string, mutable ?: Mutability,
-    memory ?: DataLocation, constant ?: boolean, indexed ?: boolean) {
+    loc ?: DataLocation, constant ?: boolean, indexed ?: boolean) {
     super(id, scope, name);
     this.value = value;
     if (visibility !== undefined) {
@@ -52,9 +50,7 @@ export class IRVariableDeclaration extends IRDeclare {
     if (mutable !== undefined) {
       this.mutable = mutable;
     }
-    if (memory !== undefined) {
-      this.memory = memory;
-    }
+    this.loc = loc;
     if (constant !== undefined) {
       this.constant = constant;
     }
@@ -68,10 +64,12 @@ export class IRVariableDeclaration extends IRDeclare {
       if (this.type.kind === TypeKind.ElementaryType) {
         const type = this.type as ElementaryType;
         typename = factory.makeElementaryTypeName(type.str(), type.str());
+        this.loc = DataLocation.Default;
       }
       else if (this.type.kind === TypeKind.ContractType) {
         const type = this.type as ContractType;
         typename = factory.makeElementaryTypeName(type.name, type.name);
+        this.loc = DataLocation.Default;
       }
       else if (this.type.kind === TypeKind.StructType) {
         const type = this.type as StructType;
@@ -85,11 +83,12 @@ export class IRVariableDeclaration extends IRDeclare {
     else {
       assert(this.typestr !== undefined, "IRVariableDeclaration: typestr is not generated")
       typename = factory.makeElementaryTypeName("", this.typestr);
+      this.loc = DataLocation.Default;
     }
-    //TODO: add support for memory
+    assert(this.loc !== undefined, "IRVariableDeclaration: loc is not generated");
     //TODO: add support for other types, firstly function type
     assert(typename !== undefined, `IRVariableDeclaration ${this.id}: typename is not generated`)
-    return factory.makeVariableDeclaration(this.constant, this.indexed, this.name, this.scope, this.state, this.memory,
+    return factory.makeVariableDeclaration(this.constant, this.indexed, this.name, this.scope, this.state, this.loc,
       this.visibility, this.mutable, "", undefined, typename, undefined, this.value?.lower());
   }
 }

@@ -21,9 +21,10 @@ import { config } from './config'
 import { toFile } from "@ts-graphviz/adapter";
 import { color } from "console-log-colors"
 import { DominanceNode, is_equal_set, is_super_set } from "./dominance";
-import { FunctionStateMutability, FunctionVisibility, StateVariableVisibility } from "solc-typed-ast";
+import { DataLocation, FunctionStateMutability, FunctionVisibility, StateVariableVisibility } from "solc-typed-ast";
 import { FuncStat } from "./funcstat";
 import { FuncVis, VarVis } from "./visibility";
+import { StorageLocation } from "./memory";
 
 interface toTail {
   tail_id : number;
@@ -1395,3 +1396,4 @@ export class TypeDominanceDAG extends DominanceDAG<TypeKind, Type> { }
 export class FuncStateMutabilityDominanceDAG extends DominanceDAG<FunctionStateMutability, FuncStat> { }
 export class FuncVisibilityDominanceDAG extends DominanceDAG<FunctionVisibility, FuncVis> { }
 export class StateVariableVisibilityDominanceDAG extends DominanceDAG<StateVariableVisibility, VarVis> { }
+export class StorageLocationDominanceDAG extends DominanceDAG<DataLocation, StorageLocation> { }

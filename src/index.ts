@@ -16,6 +16,7 @@ import {
   LatestCompilerVersion,
   FunctionVisibility,
   FunctionStateMutability,
+  DataLocation,
 } from "solc-typed-ast"
 const formatter = new PrettyFormatter(2, 0);
 const writer = new ASTWriter(
@@ -24,6 +25,7 @@ const writer = new ASTWriter(
   LatestCompilerVersion
 );
 import * as figlet from "figlet"
+import { StorageLocation, StorageLocationProvider } from "./memory";
 console.log(figlet.textSync('Erwin'));
 const version = "0.1.0";
 
@@ -42,7 +44,7 @@ program
   .command("generate")
   .description("Generate random Solidity code.")
   .option("-e --exprimental", "Enable the exprimental mode.", `${config.experimental}`)
-  .option("-m --mode <string>", "The mode of Erwin. The value can be 'type' or 'scope'.", `${config.mode}`)
+  .option("-m --mode <string>", "The mode of Erwin. The value can be 'type', 'scope', or 'loc'.", `${config.mode}`)
   .option("-d --debug", "Enable the debug mode.", `${config.debug}`)
   // Type
   .option("--int_types_num <number>", "The number of int types Erwin will consider in resolving type dominance.", `${config.int_num}`)
@@ -69,7 +71,7 @@ program
   .option("--state_variable_count_upperlimit <number>", "The upper limit of the number of state variables in a contract.", `${config.state_variable_count_upperlimit}`)
   .option("--state_variable_count_lowerlimit <number>", "The lower limit of the number of state variables in a contract.", `${config.state_variable_count_lowerlimit}`)
   // Complexity
-  .option("--expression_complex_level <number>", "The complex level of the expression Erwin will generate.\nThe suggedted range is [1,2,3,4,5]. The bigger, the more complex.", `${config.expression_complex_level}`)
+  .option("--expression_complex_level <number>", "The complex level of the expression Erwin will generate.\nThe suggedted range is [1,2,3]. The bigger, the more complex.", `${config.expression_complex_level}`)
   .option("--statement_complex_level <number>", "The complex level of the statement Erwin will generate.\nThe suggedted range is [1,2]. The bigger, the more complex.", `${config.statement_complex_level}`)
   // Probability
   .option("--nonstructured_statement_prob <float>", "The probability of generating a nonstructured statement, such as AssignmentStatment or FunctionCallAssignment.", `${config.nonstructured_statement_prob}`)
@@ -179,12 +181,12 @@ else if (program.args[0] === "generate") {
   assert(config.stream || config.maximum_type_resolution_for_heads >= config.chunk_size, "The maximum number of type resolutions for heads must be not less than the size of chunk in nonstream mode.");
   assert(config.tuple_prob >= 0 && config.tuple_prob <= 1, "The probability of generating a tuple surrounding an expression must be in the range [0,1].");
   assert(config.init_state_var_in_constructor_prob >= 0 && config.init_state_var_in_constructor_prob <= 1, "The probability of initializing a state variable in the constructor must be in the range [0,1].");
-  assert(config.expression_complex_level >= 0, "The complex level of the expression must be not less than 0.");
+  assert(config.expression_complex_level >= 1, "The complex level of the expression must be not less than 1.");
   assert(config.chunk_size > 0, "The chunk size of the database must be greater than 0.");
   assert(config.state_variable_count_upperlimit >= 0, "state_variable_count_upperlimit must be not less than 0.");
   assert(config.state_variable_count_lowerlimit >= 0, "state_variable_count_lowerlimit must be not less than 0.");
   assert(config.contract_count >= 0, "contract_count must be not less than 0.");
-  assert(["type", "scope"].includes(config.mode), "The mode is not either 'type' or 'scope', instead it is " + config.mode);
+  assert(["type", "scope", "loc"].includes(config.mode), "The mode is not either 'type' or 'scope', instead it is " + config.mode);
   assert(config.vardecl_prob >= 0 && config.vardecl_prob <= 1.0, "The probability of generating a variable declaration must be in the range [0,1].");
   assert(config.in_place_vardecl_prob >= 0 && config.in_place_vardecl_prob <= 1.0, "The probability of generating a variable declaration in place must be in the range [0,1].");
   assert(config.else_prob >= 0.0 && config.else_prob <= 1.0, "The probability of generating an else statement must be in the range [0,1].");
@@ -228,6 +230,20 @@ else if (program.args[0] === "generate") {
   })();
 }
 
+function storageLocation2loc(sl : StorageLocation) : DataLocation {
+  switch (sl) {
+    case StorageLocationProvider.memory():
+      return DataLocation.Memory;
+    case StorageLocationProvider.storage_pointer():
+    case StorageLocationProvider.storage_ref():
+      return DataLocation.Storage;
+    case StorageLocationProvider.calldata():
+      return DataLocation.CallData;
+    default:
+      return DataLocation.Default;
+  }
+}
+
 // Mutation
 async function mutate() {
   const source_unit = await mut.read_source_unit(config.file);
@@ -248,7 +264,7 @@ async function mutate() {
 function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
   console.log(`${gen.type_dag.solutions_collection.length} type solutions`);
   let good = false;
-  //! Traverse function state mutability solutions
+  //! Select one function state mutability solution
   for (let funcstat_solutions of gen.funcstat_dag.solutions_collection) {
     // assign the state mutability to the function
     for (let [key, value] of funcstat_solutions) {
@@ -276,6 +292,13 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
       break;
     }
     if (good) break;
+  }
+  //! Traverse storage location solutions
+  for (let storage_location_solutions of gen.storage_location_dag.solutions_collection) {
+    for (let [key, value] of storage_location_solutions) {
+      assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration, "The node must be a variable declaration.");
+      (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
+    }
   }
   //! Traverse state variable visibility solutions
   const state_variable_visibility_solutions = pick_random_element(gen.state_variable_visibility_dag.solutions_collection)!;
@@ -312,10 +335,17 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
   console.log(`${gen.funcstat_dag.solutions_collection.length} function stat solutions`);
   console.log(`${gen.func_visibility_dag.solutions_collection.length} function visibility solutions`);
   console.log(`${gen.state_variable_visibility_dag.solutions_collection.length} state variable visibility solutions`);
+  //! Select one type solution
   const type_solutions = pick_random_element(gen.type_dag.solutions_collection)!;
   for (let [key, value] of type_solutions) {
     if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
       (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
+  }
+  //! Select storage location solution
+  const storage_location_solutions = pick_random_element(gen.storage_location_dag.solutions_collection)!;
+  for (let [key, value] of storage_location_solutions) {
+    assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration, "The node must be a variable declaration.");
+    (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
   }
   let cnt = 0;
   //! Traverse function state mutability solutions
@@ -367,6 +397,66 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
   }
 }
 
+function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
+  console.log(`${gen.storage_location_dag.solutions_collection.length} storage location solutions`);
+  //! Select one type solution
+  const type_solutions = pick_random_element(gen.type_dag.solutions_collection)!;
+  for (let [key, value] of type_solutions) {
+    if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
+      (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
+  }
+  //! Select one function state mutability solution
+  let good = false;
+  for (let funcstat_solutions of gen.funcstat_dag.solutions_collection) {
+    // assign the state mutability to the function
+    for (let [key, value] of funcstat_solutions) {
+      assert(irnodes.get(key)! instanceof decl.IRFunctionDefinition, "The node must be a function definition.");
+      (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability = value.kind;
+    }
+    //! Traverse function visibility solutions
+    for (let func_visibility_solutions of gen.func_visibility_dag.solutions_collection) {
+      let no_conflict_with_funcstat = true;
+      // assign the visibility to the function
+      for (let [key, value] of func_visibility_solutions) {
+        assert(irnodes.get(key)! instanceof decl.IRFunctionDefinition, "The node must be a function definition.");
+        // The assignment of visibility may be influenced by the state mutability
+        if (
+          (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability === FunctionStateMutability.Payable &&
+          (value.kind === FunctionVisibility.Internal || value.kind === FunctionVisibility.Private)
+        ) {
+          no_conflict_with_funcstat = false;
+          break;
+        }
+        (irnodes.get(key)! as decl.IRFunctionDefinition).visibility = value.kind;
+      }
+      if (!no_conflict_with_funcstat) continue;
+      good = true;
+      break;
+    }
+    if (good) break;
+  }
+  //! Traverse storage location solutions
+  for (let storage_location_solutions of gen.storage_location_dag.solutions_collection) {
+    for (let [key, value] of storage_location_solutions) {
+      if (irnodes.get(key)!.typeName !== "IRVariableDeclaration") continue;
+      (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
+    }
+    let program = writer.write(source_unit_gen.irnode!.lower());
+    if (!fs.existsSync("./generated_programs")) {
+      fs.mkdirSync("./generated_programs");
+    }
+    let date = new Date();
+    let year = date.getFullYear();
+    let month = date.getMonth() + 1;
+    let day = date.getDate();
+    let hour = date.getHours();
+    let minute = date.getMinutes();
+    let second = date.getSeconds();
+    let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}.sol`;
+    fs.writeFileSync(`./generated_programs/${program_name}`, program, "utf-8");
+  }
+}
+
 // Generation
 async function generate() {
   const source_unit = new gen.SourceUnitGenerator();
@@ -386,6 +476,7 @@ async function generate() {
     gen.funcstat_dag.resolve_by_brute_force(true);
     gen.func_visibility_dag.resolve_by_brute_force(false);
     gen.state_variable_visibility_dag.resolve_by_brute_force(false);
+    gen.storage_location_dag.resolve_by_brute_force(false);
     endTime = performance.now();
     console.log(`Time cost of resolving visibility and state mutability constraints: ${endTime - startTime} ms`);
     if (config.debug) {
@@ -395,8 +486,11 @@ async function generate() {
     if (config.mode === "type") {
       generate_type_mode(source_unit);
     }
-    else {
+    else if (config.mode === "scope") {
       generate_scope_mode(source_unit);
+    }
+    else if (config.mode === "loc") {
+      generate_loc_mode(source_unit);
     }
   }
   catch (error) {
