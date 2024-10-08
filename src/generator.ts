@@ -17,7 +17,7 @@ import { FuncVis, FuncVisProvider, VarVisProvider } from "./visibility";
 import { StorageLocationProvider } from "./memory";
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Global Variables
 const global_id_start = 1;
-let global_id = global_id_start;
+export let global_id = global_id_start;
 let cur_scope : ScopeList = initScope();
 let indent = 0;
 let no_state_variable_in_function_body = false;
@@ -603,6 +603,7 @@ class VariableDeclarationGenerator extends DeclarationGenerator {
       variable_gen.generate();
       this.irnode = variable_gen.irnode;
     }
+    type_dag.specify_relevant_nodes(this.irnode!.id);
     if (config.debug) {
       indent -= 2;
       console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode!.id}: Variable Declaration, scope: ${cur_scope.kind()}`));
@@ -939,6 +940,7 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
         expr_gen.generate(0);
         return_values.push(expr_gen.irnode! as expr.IRExpression);
         let expression_extracted = expr.tuple_extraction(return_values[i]);
+        type_dag.type_range_alignment(expr_id, this.return_decls[i].id);
         // update read_vardecls
         for (const used_vardecl of expr2read_variables.get(expression_extracted.id)!) {
           read_vardecls.add(used_vardecl);
@@ -1269,6 +1271,7 @@ class LiteralGenerator extends RValueGenerator {
     }
     type_dag.update(type_dag.newNode(this.id), this.type_range);
     this.irnode = new expr.IRLiteral(this.id, cur_scope.id());
+    type_dag.specify_relevant_nodes(this.id);
     expr2read_variables.set(this.irnode.id, new Set<number>());
     if (config.debug)
       console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode.id}: Literal, scope: ${cur_scope.kind()}, type: ${type_dag.solution_range.get(this.irnode.id)!.map(t => t.str())}`));
@@ -1959,7 +1962,7 @@ class FunctionCallGenerator extends RValueGenerator {
     type_dag.insert(type_dag.newNode(this.id), this.type_range);
     //! If cur_expression_complex_level reaches the maximum, generate an terminal expression
     if (cur_expression_complex_level >= config.expression_complex_level || Math.random() < config.terminal_prob) {
-      const expression_gen_prototype = pick_random_element(terminal_expression_generators)!;
+      const expression_gen_prototype = get_generator(this.type_range, true, cur_expression_complex_level);
       const expression_gen = new expression_gen_prototype(this.id);
       expression_gen.generate(cur_expression_complex_level);
       this.irnode = expression_gen.irnode;
