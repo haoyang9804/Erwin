@@ -534,6 +534,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       if (id === root_array.length) {
         if (check_root_solution(root_resolution)) {
           yield new Map(root_resolution);
+          return;
         }
       }
       else {
@@ -552,7 +553,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   }
 
   allocate_solutions_for_leaves_based_on_solutions_to_roots_in_stream(root_solution : Map<number, Node>) : Generator<Map<number, Node>> {
-    const leaf_solution = new Map<number, Node[]>();
+    const leaf_solution_range = new Map<number, Node[]>();
     let solution4leaf : Node[] = [];
     for (let [root, solution_to_root] of root_solution) {
       // There may exist roots that are not connected any other nodes.
@@ -568,18 +569,17 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         else {
           solution4leaf = [solution_to_root];
         }
-        if (leaf_solution.has(leaf_id)) {
-          leaf_solution.set(leaf_id, leaf_solution.get(leaf_id)!.filter(t => solution4leaf.some(tt => tt.same(t))));
+        if (leaf_solution_range.has(leaf_id)) {
+          leaf_solution_range.set(leaf_id, leaf_solution_range.get(leaf_id)!.filter(t => solution4leaf.some(tt => tt.same(t))));
         }
         else {
-          leaf_solution.set(leaf_id, solution4leaf);
+          leaf_solution_range.set(leaf_id, solution4leaf);
         }
       }
     }
 
-    for (let leaf of this.leaves) this.solution_range.set(leaf, shuffle(this.solution_range.get(leaf)!));
+    for (let leaf of this.leaves) leaf_solution_range.set(leaf, shuffle(leaf_solution_range.get(leaf)!));
     const leaf_array = shuffle(Array.from(this.leaves));
-    const solution_range_copy = this.solution_range;
 
     let check_leaf_solution = (leaf_solution : Map<number, Node>) : boolean => {
       const leaf_solution_array = Array.from(leaf_solution);
@@ -611,10 +611,11 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       if (id === leaf_array.length) {
         if (check_leaf_solution(leaf_solution)) {
           yield new Map(leaf_solution);
+          return;
         }
       }
       else {
-        for (let solution of solution_range_copy.get(leaf_array[id])!) {
+        for (let solution of leaf_solution_range.get(leaf_array[id])!) {
           leaf_solution.set(leaf_array[id], solution);
           if (!check_leaf_solution(leaf_solution)) {
             leaf_solution.delete(leaf_array[id]);
@@ -941,98 +942,134 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     const local_super_dominance = this.super_dominance;
     const local_leaves = this.leaves;
     const local_root_array = [...this.roots];
-
-    function* dfs(id : number, this_solution : Map<number, Node>) : Generator<Map<number, Node>> {
+    const father = new Map<number, number>();
+    const id2child_array_id = new Map<number, number>();
+    const visited = new Set<number>();
+    const root_array_length = local_root_array.length;
+    function* dfs(root_array_id : number, id : number, child_array_id : number, this_solution : Map<number, Node>) : Generator<Map<number, Node>> {
+      if (root_array_id === root_array_length) {
+        yield this_solution;
+        return;
+      }
       assert(this_solution.has(id), `resolve_nonroots_and_nonleaves: this_solution does not have ${id}`);
-      for (let child of local_dag_nodes.get(id)!.outs) {
-        const edge = `${id} ${child}`;
-        let solution_candidates : Node[] = [];
-        let first = true;
-        /*
-        For each edge from node n1 to node n2, consider all the leaves that can be reached from n1 through the edge.
-        Since the solution of the reachable leaves have been settled, we can first restrict the solution range of n2
-        based on the solution of the reachable leaves and then randomly pick a solution from the restricted solution range.
-        */
-        const leaf_ids : number[] = [];
-        for (const leaf_id of local_edge2leaf.get(edge)!) {
-          leaf_ids.push(leaf_id);
-          if (!local_leaves.has(child)) {
-            const leaf_info = [...local_node2leaf.get(child)!].find(t => t.leaf_id === leaf_id);
-            if (local_sub_dominance.has(edge)) {
-              if (leaf_info!.sub_dominance) {
-                const solution_candidates_for_this_leaf = this_solution.get(id)!.sub_with_lowerbound(this_solution.get(leaf_id)!)!;
-                if (first) {
-                  solution_candidates = solution_candidates_for_this_leaf.map(t => t as Node);
-                  first = false;
-                }
-                else {
-                  solution_candidates = solution_candidates.filter(
-                    t => solution_candidates_for_this_leaf.some(tt => t.same(tt))
-                  );
-                  assert(solution_candidates.length > 0,
-                    `resolve_nonroots_and_nonleaves case 1: solution_candidates is empty when edge is ${edge}:
-                    \nleaf id to its solution: ${leaf_ids.map(t => `${t}: ${this_solution.get(t)!.str()}`).join("\n")}`);
-                }
-              }
-              else if (leaf_info!.super_dominance) {
-                throw new Error(`resolve_nonroots_and_nonleaves: ${id} should not be the sub_dominance of ${child}`);
-              }
-              else {
-                assert(this_solution.has(leaf_id), `resolve_nonroots_and_nonleaves: local_solutions does not have ${leaf_id}`);
-                const solution_for_leaf = this_solution.get(leaf_id)!;
-                if (first) {
-                  solution_candidates = [solution_for_leaf];
-                  first = false;
-                }
-                else {
-                  solution_candidates = solution_candidates.filter(
-                    t => solution_for_leaf.same(t)
-                  );
-                }
-              }
-            }
-            else if (local_super_dominance.has(edge)) {
-              // child is a leaf
-              throw new Error(`resolve_nonroots_and_nonleaves: ${id} should not be the super_dominance of ${child}`);
+      const root_id = local_root_array[root_array_id];
+      if (child_array_id === local_dag_nodes.get(id)!.outs.length) {
+        if (id === root_id) {
+          yield* dfs(root_array_id + 1,
+            root_array_id + 1 === root_array_length ? -1 : local_root_array[root_array_id + 1], 0, this_solution);
+          return;
+        }
+        assert(father.has(id),
+          `resolve_nonroots_and_nonleaves: father does not have ${id}, root_id is ${root_id}, child_array_id is ${child_array_id}`);
+        yield* dfs(root_array_id, father.get(id)!, id2child_array_id.get(father.get(id)!)! + 1, this_solution);
+        return;
+      }
+      id2child_array_id.set(id, child_array_id);
+      const child = local_dag_nodes.get(id)!.outs[child_array_id];
+      console.log(`root_id: ${root_id}, id: ${id}, child: ${child}`);
+      if (local_leaves.has(child)) {
+        yield* dfs(root_array_id, id, child_array_id + 1, this_solution);
+        return;
+      }
+      if (visited.has(child)) {
+        yield* dfs(root_array_id, id, child_array_id + 1, this_solution);
+        return;
+      }
+      father.set(child, id);
+      const edge = `${id} ${child}`;
+      let solution_candidates : Node[] = [];
+      let first = true;
+      /*
+      For each edge from node n1 to node n2, consider all the leaves that can be reached from n1 through the edge.
+      Since the solution of the reachable leaves have been settled, we can first restrict the solution range of n2
+      based on the solution of the reachable leaves and then randomly pick a solution from the restricted solution range.
+      */
+      const leaf_ids : number[] = [];
+      for (const leaf_id of local_edge2leaf.get(edge)!) {
+        leaf_ids.push(leaf_id);
+        assert(local_node2leaf.has(child),
+          `resolve_nonroots_and_nonleaves: local_node2leaf does not have ${child}
+        \nnode2leaf: ${[...local_node2leaf].map(([a, b]) => `${a} -> ${[...b].map(t => t.leaf_id)}\n`)}`);
+        const leaf_info = [...local_node2leaf.get(child)!].find(t => t.leaf_id === leaf_id);
+        if (local_sub_dominance.has(edge)) {
+          if (leaf_info!.sub_dominance) {
+            const solution_candidates_for_this_leaf = this_solution.get(id)!.sub_with_lowerbound(this_solution.get(leaf_id)!)!;
+            if (first) {
+              solution_candidates = solution_candidates_for_this_leaf.map(t => t as Node);
+              first = false;
             }
             else {
-              if (first) {
-                solution_candidates = [this_solution.get(id)!];
-                first = false;
-              }
-              else {
-                solution_candidates = solution_candidates.filter(
-                  t => [this_solution.get(id)!].some(tt => t.same(tt))
-                );
-                assert(solution_candidates.length > 0,
-                  `resolve_nonroots_and_nonleaves case 2: solution_candidates is empty when edge is ${edge}`);
-              }
+              solution_candidates = solution_candidates.filter(
+                t => solution_candidates_for_this_leaf.some(tt => t.same(tt))
+              );
+              assert(solution_candidates.length > 0,
+                `resolve_nonroots_and_nonleaves case 1: solution_candidates is empty when edge is ${edge}:
+                \nleaf id to its solution: ${leaf_ids.map(t => `${t}: ${this_solution.get(t)!.str()}`).join("\n")}`);
+            }
+          }
+          else if (leaf_info!.super_dominance) {
+            throw new Error(`resolve_nonroots_and_nonleaves: ${id} should not be the sub_dominance of ${child}`);
+          }
+          else {
+            assert(this_solution.has(leaf_id), `resolve_nonroots_and_nonleaves: local_solutions does not have ${leaf_id}`);
+            const solution_for_leaf = this_solution.get(leaf_id)!;
+            if (first) {
+              solution_candidates = [solution_for_leaf];
+              first = false;
+            }
+            else {
+              solution_candidates = solution_candidates.filter(
+                t => solution_for_leaf.same(t)
+              );
             }
           }
         }
-        if (!local_leaves.has(child)) {
-          assert(solution_candidates.length > 0,
-            `resolve_nonroots_and_nonleaves case 3: solution_candidates is empty when edge is ${edge}`);
-          for (const solution of solution_candidates) {
-            this_solution.set(child, solution);
-            yield* dfs(child, this_solution);
-          }
+        else if (local_super_dominance.has(edge)) {
+          // child is a leaf
+          throw new Error(`resolve_nonroots_and_nonleaves: ${id} should not be the super_dominance of ${child}`);
         }
         else {
-          yield this_solution;
+          if (first) {
+            solution_candidates = [this_solution.get(id)!];
+            first = false;
+          }
+          else {
+            solution_candidates = solution_candidates.filter(
+              t => [this_solution.get(id)!].some(tt => t.same(tt))
+            );
+            assert(solution_candidates.length > 0,
+              `resolve_nonroots_and_nonleaves case 2: solution_candidates is empty when edge is ${edge}`);
+          }
         }
+        assert(solution_candidates.length > 0,
+          `resolve_nonroots_and_nonleaves case 3: solution_candidates is empty when edge is ${edge}`);
+        for (const solution of solution_candidates) {
+          this_solution.set(child, solution);
+        }
+        visited.add(child);
+        yield* dfs(root_array_id, child, 0, this_solution);
       }
     }
 
-    function* dfs_of_each_root(root_array_index : number, this_solution : Map<number, Node>) : Generator<Map<number, Node>> {
-      if (root_array_index === local_root_array.length) {
-        yield this_solution;
-      }
-      for (const _ of dfs(local_root_array[root_array_index], this_solution)) {
-        yield* dfs_of_each_root(root_array_index + 1, this_solution);
-      }
-    }
-    return dfs_of_each_root(0, new Map(this.solutions));
+    // function* dfs_of_each_root(root_array_index : number, this_solution : Map<number, Node>) : Generator<Map<number, Node>> {
+    //   if (root_array_index === local_root_array.length) {
+    //     yield this_solution;
+    //     return;
+    //   }
+    //   const rootid = local_root_array[root_array_index];
+    //   if (local_dag_nodes.get(rootid)!.outs.length === 0) {
+    //     yield* dfs_of_each_root(root_array_index + 1, this_solution);
+    //   }
+    //   else {
+    //     console.log(`rootid: ${rootid}`);
+    //     for (const _ of dfs(rootid, rootid, 0, this_solution)) {
+    //       console.log("===================")
+    //       yield* dfs_of_each_root(root_array_index + 1, this_solution);
+    //     }
+    //   }
+    // }
+    // return dfs_of_each_root(0, this.solutions);
+    return dfs(0, local_root_array[0], 0, this.solutions);
   }
 
   check_solution_range_after_tightening(node : number) : void {
@@ -1148,7 +1185,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     // !Re-dfs4node2leaf
     this.node2leaf.clear();
     this.dfs4node2leaf();
-    if (this.name === "TypeDominanceDAG") {
+    if (config.unit_test_mode || this.name === "TypeDominanceDAG") {
       if (config.debug) {
         await this.draw("./type_constraint_before_shrink.svg");
       }
@@ -1373,15 +1410,15 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
             let i_dominance_j = grade_i === grade_j && grade_i === 1;
             if (new_sub_dominance.has(`${literals[i]} ${literals[j]}`) ||
               new_super_dominance.has(`${literals[j]} ${literals[i]}`)) {
-              assert(i_sub_dominance_j, `shrink_graph: i_sub_dominance_j is false`);
+              assert(i_sub_dominance_j, `shrink_graph >1: ${literals[i]}_sub_dominance_${literals[j]} is false`);
             }
             else if (new_sub_dominance.has(`${literals[j]} ${literals[i]}`) ||
               new_super_dominance.has(`${literals[i]} ${literals[j]}`)) {
-              assert(j_sub_dominance_i, `shrink_graph: j_sub_dominance_i is false`);
+              assert(j_sub_dominance_i, `shrink_graph >2: ${literals[j]}_sub_dominance_${literals[i]} is false`);
             }
             else if (new_equal_dominance.has(`${literals[j]} ${literals[i]}`) ||
               new_equal_dominance.has(`${literals[i]} ${literals[j]}`)) {
-              assert(i_dominance_j, `shrink_graph: i_dominance_j is false`);
+              assert(i_dominance_j, `shrink_graph >3: ${literals[i]}_dominance_${literals[j]} is false`);
             }
             else {
               let certain_relation = false;
@@ -1531,7 +1568,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         this.check_solution_range_after_tightening(root);
       }
     }
-    // this.logging();
     // !Assign solutions to roots
     let should_stop = false;
     let maximum_solution_count;
