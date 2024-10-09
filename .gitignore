@@ -12,3 +12,4 @@ generated_programs
 erwin-*.tgz
 .DS_Store
 package
+test*.svg
