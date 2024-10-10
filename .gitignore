@@ -6,6 +6,7 @@ test.ts
 dist
 coverage
 type-constraint.svg
+type_constraint*.svg
 funcstat-constraint.svg
 log.txt
 generated_programs
