@@ -13,7 +13,7 @@ export class ConstaintNode {
     this.id = id;
   }
 }
-import { assert, create_custom_set, shuffle } from "./utility";
+import { assert, shuffle } from "./utility";
 import { Type, TypeKind } from "./type"
 import * as dot from 'ts-graphviz';
 import { config } from './config'
@@ -29,21 +29,23 @@ import { irnodes } from "./node";
 
 interface toLeaf {
   leaf_id : number;
-  // sub_dominance/super_dominance = true if there exists a path from the node to leaf with leaf_id,
-  // sub_dominance/super_dominance domination holds.
-  sub_dominance : boolean;
-  super_dominance : boolean;
+  sub_dominance : boolean; // node sub dominate leaf
+  super_dominance : boolean; // node super dominate leaf
+  subsuper_dominance : boolean; // node subsuper dominate leaf
+  equal_dominance : boolean; // node equal dominate leaf
 };
 interface fromRoot {
   root_id : number;
-  sub_dominance : boolean; // the solution of root_id is a sub_dominance of the solution of the node
-  super_dominance : boolean; // the solution of root_id is a super_dominance of the solution of the node
+  sub_dominance : boolean; // root sub dominate node
+  super_dominance : boolean;  // root super dominate node
+  subsuper_dominance : boolean; // root subsuper dominate node
+  equal_dominance : boolean; // root equal dominate node
 };
 
 
-let equal_toLeaf = (a : toLeaf, b : toLeaf) : boolean => {
-  return a.leaf_id === b.leaf_id;
-}
+// let equal_toLeaf = (a : toLeaf, b : toLeaf) : boolean => {
+//   return a.leaf_id === b.leaf_id;
+// }
 export class DominanceDAG<T, Node extends DominanceNode<T>> {
   dag_nodes : Map<number, ConstaintNode> = new Map<number, ConstaintNode>();
   // If 'id1 id2' is installed in sub_dominance/super_dominance, then the solution of id2 is a sub_dominance/super_dominance of the solution of id1
@@ -72,6 +74,11 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   name : string;
   constructor() {
     this.name = this.constructor.name;
+  }
+
+  //TODO
+  check_property() : void {
+
   }
 
   newNode(id : number) : ConstaintNode {
@@ -182,62 +189,187 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   }
 
   dfs4node2leaf() : void {
-    let broadcast_from_leaves_upwards = (id : number, leaf_id : number, sub_dominance : boolean, super_dominance : boolean) : void => {
+    let broadcast_from_leaves_upwards = (id : number, leaf_id : number, pre_sub_dominance_path : boolean,
+      pre_super_dominance_path : boolean,
+      pre_subsuper_dominance_path : boolean, pre_equal_dominance_path : boolean
+    ) : void => {
       for (let parent of this.dag_nodes.get(id)!.ins) {
-        const key = `${parent} ${id}`;
-        let thissub_dominance = this.sub_dominance.has(key) || sub_dominance;
-        let thissuper_dominance = this.super_dominance.has(key) || super_dominance;
-        if (this.node2leaf.has(parent)) {
-          // presub_dominance = false if there exists a path from the parent to leaf with leaf_id on which no sub_dominance domination holds.
-          let presub_dominance = true;
-          let presuper_dominance = true;
-          let pre_leaf_info : toLeaf | undefined = undefined;
-          let meet_this_leaf_before = false;
-          for (const leaf_info of this.node2leaf.get(parent)!) {
-            if (leaf_info.leaf_id === leaf_id) {
-              meet_this_leaf_before = true;
-              presub_dominance &&= leaf_info.sub_dominance;
-              presuper_dominance &&= leaf_info.super_dominance;
-              pre_leaf_info = leaf_info;
-              break;
+        const edge = `${parent} ${id}`;
+        // + means adding an dominance edge to a dominance path
+        // sub_edge + equal_path = sub_path
+        // equal_edge + sub_path = sub_path
+        // sub_edge + sub_path = sub_path
+        let sub_dominance_path = this.sub_dominance.has(edge) && pre_equal_dominance_path
+          || this.sub_dominance.has(edge) && pre_sub_dominance_path
+          || !this.sub_dominance.has(edge) && !this.super_dominance.has(edge) && pre_sub_dominance_path;
+        // super_edge + equal_path = super_path
+        // equal_edge + super_path = super_path
+        // super_edge + super_path = super_path
+        let super_dominance_path = this.super_dominance.has(edge) && pre_equal_dominance_path
+          || this.super_dominance.has(edge) && pre_super_dominance_path
+          || !this.sub_dominance.has(edge) && !this.super_dominance.has(edge) && pre_super_dominance_path;
+        // sub_edge + super_path = subsuper_path
+        // super_edge + sub_path = subsuper_path
+        let subsuper_dominance_path = pre_subsuper_dominance_path || (this.sub_dominance.has(edge) && pre_super_dominance_path)
+          || (this.super_dominance.has(edge) && pre_sub_dominance_path);
+        // equal_edge + equald_path = equal_path
+        let equal_dominance_path = !this.sub_dominance.has(edge) && !this.super_dominance.has(edge) && pre_equal_dominance_path;
+        assert([equal_dominance_path, subsuper_dominance_path, sub_dominance_path, super_dominance_path].filter(x => x).length === 1,
+          `dfs4node2leaf: edge ${parent} -> ${id}, leaf ${leaf_id}: sub_dominance_path, super_dominance_path, subsuper_dominance_path, equal_dominance_path are not exclusive
+          \nsub_dominance_path: ${sub_dominance_path}, super_dominance_path: ${super_dominance_path}, subsuper_dominance_path: ${subsuper_dominance_path}, equal_dominance_path: ${equal_dominance_path}`);
+        // Multi-dominance from a non-leaf to this leaf node
+        if (this.node2leaf.has(parent) &&
+          [...this.node2leaf.get(parent)!].map(t => t.leaf_id).includes(leaf_id)) {
+          const tail_info = [...this.node2leaf.get(parent)!].find(t => t.leaf_id === leaf_id)!;
+          let sub_dominance_to_tail = tail_info.sub_dominance;
+          let super_dominance_to_tail = tail_info.super_dominance;
+          let subsuper_dominance_to_tail = tail_info.subsuper_dominance;
+          let equal_dominance_to_tail = tail_info.equal_dominance;
+          assert([equal_dominance_to_tail, subsuper_dominance_to_tail, sub_dominance_to_tail, super_dominance_to_tail].filter(x => x).length === 1,
+            `dfs4node2leaf edge ${parent} -> ${id}, leaf ${leaf_id}: sub_dominance_to_tail, super_dominance_to_tail, subsuper_dominance_to_tail, equal_dominance_to_tail are not exclusive
+            \npre_sub_dominance: ${sub_dominance_to_tail}, super_dominance_to_tail: ${super_dominance_to_tail}, subsuper_dominance_to_tail: ${subsuper_dominance_to_tail}, equal_dominance_to_tail: ${equal_dominance_to_tail}`);
+          this.node2leaf.get(parent)!.delete(tail_info);
+          /*
+            /\ means the conjunction of two dominance paths
+            /\ is commutative
+            
+            sub_path /\ sub_path = sub_path
+            sub_path /\ super_path = equal_path
+            sub_path /\ subsuper_path = sub_path
+            sub_path /\ equal_path = equal_path
+
+            super_path /\ super_path = super_path
+            super_path /\ sub_path = equal_path
+            super_path /\ subsuper_path = super_path
+            super_path /\ equal_path = equal_path
+
+            subsuper_path /\ subsuper_path = subsuper_path
+            subsuper_path /\ sub_path = sub_path
+            subsuper_path /\ super_path = super_path
+            subsuper_path /\ equal_path = equal_path
+
+            equal_path /\ equal_path = equal_path
+            equal_path /\ sub_path = equal_path
+            equal_path /\ super_path = equal_path
+            equal_path /\ subsuper_path = equal_path
+          */
+          if (sub_dominance_to_tail) {
+            if (sub_dominance_path) { }
+            else if (super_dominance_path) {
+              sub_dominance_to_tail = false;
+              equal_dominance_to_tail = true;
+            }
+            else if (subsuper_dominance_path) { }
+            else if (equal_dominance_path) {
+              sub_dominance_to_tail = false;
+              equal_dominance_to_tail = true;
             }
           }
-          if (meet_this_leaf_before) {
-            thissub_dominance &&= presub_dominance;
-            thissuper_dominance &&= presuper_dominance
-            if (presub_dominance === true && thissub_dominance == false
-              || presuper_dominance === true && thissuper_dominance == false
-            ) {
-              this.node2leaf.get(parent)!.delete(pre_leaf_info!);
-              this.node2leaf.get(parent)!.add({ leaf_id: leaf_id, sub_dominance: thissub_dominance, super_dominance: thissuper_dominance });
+          else if (super_dominance_to_tail) {
+            if (sub_dominance_path) {
+              super_dominance_to_tail = false;
+              equal_dominance_to_tail = true;
+            }
+            else if (super_dominance_path) { }
+            else if (subsuper_dominance_path) { }
+            else if (equal_dominance_path) {
+              super_dominance_to_tail = false;
+              equal_dominance_to_tail = true;
             }
           }
-          else {
-            this.node2leaf.get(parent)!.add({ leaf_id: leaf_id, sub_dominance: thissub_dominance, super_dominance: thissuper_dominance });
+          else if (subsuper_dominance_to_tail) {
+            if (sub_dominance_path) {
+              subsuper_dominance_to_tail = false;
+              sub_dominance_to_tail = true;
+            }
+            else if (super_dominance_path) {
+              subsuper_dominance_to_tail = false;
+              super_dominance_to_tail = true;
+            }
+            else if (subsuper_dominance_path) { }
+            else if (equal_dominance_path) {
+              subsuper_dominance_to_tail = false;
+              equal_dominance_to_tail = true;
+            }
           }
+          else if (equal_dominance_to_tail) {
+            if (sub_dominance_path) { }
+            else if (super_dominance_path) { }
+            else if (subsuper_dominance_path) { }
+            else if (equal_dominance_path) { }
+          }
+          assert([equal_dominance_to_tail, subsuper_dominance_to_tail, sub_dominance_to_tail, super_dominance_to_tail].filter(x => x).length === 1,
+            `dfs4node2leaf >2: sub_dominance_to_tail, super_dominance_to_tail, subsuper_dominance_to_tail, equal_dominance_to_tail are not exclusive
+            \npre_sub_dominance: ${sub_dominance_to_tail}, super_dominance_to_tail: ${super_dominance_to_tail}, subsuper_dominance_to_tail: ${subsuper_dominance_to_tail}, equal_dominance_to_tail: ${equal_dominance_to_tail}`);
+          this.node2leaf.get(parent)!.delete(tail_info);
+          this.node2leaf.get(parent)!.add({
+            leaf_id: leaf_id, sub_dominance: sub_dominance_to_tail,
+            super_dominance: super_dominance_to_tail, subsuper_dominance: subsuper_dominance_to_tail,
+            equal_dominance: equal_dominance_to_tail
+          });
+          broadcast_from_leaves_upwards(parent, leaf_id, sub_dominance_to_tail, super_dominance_to_tail,
+            subsuper_dominance_to_tail, equal_dominance_to_tail);
         }
         else {
-          const s = create_custom_set<toLeaf>(equal_toLeaf);
-          s.add({ leaf_id: leaf_id, sub_dominance: thissub_dominance, super_dominance: thissuper_dominance });
-          this.node2leaf.set(parent, s);
+          if (this.node2leaf.has(parent)) {
+            this.node2leaf.get(parent)!.add({
+              leaf_id: leaf_id, sub_dominance: sub_dominance_path,
+              super_dominance: super_dominance_path, subsuper_dominance: subsuper_dominance_path,
+              equal_dominance: equal_dominance_path
+            });
+          }
+          else {
+            this.node2leaf.set(parent, new Set<toLeaf>([{
+              leaf_id: leaf_id, sub_dominance: sub_dominance_path,
+              super_dominance: super_dominance_path, subsuper_dominance: subsuper_dominance_path,
+              equal_dominance: equal_dominance_path
+            }]));
+          }
+          broadcast_from_leaves_upwards(parent, leaf_id, sub_dominance_path, super_dominance_path,
+            subsuper_dominance_path, equal_dominance_path);
         }
-        broadcast_from_leaves_upwards(parent, leaf_id, thissub_dominance, thissuper_dominance);
       }
     }
+    //! Given a node's dominance to a leaf, modify its child's dominance to the same leaf.
+    //! In this case, the node's dominance is broadcast from the child's dominance in `broadcast_from_leaves_upwards`.
+    //! If there exists multi-dominance from the node to the leaf, then the modification may not work.
+    //! Therefore, we need the function remove_removable_sub_super_dominance_in_multi_dominance to remove the removable sub- and super- dominances.
     let broadcast_from_roots_downwards = (id : number) : void => {
       for (let child of this.dag_nodes.get(id)!.outs) {
-        if (!this.node2leaf.has(child)) continue;
-        for (let this_leaf_info of this.node2leaf.get(id)!) {
-          for (let child_leaf_info of this.node2leaf.get(child)!) {
-            if (this_leaf_info.leaf_id === child_leaf_info.leaf_id
-              && !this_leaf_info.sub_dominance && !this_leaf_info.super_dominance
-              && child_leaf_info.sub_dominance) {
-              child_leaf_info.sub_dominance = false;
+        if (this.leaves.has(child)) continue;
+        for (const this_leaf_info of this.node2leaf.get(id)!) {
+          for (const child_leaf_info of this.node2leaf.get(child)!) {
+            if (this_leaf_info.leaf_id !== child_leaf_info.leaf_id) {
+              continue;
             }
-            else if (this_leaf_info.leaf_id === child_leaf_info.leaf_id
-              && !this_leaf_info.sub_dominance && !this_leaf_info.super_dominance
-              && child_leaf_info.super_dominance) {
-              child_leaf_info.super_dominance = false;
+            /*
+              Suppose node N1 dominates node N2, and they both dominate leaf L;
+              
+              N1 |-_equal L -> N2 |-_equal L
+
+              N1 |-_sub L -> ( N2 |-_sub L || N2 |-_equal L || N2 |-_subsuper L || N2 |-_super L )
+              
+              N1 |-_super L -> ( N2 |-_super L || N2 |-_equal L || N2 |-_subsuper L || N2 |-_sub L )
+
+              N1 |-_subsuper L -> ( N2 |-_subsuper L || N2 |-_sub L || N2 |-_super L )
+            */
+            if (this_leaf_info.equal_dominance) {
+              if (child_leaf_info.sub_dominance) {
+                child_leaf_info.sub_dominance = false;
+                child_leaf_info.equal_dominance = true;
+              }
+              else if (child_leaf_info.super_dominance) {
+                child_leaf_info.super_dominance = false;
+                child_leaf_info.equal_dominance = true;
+              }
+              else if (child_leaf_info.subsuper_dominance) {
+                child_leaf_info.subsuper_dominance = false;
+                child_leaf_info.equal_dominance = true;
+              }
+            }
+            else if (this_leaf_info.subsuper_dominance) {
+              assert(!child_leaf_info.equal_dominance,
+                `node ${id} subsuper-dominate leaf ${this_leaf_info.leaf_id}, but node ${child} equal-dominate leaf ${this_leaf_info.leaf_id}`);
             }
           }
         }
@@ -245,7 +377,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       }
     }
     for (let leaf of this.leaves) {
-      broadcast_from_leaves_upwards(leaf, leaf, false, false);
+      broadcast_from_leaves_upwards(leaf, leaf, false, false, false, true);
     }
     for (let root of this.roots) {
       broadcast_from_roots_downwards(root);
@@ -274,17 +406,26 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     // Remove sub-dominance 1->3 and 3->4 in constraint1.png
     // In this example, node 1 dominates node 2 (leaf) for more than once.
     // Removable sub- and super- dominances may occur
+    /*
+      Suppose non-leaf node N dominate leaf L through dominance edge E (N, N_child).
+
+      sub_dominance(E) means E is a sub-dominance edge.
+      Similar for super_dominance(E) and equal_dominance(E).
+
+      (N |-_super L || N |-_equal L) && sub_dominance(E) => remove sub_dominance(E)
+      (N |-_sub L || N |-_equal L) && super_dominance(E) => remove super_dominance
+    */
     let remove_from_roots = (node : number) : void => {
       for (const child of this.dag_nodes.get(node)!.outs) {
         const edge = `${node} ${child}`;
         assert(this.edge2leaf.has(edge), `${edge} is not included in this.edge2leaf`);
         for (const leaf of this.edge2leaf.get(edge)!) {
-          const leaf_info = [...this.node2leaf.get(node)!].find(t => t.leaf_id === leaf);
+          const leaf_info = [...this.node2leaf.get(node)!].find(t => t.leaf_id === leaf)!;
           assert(leaf_info !== undefined, `remove_removable_sub_super_dominance_in_multi_dominance: leaf_info of leaf whose ID is ${leaf} is undefined`);
-          if (!leaf_info!.sub_dominance && this.sub_dominance.has(edge)) {
+          if ((leaf_info.super_dominance || leaf_info.equal_dominance) && this.sub_dominance.has(edge)) {
             this.sub_dominance.delete(edge);
           }
-          if (!leaf_info!.super_dominance && this.super_dominance.has(edge)) {
+          if ((leaf_info.sub_dominance || leaf_info.equal_dominance) && this.super_dominance.has(edge)) {
             this.super_dominance.delete(edge);
           }
         }
@@ -321,8 +462,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   remove_removable_sub_super_dominance_in_pyramid() {
     // Dominance DAG in constraint2 is considered as a pyramid
     // where sub-dominance 4->2 should be removed.
-    // assert(this.leavesequal.size > 0 || this.leavessub.size > 0 || this.leaves.size === 0,
-    //   `remove_removable_sub_super_dominance_in_pyramid: called before build_leaves_relation`);
     if (this.leavesequal.size === 0) return;
     for (const equalstr of this.leavesequal) {
       const [leaf1, leaf2] = equalstr.split(" ");
@@ -672,10 +811,18 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       if (!this.roots.has(nodeid)) continue;
       for (const leaf_info of leaf_infos) {
         if (leaf2rootinfo.has(leaf_info.leaf_id)) {
-          leaf2rootinfo.get(leaf_info.leaf_id)!.add({ root_id: nodeid, sub_dominance: leaf_info.sub_dominance, super_dominance: leaf_info.super_dominance });
+          leaf2rootinfo.get(leaf_info.leaf_id)!.add({
+            root_id: nodeid, sub_dominance: leaf_info.sub_dominance,
+            super_dominance: leaf_info.super_dominance, subsuper_dominance: leaf_info.subsuper_dominance,
+            equal_dominance: leaf_info.equal_dominance
+          });
         }
         else {
-          leaf2rootinfo.set(leaf_info.leaf_id, new Set([{ root_id: nodeid, sub_dominance: leaf_info.sub_dominance, super_dominance: leaf_info.super_dominance }]));
+          leaf2rootinfo.set(leaf_info.leaf_id, new Set([{
+            root_id: nodeid, sub_dominance: leaf_info.sub_dominance,
+            super_dominance: leaf_info.super_dominance, subsuper_dominance: leaf_info.subsuper_dominance,
+            equal_dominance: leaf_info.equal_dominance
+          }]));
         }
       }
     }
@@ -685,29 +832,29 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       const root_infos_length = root_infos_array.length;
       for (let i = 0; i < root_infos_length; i++) {
         for (let j = i + 1; j < root_infos_length; j++) {
-          const root_info = root_infos_array[i];
+          const root_info1 = root_infos_array[i];
           const root_info2 = root_infos_array[j];
-          if (root_info.sub_dominance && (!root_info2.sub_dominance && !root_info2.super_dominance)) {
-            this.rootssub.add(`${root_info.root_id} ${root_info2.root_id}`);
+          if (root_info1.sub_dominance) {
+            if (root_info2.equal_dominance || root_info2.super_dominance) {
+              this.rootssub.add(`${root_info1.root_id} ${root_info2.root_id}`);
+            }
           }
-          else if (root_info.super_dominance && (!root_info2.sub_dominance && !root_info2.super_dominance)) {
-            this.rootssub.add(`${root_info2.root_id} ${root_info.root_id}`);
+          else if (root_info1.super_dominance) {
+            if (root_info2.equal_dominance || root_info2.sub_dominance) {
+              this.rootssub.add(`${root_info2.root_id} ${root_info1.root_id}`);
+            }
           }
-          else if ((!root_info.sub_dominance && !root_info.super_dominance) && root_info2.sub_dominance) {
-            this.rootssub.add(`${root_info2.root_id} ${root_info.root_id}`);
-          }
-          else if ((!root_info.sub_dominance && !root_info.super_dominance) && root_info2.super_dominance) {
-            this.rootssub.add(`${root_info.root_id} ${root_info2.root_id}`);
-          }
-          else if ((!root_info.sub_dominance && !root_info.super_dominance) && (!root_info2.sub_dominance && !root_info2.super_dominance)) {
-            this.rootsequal.add(`${root_info.root_id} ${root_info2.root_id}`);
-            this.rootsequal.add(`${root_info2.root_id} ${root_info.root_id}`);
-          }
-          else if (root_info.sub_dominance && root_info2.super_dominance) {
-            this.rootssub.add(`${root_info.root_id} ${root_info2.root_id}`);
-          }
-          else if (root_info.super_dominance && root_info2.sub_dominance) {
-            this.rootssub.add(`${root_info2.root_id} ${root_info.root_id}`);
+          else if (root_info1.equal_dominance) {
+            if (root_info2.sub_dominance) {
+              this.rootssub.add(`${root_info2.root_id} ${root_info1.root_id}`);
+            }
+            else if (root_info2.super_dominance) {
+              this.rootssub.add(`${root_info1.root_id} ${root_info2.root_id}`);
+            }
+            else if (root_info2.equal_dominance) {
+              this.rootsequal.add(`${root_info1.root_id} ${root_info2.root_id}`);
+              this.rootsequal.add(`${root_info2.root_id} ${root_info1.root_id}`);
+            }
           }
         }
       }
@@ -759,27 +906,27 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         for (let j = i + 1; j < leaf_infos_length; j++) {
           const leaf_info1 = leaf_infos_array[i];
           const leaf_info2 = leaf_infos_array[j];
-          if (leaf_info1.sub_dominance && (!leaf_info2.sub_dominance && !leaf_info2.super_dominance)) {
-            this.leavessub.add(`${leaf_info2.leaf_id} ${leaf_info1.leaf_id}`);
+          if (leaf_info1.sub_dominance) {
+            if (leaf_info2.equal_dominance || leaf_info2.super_dominance) {
+              this.leavessub.add(`${leaf_info2.leaf_id} ${leaf_info1.leaf_id}`);
+            }
           }
-          else if (leaf_info1.super_dominance && (!leaf_info2.sub_dominance && !leaf_info2.super_dominance)) {
-            this.leavessub.add(`${leaf_info1.leaf_id} ${leaf_info2.leaf_id}`);
+          else if (leaf_info1.super_dominance) {
+            if (leaf_info2.equal_dominance || leaf_info2.sub_dominance) {
+              this.leavessub.add(`${leaf_info1.leaf_id} ${leaf_info2.leaf_id}`);
+            }
           }
-          else if ((!leaf_info1.sub_dominance && !leaf_info1.super_dominance) && leaf_info2.sub_dominance) {
-            this.leavessub.add(`${leaf_info1.leaf_id} ${leaf_info2.leaf_id}`);
-          }
-          else if ((!leaf_info1.sub_dominance && !leaf_info1.super_dominance) && leaf_info2.super_dominance) {
-            this.leavessub.add(`${leaf_info2.leaf_id} ${leaf_info1.leaf_id}`);
-          }
-          else if ((!leaf_info1.sub_dominance && !leaf_info1.super_dominance) && (!leaf_info2.sub_dominance && !leaf_info2.super_dominance)) {
-            this.leavesequal.add(`${leaf_info1.leaf_id} ${leaf_info2.leaf_id}`);
-            this.leavesequal.add(`${leaf_info2.leaf_id} ${leaf_info1.leaf_id}`);
-          }
-          else if (leaf_info1.sub_dominance && leaf_info2.super_dominance) {
-            this.leavessub.add(`${leaf_info2.leaf_id} ${leaf_info1.leaf_id}`);
-          }
-          else if (leaf_info1.super_dominance && leaf_info2.sub_dominance) {
-            this.leavessub.add(`${leaf_info1.leaf_id} ${leaf_info2.leaf_id}`);
+          else if (leaf_info1.equal_dominance) {
+            if (leaf_info2.sub_dominance) {
+              this.leavessub.add(`${leaf_info1.leaf_id} ${leaf_info2.leaf_id}`);
+            }
+            else if (leaf_info2.super_dominance) {
+              this.leavessub.add(`${leaf_info2.leaf_id} ${leaf_info1.leaf_id}`);
+            }
+            else if (leaf_info2.equal_dominance) {
+              this.leavesequal.add(`${leaf_info1.leaf_id} ${leaf_info2.leaf_id}`);
+              this.leavesequal.add(`${leaf_info2.leaf_id} ${leaf_info1.leaf_id}`);
+            }
           }
         }
       }
@@ -966,7 +1113,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       }
       id2child_array_id.set(id, child_array_id);
       const child = local_dag_nodes.get(id)!.outs[child_array_id];
-      console.log(`root_id: ${root_id}, id: ${id}, child: ${child}`);
       if (local_leaves.has(child)) {
         yield* dfs(root_array_id, id, child_array_id + 1, this_solution);
         return;
@@ -977,7 +1123,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       }
       father.set(child, id);
       const edge = `${id} ${child}`;
-      let solution_candidates : Node[] = [];
+      let solution_candidate_for_child : Node[] = [];
       let first = true;
       /*
       For each edge from node n1 to node n2, consider all the leaves that can be reached from n1 through the edge.
@@ -991,84 +1137,59 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
           `resolve_nonroots_and_nonleaves: local_node2leaf does not have ${child}
         \nnode2leaf: ${[...local_node2leaf].map(([a, b]) => `${a} -> ${[...b].map(t => t.leaf_id)}\n`)}`);
         const leaf_info = [...local_node2leaf.get(child)!].find(t => t.leaf_id === leaf_id);
+        let solution_candidate_for_child_based_on_current_leaf : Node[] = [];
+        // Update solution_candidate_for_child_based_on_current_leaf
         if (local_sub_dominance.has(edge)) {
           if (leaf_info!.sub_dominance) {
-            const solution_candidates_for_this_leaf = this_solution.get(id)!.sub_with_lowerbound(this_solution.get(leaf_id)!)!;
-            if (first) {
-              solution_candidates = solution_candidates_for_this_leaf.map(t => t as Node);
-              first = false;
-            }
-            else {
-              solution_candidates = solution_candidates.filter(
-                t => solution_candidates_for_this_leaf.some(tt => t.same(tt))
-              );
-              assert(solution_candidates.length > 0,
-                `resolve_nonroots_and_nonleaves case 1: solution_candidates is empty when edge is ${edge}:
-                \nleaf id to its solution: ${leaf_ids.map(t => `${t}: ${this_solution.get(t)!.str()}`).join("\n")}`);
-            }
+            solution_candidate_for_child_based_on_current_leaf =
+              this_solution.get(id)!.sub_with_lowerbound(this_solution.get(leaf_id)!)!
+                .map(t => t as Node);
           }
-          else if (leaf_info!.super_dominance) {
-            throw new Error(`resolve_nonroots_and_nonleaves: ${id} should not be the sub_dominance of ${child}`);
+          else if (leaf_info!.super_dominance || leaf_info!.subsuper_dominance) {
+            solution_candidate_for_child_based_on_current_leaf = this_solution.get(id)!.subs().map(t => t as Node);
           }
-          else {
+          else if (leaf_info!.equal_dominance) {
             assert(this_solution.has(leaf_id), `resolve_nonroots_and_nonleaves: local_solutions does not have ${leaf_id}`);
-            const solution_for_leaf = this_solution.get(leaf_id)!;
-            if (first) {
-              solution_candidates = [solution_for_leaf];
-              first = false;
-            }
-            else {
-              solution_candidates = solution_candidates.filter(
-                t => solution_for_leaf.same(t)
-              );
-            }
+            solution_candidate_for_child_based_on_current_leaf = [this_solution.get(leaf_id)!];
           }
         }
         else if (local_super_dominance.has(edge)) {
-          // child is a leaf
-          throw new Error(`resolve_nonroots_and_nonleaves: ${id} should not be the super_dominance of ${child}`);
+          if (leaf_info!.super_dominance) {
+            solution_candidate_for_child_based_on_current_leaf =
+              this_solution.get(id)!.super_with_upperbound(this_solution.get(leaf_id)!)!
+                .map(t => t as Node);
+          }
+          else if (leaf_info!.sub_dominance || leaf_info!.subsuper_dominance) {
+            solution_candidate_for_child_based_on_current_leaf = this_solution.get(id)!.supers().map(t => t as Node);
+          }
+          else if (leaf_info!.equal_dominance) {
+            assert(this_solution.has(leaf_id), `resolve_nonroots_and_nonleaves: local_solutions does not have ${leaf_id}`);
+            solution_candidate_for_child_based_on_current_leaf = [this_solution.get(leaf_id)!];
+          }
         }
         else {
-          if (first) {
-            solution_candidates = [this_solution.get(id)!];
-            first = false;
-          }
-          else {
-            solution_candidates = solution_candidates.filter(
-              t => [this_solution.get(id)!].some(tt => t.same(tt))
-            );
-            assert(solution_candidates.length > 0,
-              `resolve_nonroots_and_nonleaves case 2: solution_candidates is empty when edge is ${edge}`);
-          }
+          solution_candidate_for_child_based_on_current_leaf = [this_solution.get(id)!];
         }
-        assert(solution_candidates.length > 0,
-          `resolve_nonroots_and_nonleaves case 3: solution_candidates is empty when edge is ${edge}`);
-        for (const solution of solution_candidates) {
+        // Update solution_candidate_for_child
+        if (first) {
+          solution_candidate_for_child = solution_candidate_for_child_based_on_current_leaf.map(t => t as Node);
+          first = false;
+        }
+        else {
+          solution_candidate_for_child = solution_candidate_for_child.filter(
+            t => solution_candidate_for_child_based_on_current_leaf.some(tt => t.same(tt))
+          );
+        }
+        assert(solution_candidate_for_child.length > 0,
+          `resolve_nonroots_and_nonleaves: solution_candidate_for_child is empty when edge is ${edge}:
+          \nleaf id to its solution: ${leaf_ids.map(t => `${t}: ${this_solution.get(t)!.str()}`).join("\n")}`);
+        for (const solution of solution_candidate_for_child) {
           this_solution.set(child, solution);
         }
         visited.add(child);
         yield* dfs(root_array_id, child, 0, this_solution);
       }
     }
-
-    // function* dfs_of_each_root(root_array_index : number, this_solution : Map<number, Node>) : Generator<Map<number, Node>> {
-    //   if (root_array_index === local_root_array.length) {
-    //     yield this_solution;
-    //     return;
-    //   }
-    //   const rootid = local_root_array[root_array_index];
-    //   if (local_dag_nodes.get(rootid)!.outs.length === 0) {
-    //     yield* dfs_of_each_root(root_array_index + 1, this_solution);
-    //   }
-    //   else {
-    //     console.log(`rootid: ${rootid}`);
-    //     for (const _ of dfs(rootid, rootid, 0, this_solution)) {
-    //       console.log("===================")
-    //       yield* dfs_of_each_root(root_array_index + 1, this_solution);
-    //     }
-    //   }
-    // }
-    // return dfs_of_each_root(0, this.solutions);
     return dfs(0, local_root_array[0], 0, this.solutions);
   }
 
@@ -1094,67 +1215,43 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     }
   }
 
-  // Given a node, returns all its ancestors plus how acestors dominate it
-  //! Use after remove_removable_sub_super_dominance_in_multi_dominance
+  // Given a node, returns all its ancestors (not including itself) plus how acestors dominate it
+  //! Use after remove_removable_sub_super_dominance_in_multi_dominance and remove_removable_sub_super_dominance_in_pyramid
   get_ancestors(nodeid : number) : Map<number, toLeaf> {
     const node2node : Map<number, toLeaf> = new Map<number, toLeaf>();
-    node2node.set(nodeid, { leaf_id: nodeid, sub_dominance: false, super_dominance: false });
-    let broadcast_from_leaves_upwards = (id : number, leaf_id : number, sub_dominance : boolean, super_dominance : boolean) : void => {
+    // node2node.set(nodeid, { leaf_id: nodeid, sub_dominance: false, super_dominance: false, subsuper_dominance: false, equal_dominance: false });
+    let broadcast_from_leaves_upwards = (id : number, leaf_id : number, pre_sub_dominance_path : boolean,
+      pre_super_dominance_path : boolean, pre_subsuper_dominance_path : boolean, pre_equal_dominance_path : boolean) : void => {
       for (let parent of this.dag_nodes.get(id)!.ins) {
-        const key = `${parent} ${id}`;
-        let thissub_dominance = this.sub_dominance.has(key) || sub_dominance;
-        let thissuper_dominance = this.super_dominance.has(key) || super_dominance;
-        node2node.set(parent, { leaf_id: leaf_id, sub_dominance: thissub_dominance, super_dominance: thissuper_dominance });
+        const edge = `${parent} ${id}`;
+        let sub_dominance_path = this.sub_dominance.has(edge) && pre_equal_dominance_path;
+        let super_dominance_path = this.super_dominance.has(edge) && pre_equal_dominance_path;
+        let subsuper_dominance_path = pre_subsuper_dominance_path || (this.sub_dominance.has(edge) && pre_super_dominance_path)
+          || (this.super_dominance.has(edge) && pre_sub_dominance_path);
+        let equal_dominance_path = !this.sub_dominance.has(edge) && !this.super_dominance.has(edge) && pre_equal_dominance_path;
+        assert([equal_dominance_path, subsuper_dominance_path, sub_dominance_path, super_dominance_path].filter(x => x).length === 1,
+          `get_ancestors: edge ${parent} -> ${id}. sub_dominance_path, super_dominance_path, subsuper_dominance_path, equal_dominance_path are not exclusive
+          \nsub_dominance_path: ${sub_dominance_path}, super_dominance_path: ${super_dominance_path}, subsuper_dominance_path: ${subsuper_dominance_path}, equal_dominance_path: ${equal_dominance_path}`);
+
+        node2node.set(parent, {
+          leaf_id: leaf_id, sub_dominance: sub_dominance_path, super_dominance: super_dominance_path
+          , subsuper_dominance: subsuper_dominance_path, equal_dominance: equal_dominance_path
+        });
         if (node2node.has(parent)) {
           const leaf_info = node2node.get(parent)!;
-          assert(thissub_dominance === leaf_info.sub_dominance,
-            `get_ancestors: thissub_dominance ${thissub_dominance} is not equal to leaf_info.sub_dominance ${leaf_info.sub_dominance}`);
-          assert(thissuper_dominance === leaf_info.super_dominance,
-            `get_ancestors: thissuper_dominance ${thissuper_dominance} is not equal to leaf_info.super_dominance ${leaf_info.super_dominance}`);
+          assert(sub_dominance_path === leaf_info.sub_dominance,
+            `get_ancestors: thissub_dominance ${sub_dominance_path} is not equal to leaf_info.sub_dominance ${leaf_info.sub_dominance}`);
+          assert(super_dominance_path === leaf_info.super_dominance,
+            `get_ancestors: thissuper_dominance ${super_dominance_path} is not equal to leaf_info.super_dominance ${leaf_info.super_dominance}`);
+          assert(subsuper_dominance_path === leaf_info.subsuper_dominance,
+            `get_ancestors: thissubsuper_dominance ${subsuper_dominance_path} is not equal to leaf_info.subsuper_dominance ${leaf_info.subsuper_dominance}`);
+          assert(equal_dominance_path === leaf_info.equal_dominance,
+            `get_ancestors: thisequal_dominance ${equal_dominance_path} is not equal to leaf_info.equal_dominance ${leaf_info.equal_dominance}`);
         }
-        // if (node2node.has(parent)) {
-        //   // presub_dominance = false if there exists a path from the parent to leaf with leaf_id on which no sub_dominance domination holds.
-        //   let presub_dominance = true;
-        //   let presuper_dominance = true;
-        //   const leaf_info = node2node.get(parent)!;
-        //   assert(leaf_info.leaf_id === leaf_id, `get_ancestors: leaf_info.leaf_id ${leaf_info.leaf_id} is not equal to leaf_id ${leaf_id}`);
-        //   presub_dominance &&= leaf_info.sub_dominance;
-        //   presuper_dominance &&= leaf_info.super_dominance;
-        //   thissub_dominance &&= presub_dominance;
-        //   thissuper_dominance &&= presuper_dominance
-        //   if (presub_dominance === true && thissub_dominance == false
-        //     || presuper_dominance === true && thissuper_dominance == false
-        //   ) {
-        //     node2node.delete(parent);
-        //     node2node.set(parent, { leaf_id: leaf_id, sub_dominance: thissub_dominance, super_dominance: thissuper_dominance });
-        //   }
-        // }
-        // else {
-        //   node2node.set(parent, { leaf_id: leaf_id, sub_dominance: thissub_dominance, super_dominance: thissuper_dominance });
-        // }
-        broadcast_from_leaves_upwards(parent, leaf_id, thissub_dominance, thissuper_dominance);
+        broadcast_from_leaves_upwards(parent, leaf_id, sub_dominance_path, super_dominance_path, subsuper_dominance_path, equal_dominance_path);
       }
     }
-    // let broadcast_from_roots_downwards = (id : number) : void => {
-    //   for (let child of this.dag_nodes.get(id)!.outs) {
-    //     if (!node2node.has(child)) continue;
-    //     const this_leaf_info = node2node.get(id)!;
-    //     const child_leaf_info = node2node.get(child)!;
-    //     if (!this_leaf_info.sub_dominance && !this_leaf_info.super_dominance
-    //       && child_leaf_info.sub_dominance) {
-    //       child_leaf_info.sub_dominance = false;
-    //     }
-    //     else if (!this_leaf_info.sub_dominance && !this_leaf_info.super_dominance
-    //       && child_leaf_info.super_dominance) {
-    //       child_leaf_info.super_dominance = false;
-    //     }
-    //     broadcast_from_roots_downwards(child);
-    //   }
-    // }
-    broadcast_from_leaves_upwards(nodeid, nodeid, false, false);
-    // for (let root of this.roots) {
-    //   broadcast_from_roots_downwards(root);
-    // }
+    broadcast_from_leaves_upwards(nodeid, nodeid, false, false, false, true);
     return node2node;
   }
 
@@ -1165,8 +1262,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     this.initialize_resolve();
     // !Get roots and leaves
     this.get_roots_and_leaves(false);
-    // ! Neturalize the dominance
-    this.neutralize_super_and_sub();
     // !Map nodes to their leaves, recording if there exists a path from the node to leaf with leaf_id on which sub_dominance/super_dominance domination does not holds.
     // If there are multiple paths from node to leaf, then the sub_dominance does not hold as long as there exists a path on which sub_dominance domination does not hold.
     // leaf_ids are not in this.node2leaf
@@ -1240,7 +1335,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     // let gid = -1;
     //! In TypeDominanceDAG, literals should be considered.
     if (config.unit_test_mode || this.name === "TypeDominanceDAG") {
-      const node2literals : Map<number, toLeaf>[] = [];
+      const ancestor2literals : Map<number, toLeaf>[] = [];
       for (const literal_id of this.relevant_nodes) {
         new_dag_nodes.set(literal_id, new ConstaintNode(literal_id));
         if (!config.unit_test_mode) assert(irnodes.has(literal_id), `shrink_graph: irnodes does not have ${literal_id}`);
@@ -1251,39 +1346,75 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
           \nIt's children: ${this.dag_nodes.get(literal_id)!.outs}
           \nIt's outbound: ${this.dag_nodes.get(literal_id)!.outbound}`);
         //! The literal and the leaf variable decl may have the same ancestor (including the literal itself).
-        const node2literal = this.get_ancestors(literal_id);
         const visitleaf = new Set<number>();
+        for (const child of this.dag_nodes.get(literal_id)!.outs) {
+          if (relevant_leaf_set.has(child)) {
+            visitleaf.add(child);
+            new_dag_nodes.get(literal_id)!.outs.push(child);
+            new_dag_nodes.get(child)!.ins.push(literal_id);
+            new_dag_nodes.get(literal_id)!.outbound++;
+            new_dag_nodes.get(child)!.inbound++;
+            const edge = `${literal_id} ${child}`;
+            if (this.sub_dominance.has(edge)) {
+              new_sub_dominance.add(edge);
+            }
+            else if (this.super_dominance.has(edge)) {
+              new_super_dominance.add(edge);
+            }
+          }
+        }
+        const ancestor2literal = this.get_ancestors(literal_id);
         // const lazyvisitleaf = new Set<number>();
-        node2literals.push(node2literal);
-        for (let ancestor of node2literal.keys()) {
+        if (ancestor2literal.size >= 0) {
+          ancestor2literals.push(ancestor2literal);
+        }
+        for (let ancestor of ancestor2literal.keys()) {
           assert(this.node2leaf.has(ancestor), `shrink_graph: node2leaf does not have ${ancestor}`);
-          const literal_info = node2literal.get(ancestor)!;
+          const literal_info = ancestor2literal.get(ancestor)!;
           assert(!literal_info.super_dominance, `shrink_graph: literal id ${literal_info.leaf_id} literal_info.super_dominance is true`);
           for (const leaf of this.node2leaf.get(ancestor)!) {
             if (leaf.leaf_id === literal_id) continue;
             if (visitleaf.has(leaf.leaf_id)) continue;
             if (relevant_leaf_set.has(leaf.leaf_id)) {
               if (leaf.super_dominance && literal_info.sub_dominance) {
-                new_super_dominance.add(`${literal_id} ${leaf.leaf_id}`);
-                visitleaf.add(leaf.leaf_id);
-              }
-              else if (leaf.sub_dominance && literal_info.sub_dominance) {
-                // lazyvisitleaf.add(leaf.leaf_id);
-              }
-              else if (!leaf.sub_dominance && !leaf.super_dominance && literal_info.sub_dominance) {
-                new_super_dominance.add(`${literal_id} ${leaf.leaf_id}`);
-                visitleaf.add(leaf.leaf_id);
-              }
-              else if (leaf.super_dominance && !literal_info.sub_dominance && !literal_info.super_dominance) {
-                new_super_dominance.add(`${literal_id} ${leaf.leaf_id}`);
-                visitleaf.add(leaf.leaf_id);
-              }
-              else if (leaf.sub_dominance && !literal_info.sub_dominance && !literal_info.super_dominance) {
                 new_sub_dominance.add(`${literal_id} ${leaf.leaf_id}`);
                 visitleaf.add(leaf.leaf_id);
               }
-              else if (!leaf.sub_dominance && !leaf.super_dominance && !literal_info.sub_dominance && !literal_info.super_dominance) {
+              else if (leaf.super_dominance && literal_info.super_dominance) { }
+              else if (leaf.super_dominance && literal_info.equal_dominance) {
+                new_sub_dominance.add(`${literal_id} ${leaf.leaf_id}`);
                 visitleaf.add(leaf.leaf_id);
+              }
+              else if (leaf.sub_dominance && literal_info.super_dominance) {
+                new_super_dominance.add(`${literal_id} ${leaf.leaf_id}`);
+                visitleaf.add(leaf.leaf_id);
+              }
+              else if (leaf.sub_dominance && literal_info.sub_dominance) { }
+              else if (leaf.sub_dominance && literal_info.equal_dominance) {
+                new_super_dominance.add(`${literal_id} ${leaf.leaf_id}`);
+                visitleaf.add(leaf.leaf_id);
+              }
+              else if (leaf.equal_dominance && literal_info.sub_dominance) {
+                new_sub_dominance.add(`${literal_id} ${leaf.leaf_id}`);
+                visitleaf.add(leaf.leaf_id);
+              }
+              else if (leaf.equal_dominance && literal_info.super_dominance) {
+                new_super_dominance.add(`${literal_id} ${leaf.leaf_id}`);
+                visitleaf.add(leaf.leaf_id);
+              }
+              else if (leaf.equal_dominance && literal_info.equal_dominance) {
+                visitleaf.add(leaf.leaf_id);
+              }
+              else if (leaf.subsuper_dominance || literal_info.subsuper_dominance) { }
+              else {
+                throw new Error(`shrink_graph:
+                  \n ancestor ${ancestor}:
+                  \n literal_id ${literal_id}:
+                  \n literal.sub_dominance: ${literal_info.sub_dominance}, literal.super_dominance: ${literal_info.super_dominance},
+                  \n literal.equal_dominance: ${literal_info.equal_dominance}, literal.subsuper_dominance: ${literal_info.subsuper_dominance}
+                  \n leaf.leaf_id ${leaf.leaf_id}:
+                  \n leaf.sub_dominance: ${leaf.sub_dominance}, leaf.super_dominance: ${leaf.super_dominance},
+                  \n leaf.equal_dominance: ${leaf.equal_dominance}, leaf.subsuper_dominance: ${leaf.subsuper_dominance}`);
               }
               new_dag_nodes.get(literal_id)!.outs.push(leaf.leaf_id);
               new_dag_nodes.get(leaf.leaf_id)!.ins.push(literal_id);
@@ -1310,26 +1441,56 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       }
       //! Now build the relation among literals
       //! First suppose the two literals have a common ancestor.
-      const node2literal_length = node2literals.length;
+      const ancestor2literal_length = ancestor2literals.length;
       // const uncertain_literal_pairs = new Map<string, string>();
-      for (let i = 0; i < node2literal_length; i++) {
-        for (let j = i + 1; j < node2literal_length; j++) {
-          const node2literal_i = node2literals[i];
-          const node2literal_j = node2literals[j];
+      for (let i = 0; i < ancestor2literal_length; i++) {
+        for (let j = i + 1; j < ancestor2literal_length; j++) {
+          const ancestor2literal_i = ancestor2literals[i];
+          const ancestor2literal_j = ancestor2literals[j];
+          const literal_i_id = ancestor2literal_i.get([...ancestor2literal_i.keys()][0])!.leaf_id;
+          const literal_j_id = ancestor2literal_j.get([...ancestor2literal_j.keys()][0])!.leaf_id;
+          if (this.dag_nodes.get(literal_i_id)!.outs.includes(literal_j_id)) {
+            new_dag_nodes.get(literal_i_id)!.outs.push(literal_j_id);
+            new_dag_nodes.get(literal_j_id)!.ins.push(literal_i_id);
+            new_dag_nodes.get(literal_i_id)!.outbound++;
+            new_dag_nodes.get(literal_j_id)!.inbound++;
+            if (this.sub_dominance.has(`${literal_i_id} ${literal_j_id}`)) {
+              new_sub_dominance.add(`${literal_i_id} ${literal_j_id}`);
+            }
+            else if (this.super_dominance.has(`${literal_i_id} ${literal_j_id}`)) {
+              new_super_dominance.add(`${literal_i_id} ${literal_j_id}`);
+            }
+            continue;
+          }
+          if (this.dag_nodes.get(literal_j_id)!.outs.includes(literal_i_id)) {
+            new_dag_nodes.get(literal_i_id)!.outs.push(literal_j_id);
+            new_dag_nodes.get(literal_j_id)!.ins.push(literal_i_id);
+            new_dag_nodes.get(literal_i_id)!.outbound++;
+            new_dag_nodes.get(literal_j_id)!.inbound++;
+            if (this.sub_dominance.has(`${literal_i_id} ${literal_j_id}`)) {
+              new_super_dominance.add(`${literal_i_id} ${literal_j_id}`);
+            }
+            else if (this.super_dominance.has(`${literal_i_id} ${literal_j_id}`)) {
+              new_sub_dominance.add(`${literal_i_id} ${literal_j_id}`);
+            }
+            continue;
+          }
           let certain_relation = false;
           // let uncertain_relation = false;
           let grade_i, grade_j;
           let literal_info_i, literal_info_j;
-          for (const ancestor of node2literal_i.keys()) {
-            if (node2literal_j.has(ancestor)) {
-              literal_info_i = node2literal_i.get(ancestor)!;
-              literal_info_j = node2literal_j.get(ancestor)!;
+          for (const ancestor of ancestor2literal_i.keys()) {
+            if (ancestor2literal_j.has(ancestor)) {
+              literal_info_i = ancestor2literal_i.get(ancestor)!;
+              literal_info_j = ancestor2literal_j.get(ancestor)!;
               if (literal_info_i.super_dominance) grade_i = 2;
               else if (literal_info_i.sub_dominance) grade_i = 0;
-              else grade_i = 1;
+              else if (literal_info_i.equal_dominance) grade_i = 1;
+              else continue;
               if (literal_info_j.super_dominance) grade_j = 2;
               else if (literal_info_j.sub_dominance) grade_j = 0;
-              else grade_j = 1;
+              else if (literal_info_j.equal_dominance) grade_j = 1;
+              else continue;
               if (grade_i > grade_j) {
                 new_super_dominance.add(`${literal_info_i.leaf_id} ${literal_info_j.leaf_id}`);
                 certain_relation = true;
@@ -1342,9 +1503,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
                 new_equal_dominance.add(`${literal_info_i.leaf_id} ${literal_info_j.leaf_id}`);
                 certain_relation = true;
               }
-              // else {
-              // uncertain_relation = true;
-              // }
               if (certain_relation) {
                 new_dag_nodes.get(literal_info_i.leaf_id)!.outs.push(literal_info_j.leaf_id);
                 new_dag_nodes.get(literal_info_j.leaf_id)!.ins.push(literal_info_i.leaf_id);
@@ -1391,20 +1549,21 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         const leaf_infos_i = this.node2leaf.get(literals[i])!;
         for (let j = i - 1; j >= 0; j--) {
           const leaf_infos_j = this.node2leaf.get(literals[j])!;
-          const common_leaf_info = [...leaf_infos_i].filter(t => [...leaf_infos_j].some(tt => tt.leaf_id === t.leaf_id));
-          assert(common_leaf_info.length === 0 || common_leaf_info.length === 1,
-            `shrink_graph: common_leaf_info.length ${common_leaf_info.length} is not equal to 0 or 1`);
-          if (common_leaf_info.length === 1) {
-            const leaf_info_i = [...leaf_infos_i].find(t => t.leaf_id === common_leaf_info[0].leaf_id)!;
-            const leaf_info_j = [...leaf_infos_j].find(t => t.leaf_id === common_leaf_info[0].leaf_id)!;
+          const common_leaf_infos = [...leaf_infos_i].filter(t => [...leaf_infos_j].some(tt => tt.leaf_id === t.leaf_id));
+          if (common_leaf_infos.length === 0) continue;
+          for (const common_leaf_info of common_leaf_infos) {
+            const leaf_info_i = [...leaf_infos_i].find(t => t.leaf_id === common_leaf_info.leaf_id)!;
+            const leaf_info_j = [...leaf_infos_j].find(t => t.leaf_id === common_leaf_info.leaf_id)!;
             let grade_i;
             if (leaf_info_i.sub_dominance) grade_i = 2;
             else if (leaf_info_i.super_dominance) grade_i = 0;
-            else grade_i = 1;
+            else if (leaf_info_i.equal_dominance) grade_i = 1;
+            else continue;
             let grade_j;
             if (leaf_info_j.sub_dominance) grade_j = 2;
             else if (leaf_info_j.super_dominance) grade_j = 0;
-            else grade_j = 1;
+            else if (leaf_info_j.equal_dominance) grade_j = 1;
+            else continue;
             let i_sub_dominance_j = grade_i > grade_j;
             let j_sub_dominance_i = grade_i < grade_j;
             let i_dominance_j = grade_i === grade_j && grade_i === 1;
@@ -1434,12 +1593,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
                 new_equal_dominance.add(`${literals[i]} ${literals[j]}`);
                 certain_relation = true;
               }
-              // else {
-              //   assert (grade_i === grade_j, `shrink_graph: grade_i ${grade_i} is not equal to grade_j ${grade_j}`);
-              //   if (grade_i === 2) {
-
-              //   }
-              // }
               if (certain_relation) {
                 new_dag_nodes.get(literals[i])!.outs.push(literals[j]);
                 new_dag_nodes.get(literals[j])!.ins.push(literals[i]);
@@ -1521,8 +1674,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     if (shrink) await this.shrink_graph();
     // !Get roots and leaves
     this.get_roots_and_leaves();
-    // ! Neturalize the dominance
-    this.neutralize_super_and_sub();
     // !Map nodes to their leaves, recording if there exists a path from the node to leaf with leaf_id on which sub_dominance/super_dominance domination does not holds.
     // If there are multiple paths from node to leaf, then the sub_dominance does not hold as long as there exists a path on which sub_dominance domination does not hold.
     // leaf_ids are not in this.node2leaf
