@@ -291,8 +291,9 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
   //! Select one storage location solution
   for (let storage_location_solutions of gen.storage_location_dag.solutions_collection) {
     for (let [key, value] of storage_location_solutions) {
-      assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration,
-        `The node must be a variable declaration, but a ${irnodes.get(key)!.typeName} is found.`);
+      if (irnodes.get(key)!.typeName !== "IRVariableDeclaration") {
+        continue;
+      }
       (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
     }
   }
@@ -300,6 +301,7 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
   const state_variable_visibility_solutions = pick_random_element(gen.state_variable_visibility_dag.solutions_collection)!;
   // assign the visibility to the state variable
   for (let [key, value] of state_variable_visibility_solutions) {
+    assert(irnodes.has(key), `The key ${key} is not found in the irnodes`);
     assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration,
       `The node must be a variable declaration, but a ${irnodes.get(key)!.typeName} is found`);
     (irnodes.get(key)! as decl.IRVariableDeclaration).visibility = value.kind;
@@ -344,8 +346,9 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
   //! Select storage location solution
   const storage_location_solutions = pick_random_element(gen.storage_location_dag.solutions_collection)!;
   for (let [key, value] of storage_location_solutions) {
-    assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration,
-      `The node must be a variable declaration, but a ${irnodes.get(key)!.typeName} is found`);
+    if (irnodes.get(key)!.typeName !== "IRVariableDeclaration") {
+      continue;
+    }
     (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
   }
   let cnt = 0;
@@ -379,6 +382,7 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
       for (let state_variable_visibility_solutions of gen.state_variable_visibility_dag.solutions_collection) {
         // assign the visibility to the state variable
         for (let [key, value] of state_variable_visibility_solutions) {
+          assert(irnodes.has(key), `The key ${key} is not found in the irnodes`);
           assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration,
             `The node must be a variable declaration, but a ${irnodes.get(key)!.typeName} is found`);
           (irnodes.get(key)! as decl.IRVariableDeclaration).visibility = value.kind;
@@ -448,6 +452,7 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
   //! Select one state variable visibility solution
   const state_variable_visibility_solutions = pick_random_element(gen.state_variable_visibility_dag.solutions_collection)!;
   for (let [key, value] of state_variable_visibility_solutions) {
+    assert(irnodes.has(key), `The key ${key} is not found in the irnodes`);
     assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration,
       `The node must be a variable declaration, but a ${irnodes.get(key)!.typeName} is found`);
     (irnodes.get(key)! as decl.IRVariableDeclaration).visibility = value.kind;
@@ -502,6 +507,9 @@ async function generate() {
     if (config.debug) {
       gen.type_dag.verify();
       gen.funcstat_dag.verify();
+      gen.func_visibility_dag.verify();
+      gen.state_variable_visibility_dag.verify();
+      gen.storage_location_dag.verify();
     }
     if (config.mode === "type") {
       generate_type_mode(source_unit);

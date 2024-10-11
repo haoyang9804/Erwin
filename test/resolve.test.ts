@@ -263,10 +263,9 @@ async () => {
   type_dag.connect(6, 5);
   type_dag.connect(1, 7, "super_dominance");
   type_dag.relevant_nodes.add(5);
-  type_dag.relevant_nodes.add(2);
+  type_dag.relevant_nodes.add(4);
   type_dag.relevant_nodes.add(3);
   type_dag.relevant_nodes.add(7);
-  type_dag.relevant_nodes.add(6);
   type_dag.initialize_resolve();
   type_dag.get_roots_and_leaves();
   await type_dag.draw("./test_shink_graph1_before_shrink.svg");
@@ -297,7 +296,7 @@ async () => {
   type_dag.connect(2, 4);
   type_dag.connect(1, 3, "sub_dominance");
   type_dag.connect(1, 4);
-  await type_dag.resolve_by_stream(true);
+  await type_dag.resolve_by_stream();
   type_dag.verify();
 }
 )
@@ -322,8 +321,6 @@ async () => {
   type_dag.connect(5, 6)
   type_dag.connect(6, 8);
   type_dag.relevant_nodes.add(8);
-  type_dag.relevant_nodes.add(4);
-  type_dag.relevant_nodes.add(3);
   await type_dag.resolve_by_stream(true);
 }
 )
@@ -375,6 +372,39 @@ async () => {
     type_dag.verify();
   }
 )
+
+test("test resolve 3",
+async () => {
+    const type_dag = new TypeDominanceDAG();
+    type_dag.insert(type_dag.newNode(1), uinteger_types);
+    type_dag.insert(type_dag.newNode(2), uinteger_types);
+    type_dag.insert(type_dag.newNode(3), uinteger_types);
+    type_dag.insert(type_dag.newNode(4), uinteger_types);
+    type_dag.connect(1, 2, "sub_dominance");
+    type_dag.connect(3, 2, "super_dominance");
+    type_dag.connect(4, 3);
+    type_dag.connect(4, 2, "super_dominance");
+    await type_dag.resolve_by_stream();
+    type_dag.verify();
+  }
+)
+
+test("test resolve 4",
+  async () => {
+      const type_dag = new TypeDominanceDAG();
+      type_dag.insert(type_dag.newNode(1), uinteger_types);
+      type_dag.insert(type_dag.newNode(2), uinteger_types);
+      type_dag.insert(type_dag.newNode(3), uinteger_types);
+      type_dag.insert(type_dag.newNode(4), uinteger_types);
+      type_dag.insert(type_dag.newNode(5), uinteger_types);
+      type_dag.connect(1, 2, "super_dominance");
+      type_dag.connect(2, 3, "super_dominance");
+      type_dag.connect(2, 4);
+      type_dag.connect(2, 5, "super_dominance");
+      await type_dag.resolve_by_stream();
+      type_dag.verify();
+    }
+  )
 
 test("test subsuper support 1",
 async () => {

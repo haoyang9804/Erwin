@@ -25,7 +25,16 @@ export class IRSourceUnit extends IRNode {
     super(id, scope);
     this.children = children;
   }
-  lower() {
+  lower() : ASTNode {
     return factory.makeSourceUnit("", -1, "", new Map<string, number>(), this.children.map(x => x.lower()));
+  }
+}
+
+export class IRGhost extends IRNode {
+  constructor(id : number, scope : number) {
+    super(id, scope);
+  }
+  lower() : ASTNode {
+    throw new Error("IRGhost cannot be lowered");
   }
 }

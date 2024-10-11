@@ -1,5 +1,5 @@
 import { assert, pick_random_element, random_int, merge_set, intersection } from "./utility";
-import { IRNode, IRSourceUnit } from "./node";
+import { IRGhost, IRNode, IRSourceUnit } from "./node";
 import * as expr from "./expression";
 import * as decl from "./declare";
 import * as stmt from "./statement";
@@ -33,6 +33,7 @@ let name_id = 0;
 let all_types : type.Type[] = [];
 // A map from scope id to the set of unexpected extra statements.
 let unexpected_extra_stmt : Map<number, stmt.IRStatement[]> = new Map<number, stmt.IRStatement[]>();
+const ghost_function_decl_calls = new Set<number>();
 const contract_types : Map<number, type.ContractType> = new Map<number, type.ContractType>();
 const internal_struct_types = new Set<type.StructType>();
 let user_defined_types : type.UserDefinedType[] = [];
@@ -904,6 +905,7 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
       body.push(stmt_gen.irnode! as stmt.IRStatement);
       // update read_vardecls
       if (stmt_gen instanceof ExpressionStatementGenerator) {
+        if (ghost_function_decl_calls.has(stmt_gen.expr!.id)) continue;
         for (const used_vardecl of expr2read_variables.get(stmt_gen.expr!.id)!) {
           read_vardecls.add(used_vardecl);
         }
@@ -915,6 +917,7 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
       }
       else if (stmt_gen instanceof NonExpressionStatementGenerator) {
         for (const expr of stmt_gen.exprs) {
+          if (ghost_function_decl_calls.has(expr.id)) continue;
           for (const used_vardecl of expr2read_variables.get(expr.id)!) {
             read_vardecls.add(used_vardecl);
           }
@@ -1151,22 +1154,22 @@ class ContractDeclarationGenerator extends DeclarationGenerator {
       // Since expr2read_variables(functioncall) includes its returned vardecl, which may be state variable, 
       // an external call of this getter function may mislead a function body and let it believe it uses the state variable, which is not true. 
       // So we need a ghost state variable, which is a copy of the true state variable but not a state variable itself, to avoid this misleading.
-      if (config.debug) {
-        console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating ghost state variable for state variable ${variable_decl.name}`));
-        indent += 2;
-      }
-      const ghost_state_vardecl = new decl.IRVariableDeclaration(global_id++, cur_scope.id(), variable_decl.name,
-        undefined, variable_decl.visibility);
-      type_dag.insert(type_dag.newNode(ghost_state_vardecl.id), type_dag.solution_range.get(variable_decl.id)!);
-      type_dag.connect(ghost_state_vardecl.id, variable_decl.id);
-      if (config.debug) {
-        indent -= 2;
-        console.log(color.yellowBG(`${" ".repeat(indent)}${ghost_state_vardecl.id}: Ghost state variable for state variable ${variable_decl.name}, type: ${type_dag.solution_range.get(ghost_state_vardecl.id)!.map(t => t.str())}`));
-      }
+      // if (config.debug) {
+      //   console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating ghost state variable for state variable ${variable_decl.name}`));
+      //   indent += 2;
+      // }
+      // const ghost_state_vardecl = new decl.IRVariableDeclaration(global_id++, cur_scope.id(), variable_decl.name,
+      //   undefined, variable_decl.visibility);
+      // type_dag.insert(type_dag.newNode(ghost_state_vardecl.id), type_dag.solution_range.get(variable_decl.id)!);
+      // type_dag.connect(ghost_state_vardecl.id, variable_decl.id);
+      // if (config.debug) {
+      //   indent -= 2;
+      //   console.log(color.yellowBG(`${" ".repeat(indent)}${ghost_state_vardecl.id}: Ghost state variable for state variable ${variable_decl.name}, type: ${type_dag.solution_range.get(ghost_state_vardecl.id)!.map(t => t.str())}`));
+      // }
       decl_db.ghost_funcdecls.add(fid);
-      decl_db.add_ghosts_for_state_variable(fid, ghost_state_vardecl.id, variable_decl.id);
+      // decl_db.add_ghosts_for_state_variable(fid, ghost_state_vardecl.id, variable_decl.id);
       new decl.IRFunctionDefinition(fid, cur_scope.id(), variable_decl.name, FunctionKind.Function,
-        false, false, [], [ghost_state_vardecl], [], [], FunctionVisibility.External, FunctionStateMutability.View);
+        false, false, [], [variable_decl], [], [], FunctionVisibility.External, FunctionStateMutability.View);
       if (config.debug) {
         indent -= 2;
         console.log(color.yellowBG(`${" ".repeat(indent)}${fid}: Getter function for state variable ${variable_decl.name}`));
@@ -1434,7 +1437,7 @@ class AssignmentGenerator extends RValueGenerator {
     }
   }
 
-  left_dominate_right() : boolean {
+  this_dominate_right() : boolean {
     return this.op !== ">>=" && this.op !== "<<=";
   }
 
@@ -1457,20 +1460,15 @@ class AssignmentGenerator extends RValueGenerator {
     type_dag.update(type_dag.newNode(this.id), this.type_range);
     const leftid = global_id++;
     const rightid = global_id++;
-    if (this.left_dominate_right()) {
+    if (this.this_dominate_right()) {
       type_dag.insert(type_dag.newNode(rightid), this.type_range);
     }
     else {
       type_dag.insert(type_dag.newNode(rightid), type.uinteger_types);
     }
-    if (this.left_dominate_right()) {
-      type_dag.insert(type_dag.newNode(leftid), type_dag.solution_range.get(rightid)!);
-    }
-    else {
-      type_dag.insert(type_dag.newNode(leftid), type_dag.solution_range.get(this.id)!);
-    }
-    if (this.left_dominate_right()) {
-      type_dag.connect(leftid, rightid);
+    type_dag.insert(type_dag.newNode(leftid), type_dag.solution_range.get(this.id)!);
+    if (this.this_dominate_right()) {
+      type_dag.connect(this.id, rightid, "sub_dominance");
     }
     type_dag.connect(this.id, leftid);
     //! Generate the right-hand-side expression
@@ -1480,11 +1478,12 @@ class AssignmentGenerator extends RValueGenerator {
     let right_expression : expr.IRExpression = right_expression_gen.irnode as expr.IRExpression;
     let right_extracted_expression = expr.tuple_extraction(right_expression);
     //! Generate the left-hand-side identifier
-    if (this.left_dominate_right()) {
-      type_dag.type_range_alignment(leftid, rightid);
+    if (this.this_dominate_right()) {
+      type_dag.type_range_alignment(this.id, rightid);
     }
     const identifier_gen = new IdentifierGenerator(leftid, true);
     identifier_gen.generate(cur_expression_complex_level + 1);
+    type_dag.type_range_alignment(this.id, leftid);
     let left_expression : expr.IRExpression = identifier_gen.irnode as expr.IRExpression;
     let left_extracted_expression = expr.tuple_extraction(left_expression);
     assert(identifier_gen.variable_decl !== undefined, "AssignmentGenerator: identifier_gen.vardecl is undefined");
@@ -1508,10 +1507,6 @@ class AssignmentGenerator extends RValueGenerator {
     expr2write_variables.set(this.id, new Set<number>([left_extracted_expression.id]));
     //! Generate irnode
     this.irnode = new expr.IRAssignment(this.id, cur_scope.id(), left_expression, right_expression, this.op!);
-    if (this.left_dominate_right()) {
-      type_dag.type_range_alignment(leftid, rightid);
-    }
-    type_dag.type_range_alignment(this.id, leftid);
     if (config.debug) {
       indent -= 2;
       console.log(color.yellowBG(`${" ".repeat(indent)}${this.id}: Assignment ${this.op}, scope: ${cur_scope.id()}, type: ${type_dag.solution_range.get(this.id)!.map(t => t.str())}, scope: ${cur_scope.kind()}`));
@@ -1552,11 +1547,11 @@ class BinaryOpGenerator extends RValueGenerator {
   }
 
   this_dominates_left() : boolean {
-    return ["+", "-", "*", "/", "%", "<<", ">>", "&", "^", "|", "&&", "||"].filter((op) => op === this.op).length === 1;
+    return ["+", "-", "*", "/", "%", "<<", ">>", "&", "^", "|"].filter((op) => op === this.op).length === 1;
   }
 
-  left_dominate_right() : boolean {
-    return this.op !== ">>" && this.op !== "<<";
+  this_dominate_right() : boolean {
+    return ["+", "-", "*", "/", "%", "&", "^", "|"].filter((op) => op === this.op).length === 1;
   }
 
   generate(cur_expression_complex_level : number) : void {
@@ -1580,30 +1575,36 @@ class BinaryOpGenerator extends RValueGenerator {
     type_dag.update(type_dag.newNode(this.id), this.type_range);
     const leftid = global_id++;
     const rightid = global_id++;
-    if (this.left_dominate_right() && this.this_dominates_left()) {
+    if (this.this_dominate_right()) {
       type_dag.insert(type_dag.newNode(rightid), this.type_range);
     }
-    else if (this.this_dominates_left()) {
+    else if (this.op === ">>" || this.op === "<<") {
       type_dag.insert(type_dag.newNode(rightid), type.uinteger_types);
     }
     else {
       type_dag.insert(type_dag.newNode(rightid), type.all_integer_types);
     }
-    if (this.left_dominate_right()) {
-      type_dag.insert(type_dag.newNode(leftid), type_dag.solution_range.get(rightid)!);
-    }
-    else if (this.this_dominates_left()) {
+    if (this.this_dominates_left()) {
       type_dag.insert(type_dag.newNode(leftid), type_dag.solution_range.get(this.id)!);
     }
     else {
-      throw new Error(`BinaryOpGenerator: op ${this.op} leads to an invalid situation`);
+      type_dag.insert(type_dag.newNode(leftid), type.all_integer_types);
     }
     if (this.this_dominates_left()) {
-      type_dag.connect(this.id, leftid);
+      type_dag.connect(this.id, leftid, "sub_dominance");
     }
-    if (this.left_dominate_right()) {
-      type_dag.connect(leftid, rightid, "sub_dominance");
+    if (this.this_dominate_right()) {
+      type_dag.connect(this.id, rightid, "sub_dominance");
     }
+    let ghostid;
+    if (["<", ">", "<=", ">=", "==", "!="].includes(this.op)) {
+      ghostid = global_id++;
+      new IRGhost(ghostid, cur_scope.id());
+      type_dag.insert(type_dag.newNode(ghostid), type.all_integer_types);
+      type_dag.connect(ghostid, leftid, "sub_dominance");
+      type_dag.connect(ghostid, rightid, "sub_dominance");
+    }
+
     //! Select generators for the left-hand-side and right-hand-side expressions
     let left_expression : expr.IRExpression;
     let right_expression : expr.IRExpression;
@@ -1659,11 +1660,20 @@ class BinaryOpGenerator extends RValueGenerator {
     right_expression = right_expression_gen.irnode as expr.IRExpression;
     let right_extracted_expression = expr.tuple_extraction(right_expression);
     //! Generate left-hand-side expression
-    if (this.left_dominate_right()) {
-      type_dag.type_range_alignment(leftid, rightid);
+    if (this.this_dominate_right()) {
+      type_dag.type_range_alignment(this.id, rightid);
+    }
+    else if (ghostid !== undefined) {
+      type_dag.type_range_alignment(ghostid, rightid);
     }
     left_expression_gen = new left_expression_gen_prototype(leftid);
     left_expression_gen.generate(cur_expression_complex_level + 1);
+    if (this.this_dominates_left()) {
+      type_dag.type_range_alignment(this.id, leftid);
+    }
+    else if (ghostid !== undefined) {
+      type_dag.type_range_alignment(ghostid, leftid);
+    }
     left_expression = left_expression_gen.irnode as expr.IRExpression;
     let left_extracted_expression = expr.tuple_extraction(left_expression);
     //! Update expr2read_variables
@@ -1675,12 +1685,6 @@ class BinaryOpGenerator extends RValueGenerator {
     );
     //! Generate irnode
     this.irnode = new expr.IRBinaryOp(this.id, cur_scope.id(), left_expression, right_expression, this.op);
-    if (this.left_dominate_right()) {
-      type_dag.type_range_alignment(leftid, rightid);
-    }
-    if (this.this_dominates_left()) {
-      type_dag.type_range_alignment(this.id, leftid);
-    }
     if (config.debug) {
       indent -= 2;
       console.log(color.yellowBG(`${" ".repeat(indent)}${this.id}: BinaryOp ${this.op}, scope: ${cur_scope.kind()}, type: ${type_dag.solution_range.get(this.id)!.map(t => t.str())}`));
@@ -1710,10 +1714,6 @@ class BinaryCompareOpGenerator extends RValueGenerator {
     }
   }
 
-  this_dominates_left() : boolean {
-    return ["&&", "||"].filter((op) => op === this.op).length === 1;
-  }
-
   generate(cur_expression_complex_level : number) : void {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating BinaryCompareOp ${this.op}: ${this.id}: ${this.type_range.map(t => t.str())}, scope: ${cur_scope.kind()}`));
@@ -1726,13 +1726,17 @@ class BinaryCompareOpGenerator extends RValueGenerator {
       type_dag.insert(type_dag.newNode(rightid), type.all_integer_types);
     }
     else {
-      type_dag.insert(type_dag.newNode(rightid), type_dag.solution_range.get(this.id)!);
+      type_dag.insert(type_dag.newNode(rightid), type.bool_types);
     }
     type_dag.insert(type_dag.newNode(leftid), type_dag.solution_range.get(rightid)!);
-    if (this.this_dominates_left()) {
-      type_dag.connect(this.id, leftid);
+    let ghostid;
+    if (["<", ">", "<=", ">=", "==", "!="].includes(this.op)) {
+      ghostid = global_id++;
+      new IRGhost(ghostid, cur_scope.id());
+      type_dag.insert(type_dag.newNode(ghostid), type.all_integer_types);
+      type_dag.connect(ghostid, leftid, "sub_dominance");
+      type_dag.connect(ghostid, rightid, "sub_dominance");
     }
-    type_dag.connect(leftid, rightid, "sub_dominance");
     //! Select generators for the left-hand-side and right-hand-side expressions
     let left_expression : expr.IRExpression;
     let right_expression : expr.IRExpression;
@@ -1743,12 +1747,17 @@ class BinaryCompareOpGenerator extends RValueGenerator {
     right_expression_gen.generate(cur_expression_complex_level + 1);
     right_expression = right_expression_gen.irnode as expr.IRExpression;
     let right_extracted_expression = expr.tuple_extraction(right_expression);
+    if (ghostid !== undefined) {
+      type_dag.type_range_alignment(ghostid, rightid);
+    }
     //! Generate left-hand-side expression
-    type_dag.type_range_alignment(leftid, rightid);
     const left_expression_gen = new left_expression_gen_prototype(leftid);
     left_expression_gen.generate(cur_expression_complex_level + 1);
     left_expression = left_expression_gen.irnode as expr.IRExpression;
     let left_extracted_expression = expr.tuple_extraction(left_expression);
+    if (ghostid !== undefined) {
+      type_dag.type_range_alignment(ghostid, leftid);
+    }
     expr2read_variables.set(this.id,
       merge_set(
         expr2read_variables.get(left_extracted_expression.id)!,
@@ -1757,10 +1766,6 @@ class BinaryCompareOpGenerator extends RValueGenerator {
     );
     //! Generate irnode
     this.irnode = new expr.IRBinaryOp(this.id, cur_scope.id(), left_expression, right_expression, this.op);
-    type_dag.type_range_alignment(leftid, rightid);
-    if (this.this_dominates_left()) {
-      type_dag.type_range_alignment(this.id, leftid);
-    }
     if (config.debug) {
       indent -= 2;
       console.log(color.yellowBG(`${" ".repeat(indent)}${this.id}: BinaryCompareOp ${this.op}, scope: ${cur_scope.kind()}, type: ${type_dag.solution_range.get(this.id)!.map(t => t.str())}`));
@@ -1822,14 +1827,13 @@ class UnaryOpGenerator extends RValueGenerator {
     //! Generate identifier
     const identifier_gen = new IdentifierGenerator(identifier_id);
     identifier_gen.generate(cur_expression_complex_level + 1);
+    type_dag.type_range_alignment(this.id, identifier_id);
     let expression : expr.IRExpression = identifier_gen.irnode! as expr.IRExpression;
     //! Generate irnode
     this.irnode = new expr.IRUnaryOp(this.id, cur_scope.id(), pick_random_element([true, false])!, expression, this.op)!;
     let extracted_expression = expr.tuple_extraction(expression);
     //!. Update expr2read_variables, expr2dominated_vardecls
     expr2read_variables.set(this.id, expr2read_variables.get(extracted_expression.id)!);
-    //! Build dominations
-    type_dag.type_range_alignment(this.id, identifier_id);
     if (config.debug) {
       indent -= 2;
       console.log(color.yellowBG(`${" ".repeat(indent)}${this.id}: UnaryOp ${this.op}, scope: ${cur_scope.kind()}, type: ${type_dag.solution_range.get(this.id)!.map(t => t.str())}`));
@@ -1856,8 +1860,8 @@ class ConditionalGenerator extends RValueGenerator {
     type_dag.insert(type_dag.newNode(e2id), this.type_range);
     const e3id = global_id++;
     type_dag.insert(type_dag.newNode(e3id), this.type_range);
-    type_dag.connect(e2id, e3id, "sub_dominance");
-    type_dag.connect(this.id, e2id);
+    type_dag.connect(this.id, e3id, "sub_dominance");
+    type_dag.connect(this.id, e2id, "sub_dominance");
     //! Suppose the conditional expression is e1 ? e2 : e3
     //! The first step is to get a generator for e1.
     let e1_gen_prototype = get_generator(type.bool_types, false, cur_expression_complex_level);
@@ -1871,11 +1875,12 @@ class ConditionalGenerator extends RValueGenerator {
     const e3_gen = new e3_gen_prototype!(e3id);
     e3_gen.generate(cur_expression_complex_level + 1);
     let extracted_e3 = expr.tuple_extraction(e3_gen.irnode! as expr.IRExpression);
-    type_dag.type_range_alignment(e2id, e3id);
+    type_dag.type_range_alignment(this.id, e3id);
     //! Generate e2
     const e2_gen_prototype = get_generator(type_dag.solution_range.get(e3id)!, false, cur_expression_complex_level);
     const e2_gen = new e2_gen_prototype(e2id);
     e2_gen.generate(cur_expression_complex_level + 1);
+    type_dag.type_range_alignment(this.id, e2id);
     let extracted_e2 = expr.tuple_extraction(e2_gen.irnode! as expr.IRExpression);
     expr2read_variables.set(this.id,
       merge_set(
@@ -1892,9 +1897,6 @@ class ConditionalGenerator extends RValueGenerator {
       e2_gen.irnode! as expr.IRExpression,
       e3_gen.irnode! as expr.IRExpression
     );
-    //! Build dominations
-    type_dag.type_range_alignment(e2id, e3id);
-    type_dag.type_range_alignment(this.id, e2id);
     if (storage_location_dag.solution_range.has(extracted_e2.id)) {
       assert(storage_location_dag.solution_range.has(extracted_e3.id),
         `ConditionalGenerator: extracted_e3.id ${extracted_e3!.id} is not in storage_location_dag.solution_range`);
@@ -2019,6 +2021,9 @@ class FunctionCallGenerator extends RValueGenerator {
     }
     const [contractdecl_id, funcdecl_id] = pick_random_element(contractdecl_id_plus_funcdecl_id)!;
     //! Otherwise, first select a function declaration
+    if (decl_db.ghost_funcdecls.has(funcdecl_id)) {
+      ghost_function_decl_calls.add(this.id);
+    }
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating FunctionCall: ${this.id}: ${this.type_range.map(t => t.str())}, contractdecl_id: ${contractdecl_id} funcdecl_id: ${funcdecl_id}, scope: ${cur_scope.kind()}`));
       indent += 2;
@@ -2161,8 +2166,8 @@ class FunctionCallGenerator extends RValueGenerator {
       //* generate an identifier
       const identifier_id = global_id++;
       type_dag.insert(type_dag.newNode(identifier_id), type_dag.solution_range.get(selected_ret_decl.id)!);
-      type_dag.connect(identifier_id, this.id);
-      const identifier_gen = new IdentifierGenerator(identifier_id);
+      type_dag.connect(this.id, identifier_id);
+      const identifier_gen = new IdentifierGenerator(identifier_id, true);
       identifier_gen.generate(cur_expression_complex_level + 1);
       const identifier_expr = expr.tuple_extraction(identifier_gen.irnode! as expr.IRExpression);
       expr2read_variables.set(this.id, merge_set(expr2read_variables.get(this.id)!, expr2read_variables.get(identifier_expr.id)!));
