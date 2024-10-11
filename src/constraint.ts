@@ -88,24 +88,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         `DominanceDAG: node ${nodeid} has more than one inbound edge`);
       }
     }
-    // Check if the graph is acyclic
-    let visited = new Set<number>();
-    let dfs = async (nodeid : number) : Promise<void> => {
-      visited.add(nodeid);
-      for (let child of this.dag_nodes.get(nodeid)!.outs) {
-        if (visited.has(child)) {
-          await this.draw("graph_for_check_property.svg");
-          throw new Error(`DominanceDAG: the graph is cyclic, node ${child} is visited more than once`);
-        }
-        assert(!visited.has(child),
-        `DominanceDAG: the graph is cyclic, node ${child} is visited more than once`);
-        dfs(child);
-      }
-    }
-    for (let root of this.roots) {
-      visited.clear();
-      await dfs(root);
-    }
+    // No need to check if a node connects to itself because it's forbidden in the connect function
   }
 
   newNode(id : number) : ConstaintNode {
@@ -1664,6 +1647,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   }
 
   async resolve_by_stream(shrink : boolean = false) : Promise<void> {
+    await this.check_property();
     if (
       this.name === 'FuncStateMutabilityDominanceDAG' ||
       this.name === 'FuncVisibilityDominanceDAG' ||

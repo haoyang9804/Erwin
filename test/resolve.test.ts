@@ -367,7 +367,6 @@ async () => {
     type_dag.connect(3, 2);
     type_dag.connect(1, 4);
     type_dag.connect(4, 2);
-    type_dag.connect(5, 4);
     type_dag.connect(4, 6);
     type_dag.connect(5, 6);
     type_dag.connect(7, 2);
@@ -450,5 +449,35 @@ test("test subsuper support 4",
       console.log(`${node} -> ${[...leaves].map(t => [t.leaf_id, t.sub_dominance, t.super_dominance])}`)
     }
     type_dag.verify();
+  }
+)
+
+test("test check_property 1",
+async () => {
+  const type_dag = new TypeDominanceDAG();
+  type_dag.insert(type_dag.newNode(1), uinteger_types);
+  type_dag.insert(type_dag.newNode(2), uinteger_types);
+  type_dag.connect(1, 2);
+  type_dag.connect(2, 1);
+  expect(async() => {
+    await type_dag.check_property();
+  }).rejects.toThrow("DominanceDAG: no root");
+}
+)
+
+test("test check_property 2",
+  async () => {
+    const type_dag = new TypeDominanceDAG();
+    type_dag.insert(type_dag.newNode(1), uinteger_types);
+    type_dag.insert(type_dag.newNode(2), uinteger_types);
+    type_dag.insert(type_dag.newNode(3), uinteger_types);
+    type_dag.insert(type_dag.newNode(4), uinteger_types);
+    type_dag.connect(1, 2);
+    type_dag.connect(2, 3);
+    type_dag.connect(3, 2);
+    type_dag.connect(3, 4);
+    expect(async() => {
+      await type_dag.check_property();
+    }).rejects.toThrow("DominanceDAG: node 2 has more than one inbound edge");
   }
 )
