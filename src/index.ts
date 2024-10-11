@@ -261,7 +261,8 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
   for (let funcstat_solutions of gen.funcstat_dag.solutions_collection) {
     // assign the state mutability to the function
     for (let [key, value] of funcstat_solutions) {
-      assert(irnodes.get(key)! instanceof decl.IRFunctionDefinition, "The node must be a function definition.");
+      assert(irnodes.get(key)! instanceof decl.IRFunctionDefinition,
+        `The node must be a function definition, but a ${irnodes.get(key)!.typeName} is found`);
       (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability = value.kind;
     }
     //! Select one function visibility solution
@@ -269,7 +270,8 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
       let no_conflict_with_funcstat = true;
       // assign the visibility to the function
       for (let [key, value] of func_visibility_solutions) {
-        assert(irnodes.get(key)! instanceof decl.IRFunctionDefinition, "The node must be a function definition.");
+        assert(irnodes.get(key)! instanceof decl.IRFunctionDefinition,
+          `The node must be a function definition, but a ${irnodes.get(key)!.typeName} is found`);
         // The assignment of visibility may be influenced by the state mutability
         if (
           (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability === FunctionStateMutability.Payable &&
@@ -289,7 +291,8 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
   //! Select one storage location solution
   for (let storage_location_solutions of gen.storage_location_dag.solutions_collection) {
     for (let [key, value] of storage_location_solutions) {
-      assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration, "The node must be a variable declaration.");
+      assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration,
+        `The node must be a variable declaration, but a ${irnodes.get(key)!.typeName} is found.`);
       (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
     }
   }
@@ -297,7 +300,8 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
   const state_variable_visibility_solutions = pick_random_element(gen.state_variable_visibility_dag.solutions_collection)!;
   // assign the visibility to the state variable
   for (let [key, value] of state_variable_visibility_solutions) {
-    assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration, "The node must be a variable declaration.");
+    assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration,
+      `The node must be a variable declaration, but a ${irnodes.get(key)!.typeName} is found`);
     (irnodes.get(key)! as decl.IRVariableDeclaration).visibility = value.kind;
   }
   let cnt = 0;
@@ -340,7 +344,8 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
   //! Select storage location solution
   const storage_location_solutions = pick_random_element(gen.storage_location_dag.solutions_collection)!;
   for (let [key, value] of storage_location_solutions) {
-    assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration, "The node must be a variable declaration.");
+    assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration,
+      `The node must be a variable declaration, but a ${irnodes.get(key)!.typeName} is found`);
     (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
   }
   let cnt = 0;
@@ -349,7 +354,8 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
   for (let funcstat_solutions of gen.funcstat_dag.solutions_collection) {
     // assign the state mutability to the function
     for (let [key, value] of funcstat_solutions) {
-      assert(irnodes.get(key)! instanceof decl.IRFunctionDefinition, "The node must be a function definition.");
+      assert(irnodes.get(key)! instanceof decl.IRFunctionDefinition,
+        `The node must be a function definition, but a ${irnodes.get(key)!.typeName} is found`);
       (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability = value.kind;
     }
     //! Traverse function visibility solutions
@@ -357,7 +363,8 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
       let no_conflict_with_funcstat = true;
       // assign the visibility to the function
       for (let [key, value] of func_visibility_solutions) {
-        assert(irnodes.get(key)! instanceof decl.IRFunctionDefinition, "The node must be a function definition.");
+        assert(irnodes.get(key)! instanceof decl.IRFunctionDefinition,
+          `The node must be a function definition, but a ${irnodes.get(key)!.typeName} is found`);
         if (
           (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability === FunctionStateMutability.Payable &&
           (value.kind === FunctionVisibility.Internal || value.kind === FunctionVisibility.Private)
@@ -372,7 +379,8 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
       for (let state_variable_visibility_solutions of gen.state_variable_visibility_dag.solutions_collection) {
         // assign the visibility to the state variable
         for (let [key, value] of state_variable_visibility_solutions) {
-          assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration, "The node must be a variable declaration.");
+          assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration,
+            `The node must be a variable declaration, but a ${irnodes.get(key)!.typeName} is found`);
           (irnodes.get(key)! as decl.IRVariableDeclaration).visibility = value.kind;
         }
         let program = writer.write(source_unit_gen.irnode!.lower());
@@ -410,7 +418,8 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
   for (let funcstat_solutions of gen.funcstat_dag.solutions_collection) {
     // assign the state mutability to the function
     for (let [key, value] of funcstat_solutions) {
-      assert(irnodes.get(key)! instanceof decl.IRFunctionDefinition, "The node must be a function definition.");
+      assert(irnodes.get(key)! instanceof decl.IRFunctionDefinition,
+        `The node must be a function definition, but a ${irnodes.get(key)!.typeName} is found`);
       (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability = value.kind;
     }
     //! Select one function visibility solution
@@ -418,7 +427,8 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
       let no_conflict_with_funcstat = true;
       // assign the visibility to the function
       for (let [key, value] of func_visibility_solutions) {
-        assert(irnodes.get(key)! instanceof decl.IRFunctionDefinition, "The node must be a function definition.");
+        assert(irnodes.get(key)! instanceof decl.IRFunctionDefinition,
+          `The node must be a function definition, but a ${irnodes.get(key)!.typeName} is found`);
         // The assignment of visibility may be influenced by the state mutability
         if (
           (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability === FunctionStateMutability.Payable &&
@@ -438,7 +448,8 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
   //! Select one state variable visibility solution
   const state_variable_visibility_solutions = pick_random_element(gen.state_variable_visibility_dag.solutions_collection)!;
   for (let [key, value] of state_variable_visibility_solutions) {
-    assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration, "The node must be a variable declaration.");
+    assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration,
+      `The node must be a variable declaration, but a ${irnodes.get(key)!.typeName} is found`);
     (irnodes.get(key)! as decl.IRVariableDeclaration).visibility = value.kind;
   }
   //! Traverse storage location solutions

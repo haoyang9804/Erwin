@@ -1341,6 +1341,7 @@ class IdentifierGenerator extends LRValueGenerator {
         else {
           this.type_range = this.type_range.filter(t => t.typeName === "StructType");
         }
+        type_dag.update(type_dag.newNode(this.id), this.type_range);
         assert(this.type_range.length > 0, `IdentifierGenerator: type_range is empty`);
         if (contain_contract_types) {
           if (!this.left && Math.random() < config.in_place_vardecl_prob) {
@@ -2229,6 +2230,7 @@ class NewStructGenerator extends ExpressionGenerator {
     }
     assert(decl_db.structdecls.size > 0, "No struct is declared");
     this.type_range = this.type_range.filter(t => t.typeName === "StructType");
+    type_dag.update(type_dag.newNode(this.id), this.type_range);
     assert(this.type_range.length > 0, "NewStructGenerator: type_range is empty");
     const struct_type = pick_random_element(this.type_range)! as type.StructType;
     const struct_decl = irnodes.get(struct_type.referece_id) as decl.IRStructDefinition;
@@ -2288,6 +2290,7 @@ class NewContractGenerator extends ExpressionGenerator {
     }
     assert(decl_db.contractdecls.size > 0, "No contract is declared");
     this.type_range = this.type_range.filter(t => t.typeName === "ContractType");
+    type_dag.update(type_dag.newNode(this.id), this.type_range);
     assert(this.type_range.length > 0, "NewContractGenerator: type_range is empty");
     const contract_type = pick_random_element(this.type_range)! as type.ContractType;
     const contract_decl = irnodes.get(contract_type.referece_id) as decl.IRContractDefinition;
@@ -2324,7 +2327,7 @@ class NewContractGenerator extends ExpressionGenerator {
     }
     if (config.debug) {
       indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode.id}: NewContractGenerator, scope: ${cur_scope.kind()}`));
+      console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode.id}: NewContractGenerator, scope: ${cur_scope.kind()}, type_range: ${type_dag.solution_range.get(this.id)!.map(t => t.str())}`));
     }
   }
 }

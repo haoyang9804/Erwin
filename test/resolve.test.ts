@@ -297,8 +297,34 @@ async () => {
   type_dag.connect(2, 4);
   type_dag.connect(1, 3, "sub_dominance");
   type_dag.connect(1, 4);
-  await type_dag.resolve_by_stream();
+  await type_dag.resolve_by_stream(true);
   type_dag.verify();
+}
+)
+
+test("test shrink graph 3",
+async () => {
+  const type_dag = new TypeDominanceDAG();
+  type_dag.insert(type_dag.newNode(1), uinteger_types);
+  type_dag.insert(type_dag.newNode(2), uinteger_types);
+  type_dag.insert(type_dag.newNode(3), uinteger_types);
+  type_dag.insert(type_dag.newNode(4), uinteger_types);
+  type_dag.insert(type_dag.newNode(5), uinteger_types);
+  type_dag.insert(type_dag.newNode(6), uinteger_types);
+  type_dag.insert(type_dag.newNode(7), uinteger_types);
+  type_dag.insert(type_dag.newNode(8), uinteger_types);
+  type_dag.connect(1, 2, "sub_dominance");
+  type_dag.connect(2, 3);
+  type_dag.connect(3, 7, "sub_dominance");
+  type_dag.connect(7, 8);
+  type_dag.connect(1, 4);
+  type_dag.connect(4, 5, "sub_dominance");
+  type_dag.connect(5, 6)
+  type_dag.connect(6, 8);
+  type_dag.relevant_nodes.add(8);
+  type_dag.relevant_nodes.add(4);
+  type_dag.relevant_nodes.add(3);
+  await type_dag.resolve_by_stream(true);
 }
 )
 
