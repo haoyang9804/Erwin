@@ -30,6 +30,7 @@ export class IRSourceUnit extends IRNode {
   }
 }
 
+// Ghost node is to make non-leaf nodes leaf nodes
 export class IRGhost extends IRNode {
   constructor(id : number, scope : number) {
     super(id, scope);

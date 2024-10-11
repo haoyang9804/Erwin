@@ -528,8 +528,12 @@ class ElementaryTypeVariableDeclarationGenerator extends DeclarationGenerator {
         }
         const literal_id = global_id++;
         type_dag.insert(type_dag.newNode(literal_id), type_dag.solution_range.get(this.irnode!.id)!);
-        type_dag.connect(literal_id, this.irnode!.id, "super_dominance");
         const literal_gen = new LiteralGenerator(literal_id);
+        const ghost_id = global_id++;
+        new IRGhost(ghost_id, cur_scope.id());
+        type_dag.insert(type_dag.newNode(ghost_id), type_dag.solution_range.get(this.irnode!.id)!);
+        type_dag.connect(ghost_id, this.irnode!.id, "super_dominance");
+        type_dag.connect(ghost_id, literal_id);
         literal_gen.generate(0);
         (this.irnode as decl.IRVariableDeclaration).value = literal_gen.irnode! as expr.IRExpression;
         if (config.debug) {
@@ -541,11 +545,20 @@ class ElementaryTypeVariableDeclarationGenerator extends DeclarationGenerator {
         const expr_gen_prototype = pick_random_element(all_expression_generators)!;
         const expr_id = global_id++;
         type_dag.insert(type_dag.newNode(expr_id), type_dag.solution_range.get(this.irnode!.id)!);
-        type_dag.connect(expr_id, this.irnode!.id, "super_dominance");
         const expr_gen = new expr_gen_prototype(expr_id);
         expr_gen.generate(0);
+        if (expr_gen.irnode!.typeName === "IRLiteral") {
+          const ghost_id = global_id++;
+          new IRGhost(ghost_id, cur_scope.id());
+          type_dag.insert(type_dag.newNode(ghost_id), type_dag.solution_range.get(expr_id)!);
+          type_dag.connect(ghost_id, this.irnode!.id, "super_dominance");
+          type_dag.connect(ghost_id, expr_id);
+        }
+        else {
+          type_dag.connect(expr_id, this.irnode!.id, "super_dominance");
+          type_dag.type_range_alignment(expr_id, this.irnode!.id);
+        }
         (this.irnode as decl.IRVariableDeclaration).value = expr_gen.irnode! as expr.IRExpression;
-        type_dag.type_range_alignment(expr_id, this.irnode!.id);
       }
     }
     if (cur_scope.kind() === scopeKind.CONTRACT) {
@@ -937,13 +950,28 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
         const expr_id = global_id++;
         const type_range = type_dag.solution_range.get(this.return_decls[i].id)!;
         type_dag.insert(type_dag.newNode(expr_id), type_range);
-        type_dag.connect(expr_id, this.return_decls[i].id, "super_dominance");
         let expr_gen_prototype = get_generator(type_range);
+        let ghost_id;
+        if (expr_gen_prototype.name === "LiteralGenerator") {
+          ghost_id = global_id++;
+          new IRGhost(ghost_id, cur_scope.id());
+          type_dag.insert(type_dag.newNode(ghost_id), type_range);
+          type_dag.connect(ghost_id, expr_id);
+          type_dag.connect(ghost_id, this.return_decls[i].id, "super_dominance");
+        }
+        else {
+          type_dag.connect(expr_id, this.return_decls[i].id, "super_dominance");
+        }
         const expr_gen = new expr_gen_prototype(expr_id);
         expr_gen.generate(0);
         return_values.push(expr_gen.irnode! as expr.IRExpression);
         let expression_extracted = expr.tuple_extraction(return_values[i]);
-        type_dag.type_range_alignment(expr_id, this.return_decls[i].id);
+        if (ghost_id === undefined) {
+          type_dag.type_range_alignment(expr_id, this.return_decls[i].id);
+        }
+        else {
+          type_dag.type_range_alignment(ghost_id, expr_id);
+        }
         // update read_vardecls
         for (const used_vardecl of expr2read_variables.get(expression_extracted.id)!) {
           read_vardecls.add(used_vardecl);
@@ -1150,22 +1178,6 @@ class ContractDeclarationGenerator extends DeclarationGenerator {
       decl_db.funcdecls.add(fid);
       decl_db.insert(fid, erwin_visibility.INCONTRACT_EXTERNAL, cur_scope.id());
       funcstat_dag.insert(funcstat_dag.newNode(fid), [FuncStatProvider.empty()]);
-      // The returned variable_decl is not the state variable, but is a ghost variable of the true state variable
-      // Since expr2read_variables(functioncall) includes its returned vardecl, which may be state variable, 
-      // an external call of this getter function may mislead a function body and let it believe it uses the state variable, which is not true. 
-      // So we need a ghost state variable, which is a copy of the true state variable but not a state variable itself, to avoid this misleading.
-      // if (config.debug) {
-      //   console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating ghost state variable for state variable ${variable_decl.name}`));
-      //   indent += 2;
-      // }
-      // const ghost_state_vardecl = new decl.IRVariableDeclaration(global_id++, cur_scope.id(), variable_decl.name,
-      //   undefined, variable_decl.visibility);
-      // type_dag.insert(type_dag.newNode(ghost_state_vardecl.id), type_dag.solution_range.get(variable_decl.id)!);
-      // type_dag.connect(ghost_state_vardecl.id, variable_decl.id);
-      // if (config.debug) {
-      //   indent -= 2;
-      //   console.log(color.yellowBG(`${" ".repeat(indent)}${ghost_state_vardecl.id}: Ghost state variable for state variable ${variable_decl.name}, type: ${type_dag.solution_range.get(ghost_state_vardecl.id)!.map(t => t.str())}`));
-      // }
       decl_db.ghost_funcdecls.add(fid);
       // decl_db.add_ghosts_for_state_variable(fid, ghost_state_vardecl.id, variable_decl.id);
       new decl.IRFunctionDefinition(fid, cur_scope.id(), variable_decl.name, FunctionKind.Function,
@@ -2004,7 +2016,6 @@ class FunctionCallGenerator extends RValueGenerator {
         }
       }
     }
-
     //! If no available function declaration, generate other expressions
     if (!this.contains_available_funcdecls(contractdecl_id_plus_funcdecl_id)) {
       let expression_gen_prototype = get_generator(this.type_range, true, cur_expression_complex_level);
@@ -2090,12 +2101,27 @@ class FunctionCallGenerator extends RValueGenerator {
       let arg_gen_prototype = get_generator(type_range, false, cur_expression_complex_level);
       const argid = global_id++;
       type_dag.insert(type_dag.newNode(argid), type_range);
-      type_dag.connect(argid, funcdecl.parameters[i].id, "super_dominance");
+      let ghost_id;
+      if (arg_gen_prototype.name === "LiteralGenerator") {
+        ghost_id = global_id++;
+        new IRGhost(ghost_id, cur_scope.id());
+        type_dag.insert(type_dag.newNode(ghost_id), type_range);
+        type_dag.connect(ghost_id, argid);
+        type_dag.connect(ghost_id, funcdecl.parameters[i].id, "super_dominance");
+      }
+      else {
+        type_dag.connect(argid, funcdecl.parameters[i].id, "super_dominance");
+      }
       const arg_gen = new arg_gen_prototype(argid);
       arg_gen.generate(cur_expression_complex_level + 1);
       let extracted_arg = expr.tuple_extraction(arg_gen.irnode! as expr.IRExpression);
       args_ids.push(extracted_arg.id);
-      type_dag.type_range_alignment(argid, funcdecl.parameters[i].id);
+      if (ghost_id === undefined) {
+        type_dag.type_range_alignment(argid, funcdecl.parameters[i].id);
+      }
+      else {
+        type_dag.type_range_alignment(ghost_id, argid);
+      }
       if (storage_location_dag.solution_range.has(funcdecl.parameters[i].id)) {
         assert(storage_location_dag.solution_range.has(argid),
           `FunctionCallGenerator: storage_location_dag.solution_range has no argid ${argid}`);
@@ -2248,10 +2274,25 @@ class NewStructGenerator extends ExpressionGenerator {
       let arg_gen_prototype = get_generator(type_range, false, cur_expression_complex_level);
       const argid = global_id++;
       type_dag.insert(type_dag.newNode(argid), type_dag.solution_range.get(member.id)!);
-      type_dag.connect(argid, member.id);
+      let ghost_id;
+      if (arg_gen_prototype.name === "LiteralGenerator") {
+        ghost_id = global_id++;
+        new IRGhost(ghost_id, cur_scope.id());
+        type_dag.insert(type_dag.newNode(ghost_id), type_dag.solution_range.get(member.id)!);
+        type_dag.connect(ghost_id, argid);
+        type_dag.connect(ghost_id, member.id, "super_dominance");
+      }
+      else {
+        type_dag.connect(argid, member.id, "super_dominance");
+      }
       const arg_gen = new arg_gen_prototype(argid);
       arg_gen.generate(cur_expression_complex_level + 1);
-      type_dag.type_range_alignment(argid, member.id);
+      if (ghost_id === undefined) {
+        type_dag.type_range_alignment(argid, member.id);
+      }
+      else {
+        type_dag.type_range_alignment(ghost_id, argid);
+      }
       args.push(arg_gen.irnode! as expr.IRExpression);
       let extracted_arg = expr.tuple_extraction(arg_gen.irnode! as expr.IRExpression);
       args_ids.push(extracted_arg.id);
@@ -2309,10 +2350,26 @@ class NewContractGenerator extends ExpressionGenerator {
       let arg_gen_prototype = get_generator(type_range, false, cur_expression_complex_level);
       const argid = global_id++;
       type_dag.insert(type_dag.newNode(argid), type_dag.solution_range.get(contract_decl.constructor_parameters[i].id)!);
+      let ghost_id;
+      if (arg_gen_prototype.name === "LiteralGenerator") {
+        ghost_id = global_id++;
+        new IRGhost(ghost_id, cur_scope.id());
+        type_dag.insert(type_dag.newNode(ghost_id), type_dag.solution_range.get(contract_decl.constructor_parameters[i].id)!);
+        type_dag.connect(ghost_id, argid);
+        type_dag.connect(ghost_id, contract_decl.constructor_parameters[i].id, "super_dominance");
+      }
+      else {
+        type_dag.connect(argid, contract_decl.constructor_parameters[i].id, "super_dominance");
+      }
       type_dag.connect(argid, contract_decl.constructor_parameters[i].id);
       const arg_gen = new arg_gen_prototype(argid);
       arg_gen.generate(cur_expression_complex_level + 1);
-      type_dag.type_range_alignment(argid, contract_decl.constructor_parameters[i].id);
+      if (ghost_id === undefined) {
+        type_dag.type_range_alignment(argid, contract_decl.constructor_parameters[i].id);
+      }
+      else {
+        type_dag.type_range_alignment(ghost_id, argid);
+      }
       args.push(arg_gen.irnode! as expr.IRExpression);
       let extracted_arg = expr.tuple_extraction(arg_gen.irnode! as expr.IRExpression);
       args_ids.push(extracted_arg.id);
@@ -2540,8 +2597,16 @@ class SingleVariableDeclareStatementGenerator extends NonExpressionStatementGene
     }
     this.irnode = new stmt.IRVariableDeclareStatement(global_id++, cur_scope.id(), [this.vardecl], this.expr);
     let extracted_ir = expr.tuple_extraction(this.expr);
-    type_dag.connect(extracted_ir.id, this.vardecl.id, "super_dominance");
-    type_dag.type_range_alignment(extracted_ir.id, this.vardecl.id);
+    if (this.expr.typeName === "IRLiteral") {
+      const ghost_id = global_id++;
+      type_dag.insert(type_dag.newNode(ghost_id), type_dag.solution_range.get(extracted_ir.id)!);
+      type_dag.connect(ghost_id, extracted_ir.id);
+      type_dag.connect(ghost_id, this.vardecl.id, "super_dominance");
+    }
+    else {
+      type_dag.connect(extracted_ir.id, this.vardecl.id, "super_dominance");
+      type_dag.type_range_alignment(extracted_ir.id, this.vardecl.id);
+    }
     if (config.debug) {
       indent -= 2;
       console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode.id}: SingleVariableDeclareStatement, scope: ${cur_scope.kind()}`));
@@ -2587,8 +2652,16 @@ class MultipleVariableDeclareStatementGenerator extends NonExpressionStatementGe
     this.irnode = new stmt.IRVariableDeclareStatement(global_id++, cur_scope.id(), this.vardecls, ir_tuple_exp);
     for (let i = 0; i < this.var_count; i++) {
       let extracted_ir = expr.tuple_extraction(ir_exps[i]);
-      type_dag.connect(extracted_ir.id, this.vardecls[i].id, "super_dominance");
-      type_dag.type_range_alignment(extracted_ir.id, this.vardecls[i].id);
+      if (ir_exps[i].typeName === "IRLiteral") {
+        const ghost_id = global_id++;
+        type_dag.insert(type_dag.newNode(ghost_id), type_dag.solution_range.get(extracted_ir.id)!);
+        type_dag.connect(ghost_id, extracted_ir.id);
+        type_dag.connect(ghost_id, this.vardecls[i].id, "super_dominance");
+      }
+      else {
+        type_dag.connect(extracted_ir.id, this.vardecls[i].id, "super_dominance");
+        type_dag.type_range_alignment(extracted_ir.id, this.vardecls[i].id);
+      }
     }
     if (config.debug) {
       indent -= 2;
