@@ -28,7 +28,7 @@ class Pure extends FuncStat {
     else if (upper_bound instanceof View) {
       return [FuncStatProvider.pure(), FuncStatProvider.view()];
     }
-    else if (upper_bound instanceof EmptyStat) {
+    else if (upper_bound instanceof Empty) {
       return [FuncStatProvider.pure(), FuncStatProvider.view(), FuncStatProvider.empty()];
     }
     else {
@@ -42,7 +42,7 @@ class Pure extends FuncStat {
     throw new Error("Pure::copy() not implemented.");
   }
   issubof(t : FuncStat) : boolean {
-    return t instanceof Pure || t instanceof View || t instanceof EmptyStat;
+    return t instanceof Pure || t instanceof View || t instanceof Empty;
   }
   issuperof(t : FuncStat) : boolean {
     return t instanceof Pure;
@@ -77,7 +77,7 @@ class View extends FuncStat {
     if (upper_bound instanceof View) {
       return [FuncStatProvider.view()];
     }
-    else if (upper_bound instanceof EmptyStat) {
+    else if (upper_bound instanceof Empty) {
       return [FuncStatProvider.view(), FuncStatProvider.empty()];
     }
     else {
@@ -91,7 +91,7 @@ class View extends FuncStat {
     throw new Error("View::copy() not implemented.");
   }
   issubof(t : FuncStat) : boolean {
-    return t instanceof View || t instanceof EmptyStat;
+    return t instanceof View || t instanceof Empty;
   }
   issuperof(t : FuncStat) : boolean {
     return t instanceof View || t instanceof Pure;
@@ -126,14 +126,14 @@ class Payable extends FuncStat {
     throw new Error("Payable::copy() not implemented.");
   }
   issubof(t : FuncStat) : boolean {
-    return t instanceof Payable || t instanceof EmptyStat;
+    return t instanceof Payable || t instanceof Empty;
   }
   issuperof(t : FuncStat) : boolean {
     return t instanceof Payable;
   }
 }
 
-class EmptyStat extends FuncStat {
+class Empty extends FuncStat {
   constructor() {
     super(FunctionStateMutability.NonPayable);
   }
@@ -153,11 +153,11 @@ class EmptyStat extends FuncStat {
     else if (lower_bound instanceof Payable) {
       return [FuncStatProvider.payable(), FuncStatProvider.empty()];
     }
-    else if (lower_bound instanceof EmptyStat) {
+    else if (lower_bound instanceof Empty) {
       return [FuncStatProvider.empty()];
     }
     else {
-      throw new Error(`EmptyStat::sub_with_lowerbound: Improper lowerbound type ${lower_bound.str()}`);
+      throw new Error(`Empty::sub_with_lowerbound: Improper lowerbound type ${lower_bound.str()}`);
     }
   }
   supers() : FuncStat[] {
@@ -168,20 +168,20 @@ class EmptyStat extends FuncStat {
       return [FuncStatProvider.empty(), FuncStatProvider.payable()];
     }
     else {
-      throw new Error(`EmptyStat::super_with_upperbound: Improper upperbound type ${upper_bound.str()}`);
+      throw new Error(`Empty::super_with_upperbound: Improper upperbound type ${upper_bound.str()}`);
     }
   }
   same(t : FuncStat) : boolean {
-    return t instanceof EmptyStat;
+    return t instanceof Empty;
   }
   copy() : FuncStat {
-    throw new Error("EmptyStat::copy() not implemented.");
+    throw new Error("Empty::copy() not implemented.");
   }
   issubof(t : FuncStat) : boolean {
-    return t instanceof EmptyStat;
+    return t instanceof Empty;
   }
   issuperof(t : FuncStat) : boolean {
-    return t instanceof EmptyStat || t instanceof Payable || t instanceof View || t instanceof Pure;
+    return t instanceof Empty || t instanceof Payable || t instanceof View || t instanceof Pure;
   }
 }
 
@@ -195,11 +195,11 @@ export class FuncStatProvider {
   static payable() : Payable {
     return this.m_payable;
   }
-  static empty() : EmptyStat {
+  static empty() : Empty {
     return this.m_empty;
   }
   private static m_pure = new Pure();
   private static m_view = new View();
   private static m_payable = new Payable();
-  private static m_empty = new EmptyStat();
+  private static m_empty = new Empty();
 }

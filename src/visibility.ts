@@ -13,16 +13,36 @@ class FuncInternal extends FuncVis {
     return "internal";
   }
   subs() : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   sub_with_lowerbound(lower_bound : FuncVis) : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   supers() : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   super_with_upperbound(upper_bound : FuncVis) : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   same(t : FuncVis) : boolean {
     return t instanceof FuncInternal;
@@ -46,16 +66,36 @@ class FuncExternal extends FuncVis {
     return "external";
   }
   subs() : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   sub_with_lowerbound(lower_bound : FuncVis) : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   supers() : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   super_with_upperbound(upper_bound : FuncVis) : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   same(t : FuncVis) : boolean {
     return t instanceof FuncExternal;
@@ -79,16 +119,36 @@ class FuncPublic extends FuncVis {
     return "public";
   }
   subs() : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   sub_with_lowerbound(lower_bound : FuncVis) : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   supers() : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   super_with_upperbound(upper_bound : FuncVis) : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   same(t : FuncVis) : boolean {
     return t instanceof FuncPublic;
@@ -112,16 +172,36 @@ class FuncPrivate extends FuncVis {
     return "private";
   }
   subs() : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   sub_with_lowerbound(lower_bound : FuncVis) : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   supers() : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   super_with_upperbound(upper_bound : FuncVis) : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   same(t : FuncVis) : boolean {
     return t instanceof FuncPrivate;
@@ -204,16 +284,32 @@ class VarInternal extends VarVis {
     return "internal";
   }
   subs() : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   sub_with_lowerbound(lower_bound : VarVis) : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   supers() : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   super_with_upperbound(upper_bound : VarVis) : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   same(t : VarVis) : boolean {
     return t instanceof VarInternal;
@@ -237,16 +333,32 @@ class VarPublic extends VarVis {
     return "public";
   }
   subs() : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   sub_with_lowerbound(lower_bound : VarVis) : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   supers() : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   super_with_upperbound(upper_bound : VarVis) : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   same(t : VarVis) : boolean {
     return t instanceof VarPublic;
@@ -270,16 +382,32 @@ class VarPrivate extends VarVis {
     return "private";
   }
   subs() : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   sub_with_lowerbound(lower_bound : VarVis) : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   supers() : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   super_with_upperbound(upper_bound : VarVis) : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   same(t : VarVis) : boolean {
     return t instanceof VarPrivate;
@@ -303,16 +431,32 @@ class VarDefault extends VarVis {
     return "default";
   }
   subs() : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   sub_with_lowerbound(lower_bound : VarVis) : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   supers() : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   super_with_upperbound(upper_bound : VarVis) : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   same(t : VarVis) : boolean {
     return t instanceof VarDefault;
