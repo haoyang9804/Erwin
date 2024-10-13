@@ -3,18 +3,15 @@ export const config = {
   out_dir: "",
 
   experimental: false,
-  mode: "type",
+  mode: "",
   debug: false,
 
   // Type 
   uint_num: 2,
   int_num: 2,
-  no_type_exploration: false,
 
   // Dominance Constraint Solution
-  maximum_type_resolution_for_heads: 1000,
-  chunk_size: 100000,
-  stream: true,
+  maximum_solution_count: 1000,
 
   // Function
   function_body_stmt_cnt_upper_limit: 1,

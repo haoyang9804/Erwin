@@ -15,8 +15,9 @@ import {
   DefaultASTWriterMapping,
   LatestCompilerVersion,
   FunctionVisibility,
-  FunctionStateMutability,
   DataLocation,
+  StateVariableVisibility,
+  FunctionStateMutability,
 } from "solc-typed-ast"
 const formatter = new PrettyFormatter(2, 0);
 const writer = new ASTWriter(
@@ -26,6 +27,9 @@ const writer = new ASTWriter(
 );
 import * as figlet from "figlet"
 import { StorageLocation, StorageLocationProvider } from "./memory";
+import { FuncVis, FuncVisProvider, VarVis, VarVisProvider } from "./visibility";
+import { FuncVisMutKind, VarVisKind } from "./vismut";
+import { FuncStat, FuncStatProvider } from "./funcstat";
 console.log(figlet.textSync('Erwin'));
 const version = "0.1.0";
 
@@ -49,11 +53,8 @@ program
   // Type
   .option("--int_types_num <number>", "The number of int types Erwin will consider in resolving type dominance.", `${config.int_num}`)
   .option("--uint_types_num <number>", "The number of uint types Erwin will consider in resolving type dominance.", `${config.uint_num}`)
-  .option("--no_type_exploration", "Disable the type exploration.", `${config.no_type_exploration}`)
   // Dominance Constraint Solution
-  .option("--maximum_type_resolution_for_heads <number>", "The maximum number of type resolutions for heads.", `${config.maximum_type_resolution_for_heads}`)
-  .option("--chunk_size <number>", "The size of head solution chunk. The bigger the size is, the more resolutions Erwin will consider in a round.", `${config.chunk_size}`)
-  .option("--stream", "Enable the stream mode.", `${config.stream}`)
+  .option("--maximum_solution_count <number>", "The maximum number of solutions Erwin will consider.", `${config.maximum_solution_count}`)
   // Function
   .option("--function_body_stmt_cnt_upper_limit <number>", "The upper limit of the number of non-declaration statements of a function. This value is suggested to be bigger than tha value of var_count", `${config.function_body_stmt_cnt_upper_limit}`)
   .option("--function_body_stmt_cnt_lower_limit <number>", "The lower limit of the number of non-declaration statements of a function.", `${config.function_body_stmt_cnt_lower_limit}`)
@@ -119,10 +120,9 @@ else if (program.args[0] === "generate") {
   config.function_count_per_contract_upper_limit = parseInt(program.commands[1].opts().function_count_per_contract_upper_limit);
   config.function_count_per_contract_lower_limit = parseInt(program.commands[1].opts().function_count_per_contract_lower_limit);
   config.literal_prob = parseFloat(program.commands[1].opts().literal_prob);
-  config.maximum_type_resolution_for_heads = parseInt(program.commands[1].opts().maximum_type_resolution_for_heads);
+  config.maximum_solution_count = parseInt(program.commands[1].opts().maximum_solution_count);
   config.tuple_prob = parseFloat(program.commands[1].opts().tuple_prob);
   config.expression_complex_level = parseInt(program.commands[1].opts().expression_complex_level);
-  config.chunk_size = parseInt(program.commands[1].opts().chunk_size);
   config.state_variable_count_upperlimit = parseInt(program.commands[1].opts().state_variable_count_upperlimit);
   config.state_variable_count_lowerlimit = parseInt(program.commands[1].opts().state_variable_count_lowerlimit);
   config.state_variable_count_lowerlimit = parseInt(program.commands[1].opts().state_variable_count_lowerlimit);
@@ -154,8 +154,6 @@ else if (program.args[0] === "generate") {
   config.if_body_stmt_cnt_lower_limit = parseInt(program.commands[1].opts().if_body_stmt_cnt_lower_limit);
   config.if_body_stmt_cnt_upper_limit = parseInt(program.commands[1].opts().if_body_stmt_cnt_upper_limit);
   if (program.commands[1].opts().debug === true) config.debug = true;
-  if (program.commands[1].opts().no_type_exploration === true) config.no_type_exploration = true;
-  if (program.commands[1].opts().stream === true) config.stream = true;
   if (config.mode == "scope") {
     config.int_num = 1;
     config.uint_num = 1;
@@ -178,11 +176,10 @@ else if (program.args[0] === "generate") {
   assert(config.function_count_per_contract_lower_limit <= config.function_count_per_contract_upper_limit, "The lower limit of the number of functions must be less than or equal to the upper limit.");
   assert(config.function_count_per_contract_lower_limit >= 0, "The number of functions must be not less than 0.");
   assert(config.literal_prob >= 0 && config.literal_prob <= 1, "The probability of generating a literal must be in the range [0,1].");
-  assert(config.stream || config.maximum_type_resolution_for_heads >= config.chunk_size, "The maximum number of type resolutions for heads must be not less than the size of chunk in nonstream mode.");
+  assert(config.maximum_solution_count >= 0, "The maximum number of solutions must be not less than 0.");
   assert(config.tuple_prob >= 0 && config.tuple_prob <= 1, "The probability of generating a tuple surrounding an expression must be in the range [0,1].");
   assert(config.init_state_var_in_constructor_prob >= 0 && config.init_state_var_in_constructor_prob <= 1, "The probability of initializing a state variable in the constructor must be in the range [0,1].");
   assert(config.expression_complex_level >= 1, "The complex level of the expression must be not less than 1.");
-  assert(config.chunk_size > 0, "The chunk size of the database must be greater than 0.");
   assert(config.state_variable_count_upperlimit >= 0, "state_variable_count_upperlimit must be not less than 0.");
   assert(config.state_variable_count_lowerlimit >= 0, "state_variable_count_lowerlimit must be not less than 0.");
   assert(config.contract_count >= 0, "contract_count must be not less than 0.");
@@ -221,12 +218,12 @@ else if (program.args[0] === "generate") {
 // Execute
 if (program.args[0] === "mutate") {
   (async () => {
-    mutate();
+    await mutate();
   })();
 }
 else if (program.args[0] === "generate") {
   (async () => {
-    generate();
+    await generate();
   })();
 }
 
@@ -241,6 +238,49 @@ function storageLocation2loc(sl : StorageLocation) : DataLocation {
       return DataLocation.CallData;
     default:
       return DataLocation.Default;
+  }
+}
+
+function varvis2statevisibility(vv : VarVis) : StateVariableVisibility {
+  switch (vv) {
+    case VarVisProvider.public():
+      return StateVariableVisibility.Public;
+    case VarVisProvider.internal():
+      return StateVariableVisibility.Internal;
+    case VarVisProvider.private():
+      return StateVariableVisibility.Private;
+    default:
+      return StateVariableVisibility.Default;
+  }
+}
+
+function funcvis2funcvisibility(fv : FuncVis) : FunctionVisibility {
+  switch (fv) {
+    case FuncVisProvider.external():
+      return FunctionVisibility.External;
+    case FuncVisProvider.public():
+      return FunctionVisibility.Public;
+    case FuncVisProvider.internal():
+      return FunctionVisibility.Internal;
+    case FuncVisProvider.private():
+      return FunctionVisibility.Private;
+    default:
+      throw new Error("The function visibility is not supported.");
+  }
+}
+
+function funcstat2functionstatemutability(fs : FuncStat) : FunctionStateMutability {
+  switch (fs) {
+    case FuncStatProvider.pure():
+      return FunctionStateMutability.Pure;
+    case FuncStatProvider.view():
+      return FunctionStateMutability.View;
+    case FuncStatProvider.empty():
+      return FunctionStateMutability.NonPayable;
+    case FuncStatProvider.payable():
+      return FunctionStateMutability.Payable;
+    default:
+      throw new Error("The function state mutability is not supported.");
   }
 }
 
@@ -263,53 +303,31 @@ async function mutate() {
 
 function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
   console.log(`${gen.type_dag.solutions_collection.length} type solutions`);
-  //! Select one function state mutability solution
-  let good = false;
-  for (let funcstat_solutions of gen.funcstat_dag.solutions_collection) {
-    // assign the state mutability to the function
-    for (let [key, value] of funcstat_solutions) {
-      assert(irnodes.get(key)! instanceof decl.IRFunctionDefinition, "The node must be a function definition.");
-      (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability = value.kind;
+  //! Select one vismut solution
+  const vismut_solutions = pick_random_element(gen.vismut_dag.solutions_collection)!;
+  for (let [key, value] of vismut_solutions) {
+    if (irnodes.get(key)!.typeName === "IRVariableDeclaration") {
+      (irnodes.get(key)! as decl.IRVariableDeclaration).visibility =
+        varvis2statevisibility((value.kind as VarVisKind).visibility);
     }
-    //! Select one function visibility solution
-    for (let func_visibility_solutions of gen.func_visibility_dag.solutions_collection) {
-      let no_conflict_with_funcstat = true;
-      // assign the visibility to the function
-      for (let [key, value] of func_visibility_solutions) {
-        assert(irnodes.get(key)! instanceof decl.IRFunctionDefinition, "The node must be a function definition.");
-        // The assignment of visibility may be influenced by the state mutability
-        if (
-          (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability === FunctionStateMutability.Payable &&
-          (value.kind === FunctionVisibility.Internal || value.kind === FunctionVisibility.Private)
-        ) {
-          no_conflict_with_funcstat = false;
-          break;
-        }
-        (irnodes.get(key)! as decl.IRFunctionDefinition).visibility = value.kind;
-      }
-      if (!no_conflict_with_funcstat) continue;
-      good = true;
-      break;
+    else if (irnodes.get(key)!.typeName === "IRFunctionDefinition") {
+      (irnodes.get(key)! as decl.IRFunctionDefinition).visibility =
+        funcvis2funcvisibility((value.kind as FuncVisMutKind).visibility);
+      (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability =
+        funcstat2functionstatemutability((value.kind as FuncVisMutKind).state_mutability);
     }
-    if (good) break;
   }
   //! Select one storage location solution
-  for (let storage_location_solutions of gen.storage_location_dag.solutions_collection) {
-    for (let [key, value] of storage_location_solutions) {
-      assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration, "The node must be a variable declaration.");
-      (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
+  const storage_location_solutions = pick_random_element(gen.storage_location_dag.solutions_collection)!;
+  for (let [key, value] of storage_location_solutions) {
+    if (irnodes.get(key)!.typeName !== "IRVariableDeclaration") {
+      continue;
     }
+    (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
   }
-  //! Select one state variable visibility solution
-  const state_variable_visibility_solutions = pick_random_element(gen.state_variable_visibility_dag.solutions_collection)!;
-  // assign the visibility to the state variable
-  for (let [key, value] of state_variable_visibility_solutions) {
-    assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration, "The node must be a variable declaration.");
-    (irnodes.get(key)! as decl.IRVariableDeclaration).visibility = value.kind;
-  }
+  //! Traverse type solutions
   let cnt = 0;
   let pre_program = "";
-  //! Traverse type solutions
   for (let type_solutions of gen.type_dag.solutions_collection) {
     for (let [key, value] of type_solutions) {
       if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
@@ -335,9 +353,7 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
 }
 
 function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
-  console.log(`${gen.funcstat_dag.solutions_collection.length} function stat solutions`);
-  console.log(`${gen.func_visibility_dag.solutions_collection.length} function visibility solutions`);
-  console.log(`${gen.state_variable_visibility_dag.solutions_collection.length} state variable visibility solutions`);
+  console.log(`${gen.vismut_dag.solutions_collection.length} state variable visibility solutions`);
   //! Select one type solution
   const type_solutions = pick_random_element(gen.type_dag.solutions_collection)!;
   for (let [key, value] of type_solutions) {
@@ -347,60 +363,41 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
   //! Select storage location solution
   const storage_location_solutions = pick_random_element(gen.storage_location_dag.solutions_collection)!;
   for (let [key, value] of storage_location_solutions) {
-    assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration, "The node must be a variable declaration.");
+    if (irnodes.get(key)!.typeName !== "IRVariableDeclaration") {
+      continue;
+    }
     (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
   }
+  //! Traverse vismut solutions
   let cnt = 0;
   let pre_program = "";
-  //! Traverse function state mutability solutions
-  for (let funcstat_solutions of gen.funcstat_dag.solutions_collection) {
-    // assign the state mutability to the function
-    for (let [key, value] of funcstat_solutions) {
-      assert(irnodes.get(key)! instanceof decl.IRFunctionDefinition, "The node must be a function definition.");
-      (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability = value.kind;
-    }
-    //! Traverse function visibility solutions
-    for (let func_visibility_solutions of gen.func_visibility_dag.solutions_collection) {
-      let no_conflict_with_funcstat = true;
-      // assign the visibility to the function
-      for (let [key, value] of func_visibility_solutions) {
-        assert(irnodes.get(key)! instanceof decl.IRFunctionDefinition, "The node must be a function definition.");
-        if (
-          (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability === FunctionStateMutability.Payable &&
-          (value.kind === FunctionVisibility.Internal || value.kind === FunctionVisibility.Private)
-        ) {
-          no_conflict_with_funcstat = false;
-          break;
-        }
-        (irnodes.get(key)! as decl.IRFunctionDefinition).visibility = value.kind;
+  for (const vismut_solutions of gen.vismut_dag.solutions_collection) {
+    for (let [key, value] of vismut_solutions) {
+      if (irnodes.get(key)!.typeName === "IRVariableDeclaration") {
+        (irnodes.get(key)! as decl.IRVariableDeclaration).visibility =
+          varvis2statevisibility((value.kind as VarVisKind).visibility);
       }
-      if (!no_conflict_with_funcstat) continue;
-      //! Traverse state variable visibility solutions
-      for (let state_variable_visibility_solutions of gen.state_variable_visibility_dag.solutions_collection) {
-        // assign the visibility to the state variable
-        for (let [key, value] of state_variable_visibility_solutions) {
-          assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration, "The node must be a variable declaration.");
-          (irnodes.get(key)! as decl.IRVariableDeclaration).visibility = value.kind;
-        }
-        let program = writer.write(source_unit_gen.irnode!.lower());
-        if (program === pre_program) continue;
-        pre_program = program;
-        if (!fs.existsSync("./generated_programs")) {
-          fs.mkdirSync("./generated_programs");
-        }
-        let date = new Date();
-        let year = date.getFullYear();
-        let month = date.getMonth() + 1;
-        let day = date.getDate();
-        let hour = date.getHours();
-        let minute = date.getMinutes();
-        let second = date.getSeconds();
-        let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_${cnt}.sol`;
-        cnt++;
-        fs.writeFileSync(`./generated_programs/${program_name}`, program, "utf-8");
-        if (cnt > config.maximum_type_resolution_for_heads) return;
+      else if (irnodes.get(key)!.typeName === "IRFunctionDefinition") {
+        (irnodes.get(key)! as decl.IRFunctionDefinition).visibility =
+          funcvis2funcvisibility((value.kind as FuncVisMutKind).visibility);
       }
     }
+    const program = writer.write(source_unit_gen.irnode!.lower());
+    if (program === pre_program) continue;
+    pre_program = program;
+    if (!fs.existsSync("./generated_programs")) {
+      fs.mkdirSync("./generated_programs");
+    }
+    let date = new Date();
+    let year = date.getFullYear();
+    let month = date.getMonth() + 1;
+    let day = date.getDate();
+    let hour = date.getHours();
+    let minute = date.getMinutes();
+    let second = date.getSeconds();
+    let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_${cnt}.sol`;
+    cnt++;
+    fs.writeFileSync(`./generated_programs/${program_name}`, program, "utf-8");
   }
 }
 
@@ -412,41 +409,19 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
     if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
       (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
   }
-  //! Select one function state mutability solution
-  let good = false;
-  for (let funcstat_solutions of gen.funcstat_dag.solutions_collection) {
-    // assign the state mutability to the function
-    for (let [key, value] of funcstat_solutions) {
-      assert(irnodes.get(key)! instanceof decl.IRFunctionDefinition, "The node must be a function definition.");
-      (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability = value.kind;
+  //! Select one vismut solution
+  const vismut_solutions = pick_random_element(gen.vismut_dag.solutions_collection)!;
+  for (let [key, value] of vismut_solutions) {
+    if (irnodes.get(key)!.typeName === "IRVariableDeclaration") {
+      (irnodes.get(key)! as decl.IRVariableDeclaration).visibility =
+        varvis2statevisibility((value.kind as VarVisKind).visibility);
     }
-    //! Select one function visibility solution
-    for (let func_visibility_solutions of gen.func_visibility_dag.solutions_collection) {
-      let no_conflict_with_funcstat = true;
-      // assign the visibility to the function
-      for (let [key, value] of func_visibility_solutions) {
-        assert(irnodes.get(key)! instanceof decl.IRFunctionDefinition, "The node must be a function definition.");
-        // The assignment of visibility may be influenced by the state mutability
-        if (
-          (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability === FunctionStateMutability.Payable &&
-          (value.kind === FunctionVisibility.Internal || value.kind === FunctionVisibility.Private)
-        ) {
-          no_conflict_with_funcstat = false;
-          break;
-        }
-        (irnodes.get(key)! as decl.IRFunctionDefinition).visibility = value.kind;
-      }
-      if (!no_conflict_with_funcstat) continue;
-      good = true;
-      break;
+    else if (irnodes.get(key)!.typeName === "IRFunctionDefinition") {
+      (irnodes.get(key)! as decl.IRFunctionDefinition).visibility =
+        funcvis2funcvisibility((value.kind as FuncVisMutKind).visibility);
+      (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability =
+        funcstat2functionstatemutability((value.kind as FuncVisMutKind).state_mutability);
     }
-    if (good) break;
-  }
-  //! Select one state variable visibility solution
-  const state_variable_visibility_solutions = pick_random_element(gen.state_variable_visibility_dag.solutions_collection)!;
-  for (let [key, value] of state_variable_visibility_solutions) {
-    assert(irnodes.get(key)! instanceof decl.IRVariableDeclaration, "The node must be a variable declaration.");
-    (irnodes.get(key)! as decl.IRVariableDeclaration).visibility = value.kind;
   }
   //! Traverse storage location solutions
   let cnt = 0;
@@ -472,7 +447,6 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
     let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_${cnt}.sol`;
     cnt++;
     fs.writeFileSync(`./generated_programs/${program_name}`, program, "utf-8");
-    if (cnt > config.maximum_type_resolution_for_heads) return;
   }
 }
 
@@ -480,31 +454,23 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
 async function generate() {
   const source_unit = new gen.SourceUnitGenerator();
   source_unit.generate();
-  await (async () => {
-    // resolve constraints
-    if (config.debug) {
-      gen.type_dag.draw("./type-constraint.svg");
-    }
-  })();
   try {
     let startTime = performance.now()
-    gen.type_dag.resolve_by_stream();
+    // gen.type_dag.resolve_by_stream();
+    await gen.type_dag.resolve_by_stream(true);
     let endTime = performance.now();
     console.log(`Time cost of resolving type constraints: ${endTime - startTime} ms`);
     startTime = performance.now();
-    gen.funcstat_dag.resolve_by_brute_force(true);
-    gen.func_visibility_dag.resolve_by_brute_force(false);
-    gen.state_variable_visibility_dag.resolve_by_brute_force(false);
+    await gen.vismut_dag.resolve_by_stream(true);
     endTime = performance.now();
     console.log(`Time cost of resolving visibility and state mutability constraints: ${endTime - startTime} ms`);
     startTime = performance.now();
-    gen.storage_location_dag.resolve_by_brute_force(false);
+    await gen.storage_location_dag.resolve_by_stream(true);
     endTime = performance.now();
     console.log(`Time cost of resolving storage location constraints: ${endTime - startTime} ms`);
-    if (config.debug) {
-      gen.type_dag.verify();
-      gen.funcstat_dag.verify();
-    }
+    gen.type_dag.verify();
+    gen.vismut_dag.verify();
+    gen.storage_location_dag.verify();
     if (config.mode === "type") {
       generate_type_mode(source_unit);
     }

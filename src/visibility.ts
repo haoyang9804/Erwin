@@ -3,7 +3,14 @@ import { DominanceNode } from "./dominance";
 
 //! Visibility does not have super/sub relations
 
-export abstract class FuncVis extends DominanceNode<FunctionVisibility> { }
+export abstract class FuncVis extends DominanceNode<FunctionVisibility> {
+  issubof(t : FuncVis) : boolean {
+    return this.supers().includes(t);
+  }
+  issuperof(t : FuncVis) : boolean {
+    return this.subs().includes(t);
+  }
+}
 
 class FuncInternal extends FuncVis {
   constructor() {
@@ -13,28 +20,42 @@ class FuncInternal extends FuncVis {
     return "internal";
   }
   subs() : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   sub_with_lowerbound(lower_bound : FuncVis) : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   supers() : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   super_with_upperbound(upper_bound : FuncVis) : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   same(t : FuncVis) : boolean {
     return t instanceof FuncInternal;
   }
   copy() : FuncVis {
     return new FuncInternal();
-  }
-  issubof(t : FuncVis) : boolean {
-    return false;
-  }
-  issuperof(t : FuncVis) : boolean {
-    return false;
   }
 }
 
@@ -46,28 +67,42 @@ class FuncExternal extends FuncVis {
     return "external";
   }
   subs() : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   sub_with_lowerbound(lower_bound : FuncVis) : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   supers() : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   super_with_upperbound(upper_bound : FuncVis) : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   same(t : FuncVis) : boolean {
     return t instanceof FuncExternal;
   }
   copy() : FuncVis {
     return new FuncExternal();
-  }
-  issubof(t : FuncVis) : boolean {
-    return false;
-  }
-  issuperof(t : FuncVis) : boolean {
-    return false;
   }
 }
 
@@ -79,28 +114,42 @@ class FuncPublic extends FuncVis {
     return "public";
   }
   subs() : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   sub_with_lowerbound(lower_bound : FuncVis) : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   supers() : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   super_with_upperbound(upper_bound : FuncVis) : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   same(t : FuncVis) : boolean {
     return t instanceof FuncPublic;
   }
   copy() : FuncVis {
     return new FuncPublic();
-  }
-  issubof(t : FuncVis) : boolean {
-    return false;
-  }
-  issuperof(t : FuncVis) : boolean {
-    return false;
   }
 }
 
@@ -112,28 +161,42 @@ class FuncPrivate extends FuncVis {
     return "private";
   }
   subs() : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   sub_with_lowerbound(lower_bound : FuncVis) : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   supers() : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   super_with_upperbound(upper_bound : FuncVis) : FuncVis[] {
-    return [];
+    return [
+      FuncVisProvider.internal(),
+      FuncVisProvider.external(),
+      FuncVisProvider.public(),
+      FuncVisProvider.private()
+    ];
   }
   same(t : FuncVis) : boolean {
     return t instanceof FuncPrivate;
   }
   copy() : FuncVis {
     return new FuncPrivate();
-  }
-  issubof(t : FuncVis) : boolean {
-    return false;
-  }
-  issuperof(t : FuncVis) : boolean {
-    return false;
   }
 }
 
@@ -163,12 +226,6 @@ class FuncDefault extends FuncVis {
   copy() : FuncVis {
     return new FuncDefault();
   }
-  issubof(t : FuncVis) : boolean {
-    return false;
-  }
-  issuperof(t : FuncVis) : boolean {
-    return false;
-  }
 }
 
 export class FuncVisProvider {
@@ -194,7 +251,14 @@ export class FuncVisProvider {
   }
 }
 
-export abstract class VarVis extends DominanceNode<StateVariableVisibility> { }
+export abstract class VarVis extends DominanceNode<StateVariableVisibility> {
+  issubof(t : VarVis) : boolean {
+    return this.supers().includes(t);
+  }
+  issuperof(t : VarVis) : boolean {
+    return this.subs().includes(t);
+  }
+}
 
 class VarInternal extends VarVis {
   constructor() {
@@ -204,28 +268,38 @@ class VarInternal extends VarVis {
     return "internal";
   }
   subs() : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   sub_with_lowerbound(lower_bound : VarVis) : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   supers() : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   super_with_upperbound(upper_bound : VarVis) : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   same(t : VarVis) : boolean {
     return t instanceof VarInternal;
   }
   copy() : VarVis {
     return new VarInternal();
-  }
-  issubof(t : VarVis) : boolean {
-    return false;
-  }
-  issuperof(t : VarVis) : boolean {
-    return false;
   }
 }
 
@@ -237,28 +311,38 @@ class VarPublic extends VarVis {
     return "public";
   }
   subs() : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   sub_with_lowerbound(lower_bound : VarVis) : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   supers() : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   super_with_upperbound(upper_bound : VarVis) : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   same(t : VarVis) : boolean {
     return t instanceof VarPublic;
   }
   copy() : VarVis {
     return new VarPublic();
-  }
-  issubof(t : VarVis) : boolean {
-    return false;
-  }
-  issuperof(t : VarVis) : boolean {
-    return false;
   }
 }
 
@@ -270,28 +354,38 @@ class VarPrivate extends VarVis {
     return "private";
   }
   subs() : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   sub_with_lowerbound(lower_bound : VarVis) : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   supers() : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   super_with_upperbound(upper_bound : VarVis) : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   same(t : VarVis) : boolean {
     return t instanceof VarPrivate;
   }
   copy() : VarVis {
     return new VarPrivate();
-  }
-  issubof(t : VarVis) : boolean {
-    return false;
-  }
-  issuperof(t : VarVis) : boolean {
-    return false;
   }
 }
 
@@ -303,28 +397,38 @@ class VarDefault extends VarVis {
     return "default";
   }
   subs() : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   sub_with_lowerbound(lower_bound : VarVis) : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   supers() : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   super_with_upperbound(upper_bound : VarVis) : VarVis[] {
-    return [];
+    return [
+      VarVisProvider.internal(),
+      VarVisProvider.public(),
+      VarVisProvider.private()
+    ];
   }
   same(t : VarVis) : boolean {
     return t instanceof VarDefault;
   }
   copy() : VarVis {
     return new VarDefault();
-  }
-  issubof(t : VarVis) : boolean {
-    return false;
-  }
-  issuperof(t : VarVis) : boolean {
-    return false;
   }
 }
 

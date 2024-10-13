@@ -5,8 +5,7 @@ test.ts
 *.sol
 dist
 coverage
-type-constraint.svg
-funcstat-constraint.svg
+*.svg
 log.txt
 generated_programs
 erwin-*.tgz

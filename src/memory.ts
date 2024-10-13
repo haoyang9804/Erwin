@@ -8,7 +8,7 @@ export class StoragePointer extends StorageLocation {
     super(DataLocation.Storage);
   }
   str() : string {
-    throw new Error("Method not implemented.");
+    return "StoragePointer";
   }
   subs() : StorageLocation[] {
     return [
@@ -36,10 +36,10 @@ export class StoragePointer extends StorageLocation {
     return new StoragePointer();
   }
   issubof(t : StorageLocation) : boolean {
-    return this.supers().includes(t) && !this.same(t);
+    return this.supers().includes(t);
   }
   issuperof(t : StorageLocation) : boolean {
-    return this.subs().includes(t) && !this.same(t);
+    return this.subs().includes(t);
   }
 }
 
@@ -48,7 +48,7 @@ export class StorageRef extends StorageLocation {
     super(DataLocation.Storage);
   }
   str() : string {
-    throw new Error("Method not implemented.");
+    return "StorageRef";
   }
   subs() : StorageLocation[] {
     return [
@@ -78,10 +78,10 @@ export class StorageRef extends StorageLocation {
     return new StorageRef();
   }
   issubof(t : StorageLocation) : boolean {
-    return this.supers().includes(t) && !this.same(t);
+    return this.supers().includes(t);
   }
   issuperof(t : StorageLocation) : boolean {
-    return this.subs().includes(t) && !this.same(t);
+    return this.subs().includes(t);
   }
 }
 
@@ -90,7 +90,7 @@ export class Memory extends StorageLocation {
     super(DataLocation.Memory);
   }
   str() : string {
-    throw new Error("Method not implemented.");
+    return "Memory";
   }
   subs() : StorageLocation[] {
     return [
@@ -119,10 +119,10 @@ export class Memory extends StorageLocation {
     return new Memory();
   }
   issubof(t : StorageLocation) : boolean {
-    return this.supers().includes(t) && !this.same(t);
+    return this.supers().includes(t);
   }
   issuperof(t : StorageLocation) : boolean {
-    return this.subs().includes(t) && !this.same(t);
+    return this.subs().includes(t);
   }
 }
 
@@ -131,7 +131,7 @@ export class Calldata extends StorageLocation {
     super(DataLocation.CallData);
   }
   str() : string {
-    throw new Error("Method not implemented.");
+    return "Calldata";
   }
   subs() : StorageLocation[] {
     return [StorageLocationProvider.calldata()];
@@ -156,10 +156,10 @@ export class Calldata extends StorageLocation {
     return new Calldata();
   }
   issubof(t : StorageLocation) : boolean {
-    return this.supers().includes(t) && !this.same(t);
+    return this.supers().includes(t);
   }
   issuperof(t : StorageLocation) : boolean {
-    return this.subs().includes(t) && !this.same(t);
+    return this.subs().includes(t);
   }
 }
 
@@ -170,7 +170,7 @@ export class MemoryDefault extends StorageLocation {
     super(DataLocation.Default);
   }
   str() : string {
-    throw new Error("Method not implemented.");
+    return "MemoryDefault";
   }
   subs() : StorageLocation[] {
     return [
@@ -193,16 +193,16 @@ export class MemoryDefault extends StorageLocation {
     throw new Error("Method not implemented.");
   }
   same(t : StorageLocation) : boolean {
-    return t instanceof Memory;
+    return t instanceof MemoryDefault;
   }
   copy() : StorageLocation {
-    return new Memory();
+    return new MemoryDefault();
   }
   issubof(t : StorageLocation) : boolean {
-    return this.supers().includes(t) && !this.same(t);
+    return this.supers().includes(t);
   }
   issuperof(t : StorageLocation) : boolean {
-    return this.subs().includes(t) && !this.same(t);
+    return this.subs().includes(t);
   }
 }
 
