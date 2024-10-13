@@ -204,20 +204,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       // console.log(`2> dominator_id: ${dominator_id}, dominatee_id: ${dominatee_id}, minimum_solution_range_of_dominatee: ${minimum_solution_range_of_dominatee.map(t => t.str())}`);
       this.tighten_solution_range_middle_out(dominatee_id);
     }
-
-    // if (is_equal_set(this.solution_range.get(dominator_id)!, this.solution_range.get(dominatee_id)!)) return;
-    // if (is_super_set(this.solution_range.get(dominator_id)!, this.solution_range.get(dominatee_id)!)) {
-    //   this.solution_range.set(dominator_id, this.solution_range.get(dominatee_id)!);
-    //   this.tighten_solution_range_middle_out(dominator_id);
-    //   return;
-    // }
-    // if (is_super_set(this.solution_range.get(dominatee_id)!, this.solution_range.get(dominator_id)!)) {
-    //   this.solution_range.set(dominatee_id, this.solution_range.get(dominator_id)!);
-    //   this.tighten_solution_range_middle_out(dominatee_id);
-    //   return;
-    // }
-    // throw new Error(`solution_range_alignment: type_range of ${dominator_id}: ${this.solution_range.get(dominator_id)!.map(t => t.str())}
-    //   and ${dominatee_id}: ${this.solution_range.get(dominatee_id)!.map(t => t.str())} cannot be aligned`);
   }
 
   initialize_resolve() : void {
@@ -651,23 +637,11 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         if (is_equal_set(solution_range.get(parent)!, minimum_solution_range_of_dominator)) {
           continue;
         }
-        // if (is_equal_set(solution_range.get(parent)!, solution_range.get(node)!)) {
-        //   continue;
-        // }
-        // if (!is_super_set(solution_range.get(parent)!, solution_range.get(node)!)
-        //   && !is_super_set(solution_range.get(node)!, solution_range.get(parent)!)) {
-        //   return false
-        // }
         solution_range.set(parent, minimum_solution_range_of_dominator);
         res &&= upwards(parent);
         if (!res) return false;
         res &&= downwards(parent);
         if (!res) return false;
-        // solution_range.set(parent, solution_range.get(node)!);
-        // res &&= upwards(parent)
-        // if (!res) return false;
-        // res &&= downwards(parent);
-        // if (!res) return false;
       }
       return res;
     }
@@ -682,23 +656,11 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         if (is_equal_set(solution_range.get(child)!, minimum_solution_range_of_dominatee)) {
           continue;
         }
-        // if (is_equal_set(solution_range.get(child)!, solution_range.get(node)!)) {
-        //   continue;
-        // }
-        // if (!is_super_set(solution_range.get(child)!, solution_range.get(node)!)
-        //   && !is_super_set(solution_range.get(node)!, solution_range.get(child)!)) {
-        //   return false;
-        // }
         solution_range.set(child, minimum_solution_range_of_dominatee);
         res &&= upwards(child);
         if (!res) return false;
         res &&= downwards(child);
         if (!res) return false;
-        // solution_range.set(child, solution_range.get(node)!);
-        // res &&= downwards(child);
-        // if (!res) return false;
-        // res &&= upwards(child);
-        // if (!res) return false;
       }
       return res;
     }
@@ -723,17 +685,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
             downwards(parent);
           }
         }
-        // if (is_equal_set(this.solution_range.get(parent)!, this.solution_range.get(node)!)) {
-        //   continue;
-        // }
-        // assert(is_super_set(this.solution_range.get(parent)!, this.solution_range.get(node)!)
-        //   || is_super_set(this.solution_range.get(node)!, this.solution_range.get(parent)!),
-        //   `tighten_solution_range_middle_out::upwards: the solution range of ${parent}:
-        // ${this.solution_range.get(parent)!.map(t => t.str())} is not a superset/subset of the solution
-        // range of ${node}: ${this.solution_range.get(node)!.map(t => t.str())}`);
-        // this.solution_range.set(parent, this.solution_range.get(node)!);
-        // upwards(parent);
-        // downwards(parent);
       }
     }
     let downwards = (node : number) : void => {
@@ -753,42 +704,11 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
             upwards(child);
           }
         }
-        // if (is_equal_set(this.solution_range.get(child)!, this.solution_range.get(node)!)) {
-        //   continue;
-        // }
-        // assert(is_super_set(this.solution_range.get(child)!, this.solution_range.get(node)!)
-        //   || is_super_set(this.solution_range.get(node)!, this.solution_range.get(child)!),
-        //   `tighten_solution_range_middle_out::downwards: the solution range of ${child}:
-        // ${this.solution_range.get(child)!.map(t => t.str())} is not a superset/subset of the solution
-        // range of ${node}: ${this.solution_range.get(node)!.map(t => t.str())}`);
-        // this.solution_range.set(child, this.solution_range.get(node)!);
-        // downwards(child);
-        // upwards(child);
       }
     }
     upwards(node);
     downwards(node);
   }
-
-  // tighten_solution_range() {
-  //   let broadcast_the_tightest_type_range_downwards = (node : number) : void => {
-  //     for (let child of this.dag_nodes.get(node)!.outs) {
-  //       let child_type_range = this.solution_range.get(child)!;
-  //       let parent_type_range = this.solution_range.get(node)!;
-  //       if (!is_equal_set(child_type_range, parent_type_range)) {
-  //         assert(is_super_set(child_type_range, parent_type_range),
-  //           `tighten_solution_range::broadcast_the_tightest_type_range_downwards: the solution
-  //             range of ${child}: ${child_type_range.map(t => t.str())} is not a superset of the
-  //             solution range of ${node}: ${parent_type_range.map(t => t.str())}`);
-  //         this.solution_range.set(child, parent_type_range);
-  //       }
-  //       broadcast_the_tightest_type_range_downwards(child);
-  //     }
-  //   }
-  //   for (let root of this.roots) {
-  //     broadcast_the_tightest_type_range_downwards(root);
-  //   }
-  // }
 
   allocate_solutions_for_roots_in_stream() : Generator<Map<number, Node>> {
     for (let root of this.roots) this.solution_range.set(root, shuffle(this.solution_range.get(root)!));
@@ -1450,28 +1370,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     return dfs(0, local_root_array[0], 0, this.solutions);
   }
 
-  // check_solution_range_after_tightening(node : number) : void {
-  //   for (let child of this.dag_nodes.get(node)!.outs) {
-  //     assert(is_equal_set(this.solution_range.get(node)!, this.solution_range.get(child)!),
-  //       `check_solution_range_after_tightening: the solution range of ${node}:
-  //       ${this.solution_range.get(node)!.map(t => t.str())} is not the same as the solution
-  //       range of ${child}: ${this.solution_range.get(child)!.map(t => t.str())}`);
-  //     this.check_solution_range_after_tightening(child);
-  //   }
-  // }
-
-  // check_solution_range_before_tightening(node : number) : void {
-  //   for (let child of this.dag_nodes.get(node)!.outs) {
-  //     assert(is_super_set(this.solution_range.get(child)!, this.solution_range.get(node)!),
-  //       `check_solution_range_before_tightening: the solution range of ${child}:
-  //       ${this.solution_range.get(child)!.map(t => t.str())} is not the superset of the solution
-  //       range of ${node}: ${this.solution_range.get(node)!.map(t => t.str())}.
-  //       \nBelow are solution ranges for all nodes:\n
-  //       ${[...this.solution_range.keys()].map(k => `${k}: ${this.solution_range.get(k)!.map(t => t.str())}`).join("\n")}`);
-  //     this.check_solution_range_before_tightening(child);
-  //   }
-  // }
-
   // Given a node, returns all its ancestors (not including itself) plus how acestors dominate it
   //! Use after remove_removable_sub_super_dominance_in_multi_dominance and remove_removable_sub_super_dominance_in_pyramid
   get_ancestors(nodeid : number) : Map<number, toLeaf> {
@@ -1591,43 +1489,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       }
       return visited;
     }
-    // let reverse_edges = (nodeid: number, visited: Set<number>): void  => {
-    //   assert(new_dag_nodes.get(nodeid)!.inbound <= 1,
-    //     `shrink_graph: new_dag_nodes.get(${nodeid})!.inbound = ${new_dag_nodes.get(nodeid)!.inbound} is greater than 1`);
-    //   if (new_dag_nodes.get(nodeid)!.inbound === 0) return;
-    //   const dominatorid = new_dag_nodes.get(nodeid)!.ins[0];
-    //   // break the directed edge from the dominator to the node
-    //   new_dag_nodes.get(dominatorid)!.outs = new_dag_nodes.get(dominatorid)!.outs.filter(t => t !== nodeid);
-    //   new_dag_nodes.get(nodeid)!.ins = new_dag_nodes.get(nodeid)!.ins.filter(t => t !== dominatorid);
-    //   new_dag_nodes.get(dominatorid)!.outbound--;
-    //   new_dag_nodes.get(nodeid)!.inbound--;
-    //   // add the directed edge from the node to the dominator
-    //   new_dag_nodes.get(nodeid)!.outs.push(dominatorid);
-    //   new_dag_nodes.get(dominatorid)!.ins.push(nodeid);
-    //   new_dag_nodes.get(nodeid)!.outbound++;
-    //   new_dag_nodes.get(dominatorid)!.inbound++;
-    //   // change new_sub_dominance, new_super_dominance, this.subsuper_dominance
-    //   if (new_sub_dominance.has(`${dominatorid} ${nodeid}`)) {
-    //     new_sub_dominance.delete(`${dominatorid} ${nodeid}`);
-    //     new_super_dominance.add(`${nodeid} ${dominatorid}`);
-    //   }
-    //   else if (new_super_dominance.has(`${dominatorid} ${nodeid}`)) {
-    //     new_super_dominance.delete(`${dominatorid} ${nodeid}`);
-    //     new_sub_dominance.add(`${nodeid} ${dominatorid}`);
-    //   }
-    //   else if (this.subsuper_dominance.has(`${dominatorid} ${nodeid}`)) {
-    //     this.subsuper_dominance.delete(`${dominatorid} ${nodeid}`);
-    //     this.subsuper_dominance.add(`${nodeid} ${dominatorid}`);
-    //   }
-    //   // change collectedby
-    //   if (collectedby.has(dominatorid)) {
-    //     collectedby.get(dominatorid)!.add(nodeid);
-    //   }
-    //   else {
-    //     collectedby.set(dominatorid, new Set([nodeid]));
-    //   }
-
-    // }
     for (let i = 0; i < relevant_leaf_count; i++) {
       let visited = new Set<number>();
       for (let j = i - 1; j >= 0; j--) {
@@ -1789,18 +1650,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     else if (this.name === "VisMutDominanceDAG" && config.debug || config.unit_test_mode) {
       await this.draw("./scope_constraint_after_shrink.svg");
     }
-    // if (this.name === "TypeDominanceDAG") {
-    //   // !Check before solution range tightening
-    //   for (let root of this.roots) {
-    //     this.check_solution_range_before_tightening(root);
-    //   }
-    //   // !Tighten the solution range for each node
-    //   this.tighten_solution_range();
-    //   // !Check after solution range tightening
-    //   for (let root of this.roots) {
-    //     this.check_solution_range_after_tightening(root);
-    //   }
-    // }
     // !Assign solutions to roots
     let should_stop = false;
     let maximum_solution_count;
