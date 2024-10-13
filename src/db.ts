@@ -157,11 +157,6 @@ class DeclDB {
     this.contractdecl_id_to_scope = new Map<number, number>();
   }
 
-  add_ghosts_for_state_variable(ghost_funcdecl_id : number, ghost_vardecl_id : number, state_vardecl_id : number) : void {
-    this.ghost_funcdecls.add(ghost_funcdecl_id);
-    this.ghost_vardecl_to_state_vardecl.set(ghost_vardecl_id, state_vardecl_id);
-  }
-
   new_scope(cur_scope_id : number, parent_scope_id : number) : void {
     this.scope_tree.insert(parent_scope_id, cur_scope_id);
   }

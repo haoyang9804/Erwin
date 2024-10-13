@@ -5,11 +5,11 @@ config.unit_test_mode = true;
 test("test dominance dag 1",
 async () => {
   const type_dag = new TypeDominanceDAG();
-  type_dag.insert(type_dag.newNode(1), uinteger_types);
-  type_dag.insert(type_dag.newNode(2), uinteger_types);
-  type_dag.insert(type_dag.newNode(3), uinteger_types);
-  type_dag.insert(type_dag.newNode(4), uinteger_types);
-  type_dag.insert(type_dag.newNode(5), uinteger_types);
+  type_dag.insert(1, uinteger_types);
+  type_dag.insert(2, uinteger_types);
+  type_dag.insert(3, uinteger_types);
+  type_dag.insert(4, uinteger_types);
+  type_dag.insert(5, uinteger_types);
   type_dag.connect(1, 2, "sub_dominance");
   type_dag.connect(2, 4);
   type_dag.connect(4, 5);
@@ -23,13 +23,13 @@ async () => {
 test("test dominance dag 2",
 async () => {
   const type_dag = new TypeDominanceDAG();
-  type_dag.insert(type_dag.newNode(1), uinteger_types);
-  type_dag.insert(type_dag.newNode(2), uinteger_types);
-  type_dag.insert(type_dag.newNode(3), uinteger_types);
-  type_dag.insert(type_dag.newNode(4), uinteger_types);
-  type_dag.insert(type_dag.newNode(5), uinteger_types);
-  type_dag.insert(type_dag.newNode(6), uinteger_types);
-  type_dag.insert(type_dag.newNode(7), uinteger_types);
+  type_dag.insert(1, uinteger_types);
+  type_dag.insert(2, uinteger_types);
+  type_dag.insert(3, uinteger_types);
+  type_dag.insert(4, uinteger_types);
+  type_dag.insert(5, uinteger_types);
+  type_dag.insert(6, uinteger_types);
+  type_dag.insert(7, uinteger_types);
   type_dag.connect(1, 2, "sub_dominance");
   type_dag.connect(2, 3);
   type_dag.connect(3, 4);
@@ -45,17 +45,17 @@ async () => {
 test("test dominance dag 3",
 async () => {
   const type_dag = new TypeDominanceDAG();
-  type_dag.insert(type_dag.newNode(1), uinteger_types);
-  type_dag.insert(type_dag.newNode(2), uinteger_types);
-  type_dag.insert(type_dag.newNode(3), uinteger_types);
-  type_dag.insert(type_dag.newNode(4), uinteger_types);
-  type_dag.insert(type_dag.newNode(5), uinteger_types);
-  type_dag.insert(type_dag.newNode(6), uinteger_types);
-  type_dag.insert(type_dag.newNode(7), uinteger_types);
-  type_dag.insert(type_dag.newNode(8), uinteger_types);
-  type_dag.insert(type_dag.newNode(9), uinteger_types);
-  type_dag.insert(type_dag.newNode(10), uinteger_types);
-  type_dag.insert(type_dag.newNode(11), uinteger_types);
+  type_dag.insert(1, uinteger_types);
+  type_dag.insert(2, uinteger_types);
+  type_dag.insert(3, uinteger_types);
+  type_dag.insert(4, uinteger_types);
+  type_dag.insert(5, uinteger_types);
+  type_dag.insert(6, uinteger_types);
+  type_dag.insert(7, uinteger_types);
+  type_dag.insert(8, uinteger_types);
+  type_dag.insert(9, uinteger_types);
+  type_dag.insert(10, uinteger_types);
+  type_dag.insert(11, uinteger_types);
   type_dag.connect(1, 3, "sub_dominance");
   type_dag.connect(1, 2);
   type_dag.connect(3, 4);
@@ -76,18 +76,18 @@ async () => {
 test("test dominance dag 4",
 async () => {
   const type_dag = new TypeDominanceDAG();
-  type_dag.insert(type_dag.newNode(1), uinteger_types);
-  type_dag.insert(type_dag.newNode(2), uinteger_types);
-  type_dag.insert(type_dag.newNode(3), uinteger_types);
-  type_dag.insert(type_dag.newNode(4), uinteger_types);
-  type_dag.insert(type_dag.newNode(5), uinteger_types);
-  type_dag.insert(type_dag.newNode(6), uinteger_types);
-  type_dag.insert(type_dag.newNode(7), uinteger_types);
-  type_dag.insert(type_dag.newNode(8), uinteger_types);
-  type_dag.insert(type_dag.newNode(9), uinteger_types);
-  type_dag.insert(type_dag.newNode(10), uinteger_types);
-  type_dag.insert(type_dag.newNode(11), uinteger_types);
-  type_dag.insert(type_dag.newNode(12), uinteger_types);
+  type_dag.insert(1, uinteger_types);
+  type_dag.insert(2, uinteger_types);
+  type_dag.insert(3, uinteger_types);
+  type_dag.insert(4, uinteger_types);
+  type_dag.insert(5, uinteger_types);
+  type_dag.insert(6, uinteger_types);
+  type_dag.insert(7, uinteger_types);
+  type_dag.insert(8, uinteger_types);
+  type_dag.insert(9, uinteger_types);
+  type_dag.insert(10, uinteger_types);
+  type_dag.insert(11, uinteger_types);
+  type_dag.insert(12, uinteger_types);
   type_dag.connect(1, 2);
   type_dag.connect(2, 3);
   type_dag.connect(2, 4, "sub_dominance");
@@ -111,12 +111,12 @@ test("test dominance pyramids 1",
 // graph: constraintDAGs/constraint2
 async () => {
   const type_dag = new TypeDominanceDAG();
-  type_dag.insert(type_dag.newNode(1), uinteger_types);
-  type_dag.insert(type_dag.newNode(2), uinteger_types);
-  type_dag.insert(type_dag.newNode(3), uinteger_types);
-  type_dag.insert(type_dag.newNode(4), uinteger_types);
-  type_dag.insert(type_dag.newNode(5), uinteger_types);
-  type_dag.insert(type_dag.newNode(6), uinteger_types);
+  type_dag.insert(1, uinteger_types);
+  type_dag.insert(2, uinteger_types);
+  type_dag.insert(3, uinteger_types);
+  type_dag.insert(4, uinteger_types);
+  type_dag.insert(5, uinteger_types);
+  type_dag.insert(6, uinteger_types);
   type_dag.connect(4, 1);
   type_dag.connect(4, 2, "sub_dominance");
   type_dag.connect(5, 2);
@@ -142,13 +142,13 @@ test("test dominance pyramids 2",
   // graph: constraintDAGs/constraint3
   () => {
     const type_dag = new TypeDominanceDAG();
-    type_dag.insert(type_dag.newNode(1), uinteger_types);
-    type_dag.insert(type_dag.newNode(2), uinteger_types);
-    type_dag.insert(type_dag.newNode(3), uinteger_types);
-    type_dag.insert(type_dag.newNode(4), uinteger_types);
-    type_dag.insert(type_dag.newNode(5), uinteger_types);
-    type_dag.insert(type_dag.newNode(6), uinteger_types);
-    type_dag.insert(type_dag.newNode(7), uinteger_types);
+    type_dag.insert(1, uinteger_types);
+    type_dag.insert(2, uinteger_types);
+    type_dag.insert(3, uinteger_types);
+    type_dag.insert(4, uinteger_types);
+    type_dag.insert(5, uinteger_types);
+    type_dag.insert(6, uinteger_types);
+    type_dag.insert(7, uinteger_types);
     type_dag.connect(4, 1);
     type_dag.connect(4, 7);
     type_dag.connect(7, 2, "sub_dominance");
@@ -175,13 +175,13 @@ test("test dominance pyramids 3",
   // mutation of test dominance pyramids 2
   () => {
     const type_dag = new TypeDominanceDAG();
-    type_dag.insert(type_dag.newNode(1), uinteger_types);
-    type_dag.insert(type_dag.newNode(2), uinteger_types);
-    type_dag.insert(type_dag.newNode(3), uinteger_types);
-    type_dag.insert(type_dag.newNode(4), uinteger_types);
-    type_dag.insert(type_dag.newNode(5), uinteger_types);
-    type_dag.insert(type_dag.newNode(6), uinteger_types);
-    type_dag.insert(type_dag.newNode(7), uinteger_types);
+    type_dag.insert(1, uinteger_types);
+    type_dag.insert(2, uinteger_types);
+    type_dag.insert(3, uinteger_types);
+    type_dag.insert(4, uinteger_types);
+    type_dag.insert(5, uinteger_types);
+    type_dag.insert(6, uinteger_types);
+    type_dag.insert(7, uinteger_types);
     type_dag.connect(4, 1);
     type_dag.connect(4, 7, "sub_dominance");
     type_dag.connect(7, 2, "sub_dominance");
@@ -208,11 +208,11 @@ test("test dominance multi-dominance",
   // graph: constraintDAGs/constraint1
   () => {
     const type_dag = new TypeDominanceDAG();
-    type_dag.insert(type_dag.newNode(1), uinteger_types);
-    type_dag.insert(type_dag.newNode(2), uinteger_types);
-    type_dag.insert(type_dag.newNode(3), uinteger_types);
-    type_dag.insert(type_dag.newNode(4), uinteger_types);
-    type_dag.insert(type_dag.newNode(5), uinteger_types);
+    type_dag.insert(1, uinteger_types);
+    type_dag.insert(2, uinteger_types);
+    type_dag.insert(3, uinteger_types);
+    type_dag.insert(4, uinteger_types);
+    type_dag.insert(5, uinteger_types);
     type_dag.connect(1, 2);
     type_dag.connect(1, 3, "sub_dominance");
     type_dag.connect(3, 4, "sub_dominance");
@@ -232,9 +232,9 @@ test("test dominance multi-dominance",
 test("test neutralization",
 () => {
   const type_dag = new TypeDominanceDAG();
-  type_dag.insert(type_dag.newNode(1), uinteger_types);
-  type_dag.insert(type_dag.newNode(2), uinteger_types);
-  type_dag.insert(type_dag.newNode(3), uinteger_types);
+  type_dag.insert(1, uinteger_types);
+  type_dag.insert(2, uinteger_types);
+  type_dag.insert(3, uinteger_types);
   type_dag.connect(1, 2, "super_dominance");
   type_dag.connect(2, 3, "sub_dominance");
   type_dag.initialize_resolve();
@@ -248,13 +248,13 @@ test("test neutralization",
 test("test shrink graph 1",
 async () => {
   const type_dag = new TypeDominanceDAG();
-  type_dag.insert(type_dag.newNode(1), uinteger_types);
-  type_dag.insert(type_dag.newNode(2), uinteger_types);
-  type_dag.insert(type_dag.newNode(3), uinteger_types);
-  type_dag.insert(type_dag.newNode(4), uinteger_types);
-  type_dag.insert(type_dag.newNode(5), uinteger_types);
-  type_dag.insert(type_dag.newNode(6), uinteger_types);
-  type_dag.insert(type_dag.newNode(7), uinteger_types);
+  type_dag.insert(1, uinteger_types);
+  type_dag.insert(2, uinteger_types);
+  type_dag.insert(3, uinteger_types);
+  type_dag.insert(4, uinteger_types);
+  type_dag.insert(5, uinteger_types);
+  type_dag.insert(6, uinteger_types);
+  type_dag.insert(7, uinteger_types);
   type_dag.connect(1, 2);
   type_dag.connect(2, 3, "sub_dominance");
   type_dag.connect(2, 4);
@@ -262,10 +262,6 @@ async () => {
   type_dag.connect(1, 6);
   type_dag.connect(6, 5);
   type_dag.connect(1, 7, "super_dominance");
-  type_dag.relevant_nodes.add(5);
-  type_dag.relevant_nodes.add(4);
-  type_dag.relevant_nodes.add(3);
-  type_dag.relevant_nodes.add(7);
   type_dag.initialize_resolve();
   type_dag.get_roots_and_leaves();
   await type_dag.draw("./test_shink_graph1_before_shrink.svg");
@@ -287,10 +283,10 @@ async () => {
 test("test shrink graph 2",
 async () => {
   const type_dag = new TypeDominanceDAG();
-  type_dag.insert(type_dag.newNode(1), uinteger_types);
-  type_dag.insert(type_dag.newNode(2), uinteger_types);
-  type_dag.insert(type_dag.newNode(3), uinteger_types);
-  type_dag.insert(type_dag.newNode(4), uinteger_types);
+  type_dag.insert(1, uinteger_types);
+  type_dag.insert(2, uinteger_types);
+  type_dag.insert(3, uinteger_types);
+  type_dag.insert(4, uinteger_types);
   type_dag.connect(1, 2);
   type_dag.connect(2, 3, "sub_dominance");
   type_dag.connect(2, 4);
@@ -304,14 +300,14 @@ async () => {
 test("test shrink graph 3",
 async () => {
   const type_dag = new TypeDominanceDAG();
-  type_dag.insert(type_dag.newNode(1), uinteger_types);
-  type_dag.insert(type_dag.newNode(2), uinteger_types);
-  type_dag.insert(type_dag.newNode(3), uinteger_types);
-  type_dag.insert(type_dag.newNode(4), uinteger_types);
-  type_dag.insert(type_dag.newNode(5), uinteger_types);
-  type_dag.insert(type_dag.newNode(6), uinteger_types);
-  type_dag.insert(type_dag.newNode(7), uinteger_types);
-  type_dag.insert(type_dag.newNode(8), uinteger_types);
+  type_dag.insert(1, uinteger_types);
+  type_dag.insert(2, uinteger_types);
+  type_dag.insert(3, uinteger_types);
+  type_dag.insert(4, uinteger_types);
+  type_dag.insert(5, uinteger_types);
+  type_dag.insert(6, uinteger_types);
+  type_dag.insert(7, uinteger_types);
+  type_dag.insert(8, uinteger_types);
   type_dag.connect(1, 2, "sub_dominance");
   type_dag.connect(2, 3);
   type_dag.connect(3, 7, "sub_dominance");
@@ -320,7 +316,6 @@ async () => {
   type_dag.connect(4, 5, "sub_dominance");
   type_dag.connect(5, 6)
   type_dag.connect(6, 8);
-  type_dag.relevant_nodes.add(8);
   await type_dag.resolve_by_stream(true);
 }
 )
@@ -328,12 +323,12 @@ async () => {
 test("test resolve 1",
 async () => {
     const type_dag = new TypeDominanceDAG();
-    type_dag.insert(type_dag.newNode(1), uinteger_types);
-    type_dag.insert(type_dag.newNode(2), uinteger_types);
-    type_dag.insert(type_dag.newNode(3), uinteger_types);
-    type_dag.insert(type_dag.newNode(4), uinteger_types);
-    type_dag.insert(type_dag.newNode(5), uinteger_types);
-    type_dag.insert(type_dag.newNode(6), uinteger_types);
+    type_dag.insert(1, uinteger_types);
+    type_dag.insert(2, uinteger_types);
+    type_dag.insert(3, uinteger_types);
+    type_dag.insert(4, uinteger_types);
+    type_dag.insert(5, uinteger_types);
+    type_dag.insert(6, uinteger_types);
     type_dag.connect(1, 2);
     type_dag.connect(2, 3);
     type_dag.connect(1, 3);
@@ -351,14 +346,14 @@ async () => {
 test("test resolve 2",
 async () => {
     const type_dag = new TypeDominanceDAG();
-    type_dag.insert(type_dag.newNode(1), uinteger_types);
-    type_dag.insert(type_dag.newNode(2), uinteger_types);
-    type_dag.insert(type_dag.newNode(3), uinteger_types);
-    type_dag.insert(type_dag.newNode(4), uinteger_types);
-    type_dag.insert(type_dag.newNode(5), uinteger_types);
-    type_dag.insert(type_dag.newNode(6), uinteger_types);
-    type_dag.insert(type_dag.newNode(7), uinteger_types);
-    type_dag.insert(type_dag.newNode(8), uinteger_types);
+    type_dag.insert(1, uinteger_types);
+    type_dag.insert(2, uinteger_types);
+    type_dag.insert(3, uinteger_types);
+    type_dag.insert(4, uinteger_types);
+    type_dag.insert(5, uinteger_types);
+    type_dag.insert(6, uinteger_types);
+    type_dag.insert(7, uinteger_types);
+    type_dag.insert(8, uinteger_types);
     type_dag.connect(1, 2);
     type_dag.connect(1, 3);
     type_dag.connect(3, 2);
@@ -376,10 +371,10 @@ async () => {
 test("test resolve 3",
 async () => {
     const type_dag = new TypeDominanceDAG();
-    type_dag.insert(type_dag.newNode(1), uinteger_types);
-    type_dag.insert(type_dag.newNode(2), uinteger_types);
-    type_dag.insert(type_dag.newNode(3), uinteger_types);
-    type_dag.insert(type_dag.newNode(4), uinteger_types);
+    type_dag.insert(1, uinteger_types);
+    type_dag.insert(2, uinteger_types);
+    type_dag.insert(3, uinteger_types);
+    type_dag.insert(4, uinteger_types);
     type_dag.connect(1, 2, "sub_dominance");
     type_dag.connect(3, 2, "super_dominance");
     type_dag.connect(4, 3);
@@ -392,11 +387,11 @@ async () => {
 test("test resolve 4",
   async () => {
       const type_dag = new TypeDominanceDAG();
-      type_dag.insert(type_dag.newNode(1), uinteger_types);
-      type_dag.insert(type_dag.newNode(2), uinteger_types);
-      type_dag.insert(type_dag.newNode(3), uinteger_types);
-      type_dag.insert(type_dag.newNode(4), uinteger_types);
-      type_dag.insert(type_dag.newNode(5), uinteger_types);
+      type_dag.insert(1, uinteger_types);
+      type_dag.insert(2, uinteger_types);
+      type_dag.insert(3, uinteger_types);
+      type_dag.insert(4, uinteger_types);
+      type_dag.insert(5, uinteger_types);
       type_dag.connect(1, 2, "super_dominance");
       type_dag.connect(2, 3, "super_dominance");
       type_dag.connect(2, 4);
@@ -409,9 +404,9 @@ test("test resolve 4",
 test("test subsuper support 1",
 async () => {
   const type_dag = new TypeDominanceDAG();
-  type_dag.insert(type_dag.newNode(1), uinteger_types);
-  type_dag.insert(type_dag.newNode(2), uinteger_types);
-  type_dag.insert(type_dag.newNode(3), uinteger_types);
+  type_dag.insert(1, uinteger_types);
+  type_dag.insert(2, uinteger_types);
+  type_dag.insert(3, uinteger_types);
   type_dag.connect(1, 2, "sub_dominance");
   type_dag.connect(2, 3, "super_dominance");
   type_dag.connect(1, 3);
@@ -428,9 +423,9 @@ async () => {
 test("test subsuper support 2",
   async () => {
     const type_dag = new TypeDominanceDAG();
-    type_dag.insert(type_dag.newNode(1), uinteger_types);
-    type_dag.insert(type_dag.newNode(2), uinteger_types);
-    type_dag.insert(type_dag.newNode(3), uinteger_types);
+    type_dag.insert(1, uinteger_types);
+    type_dag.insert(2, uinteger_types);
+    type_dag.insert(3, uinteger_types);
     type_dag.connect(1, 2, "super_dominance");
     type_dag.connect(2, 3, "sub_dominance");
     type_dag.connect(1, 3);
@@ -447,9 +442,9 @@ test("test subsuper support 2",
 test("test subsuper support 3",
   async () => {
     const type_dag = new TypeDominanceDAG();
-    type_dag.insert(type_dag.newNode(1), uinteger_types);
-    type_dag.insert(type_dag.newNode(2), uinteger_types);
-    type_dag.insert(type_dag.newNode(3), uinteger_types);
+    type_dag.insert(1, uinteger_types);
+    type_dag.insert(2, uinteger_types);
+    type_dag.insert(3, uinteger_types);
     type_dag.connect(1, 2, "sub_dominance");
     type_dag.connect(2, 3, "super_dominance");
     type_dag.connect(1, 3, "sub_dominance");
@@ -466,9 +461,9 @@ test("test subsuper support 3",
 test("test subsuper support 4",
   async () => {
     const type_dag = new TypeDominanceDAG();
-    type_dag.insert(type_dag.newNode(1), uinteger_types);
-    type_dag.insert(type_dag.newNode(2), uinteger_types);
-    type_dag.insert(type_dag.newNode(3), uinteger_types);
+    type_dag.insert(1, uinteger_types);
+    type_dag.insert(2, uinteger_types);
+    type_dag.insert(3, uinteger_types);
     type_dag.connect(1, 2, "sub_dominance");
     type_dag.connect(2, 3, "super_dominance");
     type_dag.connect(1, 3, "super_dominance");
@@ -485,8 +480,8 @@ test("test subsuper support 4",
 test("test check_property 1",
 async () => {
   const type_dag = new TypeDominanceDAG();
-  type_dag.insert(type_dag.newNode(1), uinteger_types);
-  type_dag.insert(type_dag.newNode(2), uinteger_types);
+  type_dag.insert(1, uinteger_types);
+  type_dag.insert(2, uinteger_types);
   type_dag.connect(1, 2);
   type_dag.connect(2, 1);
   expect(async() => {
@@ -498,10 +493,10 @@ async () => {
 test("test check_property 2",
   async () => {
     const type_dag = new TypeDominanceDAG();
-    type_dag.insert(type_dag.newNode(1), uinteger_types);
-    type_dag.insert(type_dag.newNode(2), uinteger_types);
-    type_dag.insert(type_dag.newNode(3), uinteger_types);
-    type_dag.insert(type_dag.newNode(4), uinteger_types);
+    type_dag.insert(1, uinteger_types);
+    type_dag.insert(2, uinteger_types);
+    type_dag.insert(3, uinteger_types);
+    type_dag.insert(4, uinteger_types);
     type_dag.connect(1, 2);
     type_dag.connect(2, 3);
     type_dag.connect(3, 2);

@@ -2,7 +2,14 @@ import { FunctionStateMutability } from "solc-typed-ast";
 import { DominanceNode } from "./dominance";
 import { assert } from "./utility";
 
-export abstract class FuncStat extends DominanceNode<FunctionStateMutability> { }
+export abstract class FuncStat extends DominanceNode<FunctionStateMutability> {
+  issubof(t : FuncStat) : boolean {
+    return this.supers().includes(t);
+  }
+  issuperof(t : FuncStat) : boolean {
+    return this.subs().includes(t);
+  }
+}
 
 class Pure extends FuncStat {
   constructor() {
@@ -40,12 +47,6 @@ class Pure extends FuncStat {
   }
   copy() : FuncStat {
     throw new Error("Pure::copy() not implemented.");
-  }
-  issubof(t : FuncStat) : boolean {
-    return t instanceof Pure || t instanceof View || t instanceof Empty;
-  }
-  issuperof(t : FuncStat) : boolean {
-    return t instanceof Pure;
   }
 }
 
@@ -90,12 +91,6 @@ class View extends FuncStat {
   copy() : FuncStat {
     throw new Error("View::copy() not implemented.");
   }
-  issubof(t : FuncStat) : boolean {
-    return t instanceof View || t instanceof Empty;
-  }
-  issuperof(t : FuncStat) : boolean {
-    return t instanceof View || t instanceof Pure;
-  }
 }
 
 class Payable extends FuncStat {
@@ -124,12 +119,6 @@ class Payable extends FuncStat {
   }
   copy() : FuncStat {
     throw new Error("Payable::copy() not implemented.");
-  }
-  issubof(t : FuncStat) : boolean {
-    return t instanceof Payable || t instanceof Empty;
-  }
-  issuperof(t : FuncStat) : boolean {
-    return t instanceof Payable;
   }
 }
 
@@ -176,12 +165,6 @@ class Empty extends FuncStat {
   }
   copy() : FuncStat {
     throw new Error("Empty::copy() not implemented.");
-  }
-  issubof(t : FuncStat) : boolean {
-    return t instanceof Empty;
-  }
-  issuperof(t : FuncStat) : boolean {
-    return t instanceof Empty || t instanceof Payable || t instanceof View || t instanceof Pure;
   }
 }
 

@@ -3,7 +3,14 @@ import { DominanceNode } from "./dominance";
 
 //! Visibility does not have super/sub relations
 
-export abstract class FuncVis extends DominanceNode<FunctionVisibility> { }
+export abstract class FuncVis extends DominanceNode<FunctionVisibility> {
+  issubof(t : FuncVis) : boolean {
+    return this.supers().includes(t);
+  }
+  issuperof(t : FuncVis) : boolean {
+    return this.subs().includes(t);
+  }
+}
 
 class FuncInternal extends FuncVis {
   constructor() {
@@ -49,12 +56,6 @@ class FuncInternal extends FuncVis {
   }
   copy() : FuncVis {
     return new FuncInternal();
-  }
-  issubof(t : FuncVis) : boolean {
-    return false;
-  }
-  issuperof(t : FuncVis) : boolean {
-    return false;
   }
 }
 
@@ -103,12 +104,6 @@ class FuncExternal extends FuncVis {
   copy() : FuncVis {
     return new FuncExternal();
   }
-  issubof(t : FuncVis) : boolean {
-    return false;
-  }
-  issuperof(t : FuncVis) : boolean {
-    return false;
-  }
 }
 
 class FuncPublic extends FuncVis {
@@ -155,12 +150,6 @@ class FuncPublic extends FuncVis {
   }
   copy() : FuncVis {
     return new FuncPublic();
-  }
-  issubof(t : FuncVis) : boolean {
-    return false;
-  }
-  issuperof(t : FuncVis) : boolean {
-    return false;
   }
 }
 
@@ -209,12 +198,6 @@ class FuncPrivate extends FuncVis {
   copy() : FuncVis {
     return new FuncPrivate();
   }
-  issubof(t : FuncVis) : boolean {
-    return false;
-  }
-  issuperof(t : FuncVis) : boolean {
-    return false;
-  }
 }
 
 // @ts-ignore
@@ -243,12 +226,6 @@ class FuncDefault extends FuncVis {
   copy() : FuncVis {
     return new FuncDefault();
   }
-  issubof(t : FuncVis) : boolean {
-    return false;
-  }
-  issuperof(t : FuncVis) : boolean {
-    return false;
-  }
 }
 
 export class FuncVisProvider {
@@ -274,7 +251,14 @@ export class FuncVisProvider {
   }
 }
 
-export abstract class VarVis extends DominanceNode<StateVariableVisibility> { }
+export abstract class VarVis extends DominanceNode<StateVariableVisibility> {
+  issubof(t : VarVis) : boolean {
+    return this.supers().includes(t);
+  }
+  issuperof(t : VarVis) : boolean {
+    return this.subs().includes(t);
+  }
+}
 
 class VarInternal extends VarVis {
   constructor() {
@@ -316,12 +300,6 @@ class VarInternal extends VarVis {
   }
   copy() : VarVis {
     return new VarInternal();
-  }
-  issubof(t : VarVis) : boolean {
-    return false;
-  }
-  issuperof(t : VarVis) : boolean {
-    return false;
   }
 }
 
@@ -366,12 +344,6 @@ class VarPublic extends VarVis {
   copy() : VarVis {
     return new VarPublic();
   }
-  issubof(t : VarVis) : boolean {
-    return false;
-  }
-  issuperof(t : VarVis) : boolean {
-    return false;
-  }
 }
 
 class VarPrivate extends VarVis {
@@ -415,12 +387,6 @@ class VarPrivate extends VarVis {
   copy() : VarVis {
     return new VarPrivate();
   }
-  issubof(t : VarVis) : boolean {
-    return false;
-  }
-  issuperof(t : VarVis) : boolean {
-    return false;
-  }
 }
 
 class VarDefault extends VarVis {
@@ -463,12 +429,6 @@ class VarDefault extends VarVis {
   }
   copy() : VarVis {
     return new VarDefault();
-  }
-  issubof(t : VarVis) : boolean {
-    return false;
-  }
-  issuperof(t : VarVis) : boolean {
-    return false;
   }
 }
 
