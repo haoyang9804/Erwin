@@ -257,8 +257,10 @@ export class IRFunctionDefinition extends IRDeclare {
   }
 
   lower() : ASTNode {
-    assert(this.visibility !== undefined, `IRFunctionDefinition ${this.id}: visibility is undefined`);
-    assert(this.stateMutability !== undefined, `IRFunctionDefinition ${this.id}: stateMutability is undefined`);
+    assert(this.visibility !== undefined,
+      `IRFunctionDefinition ${this.id}: visibility is undefined, stateMutability is ${this.stateMutability}`);
+    assert(this.stateMutability !== undefined,
+      `IRFunctionDefinition ${this.id}: stateMutability is undefined, visibility is ${this.visibility}`);
     //WARNING: currently, we don't support visibility = default or stateMutability = constant
     assert(this.visibility !== FunctionVisibility.Default, `IRFunctionDefinition ${this.id}: visibility is default`);
     assert(this.stateMutability !== FunctionStateMutability.Constant, `IRFunctionDefinition ${this.id}: stateMutability is constant`);

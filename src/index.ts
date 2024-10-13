@@ -419,6 +419,8 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
     else if (irnodes.get(key)!.typeName === "IRFunctionDefinition") {
       (irnodes.get(key)! as decl.IRFunctionDefinition).visibility =
         funcvis2funcvisibility((value.kind as FuncVisMutKind).visibility);
+      (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability =
+        funcstat2functionstatemutability((value.kind as FuncVisMutKind).state_mutability);
     }
   }
   //! Traverse storage location solutions
