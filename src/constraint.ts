@@ -26,7 +26,6 @@ import { FuncStat } from "./funcstat";
 import { FuncVis, VarVis } from "./visibility";
 import { StorageLocation } from "./memory";
 import { VisMut, VisMutKind } from "./vismut";
-// import { irnodes } from "./node";
 
 interface toLeaf {
   leaf_id : number;
@@ -153,7 +152,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     else {
       throw new Error(`dominator_solution_range_should_be_shrinked: rank ${rank} is not supported`);
     }
-    // console.log(`node1_id: ${node1_id}, node2_id: ${node2_id} minimum_solution_range_of_node1: ${minimum_solution_range_of_node1.map(t => t.str())}`);
     const intersection = this.solution_range.get(dominator_id)!.filter(t => minimum_solution_range_of_dominator!.includes(t));
     assert(intersection.length > 0,
       `dominator_solution_range_should_be_shrinked: intersection is empty
@@ -179,7 +177,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     else {
       throw new Error(`dominatee_solution_range_should_be_shrinked: rank ${rank} is not supported`);
     }
-    // console.log(`node1_id: ${node1_id}, node2_id: ${node2_id} minimum_solution_range_of_node2: ${minimum_solution_range_of_node2.map(t => t.str())}`);
     const intersection = this.solution_range.get(dominatee_id)!.filter(t => minimum_solution_range_of_dominatee!.includes(t));
     assert(intersection.length > 0,
       `dominatee_solution_range_should_be_shrinked: intersection is empty
@@ -195,13 +192,11 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     let minimum_solution_range_of_dominator;
     if (minimum_solution_range_of_dominator = this.dominator_solution_range_should_be_shrinked(dominator_id, dominatee_id)) {
       this.solution_range.set(dominator_id, minimum_solution_range_of_dominator);
-      // console.log(`1> dominator_id: ${dominator_id}, dominatee_id: ${dominatee_id}, minimum_solution_range_of_dominator: ${minimum_solution_range_of_dominator.map(t => t.str())}`);
       this.tighten_solution_range_middle_out(dominator_id);
     }
     let minimum_solution_range_of_dominatee;
     if (minimum_solution_range_of_dominatee = this.dominatee_solution_range_should_be_shrinked(dominator_id, dominatee_id)) {
       this.solution_range.set(dominatee_id, minimum_solution_range_of_dominatee);
-      // console.log(`2> dominator_id: ${dominator_id}, dominatee_id: ${dominatee_id}, minimum_solution_range_of_dominatee: ${minimum_solution_range_of_dominatee.map(t => t.str())}`);
       this.tighten_solution_range_middle_out(dominatee_id);
     }
   }
@@ -1469,13 +1464,11 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     const new_dag_nodes = new Map<number, ConstaintNode>();
     const new_sub_dominance = new Set<string>();
     const new_super_dominance = new Set<string>();
-    // const new_equal_dominance = new Set<string>();
     const relevant_leaf_array = [];
     for (let i = 0; i < leaf_count; i++) {
       new_dag_nodes.set(leaf_array[i], new ConstaintNode(leaf_array[i]));
       relevant_leaf_array.push(leaf_array[i]);
     }
-    // const relevant_leaf_set = new Set(relevant_leaf_array);
     const relevant_leaf_count = relevant_leaf_array.length;
     const collectedby = new Map<number, Set<number>>();
     let visit_all_collected_nodes = (nodeid : number) : Set<number> => {
@@ -1690,9 +1683,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         let exist_nonroot_nonleaf = false;
         for (const _ of this.resolve_nonroots_and_nonleaves_in_stream()) {
           exist_nonroot_nonleaf = true;
-          // for (const [node, solution] of nonroot_nonleaf_solution) {
-          //   this.solutions.set(node, solution);
-          // }
           this.solutions_collection.push(new Map(this.solutions));
           if (this.solutions_collection.length >= maximum_solution_count) {
             should_stop = true;
@@ -1736,13 +1726,13 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   }
 
   check(solutions : Map<number, Node>) : boolean {
-    // 1. Verify that all nodes have been resolved.
+    // 1. Check that all nodes have been resolved.
     for (let [id, _] of this.dag_nodes) {
       if (!solutions.has(id)) {
         return false;
       }
     }
-    // 2. Verify that all resolved types are one of the solution candidates of the node.
+    // 2. Check that all resolved types are one of the solution candidates of the node.
     for (let [id, solution_candidates] of this.solution_range) {
       let resolved_type = solutions.get(id)!;
       let match = false;
@@ -1754,7 +1744,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       }
       if (!match) return false;
     }
-    // 3. Verify that all domination relations hold.
+    // 3. Check that all domination relations hold.
     for (let [_, node] of this.dag_nodes) {
       for (let child of node.outs) {
         if (this.sub_dominance.has(`${node.id} ${child}`)) {
