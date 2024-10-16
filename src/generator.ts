@@ -2399,8 +2399,6 @@ class NewStructGenerator extends ExpressionGenerator {
       new expr.IRIdentifier(global_id++, cur_scope.id(), identifier_name, struct_type.referece_id), args);
     this.irnode = function_call_expr;
     storage_location_dag.insert(this.id, [
-      StorageLocationProvider.calldata(),
-      StorageLocationProvider.storage_pointer(),
       StorageLocationProvider.memory(),
     ]);
     if (Math.random() < config.tuple_prob) {
