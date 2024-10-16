@@ -46,6 +46,8 @@ const function_name_to_contract_id : Map<string, Set<number>> = new Map<string, 
 // Record which contract the state variable or the in-contract struct belongs to.
 const contract_member_variable_name_to_contract_ids : Map<string, Set<number>> = new Map<string, Set<number>>();
 const struct_member_variable_name_to_struct_ids : Map<string, Set<number>> = new Map<string, Set<number>>();
+// vardecl id to the id of the struct decl wrapping it
+const vardecl2structdecl : Map<number, number> = new Map<number, number>();
 enum IDENTIFIER {
   FREE_VAR,
   FREE_FUNC,
@@ -220,6 +222,18 @@ function has_available_IRVariableDeclarations() : boolean {
 function get_available_IRVariableDeclarations_with_type_constraint(types : type.Type[]) : decl.IRVariableDeclaration[] {
   const collection : decl.IRVariableDeclaration[] = [];
   const available_irnode_ids = decl_db.get_irnodes_ids_recursively_from_a_scope(cur_scope.id());
+  // First search for struct members
+  for (const struct_decl_id of decl_db.structdecls) {
+    const struct_decl = irnodes.get(struct_decl_id) as decl.IRStructDefinition;
+    struct_decl.members.forEach((member) => {
+      if (is_super_set(type_dag.solution_range.get(member.id)!, types) &&
+        type_dag.try_tighten_solution_range_middle_out(member.id, types) ||
+        is_super_set(types, type_dag.solution_range.get(member.id)!)) {
+        collection.push(member);
+      }
+    });
+  }
+  // Then if the current scope is a contract, only search for state variables
   if (cur_scope.kind() === scopeKind.CONTRACT) {
     for (let id of available_irnode_ids) {
       if (decl_db.state_variables.has(id)) {
@@ -227,6 +241,7 @@ function get_available_IRVariableDeclarations_with_type_constraint(types : type.
       }
     }
   }
+  // Otherwise, search for non-state variables and state variables
   else {
     for (let id of available_irnode_ids) {
       if (
@@ -243,10 +258,6 @@ function get_available_IRVariableDeclarations_with_type_constraint(types : type.
       type_dag.try_tighten_solution_range_middle_out(irdecl.id, types) ||
       is_super_set(types, type_dag.solution_range.get(irdecl.id)!)
   );
-}
-
-function has_available_IRVariableDeclaration_with_type_constraint(types : type.Type[]) : boolean {
-  return get_available_IRVariableDeclarations_with_type_constraint(types).length > 0;
 }
 
 function unexpected_extra_stmt_belong_to_the_parent_scope() : boolean {
@@ -322,6 +333,11 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
     this.type_range = this.type_range.filter((t) => t.typeName === 'StructType');
     if (this.struct_id === undefined) {
       this.struct_id = pick_random_element(this.type_range.map(t => (t as type.StructType).referece_id))!;
+    }
+    else {
+      assert(this.type_range.some((t) => (t as type.StructType).referece_id === this.struct_id),
+        `StructInstanceDeclarationGenerator: struct_id ${this.struct_id} is not in the type_range ${this.type_range.map(t => t.str())}`);
+      this.type_range = this.type_range.filter((t) => (t as type.StructType).referece_id === this.struct_id);
     }
     assert(irnodes.has(this.struct_id), `StructInstanceDeclarationGenerator: struct_id ${this.struct_id} is not in irnodes`);
     if (config.debug) {
@@ -758,6 +774,7 @@ class StructGenerator extends DeclarationGenerator {
       const variable_gen = new VariableDeclarationGenerator(all_types);
       variable_gen.generate();
       body.push(variable_gen.irnode! as decl.IRVariableDeclaration);
+      vardecl2structdecl.set(variable_gen.irnode!.id, thisid);
     }
     this.irnode = new decl.IRStructDefinition(thisid, cur_scope.id(), struct_name, body);
     cur_scope = cur_scope.rollback();
@@ -1311,9 +1328,9 @@ class IdentifierGenerator extends LRValueGenerator {
       }
     }
     expr2read_variables.set(this.id, new Set<number>());
-    // Generate a variable decl if there is no variable decl available.
-    if (!has_available_IRVariableDeclaration_with_type_constraint(this.type_range) ||
-      Math.random() < config.vardecl_prob) {
+    let available_irdecl = get_available_IRVariableDeclarations_with_type_constraint(this.type_range);
+    //! Generate a variable decl if there is no variable decl available.
+    if (available_irdecl.length === 0 || Math.random() < config.vardecl_prob) {
       const contain_element_types = this.type_range.some(t => t.typeName === "ElementaryType");
       if (contain_element_types) {
         generate_var_decl();
@@ -1365,18 +1382,77 @@ class IdentifierGenerator extends LRValueGenerator {
         }
       }
     }
+    //! Get an available variable decl if there is one.
     else {
-      const available_irdecl = get_available_IRVariableDeclarations_with_type_constraint(this.type_range);
-      assert(available_irdecl !== undefined, "IdentifierGenerator: available_irdecl is undefined");
-      assert(available_irdecl.length > 0, "IdentifierGenerator: no available IR irnodes");
       this.variable_decl = pick_random_element(available_irdecl)!;
     }
     if (this.variable_decl !== undefined) {
       assert(this.irnode === undefined, "IdentifierGenerator: this.irnode is not undefined");
-      this.irnode = new expr.IRIdentifier(this.id, cur_scope.id(), this.variable_decl.name, this.variable_decl.id);
+      //! If this selected variable decl is not the member of a struct, then generate an IRIdentifier.
+      if (!vardecl2structdecl.has(this.variable_decl.id)) {
+        this.irnode = new expr.IRIdentifier(this.id, cur_scope.id(), this.variable_decl.name, this.variable_decl.id);
+      }
+      //! Otherwise, select for the struct instance and generate an IRMemberAccess,
+      //! or generate a temporary struct instance and generate an IRMemberAccess.
+      else {
+        const struct_decl_id = vardecl2structdecl.get(this.variable_decl.id)!;
+        const available_possible_struct_instances = available_irdecl.filter(v =>
+          type_dag.solution_range.get(v.id)!.some(
+            t => t.typeName === "StructType" &&
+              (t as type.StructType).referece_id === struct_decl_id));
+        if (available_possible_struct_instances.length === 0) {
+          //! If no available struct instance to expose this variable decl and the identifier is a left value,
+          //! then first generate a struct instance of a specified struct type and then generate an IRMemberAccess.
+          if (this.left || Math.random() < config.vardecl_prob) {
+            //* Generate a struct instance
+            let rollback = false;
+            let snapshot_scope = cur_scope.snapshot();
+            if (unexpected_extra_stmt_belong_to_the_parent_scope()) {
+              rollback = true;
+              cur_scope = cur_scope.rollback();
+            }
+            const type_range = user_defined_types.filter(t => t.typeName === "StructType" &&
+              (t as type.StructType).referece_id === struct_decl_id);
+            const struct_instance_gen = new StructInstanceDeclarationGenerator(type_range, false, struct_decl_id);
+            struct_instance_gen.generate();
+            const vardeclstmt = new stmt.IRVariableDeclareStatement(global_id++, cur_scope.id(),
+              [struct_instance_gen.irnode! as decl.IRVariableDeclaration],
+              (struct_instance_gen.irnode as decl.IRVariableDeclaration).value);
+            (struct_instance_gen.irnode as decl.IRVariableDeclaration).value = undefined;
+            if (unexpected_extra_stmt.has(cur_scope.id())) {
+              unexpected_extra_stmt.get(cur_scope.id())!.push(vardeclstmt);
+            }
+            else {
+              unexpected_extra_stmt.set(cur_scope.id(), [vardeclstmt]);
+            }
+            if (rollback) {
+              cur_scope = snapshot_scope.snapshot();
+            }
+            //* Generate an IRMemberAccess
+            this.irnode = new expr.IRMemberAccess(this.id, cur_scope.id(), this.variable_decl.name,
+              struct_decl_id, new expr.IRIdentifier(global_id++, cur_scope.id(),
+                (struct_instance_gen.irnode! as decl.IRVariableDeclaration).name, struct_instance_gen.irnode!.id));
+          }
+          //! Otherwise, generate a new struct instance and then generate an IRMemberAccess.
+          else {
+            const nsid = global_id++;
+            type_dag.insert(nsid, [user_defined_types.find(t => t.typeName === "StructType" &&
+              (t as type.StructType).referece_id === struct_decl_id)!]);
+            const struct_instance_gen = new NewStructGenerator(nsid);
+            struct_instance_gen.generate(cur_expression_complex_level + 1);
+            const struct_instance_expr = struct_instance_gen.irnode as expr.IRExpression;
+            const extracted_struct_instance_expr = expr.tuple_extraction(struct_instance_expr);
+            expr2read_variables.set(this.id, merge_set(expr2read_variables.get(this.id)!, expr2read_variables.get(extracted_struct_instance_expr.id)!));
+            this.irnode = new expr.IRMemberAccess(this.id, cur_scope.id(), this.variable_decl.name,
+              struct_decl_id, struct_instance_expr);
+          }
+        }
+
+      }
       type_dag.connect(this.id, this.variable_decl.id);
       type_dag.solution_range_alignment(this.id, this.variable_decl.id);
       expr2read_variables.set(this.id, merge_set(expr2read_variables.get(this.id)!, new Set<number>([this.variable_decl.id])));
+      //! Update storage location dag
       if (storage_location_dag.solution_range.has(this.variable_decl.id)) {
         if ((this.left && cur_expression_complex_level === 1) || cur_expression_complex_level === 0) {
           storage_location_dag.insert(this.id,
