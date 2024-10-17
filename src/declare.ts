@@ -81,12 +81,11 @@ export class IRVariableDeclaration extends IRDeclare {
       }
     }
     else {
-      assert(this.typestr !== undefined, "IRVariableDeclaration: typestr is not generated")
+      assert(this.typestr !== undefined, `IRVariableDeclaration: ${this.id} typestr is not generated`)
       typename = factory.makeElementaryTypeName("", this.typestr);
       this.loc = DataLocation.Default;
     }
-    assert(this.loc !== undefined, "IRVariableDeclaration: loc is not generated");
-    //TODO: add support for other types, firstly function type
+    assert(this.loc !== undefined, `IRVariableDeclaration: ${this.id} loc is not generated`);
     assert(typename !== undefined, `IRVariableDeclaration ${this.id}: typename is not generated`)
     return factory.makeVariableDeclaration(this.constant, this.indexed, this.name, this.scope, this.state, this.loc,
       this.visibility, this.mutable, "", undefined, typename, undefined, this.value?.lower());

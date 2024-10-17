@@ -11,7 +11,7 @@ export const config = {
   int_num: 2,
 
   // Dominance Constraint Solution
-  maximum_solution_count: 1000,
+  maximum_solution_count: 500,
 
   // Function
   function_body_stmt_cnt_upper_limit: 1,
@@ -33,17 +33,17 @@ export const config = {
   state_variable_count_lowerlimit: 1,
 
   // Complexity
-  expression_complex_level: 2,
+  expression_complex_level: 1,
   statement_complex_level: 1,
 
   // Probability
   nonstructured_statement_prob: 0.05,
   literal_prob: 0.05,
   tuple_prob: 0.3,
-  vardecl_prob: 0.1,
+  vardecl_prob: 0.0,
   // The probability of "new"ing a contract or a struct instance
-  in_place_vardecl_prob: 0.5,
-  else_prob: 0.3,
+  new_prob: 0.1,
+  else_prob: 0.1,
   terminal_prob: 0.05,
   init_state_var_in_constructor_prob: 0.3,
   struct_prob: 0.5,
@@ -52,7 +52,7 @@ export const config = {
   initialization_prob: 0.3,
   constructor_prob: 0.5,
   return_prob: 0.5,
-  reuse_name_prob: 0.3,
+  reuse_name_prob: 0.0,
 
   // Structured Statements
   for_init_cnt_upper_limit: 1,
