@@ -954,6 +954,10 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
               this.rootsnotsure.add(`${root_info2.root_id} ${root_info1.root_id}`);
             }
           }
+          else if (root_info1.subsuper_dominance) {
+            this.rootsnotsure.add(`${root_info1.root_id} ${root_info2.root_id}`);
+            this.rootsnotsure.add(`${root_info2.root_id} ${root_info1.root_id}`);
+          }
         }
       }
     }
@@ -1062,6 +1066,10 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
               this.leavesequal.add(`${leaf_info1.leaf_id} ${leaf_info2.leaf_id}`);
               this.leavesequal.add(`${leaf_info2.leaf_id} ${leaf_info1.leaf_id}`);
             }
+          }
+          else if (leaf_info1.subsuper_dominance) {
+            this.leavesnotsure.add(`${leaf_info1.leaf_id} ${leaf_info2.leaf_id}`);
+            this.leavesnotsure.add(`${leaf_info2.leaf_id} ${leaf_info1.leaf_id}`);
           }
         }
       }
