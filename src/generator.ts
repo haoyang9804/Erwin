@@ -962,7 +962,8 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
         type_dag.insert(expr_id, type_range);
         let expr_gen_prototype = get_exprgenerator(type_range);
         let ghost_id;
-        if (expr_gen_prototype.name === "LiteralGenerator") {
+        const expr_gen = new expr_gen_prototype(expr_id);
+        if (expr_gen.generator_name === "LiteralGenerator") {
           ghost_id = global_id++;
           new IRGhost(ghost_id, cur_scope.id());
           type_dag.insert(ghost_id, type_range);
@@ -972,7 +973,6 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
         else {
           type_dag.connect(expr_id, this.return_decls[i].id, "super_dominance");
         }
-        const expr_gen = new expr_gen_prototype(expr_id);
         expr_gen.generate(0);
         return_values.push(expr_gen.irnode! as expr.IRExpression);
         let expression_extracted = expr.tuple_extraction(return_values[i]);
@@ -1712,7 +1712,8 @@ class BinaryOpGenerator extends RValueGenerator {
         left_expression_gen_prototype = pick_random_element(all_expression_generators)!;
       }
     }
-    if (left_expression_gen_prototype.name === "LiteralGenerator") {
+    left_expression_gen = new left_expression_gen_prototype(leftid);
+    if (left_expression_gen.generator_name === "LiteralGenerator") {
       if (cur_expression_complex_level >= config.expression_complex_level || Math.random() < config.terminal_prob) {
         right_expression_gen_prototype = IdentifierGenerator;
       }
@@ -1740,7 +1741,6 @@ class BinaryOpGenerator extends RValueGenerator {
     else if (ghostid !== undefined) {
       type_dag.solution_range_alignment(ghostid, rightid);
     }
-    left_expression_gen = new left_expression_gen_prototype(leftid);
     left_expression_gen.generate(cur_expression_complex_level + 1);
     if (this.this_dominates_left()) {
       type_dag.solution_range_alignment(this.id, leftid);
@@ -2102,7 +2102,6 @@ class FunctionCallGenerator extends RValueGenerator {
     }
     if (contractdecl_id === cur_contract_id) {
       if ((irnodes.get(funcdecl_id)! as decl.IRFunctionDefinition).visibility === undefined) {
-
         vismut_dag.solution_range.set(funcdecl_id,
           [...intersection(new Set<VisMut>(nonpayable_func_vismut),
             new Set<VisMut>(vismut_dag.solution_range.get(funcdecl_id)!))]);
@@ -2157,7 +2156,8 @@ class FunctionCallGenerator extends RValueGenerator {
       const argid = global_id++;
       type_dag.insert(argid, type_range);
       let ghost_id;
-      if (arg_gen_prototype.name === "LiteralGenerator") {
+      const arg_gen = new arg_gen_prototype(argid);
+      if (arg_gen.generator_name === "LiteralGenerator") {
         ghost_id = global_id++;
         new IRGhost(ghost_id, cur_scope.id());
         type_dag.insert(ghost_id, type_range);
@@ -2167,7 +2167,6 @@ class FunctionCallGenerator extends RValueGenerator {
       else {
         type_dag.connect(argid, funcdecl.parameters[i].id, "super_dominance");
       }
-      const arg_gen = new arg_gen_prototype(argid);
       arg_gen.generate(cur_expression_complex_level + 1);
       let extracted_arg = expr.tuple_extraction(arg_gen.irnode! as expr.IRExpression);
       args_ids.push(extracted_arg.id);
@@ -2363,7 +2362,8 @@ class NewStructGenerator extends ExpressionGenerator {
       const argid = global_id++;
       type_dag.insert(argid, type_dag.solution_range.get(member.id)!);
       let ghost_id;
-      if (arg_gen_prototype.name === "LiteralGenerator") {
+      const arg_gen = new arg_gen_prototype(argid);
+      if (arg_gen.generator_name === "LiteralGenerator") {
         ghost_id = global_id++;
         new IRGhost(ghost_id, cur_scope.id());
         type_dag.insert(ghost_id, type_dag.solution_range.get(member.id)!);
@@ -2373,7 +2373,6 @@ class NewStructGenerator extends ExpressionGenerator {
       else {
         type_dag.connect(argid, member.id, "super_dominance");
       }
-      const arg_gen = new arg_gen_prototype(argid);
       arg_gen.generate(cur_expression_complex_level + 1);
       if (ghost_id === undefined) {
         type_dag.solution_range_alignment(argid, member.id);
@@ -2438,7 +2437,8 @@ class NewContractGenerator extends ExpressionGenerator {
       const argid = global_id++;
       type_dag.insert(argid, type_dag.solution_range.get(contract_decl.constructor_parameters[i].id)!);
       let ghost_id;
-      if (arg_gen_prototype.name === "LiteralGenerator") {
+      const arg_gen = new arg_gen_prototype(argid);
+      if (arg_gen.generator_name === "LiteralGenerator") {
         ghost_id = global_id++;
         new IRGhost(ghost_id, cur_scope.id());
         type_dag.insert(ghost_id, type_dag.solution_range.get(contract_decl.constructor_parameters[i].id)!);
@@ -2449,7 +2449,6 @@ class NewContractGenerator extends ExpressionGenerator {
         type_dag.connect(argid, contract_decl.constructor_parameters[i].id, "super_dominance");
       }
       type_dag.connect(argid, contract_decl.constructor_parameters[i].id);
-      const arg_gen = new arg_gen_prototype(argid);
       arg_gen.generate(cur_expression_complex_level + 1);
       if (ghost_id === undefined) {
         type_dag.solution_range_alignment(argid, contract_decl.constructor_parameters[i].id);
