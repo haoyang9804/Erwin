@@ -79,7 +79,7 @@ program
   .option("--literal_prob <float>", "The probability of generating a literal.", `${config.literal_prob}`)
   .option("--tuple_prob <float>", "The probability of generating a tuple surrounding an expression.", `${config.tuple_prob}`)
   .option("--vardecl_prob <float>", "The probability of generating a variable declaration.", `${config.vardecl_prob}`)
-  .option("--in_place_vardecl_prob <float>", "The probability of generating a variable declaration in place.", `${config.in_place_vardecl_prob}`)
+  .option("--new_prob <float>", "The probability of generating a variable declaration in place.", `${config.new_prob}`)
   .option("--else_prob <float>", "The probability of generating an else statement.", `${config.else_prob}`)
   .option("--terminal_prob <float>", "The probability of generating a terminal statement.", `${config.terminal_prob}`)
   .option("--init_state_var_in_constructor_prob <float>", "The probability of initializing a state variable in the constructor.", `${config.init_state_var_in_constructor_prob}`)
@@ -130,7 +130,7 @@ else if (program.args[0] === "generate") {
   config.contract_count = parseInt(program.commands[1].opts().contract_count);
   config.mode = program.commands[1].opts().mode;
   config.vardecl_prob = parseFloat(program.commands[1].opts().vardecl_prob);
-  config.in_place_vardecl_prob = parseFloat(program.commands[1].opts().in_place_vardecl_prob);
+  config.new_prob = parseFloat(program.commands[1].opts().new_prob);
   config.else_prob = parseFloat(program.commands[1].opts().else_prob);
   config.terminal_prob = parseFloat(program.commands[1].opts().terminal_prob);
   config.init_state_var_in_constructor_prob = parseFloat(program.commands[1].opts().init_state_var_in_constructor_prob);
@@ -185,7 +185,7 @@ else if (program.args[0] === "generate") {
   assert(config.contract_count >= 0, "contract_count must be not less than 0.");
   assert(["type", "scope", "loc"].includes(config.mode), "The mode is not either 'type' or 'scope', instead it is " + config.mode);
   assert(config.vardecl_prob >= 0 && config.vardecl_prob <= 1.0, "The probability of generating a variable declaration must be in the range [0,1].");
-  assert(config.in_place_vardecl_prob >= 0 && config.in_place_vardecl_prob <= 1.0, "The probability of generating a variable declaration in place must be in the range [0,1].");
+  assert(config.new_prob >= 0 && config.new_prob <= 1.0, "The probability of generating a variable declaration in place must be in the range [0,1].");
   assert(config.else_prob >= 0.0 && config.else_prob <= 1.0, "The probability of generating an else statement must be in the range [0,1].");
   assert(config.terminal_prob >= 0.0 && config.terminal_prob <= 1.0, "The probability of generating a terminal statement must be in the range [0,1].");
   assert(config.return_count_of_function_lowerlimit <= config.return_count_of_function_upperlimit, "The lower limit of the number of return values of a function must be less than or equal to the upper limit.");
@@ -456,16 +456,16 @@ async function generate() {
   source_unit.generate();
   try {
     let startTime = performance.now()
-    // gen.type_dag.resolve_by_stream();
-    await gen.type_dag.resolve_by_stream(true);
+    // gen.type_dag.resolve();
+    await gen.type_dag.resolve();
     let endTime = performance.now();
     console.log(`Time cost of resolving type constraints: ${endTime - startTime} ms`);
     startTime = performance.now();
-    await gen.vismut_dag.resolve_by_stream(true);
+    await gen.vismut_dag.resolve();
     endTime = performance.now();
     console.log(`Time cost of resolving visibility and state mutability constraints: ${endTime - startTime} ms`);
     startTime = performance.now();
-    await gen.storage_location_dag.resolve_by_stream(true);
+    await gen.storage_location_dag.resolve();
     endTime = performance.now();
     console.log(`Time cost of resolving storage location constraints: ${endTime - startTime} ms`);
     gen.type_dag.verify();

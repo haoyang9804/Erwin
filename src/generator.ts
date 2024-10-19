@@ -32,8 +32,9 @@ let virtual_env = false;
 let override_env = false;
 let name_id = 0;
 let all_types : type.Type[] = [];
-// A map from scope id to the set of unexpected extra statements.
-let unexpected_extra_stmt : Map<number, stmt.IRStatement[]> = new Map<number, stmt.IRStatement[]>();
+let noliteralgen = false;
+// Record the statements that are not expected to be generated before the current statement.
+let unexpected_pre_extra_stmt : Map<number, stmt.IRStatement[]> = new Map<number, stmt.IRStatement[]>();
 const ghost_function_decl_calls = new Set<number>();
 const contract_types : Map<number, type.ContractType> = new Map<number, type.ContractType>();
 const internal_struct_types = new Set<type.StructType>();
@@ -188,6 +189,9 @@ function get_exprgenerator(type_range : type.Type[], nofunccall : boolean = true
   if (nofunccall) {
     generator_candidates.delete(FunctionCallGenerator);
   }
+  if (noliteralgen) {
+    generator_candidates.delete(LiteralGenerator);
+  }
   const generator_candidates_array = Array.from(generator_candidates);
   assert(generator_candidates_array.length > 0, `get_exprgenerator: generator_candidates is empty, type_range is ${type_range.map(t => t.str())}`);
   arg_gen_prototype = pick_random_element(generator_candidates_array)!;
@@ -226,11 +230,7 @@ function get_available_IRVariableDeclarations_with_type_constraint(types : type.
   for (const struct_decl_id of decl_db.structdecls) {
     const struct_decl = irnodes.get(struct_decl_id) as decl.IRStructDefinition;
     struct_decl.members.forEach((member) => {
-      if (is_super_set(type_dag.solution_range.get(member.id)!, types) &&
-        type_dag.try_tighten_solution_range_middle_out(member.id, types) ||
-        is_super_set(types, type_dag.solution_range.get(member.id)!)) {
-        collection.push(member);
-      }
+      collection.push(member);
     });
   }
   // Then if the current scope is a contract, only search for state variables
@@ -260,7 +260,7 @@ function get_available_IRVariableDeclarations_with_type_constraint(types : type.
   );
 }
 
-function unexpected_extra_stmt_belong_to_the_parent_scope() : boolean {
+function unexpected_pre_extra_stmt_belong_to_the_parent_scope() : boolean {
   return cur_scope.kind() === scopeKind.FOR_CONDITION ||
     cur_scope.kind() === scopeKind.WHILE_CONDITION ||
     cur_scope.kind() === scopeKind.DOWHILE_COND ||
@@ -392,13 +392,14 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
         // https://github.com/ethereum/solidity/issues/15483#issuecomment-2396563287
         storage_location_dag.insert(this.irnode.id, [
           StorageLocationProvider.memory(),
-          StorageLocationProvider.storage_pointer()
         ]);
       }
       decl_db.insert(this.irnode.id, decide_variable_visibility(cur_scope.kind(), StateVariableVisibility.Default), cur_scope.id());
     }
     if (initializer !== undefined) {
-      storage_location_dag.connect(expr.tuple_extraction(initializer).id, this.irnode.id, "super_dominance");
+      const initializer_id = expr.tuple_extraction(initializer).id;
+      storage_location_dag.connect(initializer_id, this.irnode.id, "super_dominance");
+      storage_location_dag.solution_range_alignment(initializer_id, this.irnode.id);
     }
     if (cur_scope.kind() === scopeKind.CONTRACT) {
       decl_db.state_variables.add(this.irnode.id);
@@ -671,16 +672,16 @@ class ConstructorDeclarationGenerator extends DeclarationGenerator {
         const expression = expr_gen.irnode! as expr.IRExpression;
         const assignment = new expr.IRAssignment(global_id++, cur_scope.id(), identifier, expression, "=");
         const assignment_stmt = new stmt.IRExpressionStatement(global_id++, cur_scope.id(), assignment);
-        body = body.concat(unexpected_extra_stmt.has(cur_scope.id()) ? unexpected_extra_stmt.get(cur_scope.id())! : []);
-        unexpected_extra_stmt.delete(cur_scope.id());
+        body = body.concat(unexpected_pre_extra_stmt.has(cur_scope.id()) ? unexpected_pre_extra_stmt.get(cur_scope.id())! : []);
+        unexpected_pre_extra_stmt.delete(cur_scope.id());
         body.push(assignment_stmt);
       }
       else {
         const stmt_gen_prototype = pick_random_element(statement_generators)!;
         const stmt_gen = new stmt_gen_prototype();
         stmt_gen.generate(0);
-        body = body.concat(unexpected_extra_stmt.has(cur_scope.id()) ? unexpected_extra_stmt.get(cur_scope.id())! : []);
-        unexpected_extra_stmt.delete(cur_scope.id());
+        body = body.concat(unexpected_pre_extra_stmt.has(cur_scope.id()) ? unexpected_pre_extra_stmt.get(cur_scope.id())! : []);
+        unexpected_pre_extra_stmt.delete(cur_scope.id());
         body.push(stmt_gen.irnode! as stmt.IRStatement);
       }
     }
@@ -922,8 +923,8 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
       const stmt_gen_prototype = pick_random_element(statement_generators)!;
       const stmt_gen = new stmt_gen_prototype();
       stmt_gen.generate(0);
-      body = body.concat(unexpected_extra_stmt.has(cur_scope.id()) ? unexpected_extra_stmt.get(cur_scope.id())! : []);
-      unexpected_extra_stmt.delete(cur_scope.id());
+      body = body.concat(unexpected_pre_extra_stmt.has(cur_scope.id()) ? unexpected_pre_extra_stmt.get(cur_scope.id())! : []);
+      unexpected_pre_extra_stmt.delete(cur_scope.id());
       body.push(stmt_gen.irnode! as stmt.IRStatement);
       // update read_vardecls
       if (stmt_gen instanceof ExpressionStatementGenerator) {
@@ -961,7 +962,8 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
         type_dag.insert(expr_id, type_range);
         let expr_gen_prototype = get_exprgenerator(type_range);
         let ghost_id;
-        if (expr_gen_prototype.name === "LiteralGenerator") {
+        const expr_gen = new expr_gen_prototype(expr_id);
+        if (expr_gen.generator_name === "LiteralGenerator") {
           ghost_id = global_id++;
           new IRGhost(ghost_id, cur_scope.id());
           type_dag.insert(ghost_id, type_range);
@@ -971,7 +973,6 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
         else {
           type_dag.connect(expr_id, this.return_decls[i].id, "super_dominance");
         }
-        const expr_gen = new expr_gen_prototype(expr_id);
         expr_gen.generate(0);
         return_values.push(expr_gen.irnode! as expr.IRExpression);
         let expression_extracted = expr.tuple_extraction(return_values[i]);
@@ -985,12 +986,13 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
         for (const used_vardecl of expr2read_variables.get(expression_extracted.id)!) {
           read_vardecls.add(used_vardecl);
         }
-        body = body.concat(unexpected_extra_stmt.has(cur_scope.id()) ? unexpected_extra_stmt.get(cur_scope.id())! : []);
-        unexpected_extra_stmt.delete(cur_scope.id());
+        body = body.concat(unexpected_pre_extra_stmt.has(cur_scope.id()) ? unexpected_pre_extra_stmt.get(cur_scope.id())! : []);
+        unexpected_pre_extra_stmt.delete(cur_scope.id());
         if (storage_location_dag.solution_range.has(this.return_decls[i].id)) {
           assert(storage_location_dag.solution_range.has(expression_extracted.id),
             `storage_location_dag.solution_range should have ${expression_extracted.id}`);
           storage_location_dag.connect(expression_extracted.id, this.return_decls[i].id, "super_dominance");
+          storage_location_dag.solution_range_alignment(expression_extracted.id, this.return_decls[i].id);
         }
       }
       if (return_values.length === 0 && Math.random() > 0.5) { }
@@ -1141,8 +1143,8 @@ class ContractDeclarationGenerator extends DeclarationGenerator {
       const variable_decl = variable_gen.irnode as decl.IRVariableDeclaration;
       variable_decl.state = true;
       local_state_variables.push(variable_decl);
-      if (unexpected_extra_stmt.has(cur_scope.id())) {
-        for (const stmt of unexpected_extra_stmt.get(cur_scope.id())!) {
+      if (unexpected_pre_extra_stmt.has(cur_scope.id())) {
+        for (const stmt of unexpected_pre_extra_stmt.get(cur_scope.id())!) {
           assert(stmt.typeName === "IRVariableDeclareStatement",
             `ContractDeclarationGenerator: stmt is not IRVariableDeclareStatement, but is ${stmt.typeName}`);
           for (const vardecl of (stmt as stmt.IRVariableDeclareStatement).variable_declares) {
@@ -1155,7 +1157,7 @@ class ContractDeclarationGenerator extends DeclarationGenerator {
           }
         }
       }
-      unexpected_extra_stmt.delete(cur_scope.id());
+      unexpected_pre_extra_stmt.delete(cur_scope.id());
       body.push(variable_decl);
       decl_db.state_variables.add(variable_decl.id);
     }
@@ -1305,7 +1307,7 @@ class IdentifierGenerator extends LRValueGenerator {
     let generate_var_decl = () => {
       let roll_back = false;
       let snapshot_scope = cur_scope.snapshot();
-      if (unexpected_extra_stmt_belong_to_the_parent_scope()) {
+      if (unexpected_pre_extra_stmt_belong_to_the_parent_scope()) {
         roll_back = true;
         cur_scope = cur_scope.rollback();
       }
@@ -1317,11 +1319,11 @@ class IdentifierGenerator extends LRValueGenerator {
         this.variable_decl.value!
       );
       this.variable_decl.value = undefined;
-      if (unexpected_extra_stmt.has(cur_scope.id())) {
-        unexpected_extra_stmt.get(cur_scope.id())!.push(variable_decl_stmt);
+      if (unexpected_pre_extra_stmt.has(cur_scope.id())) {
+        unexpected_pre_extra_stmt.get(cur_scope.id())!.push(variable_decl_stmt);
       }
       else {
-        unexpected_extra_stmt.set(cur_scope.id(), [variable_decl_stmt]);
+        unexpected_pre_extra_stmt.set(cur_scope.id(), [variable_decl_stmt]);
       }
       if (roll_back) {
         cur_scope = snapshot_scope.snapshot();
@@ -1353,7 +1355,7 @@ class IdentifierGenerator extends LRValueGenerator {
         type_dag.update(this.id, this.type_range);
         assert(this.type_range.length > 0, `IdentifierGenerator: type_range is empty`);
         if (contain_contract_types) {
-          if (!this.left && Math.random() < config.in_place_vardecl_prob) {
+          if (!this.left && Math.random() < config.new_prob) {
             // Generate a new expr for the contract type
             const new_contract_gen = new NewContractGenerator(this.id);
             new_contract_gen.generate(cur_expression_complex_level + 1);
@@ -1367,7 +1369,7 @@ class IdentifierGenerator extends LRValueGenerator {
           }
         }
         else if (contain_struct_types) {
-          if (!this.left && Math.random() < config.in_place_vardecl_prob) {
+          if (!this.left && Math.random() < config.new_prob) {
             // Generate an instance of the struct type
             const new_struct_gen = new NewStructGenerator(this.id);
             new_struct_gen.generate(cur_expression_complex_level + 1);
@@ -1375,6 +1377,7 @@ class IdentifierGenerator extends LRValueGenerator {
             const extracted_struct_instance_expr = expr.tuple_extraction(struct_instance_expr);
             expr2read_variables.set(this.id, merge_set(expr2read_variables.get(this.id)!, expr2read_variables.get(extracted_struct_instance_expr.id)!));
             this.irnode = struct_instance_expr;
+            storage_location_dag.insert(this.id, [StorageLocationProvider.memory()]);
           }
           else {
             generate_var_decl();
@@ -1387,6 +1390,7 @@ class IdentifierGenerator extends LRValueGenerator {
       this.variable_decl = pick_random_element(available_irdecl)!;
     }
     if (this.variable_decl !== undefined) {
+      type_dag.connect(this.id, this.variable_decl.id);
       assert(this.irnode === undefined, "IdentifierGenerator: this.irnode is not undefined");
       //! If this selected variable decl is not the member of a struct, then generate an IRIdentifier.
       if (!vardecl2structdecl.has(this.variable_decl.id)) {
@@ -1403,11 +1407,11 @@ class IdentifierGenerator extends LRValueGenerator {
         if (available_possible_struct_instances.length === 0) {
           //! If no available struct instance to expose this variable decl and the identifier is a left value,
           //! then first generate a struct instance of a specified struct type and then generate an IRMemberAccess.
-          if (this.left || Math.random() < config.vardecl_prob) {
+          if (this.left || Math.random() > config.new_prob) {
             //* Generate a struct instance
             let rollback = false;
             let snapshot_scope = cur_scope.snapshot();
-            if (unexpected_extra_stmt_belong_to_the_parent_scope()) {
+            if (unexpected_pre_extra_stmt_belong_to_the_parent_scope()) {
               rollback = true;
               cur_scope = cur_scope.rollback();
             }
@@ -1419,11 +1423,11 @@ class IdentifierGenerator extends LRValueGenerator {
               [struct_instance_gen.irnode! as decl.IRVariableDeclaration],
               (struct_instance_gen.irnode as decl.IRVariableDeclaration).value);
             (struct_instance_gen.irnode as decl.IRVariableDeclaration).value = undefined;
-            if (unexpected_extra_stmt.has(cur_scope.id())) {
-              unexpected_extra_stmt.get(cur_scope.id())!.push(vardeclstmt);
+            if (unexpected_pre_extra_stmt.has(cur_scope.id())) {
+              unexpected_pre_extra_stmt.get(cur_scope.id())!.push(vardeclstmt);
             }
             else {
-              unexpected_extra_stmt.set(cur_scope.id(), [vardeclstmt]);
+              unexpected_pre_extra_stmt.set(cur_scope.id(), [vardeclstmt]);
             }
             if (rollback) {
               cur_scope = snapshot_scope.snapshot();
@@ -1447,9 +1451,7 @@ class IdentifierGenerator extends LRValueGenerator {
               struct_decl_id, struct_instance_expr);
           }
         }
-
       }
-      type_dag.connect(this.id, this.variable_decl.id);
       type_dag.solution_range_alignment(this.id, this.variable_decl.id);
       expr2read_variables.set(this.id, merge_set(expr2read_variables.get(this.id)!, new Set<number>([this.variable_decl.id])));
       //! Update storage location dag
@@ -1541,7 +1543,6 @@ class AssignmentGenerator extends RValueGenerator {
     const right_expression_gen = new right_expression_gen_prototype(rightid);
     right_expression_gen.generate(cur_expression_complex_level + 1);
     let right_expression : expr.IRExpression = right_expression_gen.irnode as expr.IRExpression;
-    let right_extracted_expression = expr.tuple_extraction(right_expression);
     //! Generate the left-hand-side identifier
     if (this.this_dominate_right()) {
       type_dag.solution_range_alignment(this.id, rightid);
@@ -1550,26 +1551,27 @@ class AssignmentGenerator extends RValueGenerator {
     identifier_gen.generate(cur_expression_complex_level + 1);
     type_dag.solution_range_alignment(this.id, leftid);
     let left_expression : expr.IRExpression = identifier_gen.irnode as expr.IRExpression;
-    let left_extracted_expression = expr.tuple_extraction(left_expression);
     assert(identifier_gen.variable_decl !== undefined, "AssignmentGenerator: identifier_gen.vardecl is undefined");
     if (storage_location_dag.solution_range.has(identifier_gen.variable_decl.id)) {
       assert(this.op === "=", `AssignmentGenerator: op is not =, but is ${this.op}`);
-      assert(storage_location_dag.solution_range.has(right_extracted_expression.id),
-        `AssignmentGenerator: right_extracted_expression.id ${right_extracted_expression.id} is not in storage_location_dag.solution_range`);
+      assert(storage_location_dag.solution_range.has(rightid),
+        `AssignmentGenerator: right_extracted_expression.id ${rightid} is not in storage_location_dag.solution_range`);
       storage_location_dag.insert(this.id,
-        storage_location_dag.solution_range.get(identifier_gen.irnode!.id)!
+        storage_location_dag.solution_range.get(leftid)!
       );
-      storage_location_dag.connect(this.id, left_extracted_expression.id);
-      storage_location_dag.connect(left_extracted_expression.id, right_extracted_expression.id, "sub_dominance");
+      storage_location_dag.connect(this.id, leftid);
+      storage_location_dag.solution_range_alignment(this.id, leftid);
+      storage_location_dag.connect(this.id, rightid, "sub_dominance");
+      storage_location_dag.solution_range_alignment(this.id, rightid);
     }
     //! Update expr2read_variables
     expr2read_variables.set(this.id,
       merge_set(
-        expr2read_variables.get(left_extracted_expression.id)!,
-        expr2read_variables.get(right_extracted_expression.id)!
+        expr2read_variables.get(leftid)!,
+        expr2read_variables.get(rightid)!
       )
     );
-    expr2write_variables.set(this.id, new Set<number>([left_extracted_expression.id]));
+    expr2write_variables.set(this.id, new Set<number>([leftid]));
     //! Generate irnode
     this.irnode = new expr.IRAssignment(this.id, cur_scope.id(), left_expression, right_expression, this.op!);
     if (config.debug) {
@@ -1703,13 +1705,15 @@ class BinaryOpGenerator extends RValueGenerator {
     }
     else {
       if (this.op === "<<" || this.op === ">>") {
+        noliteralgen = true;
         left_expression_gen_prototype = pick_random_element(nonliteral_expression_generators)!;
       }
       else {
         left_expression_gen_prototype = pick_random_element(all_expression_generators)!;
       }
     }
-    if (left_expression_gen_prototype.name === "LiteralGenerator") {
+    left_expression_gen = new left_expression_gen_prototype(leftid);
+    if (left_expression_gen.generator_name === "LiteralGenerator") {
       if (cur_expression_complex_level >= config.expression_complex_level || Math.random() < config.terminal_prob) {
         right_expression_gen_prototype = IdentifierGenerator;
       }
@@ -1737,7 +1741,6 @@ class BinaryOpGenerator extends RValueGenerator {
     else if (ghostid !== undefined) {
       type_dag.solution_range_alignment(ghostid, rightid);
     }
-    left_expression_gen = new left_expression_gen_prototype(leftid);
     left_expression_gen.generate(cur_expression_complex_level + 1);
     if (this.this_dominates_left()) {
       type_dag.solution_range_alignment(this.id, leftid);
@@ -1975,7 +1978,9 @@ class ConditionalGenerator extends RValueGenerator {
         storage_location_dag.solution_range.get(extracted_e2.id)!
       );
       storage_location_dag.connect(this.id, extracted_e2.id);
-      storage_location_dag.connect(extracted_e2.id, extracted_e3.id, "sub_dominance");
+      storage_location_dag.solution_range_alignment(this.id, extracted_e2.id);
+      storage_location_dag.connect(this.id, extracted_e3.id, "sub_dominance");
+      storage_location_dag.solution_range_alignment(this.id, extracted_e3.id);
     }
     if (config.debug) {
       indent -= 2;
@@ -2036,14 +2041,6 @@ class FunctionCallGenerator extends RValueGenerator {
         type_dag.try_tighten_solution_range_middle_out(ret_decl_id, this.type_range)
     };
     type_dag.insert(this.id, this.type_range);
-    //! If cur_expression_complex_level reaches the maximum, generate an terminal expression
-    if (cur_expression_complex_level >= config.expression_complex_level || Math.random() < config.terminal_prob) {
-      const expression_gen_prototype = get_exprgenerator(this.type_range, true, cur_expression_complex_level);
-      const expression_gen = new expression_gen_prototype(this.id);
-      expression_gen.generate(cur_expression_complex_level);
-      this.irnode = expression_gen.irnode;
-      return;
-    }
     //! Find available function declarations
     let contractdecl_id_plus_funcdecl_id : [number, number][] = [];
     for (let contract_id of decl_db.contractdecls) {
@@ -2084,7 +2081,7 @@ class FunctionCallGenerator extends RValueGenerator {
     if (!this.contains_available_funcdecls(contractdecl_id_plus_funcdecl_id)) {
       let expression_gen_prototype = get_exprgenerator(this.type_range, true, cur_expression_complex_level);
       const expression_gen = new expression_gen_prototype(this.id);
-      expression_gen.generate(cur_expression_complex_level);
+      expression_gen.generate(cur_expression_complex_level + 1);
       this.irnode = expression_gen.irnode;
       return;
     }
@@ -2105,7 +2102,6 @@ class FunctionCallGenerator extends RValueGenerator {
     }
     if (contractdecl_id === cur_contract_id) {
       if ((irnodes.get(funcdecl_id)! as decl.IRFunctionDefinition).visibility === undefined) {
-
         vismut_dag.solution_range.set(funcdecl_id,
           [...intersection(new Set<VisMut>(nonpayable_func_vismut),
             new Set<VisMut>(vismut_dag.solution_range.get(funcdecl_id)!))]);
@@ -2160,7 +2156,8 @@ class FunctionCallGenerator extends RValueGenerator {
       const argid = global_id++;
       type_dag.insert(argid, type_range);
       let ghost_id;
-      if (arg_gen_prototype.name === "LiteralGenerator") {
+      const arg_gen = new arg_gen_prototype(argid);
+      if (arg_gen.generator_name === "LiteralGenerator") {
         ghost_id = global_id++;
         new IRGhost(ghost_id, cur_scope.id());
         type_dag.insert(ghost_id, type_range);
@@ -2170,7 +2167,6 @@ class FunctionCallGenerator extends RValueGenerator {
       else {
         type_dag.connect(argid, funcdecl.parameters[i].id, "super_dominance");
       }
-      const arg_gen = new arg_gen_prototype(argid);
       arg_gen.generate(cur_expression_complex_level + 1);
       let extracted_arg = expr.tuple_extraction(arg_gen.irnode! as expr.IRExpression);
       args_ids.push(extracted_arg.id);
@@ -2184,6 +2180,7 @@ class FunctionCallGenerator extends RValueGenerator {
         assert(storage_location_dag.solution_range.has(argid),
           `FunctionCallGenerator: storage_location_dag.solution_range has no argid ${argid}`);
         storage_location_dag.connect(argid, funcdecl.parameters[i].id, "super_dominance");
+        storage_location_dag.solution_range_alignment(argid, funcdecl.parameters[i].id);
       }
     }
     for (const arg_id of args_ids) {
@@ -2262,20 +2259,20 @@ class FunctionCallGenerator extends RValueGenerator {
       const assignment_node = new expr.IRAssignment(global_id++, cur_scope.id(), tuple_node, func_call_node, "=");
       //* 4. generate an assignment statement passing the returned values of the callee to the tuple
       const assignment_stmt_node = new stmt.IRExpressionStatement(global_id++, cur_scope.id(), assignment_node);
-      if (unexpected_extra_stmt_belong_to_the_parent_scope()) {
-        if (unexpected_extra_stmt.has(cur_scope.pre().id())) {
-          unexpected_extra_stmt.get(cur_scope.pre().id())!.push(assignment_stmt_node);
+      if (unexpected_pre_extra_stmt_belong_to_the_parent_scope()) {
+        if (unexpected_pre_extra_stmt.has(cur_scope.pre().id())) {
+          unexpected_pre_extra_stmt.get(cur_scope.pre().id())!.push(assignment_stmt_node);
         }
         else {
-          unexpected_extra_stmt.set(cur_scope.pre().id(), [assignment_stmt_node]);
+          unexpected_pre_extra_stmt.set(cur_scope.pre().id(), [assignment_stmt_node]);
         }
       }
       else {
-        if (unexpected_extra_stmt.has(cur_scope.id())) {
-          unexpected_extra_stmt.get(cur_scope.id())!.push(assignment_stmt_node);
+        if (unexpected_pre_extra_stmt.has(cur_scope.id())) {
+          unexpected_pre_extra_stmt.get(cur_scope.id())!.push(assignment_stmt_node);
         }
         else {
-          unexpected_extra_stmt.set(cur_scope.id(), [assignment_stmt_node]);
+          unexpected_pre_extra_stmt.set(cur_scope.id(), [assignment_stmt_node]);
         }
       }
     }
@@ -2327,6 +2324,7 @@ class FunctionCallGenerator extends RValueGenerator {
           storage_location_dag.solution_range.get(selected_ret_decl.id)!
         );
         storage_location_dag.connect(this.id, selected_ret_decl.id);
+        storage_location_dag.solution_range_alignment(this.id, selected_ret_decl.id);
       }
     }
     if (Math.random() < config.tuple_prob) {
@@ -2364,7 +2362,8 @@ class NewStructGenerator extends ExpressionGenerator {
       const argid = global_id++;
       type_dag.insert(argid, type_dag.solution_range.get(member.id)!);
       let ghost_id;
-      if (arg_gen_prototype.name === "LiteralGenerator") {
+      const arg_gen = new arg_gen_prototype(argid);
+      if (arg_gen.generator_name === "LiteralGenerator") {
         ghost_id = global_id++;
         new IRGhost(ghost_id, cur_scope.id());
         type_dag.insert(ghost_id, type_dag.solution_range.get(member.id)!);
@@ -2374,7 +2373,6 @@ class NewStructGenerator extends ExpressionGenerator {
       else {
         type_dag.connect(argid, member.id, "super_dominance");
       }
-      const arg_gen = new arg_gen_prototype(argid);
       arg_gen.generate(cur_expression_complex_level + 1);
       if (ghost_id === undefined) {
         type_dag.solution_range_alignment(argid, member.id);
@@ -2392,6 +2390,7 @@ class NewStructGenerator extends ExpressionGenerator {
         assert(storage_location_dag.solution_range.has(argid),
           `NewStructGenerator: storage_location_dag.solution_range has no argid ${argid}`);
         storage_location_dag.connect(argid, member.id, "super_dominance");
+        storage_location_dag.solution_range_alignment(argid, member.id);
       }
     }
     let identifier_name = struct_type.name;
@@ -2438,7 +2437,8 @@ class NewContractGenerator extends ExpressionGenerator {
       const argid = global_id++;
       type_dag.insert(argid, type_dag.solution_range.get(contract_decl.constructor_parameters[i].id)!);
       let ghost_id;
-      if (arg_gen_prototype.name === "LiteralGenerator") {
+      const arg_gen = new arg_gen_prototype(argid);
+      if (arg_gen.generator_name === "LiteralGenerator") {
         ghost_id = global_id++;
         new IRGhost(ghost_id, cur_scope.id());
         type_dag.insert(ghost_id, type_dag.solution_range.get(contract_decl.constructor_parameters[i].id)!);
@@ -2449,7 +2449,6 @@ class NewContractGenerator extends ExpressionGenerator {
         type_dag.connect(argid, contract_decl.constructor_parameters[i].id, "super_dominance");
       }
       type_dag.connect(argid, contract_decl.constructor_parameters[i].id);
-      const arg_gen = new arg_gen_prototype(argid);
       arg_gen.generate(cur_expression_complex_level + 1);
       if (ghost_id === undefined) {
         type_dag.solution_range_alignment(argid, contract_decl.constructor_parameters[i].id);
@@ -2467,6 +2466,7 @@ class NewContractGenerator extends ExpressionGenerator {
         assert(storage_location_dag.solution_range.has(argid),
           `NewContractGenerator: storage_location_dag.solution_range has no argid ${argid}`);
         storage_location_dag.connect(argid, contract_decl.constructor_parameters[i].id, "super_dominance");
+        storage_location_dag.solution_range_alignment(argid, contract_decl.constructor_parameters[i].id);
       }
     }
     const new_function_expr = new expr.IRFunctionCall(this.id, cur_scope.id(), FunctionCallKind.FunctionCall, new_expr, args);
@@ -2663,7 +2663,7 @@ class SingleVariableDeclareStatementGenerator extends NonExpressionStatementGene
     }
     if (this.expr === undefined) {
       let expression_gen_prototype;
-      if (has_available_IRVariableDeclarations() && Math.random() > config.literal_prob) {
+      if (has_available_IRVariableDeclarations() && Math.random() > config.terminal_prob) {
         expression_gen_prototype = pick_random_element(all_expression_generators)!;
       }
       else {
@@ -2716,7 +2716,7 @@ class MultipleVariableDeclareStatementGenerator extends NonExpressionStatementGe
     const ir_exps : expr.IRExpression[] = [];
     for (let i = 0; i < this.var_count; i++) {
       let expression_gen_prototype;
-      if (has_available_IRVariableDeclarations() && Math.random() > config.literal_prob) {
+      if (has_available_IRVariableDeclarations() && Math.random() > config.terminal_prob) {
         expression_gen_prototype = pick_random_element(all_expression_generators)!;
       }
       else {
@@ -2827,8 +2827,8 @@ class IfStatementGenerator extends NonExpressionStatementGenerator {
         pick_random_element(statement_generators)!;
       const then_stmt_gen = new then_stmt_gen_prototype();
       then_stmt_gen.generate(cur_stmt_complex_level + 1);
-      true_body = true_body.concat(unexpected_extra_stmt.has(cur_scope.id()) ? unexpected_extra_stmt.get(cur_scope.id())! : []);
-      unexpected_extra_stmt.delete(cur_scope.id());
+      true_body = true_body.concat(unexpected_pre_extra_stmt.has(cur_scope.id()) ? unexpected_pre_extra_stmt.get(cur_scope.id())! : []);
+      unexpected_pre_extra_stmt.delete(cur_scope.id());
       true_body.push(then_stmt_gen.irnode!);
       this.exprs = this.exprs.concat(
         then_stmt_gen instanceof ExpressionStatementGenerator ?
@@ -2859,8 +2859,8 @@ class IfStatementGenerator extends NonExpressionStatementGenerator {
         pick_random_element(statement_generators)!;
       const else_stmt_gen = new else_stmt_gen_prototype();
       else_stmt_gen.generate(cur_stmt_complex_level + 1);
-      false_body = false_body.concat(unexpected_extra_stmt.has(cur_scope.id()) ? unexpected_extra_stmt.get(cur_scope.id())! : []);
-      unexpected_extra_stmt.delete(cur_scope.id());
+      false_body = false_body.concat(unexpected_pre_extra_stmt.has(cur_scope.id()) ? unexpected_pre_extra_stmt.get(cur_scope.id())! : []);
+      unexpected_pre_extra_stmt.delete(cur_scope.id());
       false_body.push(else_stmt_gen.irnode!);
       this.exprs = this.exprs.concat(
         else_stmt_gen instanceof ExpressionStatementGenerator ?
@@ -2972,8 +2972,8 @@ class ForStatementGenerator extends NonExpressionStatementGenerator {
         pick_random_element(statement_generators)!;
       const body_stmt_gen = new body_stmt_gen_prototype();
       body_stmt_gen.generate(cur_stmt_complex_level + 1);
-      body = body.concat(unexpected_extra_stmt.has(cur_scope.id()) ? unexpected_extra_stmt.get(cur_scope.id())! : []);
-      unexpected_extra_stmt.delete(cur_scope.id());
+      body = body.concat(unexpected_pre_extra_stmt.has(cur_scope.id()) ? unexpected_pre_extra_stmt.get(cur_scope.id())! : []);
+      unexpected_pre_extra_stmt.delete(cur_scope.id());
       body.push(body_stmt_gen.irnode!);
       this.exprs = this.exprs.concat(
         body_stmt_gen instanceof ExpressionStatementGenerator ?
@@ -3041,8 +3041,8 @@ class WhileStatementGenerator extends NonExpressionStatementGenerator {
           [expr.tuple_extraction(body_stmt_gen.expr!)] :
           body_stmt_gen.exprs
       );
-      body = body.concat(unexpected_extra_stmt.has(cur_scope.id()) ? unexpected_extra_stmt.get(cur_scope.id())! : []);
-      unexpected_extra_stmt.delete(cur_scope.id());
+      body = body.concat(unexpected_pre_extra_stmt.has(cur_scope.id()) ? unexpected_pre_extra_stmt.get(cur_scope.id())! : []);
+      unexpected_pre_extra_stmt.delete(cur_scope.id());
       body.push(body_stmt_gen.irnode!);
     }
     if (config.debug) {
@@ -3103,8 +3103,8 @@ class DoWhileStatementGenerator extends NonExpressionStatementGenerator {
           [expr.tuple_extraction(body_stmt_gen.expr!)] :
           body_stmt_gen.exprs
       );
-      body = body.concat(unexpected_extra_stmt.has(cur_scope.id()) ? unexpected_extra_stmt.get(cur_scope.id())! : []);
-      unexpected_extra_stmt.delete(cur_scope.id());
+      body = body.concat(unexpected_pre_extra_stmt.has(cur_scope.id()) ? unexpected_pre_extra_stmt.get(cur_scope.id())! : []);
+      unexpected_pre_extra_stmt.delete(cur_scope.id());
       body.push(body_stmt_gen.irnode!);
     }
     if (config.debug) {
