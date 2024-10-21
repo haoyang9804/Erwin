@@ -1,3 +1,10 @@
+# Erwin
+
+<img src="Erwin.png" alt="erwin" width="100"/>
+
+
+## Detected Bugs
+
 1. https://github.com/ethereum/solidity/issues/14719 (medium impact, confirmed, fixed, type) ✅
 2. https://github.com/ethereum/solidity/issues/14720 (duplicate of 14719)
 3. https://github.com/ethereum/solidity/issues/15223 (confirmation, error handling) ✅
