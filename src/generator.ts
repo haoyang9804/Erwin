@@ -1177,8 +1177,13 @@ class ContractDeclarationGenerator extends DeclarationGenerator {
       decl_db.insert(fid, erwin_visibility.INCONTRACT_EXTERNAL, cur_scope.id());
       decl_db.ghost_funcdecls.add(fid);
       vismut_dag.insert(fid, [VisMutProvider.func_external_view()]);
-      new decl.IRFunctionDefinition(fid, cur_scope.id(), variable_decl.name, FunctionKind.Function,
-        false, false, [], [variable_decl], [], [], FunctionVisibility.External, FunctionStateMutability.View);
+      const type_range_of_vardecl = type_dag.solution_range.get(variable_decl.id)!;
+      const iscontractdecl = type_range_of_vardecl.every((t) => t.typeName === 'ContractType');
+      const iselementarydecl = type_range_of_vardecl.every((t) => t.typeName === 'ElementaryType');
+      if (iselementarydecl || iscontractdecl) {
+        new decl.IRFunctionDefinition(fid, cur_scope.id(), variable_decl.name, FunctionKind.Function,
+          false, false, [], [variable_decl], [], [], FunctionVisibility.External, FunctionStateMutability.View);
+      }
       if (config.debug) {
         indent -= 2;
         console.log(color.yellowBG(`${" ".repeat(indent)}${fid}: Getter function for state variable ${variable_decl.name}`));
