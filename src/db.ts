@@ -5,6 +5,8 @@ import { scopeKind } from './scope';
 import { FunctionVisibility, StateVariableVisibility } from 'solc-typed-ast';
 import { assert } from 'console';
 import { config } from './config';
+import { IRFunctionDefinition, IRStructDefinition } from './declare';
+import { irnodes } from './node';
 
 // Deprecated Database
 export class DeprecatedDB {
@@ -139,13 +141,11 @@ class DeclDB {
   public funcdecls : Set<number> = new Set<number>();
   public contractdecls : Set<number> = new Set<number>();
   public state_variables : Set<number> = new Set<number>();
-  // public structdecl_to_struct_instance : Map<number, number[]> = new Map<number, number[]>();
-  // public contractdecl_to_contract_instance : Map<number, number[]> = new Map<number, number[]>();
-  // ghost funcdecls are function decls playing the role of getter functions of member variables
-  public ghost_funcdecls : Set<number> = new Set<number>();
-  // vardecl_to_ghost_vardecls are used in collaboration with ghost funcdecls to avoid type resolution problems.
-  public ghost_vardecl_to_state_vardecl : Map<number, number> = new Map<number, number>();
+  public getter_funcdecls : Set<number> = new Set<number>();
   public called_function_decls_IDs : Set<number> = new Set<number>();
+  public getter_function_id_to_state_struct_instance_id : Map<number, number> = new Map<number, number>();
+  public getter_function_id_to_struct_decl_id : Map<number, number> = new Map<number, number>();
+  public state_struct_instance_id_to_getter_function_ids : Map<number, number[]> = new Map<number, number[]>();
   constructor() {
     this.scope_tree = new Tree();
     this.scope2irnodeinfo = new Map<number, irnodeInfo[]>();
@@ -155,6 +155,48 @@ class DeclDB {
     this.scope_tree = new Tree();
     this.scope2irnodeinfo = new Map<number, irnodeInfo[]>();
     this.contractdecl_id_to_scope = new Map<number, number>();
+  }
+
+  find_structdecl_by_name(name : string) : IRStructDefinition | undefined {
+    const struct_decl = Array.from(this.structdecls).find(x => (irnodes.get(x)! as IRStructDefinition).name === name);
+    return struct_decl === undefined ? undefined : irnodes.get(struct_decl)! as IRStructDefinition;
+  }
+
+  is_state_struct_instance(node_id : number) : boolean {
+    return this.state_struct_instance_id_to_getter_function_ids.has(node_id);
+  }
+
+  map_getter_function_to_state_struct_instance(funcdecl_id : number, state_struct_instance_id : number, struct_decl_id : number) : void {
+    this.getter_function_id_to_state_struct_instance_id.set(funcdecl_id, state_struct_instance_id);
+    if (this.state_struct_instance_id_to_getter_function_ids.has(state_struct_instance_id)) {
+      this.state_struct_instance_id_to_getter_function_ids.set(state_struct_instance_id,
+        this.state_struct_instance_id_to_getter_function_ids.get(state_struct_instance_id)!.concat(funcdecl_id));
+    }
+    else {
+      this.state_struct_instance_id_to_getter_function_ids.set(state_struct_instance_id, [funcdecl_id]);
+    }
+    this.getter_function_id_to_struct_decl_id.set(funcdecl_id, struct_decl_id);
+  }
+
+  is_getter_function(funcdecl_id : number) : boolean {
+    return this.getter_funcdecls.has(funcdecl_id);
+  }
+
+  is_getter_function_for_state_struct_instance(funcdecl_id : number) : boolean {
+    return this.getter_function_id_to_state_struct_instance_id.has(funcdecl_id);
+  }
+
+  remove_getter_function(funcdecl_id : number) : void {
+    this.getter_funcdecls.delete(funcdecl_id);
+    this.funcdecls.delete(funcdecl_id);
+    this.remove(funcdecl_id, (irnodes.get(funcdecl_id)! as IRFunctionDefinition).scope);
+    const state_struct_instance = this.getter_function_id_to_state_struct_instance_id.get(funcdecl_id);
+    this.getter_function_id_to_state_struct_instance_id.delete(funcdecl_id);
+    if (state_struct_instance !== undefined) {
+      const getter_functions = this.state_struct_instance_id_to_getter_function_ids.get(state_struct_instance)!;
+      this.state_struct_instance_id_to_getter_function_ids.set(state_struct_instance, getter_functions.filter(x => x !== funcdecl_id));
+    }
+    this.getter_function_id_to_struct_decl_id.delete(funcdecl_id);
   }
 
   new_scope(cur_scope_id : number, parent_scope_id : number) : void {
@@ -178,6 +220,15 @@ class DeclDB {
     }
     else {
       this.scope2irnodeinfo.set(scope_id, [{ id: node_id, vis: ervis }]);
+    }
+  }
+
+  remove(node_id : number, scope_id : number) : void {
+    if (this.scope2irnodeinfo.has(scope_id)) {
+      this.scope2irnodeinfo.set(scope_id, this.scope2irnodeinfo.get(scope_id)!.filter(x => x.id !== node_id));
+    }
+    else {
+      throw new Error(`The scope ${scope_id} does not exist.`);
     }
   }
 

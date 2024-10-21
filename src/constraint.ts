@@ -9,7 +9,7 @@ export class ConstaintNode {
     this.id = id;
   }
 }
-import { assert, shuffle } from "./utility";
+import { assert, intersection, shuffle } from "./utility";
 import { Type, TypeKind } from "./type"
 import * as dot from 'ts-graphviz';
 import { config } from './config'
@@ -93,10 +93,28 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     this.solution_range.set(node.id, range);
   }
 
+  remove(nodeid : number) : void {
+    if (config.debug) {
+      assert(this.dag_nodes.has(nodeid), `DominanceDAG: node ${nodeid} is not in the graph`);
+    }
+    this.solution_range.delete(nodeid);
+    for (const innode of this.dag_nodes.get(nodeid)!.ins) {
+      this.dag_nodes.get(innode)!.outs = this.dag_nodes.get(innode)!.outs.filter(t => t !== nodeid);
+      this.dag_nodes.get(innode)!.outbound--;
+    }
+    for (const outnode of this.dag_nodes.get(nodeid)!.outs) {
+      this.dag_nodes.get(outnode)!.ins = this.dag_nodes.get(outnode)!.ins.filter(t => t !== nodeid);
+      this.dag_nodes.get(outnode)!.inbound--;
+    }
+    this.dag_nodes.delete(nodeid);
+    this.sub_dominance = new Set([...this.sub_dominance].filter(t => !t.includes(`${nodeid}`)));
+    this.super_dominance = new Set([...this.super_dominance].filter(t => !t.includes(`${nodeid}`)));
+  }
+
   update(nodeid : number, range : Node[]) : void {
     assert(this.dag_nodes.has(nodeid), `DominanceDAG: node ${nodeid} is not in the graph`);
     assert(this.solution_range.has(nodeid), `DominanceDAG: node ${nodeid} is not in the solution_range`);
-    this.solution_range.set(nodeid, range);
+    this.solution_range.set(nodeid, [...intersection(new Set<Node>(this.solution_range.get(nodeid)), new Set<Node>(range))]);
   }
 
   connect(from : number, to : number, rank ?: string) : void {
@@ -117,6 +135,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     else if (rank === "super_dominance") {
       this.super_dominance.add(`${from} ${to}`);
     }
+    this.solution_range_alignment(from, to);
   }
 
   dominator_solution_range_should_be_shrinked(dominator_id : number, dominatee_id : number) : Node[] | undefined {
