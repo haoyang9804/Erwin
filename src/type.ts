@@ -43,8 +43,14 @@ export abstract class UserDefinedType extends Type {
   add_sub(subs : UserDefinedType) : void {
     this._subs.push(subs);
   }
+  remove_sub(subs : UserDefinedType) : void {
+    this._subs = this._subs.filter(x => x !== subs);
+  }
   add_super(supers : UserDefinedType) : void {
     this._supers.push(supers);
+  }
+  remove_super(supers : UserDefinedType) : void {
+    this._supers = this._supers.filter(x => x !== supers);
   }
   type_range() : UserDefinedType[] {
     return [...merge_set(new Set<UserDefinedType>(this._subs), new Set<UserDefinedType>(this._supers))];
@@ -773,6 +779,7 @@ export class MappingType extends Type {
   vType : Type;
   constructor(kType : Type, vType : Type) {
     super(TypeKind.MappingType);
+    assert(kType.kind !== TypeKind.StructType, `MappingType: key type cannot be struct`);
     this.kType = kType;
     this.vType = vType;
   }
@@ -783,29 +790,25 @@ export class MappingType extends Type {
     return new MappingType(this.kType.copy(), this.vType.copy());
   }
   same(t : Type) : boolean {
-    if (t.kind !== TypeKind.MappingType) return false;
-    if ((t as MappingType).kType.same(this.kType) && (t as MappingType).vType.same(this.vType)) {
-      return true;
-    }
-    return false;
+    throw new Error("MappingType::same() is disallowed.");
   }
   subs() : Type[] {
-    return [this.copy()];
+    throw new Error("MappingType::subs() is disallowed.");
   }
   sub_with_lowerbound(lower_bound : Type) : Type[] {
-    return this.subs().filter(x => x.issuperof(lower_bound));
+    throw new Error("MappingType::sub_with_lowerbound() is disallowed.");
   }
   supers() : Type[] {
-    return [this.copy()];
+    throw new Error("MappingType::supers() is disallowed.");
   }
   super_with_upperbound(upper_bound : Type) : Type[] {
-    return this.supers().filter(x => x.issubof(upper_bound));
+    throw new Error("MappingType::super_with_upperbound() is disallowed.");
   }
   issubof(t : Type) : boolean {
-    return this.same(t);
+    throw new Error("MappingType::issubof() is disallowed.");
   }
   issuperof(t : Type) : boolean {
-    return this.same(t);
+    throw new Error("MappingType::issuperof() is disallowed.");
   }
 }
 

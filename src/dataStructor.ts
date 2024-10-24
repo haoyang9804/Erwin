@@ -135,10 +135,11 @@ export class LinkedListNode<T> {
   set_pre(pre : LinkedListNode<T> | undefined) : void {
     this.m_pre = pre;
   }
+  update(value : T) : void {
+    this.m_value = value;
+  }
   value() : T {
-    if (config.debug) {
-      assert(this.m_value !== undefined, "The value must be set.");
-    }
+    assert(this.m_value !== undefined, "The value must be set.");
     return this.m_value!;
   }
 }
