@@ -212,3 +212,10 @@ test("test memory",
   expect(writer.write(variable_node)).toBe("uint256 x");
 }
 )
+
+test("test mapping type",
+() => {
+  const mapping_type = factory.makeMapping("", factory.makeElementaryTypeName("??", "uint256"), factory.makeElementaryTypeName("??", "uint256"));
+  expect(writer.write(mapping_type)).toBe("mapping(uint256 => uint256)");
+}
+)

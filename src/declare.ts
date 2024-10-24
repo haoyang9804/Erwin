@@ -9,11 +9,11 @@ import {
   FunctionVisibility,
   FunctionStateMutability,
   ModifierInvocation,
-  ContractKind
-} from "solc-typed-ast"
+  ContractKind,
+} from "solc-typed-ast";
 
 import { assert } from "./utility";
-import { TypeKind, Type, ElementaryType, UnionType, FunctionType, ContractType, StructType } from "./type";
+import { TypeKind, Type, ElementaryType, UnionType, FunctionType, ContractType, StructType, MappingType } from "./type";
 import { IRNode, factory } from "./node";
 import { IRStatement, IRPlaceholderStatement } from "./statement";
 import { IRExpression } from "./expression";
@@ -58,23 +58,42 @@ export class IRVariableDeclaration extends IRDeclare {
       this.indexed = indexed;
     }
   }
+
+  lower_type(type : Type) : TypeName {
+    if (type.kind === TypeKind.ElementaryType) {
+      const type = this.type as ElementaryType;
+      return factory.makeElementaryTypeName(type.str(), type.str());
+    }
+    if (type.kind === TypeKind.ContractType) {
+      const type = this.type as ContractType;
+      return factory.makeElementaryTypeName(type.name, type.name);
+    }
+    if (type.kind === TypeKind.StructType) {
+      const type = this.type as StructType;
+      return factory.makeUserDefinedTypeName((type as StructType).type_str, type.name,
+        type.referece_id, factory.makeIdentifierPath(type.name, type.referece_id));
+    }
+    if (type.kind === TypeKind.MappingType) {
+      const type = this.type as MappingType;
+      return factory.makeElementaryTypeName(type.str(), type.str());
+    }
+    else {
+      throw new Error(`IRVariableDeclaration: type ${type.kind} is not supported`);
+    }
+  }
+
   lower() : ASTNode {
-    let typename : TypeName | undefined = undefined;
+    let typename : TypeName;
     if (this.type !== undefined) {
-      if (this.type.kind === TypeKind.ElementaryType) {
-        const type = this.type as ElementaryType;
-        typename = factory.makeElementaryTypeName(type.str(), type.str());
-        this.loc = DataLocation.Default;
-      }
-      else if (this.type.kind === TypeKind.ContractType) {
-        const type = this.type as ContractType;
-        typename = factory.makeElementaryTypeName(type.name, type.name);
-        this.loc = DataLocation.Default;
+      typename = this.lower_type(this.type);
+      if (this.type.kind === TypeKind.MappingType
+        || this.type.kind === TypeKind.ContractType
+        || this.type.kind === TypeKind.ElementaryType
+      ) {
+        if (this.loc === undefined)
+          this.loc = DataLocation.Default;
       }
       else if (this.type.kind === TypeKind.StructType) {
-        const type = this.type as StructType;
-        typename = factory.makeUserDefinedTypeName((type as StructType).type_str, type.name,
-          type.referece_id, factory.makeIdentifierPath(type.name, type.referece_id));
       }
       else {
         throw new Error(`IRVariableDeclaration: type ${this.type.kind} is not supported`);
@@ -83,10 +102,12 @@ export class IRVariableDeclaration extends IRDeclare {
     else {
       assert(this.typestr !== undefined, `IRVariableDeclaration: ${this.id} typestr is not generated`)
       typename = factory.makeElementaryTypeName("", this.typestr);
-      this.loc = DataLocation.Default;
+      if (this.loc === undefined)
+        this.loc = DataLocation.Default;
     }
     assert(this.loc !== undefined, `IRVariableDeclaration: ${this.id} loc is not generated`);
-    assert(typename !== undefined, `IRVariableDeclaration ${this.id}: typename is not generated`)
+    assert(typename !== undefined, `IRVariableDeclaration ${this.id}: typename is not generated`);
+
     return factory.makeVariableDeclaration(this.constant, this.indexed, this.name, this.scope, this.state, this.loc,
       this.visibility, this.mutable, "", undefined, typename, undefined, this.value?.lower());
   }

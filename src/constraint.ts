@@ -9,7 +9,7 @@ export class ConstaintNode {
     this.id = id;
   }
 }
-import { assert, intersection, shuffle } from "./utility";
+import { assert, intersection, merge_set } from "./utility";
 import { Type, TypeKind } from "./type"
 import * as dot from 'ts-graphviz';
 import { config } from './config'
@@ -22,6 +22,7 @@ import { FuncStat } from "./funcstat";
 import { FuncVis, VarVis } from "./visibility";
 import { StorageLocation } from "./memory";
 import { VisMut, VisMutKind } from "./vismut";
+import { LinkedListNode } from "./dataStructor";
 
 interface toLeaf {
   leaf_id : number;
@@ -589,8 +590,8 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   }
 
   allocate_solutions_for_leaves_in_stream() : Generator<Map<number, Node>> {
-    for (let leaf of this.leaves) this.solution_range.set(leaf, shuffle(this.solution_range.get(leaf)!));
-    const leave_array = shuffle(Array.from(this.leaves));
+    for (let leaf of this.leaves) this.solution_range.set(leaf, this.solution_range.get(leaf)!);
+    const leave_array = Array.from(this.leaves);
     const solution_range_copy = this.solution_range;
 
     let check_leaf_solution = (leavf_solution : Map<number, Node>) : boolean => {
@@ -625,6 +626,115 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       return true;
     }
 
+    class SolutionRangeList extends LinkedListNode<Node[]> {
+      new(range : Node[]) : SolutionRangeList {
+        this.m_next = new SolutionRangeList(range);
+        this.m_next.set_pre(this);
+        return this.m_next as SolutionRangeList;
+      }
+      rollback() : SolutionRangeList {
+        assert(this.m_pre !== undefined, "The previous node must exist.");
+        this.m_pre!.set_next(undefined);
+        return this.m_pre! as SolutionRangeList;
+      }
+    }
+
+    const narrowed_solution_range : Map<number, SolutionRangeList> = new Map<number, SolutionRangeList>();
+
+    let narrow_solution_range_for_leaves_behind = (id : number, solution : Node) : boolean => {
+      for (let j = id + 1; j < leave_array.length; j++) {
+        if (this.leavessub.has(`${leave_array[j]} ${leave_array[id]}`)) {
+          if (!narrowed_solution_range.has(leave_array[j])) {
+            narrowed_solution_range.set(leave_array[j], new SolutionRangeList(solution.supers() as Node[]));
+          }
+          else {
+            let leave_solution_range_node = narrowed_solution_range.get(leave_array[j])!;
+            const leave_solution_range = leave_solution_range_node.value().filter(
+              t => solution.supers()!.includes(t)
+            );
+            leave_solution_range_node = leave_solution_range_node.new(leave_solution_range);
+            narrowed_solution_range.set(leave_array[j], leave_solution_range_node);
+          }
+        }
+        else if (this.leavessub.has(`${leave_array[id]} ${leave_array[j]}`)) {
+          if (!narrowed_solution_range.has(leave_array[j])) {
+            narrowed_solution_range.set(leave_array[j], new SolutionRangeList(solution.subs() as Node[]));
+          }
+          else {
+            let leave_solution_range_node = narrowed_solution_range.get(leave_array[j])!;
+            const leave_solution_range = leave_solution_range_node.value().filter(
+              t => solution.subs()!.includes(t)
+            );
+            leave_solution_range_node = leave_solution_range_node.new(leave_solution_range);
+            narrowed_solution_range.set(leave_array[j], leave_solution_range_node);
+          }
+        }
+        else if (this.leavesequal.has(`${leave_array[j]} ${leave_array[id]}`)
+          || this.leavesequal.has(`${leave_array[id]} ${leave_array[j]}`)) {
+          if (!narrowed_solution_range.has(leave_array[j])) {
+            narrowed_solution_range.set(leave_array[j], new SolutionRangeList([solution] as Node[]));
+          }
+          else {
+            let leave_solution_range_node = narrowed_solution_range.get(leave_array[j])!;
+            const leave_solution_range = leave_solution_range_node.value().filter(
+              t => solution.same(t)
+            );
+            leave_solution_range_node = leave_solution_range_node.new(leave_solution_range);
+            narrowed_solution_range.set(leave_array[j], leave_solution_range_node);
+          }
+        }
+        else if (this.leavesnotsure.has(`${leave_array[j]} ${leave_array[id]}`)
+          || this.leavesnotsure.has(`${leave_array[id]} ${leave_array[j]}`)) {
+          if (!narrowed_solution_range.has(leave_array[j])) {
+            narrowed_solution_range.set(leave_array[j], new SolutionRangeList([...merge_set(
+              new Set<Node>(solution.supers() as Node[]), new Set<Node>(solution.subs() as Node[]))]));
+          }
+          else {
+            let leave_solution_range_node = narrowed_solution_range.get(leave_array[j])!;
+            const leave_solution_range = leave_solution_range_node.value().filter(
+              t => merge_set(
+                new Set<Node>(solution.supers() as Node[]), new Set<Node>(solution.subs() as Node[])
+              ).has(t)
+            );
+            leave_solution_range_node = leave_solution_range_node.new(leave_solution_range);
+            narrowed_solution_range.set(leave_array[j], leave_solution_range_node);
+          }
+        }
+        if (narrowed_solution_range.has(leave_array[j])) {
+          const leave_solution_range_node = narrowed_solution_range.get(leave_array[j])!;
+          let leave_solution_range = leave_solution_range_node.value();
+          leave_solution_range = leave_solution_range.filter(t => solution_range_copy.get(leave_array[j])!.includes(t));
+          narrowed_solution_range.get(leave_array[j])!.update(leave_solution_range);
+          if (narrowed_solution_range.get(leave_array[j])!.value().length === 0) {
+            return false;
+          }
+        }
+      }
+      return true;
+    }
+
+    let clear_narrowed_solution_for_leaves_behind = (id : number) : void => {
+      for (let j = id + 1; j < leave_array.length; j++) {
+        if (this.leavesequal.has(`${leave_array[j]} ${leave_array[id]}`)
+          || this.leavesequal.has(`${leave_array[id]} ${leave_array[j]}`)
+          || this.leavessub.has(`${leave_array[j]} ${leave_array[id]}`)
+          || this.leavessub.has(`${leave_array[id]} ${leave_array[j]}`)
+          || this.leavesnotsure.has(`${leave_array[j]} ${leave_array[id]}`)
+          || this.leavesnotsure.has(`${leave_array[id]} ${leave_array[j]}`)) {
+          assert(narrowed_solution_range.has(leave_array[j]),
+            `allocate_solutions_for_leaves_in_stream: narrowed_solution_range_for_id of ${leave_array[j]} is empty given ${leave_array[id]}`);
+          let leave_solution_range_node = narrowed_solution_range.get(leave_array[j])!;
+          if (leave_solution_range_node.pre() != null) {
+            leave_solution_range_node = leave_solution_range_node.rollback();
+            narrowed_solution_range.set(leave_array[j], leave_solution_range_node);
+          }
+          else {
+            narrowed_solution_range.delete(leave_array[j]);
+          }
+        }
+      }
+    }
+
     function* dfs(id : number, leaf_resolution : Map<number, Node>) : Generator<Map<number, Node>> {
       if (id === leave_array.length) {
         if (check_leaf_solution(leaf_resolution)) {
@@ -633,13 +743,25 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         }
       }
       else {
-        for (let solution of solution_range_copy.get(leave_array[id])!) {
+        let solution_range_for_id = solution_range_copy.get(leave_array[id])!;
+        if (narrowed_solution_range.has(leave_array[id])) {
+          solution_range_for_id = narrowed_solution_range.get(leave_array[id])!.value();
+          assert(solution_range_for_id.length > 0,
+            `allocate_solutions_for_leaves_in_stream: narrowed_solution_range_for_id of ${id} is empty`);
+        }
+        for (let solution of solution_range_for_id) {
           leaf_resolution.set(leave_array[id], solution);
           if (!check_leaf_solution(leaf_resolution)) {
             leaf_resolution.delete(leave_array[id]);
             continue;
           }
+          if (!narrow_solution_range_for_leaves_behind(id, solution)) {
+            clear_narrowed_solution_for_leaves_behind(id);
+            continue;
+          }
+          console.log(`id is ${id}: ${leave_array[id]}, leave_array.length is ${leave_array.length}, solution is ${solution}`);
           yield* dfs(id + 1, leaf_resolution);
+          clear_narrowed_solution_for_leaves_behind(id);
           leaf_resolution.delete(leave_array[id]);
         }
       }
@@ -776,12 +898,17 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     // If there are multiple paths from node to leaf, then the sub_dominance does not hold as long as there exists a path on which sub_dominance domination does not hold.
     // leaf_ids are not in this.node2leaf
     this.dfs4node2leaf();
-    // !Map edges to their reachable this.leaves
-    this.dfs4edge2leaf();
+    if (config.debug || config.unit_test_mode) {
+      for (let [id, leaf_infos] of this.node2leaf) {
+        for (const leaf_info of leaf_infos) {
+          console.log(`node ${id} dominates leaf ${leaf_info.leaf_id}: sub_dominance: ${leaf_info.sub_dominance}, super_dominance: ${leaf_info.super_dominance}, subsuper_dominance: ${leaf_info.subsuper_dominance}, equal_dominance: ${leaf_info.equal_dominance}`);
+        }
+      }
+    }
     this.build_leaves_relation();
     if (config.debug || config.unit_test_mode) {
       console.log(color.green("> leavessub:"));
-      for (const edge of this.leavesequal) {
+      for (const edge of this.leavessub) {
         console.log(edge);
       }
       console.log(color.green("> leavesequal:"));
@@ -894,11 +1021,11 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       if (visited.has(node)) {
         if (pre_gnode !== undefined) {
           if (super_dominance) {
-            const edge = new dot.Edge([pre_gnode, visited.get(node)!], { [dot.attribute.label]: "subd" });
+            const edge = new dot.Edge([pre_gnode, visited.get(node)!], { [dot.attribute.label]: "superd" });
             G.addEdge(edge);
           }
           else if (sub_dominance) {
-            const edge = new dot.Edge([pre_gnode, visited.get(node)!], { [dot.attribute.label]: 'superd' });
+            const edge = new dot.Edge([pre_gnode, visited.get(node)!], { [dot.attribute.label]: 'subd' });
             G.addEdge(edge);
           }
           else {

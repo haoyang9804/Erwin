@@ -87,6 +87,7 @@ export function decide_function_visibility(kind : scopeKind, vis : FunctionVisib
     case scopeKind.CONSTRUCTOR:
     case scopeKind.STRUCT:
     case scopeKind.FUNC_PARAMETER:
+    case scopeKind.MAPPING:
       return erwin_visibility.NAV;
     default:
       throw new Error(`Unsupported scopeKind: ${kind}`);
@@ -119,6 +120,7 @@ export function decide_variable_visibility(kind : scopeKind, vis : StateVariable
     case scopeKind.CONSTRUCTOR:
     case scopeKind.STRUCT:
     case scopeKind.FUNC_PARAMETER:
+    case scopeKind.MAPPING:
       return erwin_visibility.NAV;
     default:
       throw new Error(`Unsupported scopeKind: ${kind}`);
@@ -142,9 +144,13 @@ class DeclDB {
   public contractdecls : Set<number> = new Set<number>();
   public state_variables : Set<number> = new Set<number>();
   public getter_funcdecls : Set<number> = new Set<number>();
-  public called_function_decls_IDs : Set<number> = new Set<number>();
+  public mapping_decl_id : Set<number> = new Set<number>();
+  public mapping_decl_id_to_kv_ids : Map<number, [number, number]> = new Map<number, [number, number]>();
+  public value_id_to_mapping_decl_id : Map<number, number> = new Map<number, number>();
+  public called_function_decls_ids : Set<number> = new Set<number>();
   public getter_function_id_to_state_struct_instance_id : Map<number, number> = new Map<number, number>();
   public getter_function_id_to_struct_decl_id : Map<number, number> = new Map<number, number>();
+  public getter_function_id_for_mapping : Set<number> = new Set<number>();
   public state_struct_instance_id_to_getter_function_ids : Map<number, number[]> = new Map<number, number[]>();
   constructor() {
     this.scope_tree = new Tree();
@@ -184,6 +190,29 @@ class DeclDB {
 
   is_getter_function_for_state_struct_instance(funcdecl_id : number) : boolean {
     return this.getter_function_id_to_state_struct_instance_id.has(funcdecl_id);
+  }
+
+  add_mapping_decl(mapping_decl_id : number, key_id : number, value_id : number) : void {
+    this.mapping_decl_id.add(mapping_decl_id);
+    this.mapping_decl_id_to_kv_ids.set(mapping_decl_id, [key_id, value_id]);
+    this.value_id_to_mapping_decl_id.set(value_id, mapping_decl_id);
+  }
+
+  is_mapping_decl(mapping_decl_id : number) : boolean {
+    return this.mapping_decl_id.has(mapping_decl_id);
+  }
+
+  kv_idpair_of_mapping_decl(mapping_decl_id : number) : [number, number] {
+    assert(this.mapping_decl_id_to_kv_ids.has(mapping_decl_id), `The mapping declaration ${mapping_decl_id} does not exist.`);
+    return this.mapping_decl_id_to_kv_ids.get(mapping_decl_id)!;
+  }
+
+  key_id_of_mapping_decl(mapping_decl_id : number) : number {
+    return this.kv_idpair_of_mapping_decl(mapping_decl_id)[0];
+  }
+
+  value_id_of_mapping_decl(mapping_decl_id : number) : number {
+    return this.kv_idpair_of_mapping_decl(mapping_decl_id)[1];
   }
 
   remove_getter_function(funcdecl_id : number) : void {

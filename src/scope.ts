@@ -1,6 +1,5 @@
 import { LinkedListNode } from "./dataStructor";
 import { decl_db } from "./db";
-import { config } from './config'
 import { assert } from './utility'
 
 export enum scopeKind {
@@ -18,6 +17,7 @@ export enum scopeKind {
   DOWHILE_BODY = "scopeKind::DOWHILE_BODY",
   DOWHILE_COND = "scopeKind::DOWHILE_COND",
   STRUCT = "scopeKind::STRUCT",
+  MAPPING = "scopeKind::MAPPING",
 }
 
 type scopeT = {
@@ -52,9 +52,7 @@ export class ScopeList extends LinkedListNode<scopeT> {
 
   // Roll back to the previous scope
   rollback() : ScopeList {
-    if (config.debug) {
-      assert(this.m_pre !== undefined, "The previous node must exist.");
-    }
+    assert(this.m_pre !== undefined, "The previous node must exist.");
     this.m_pre!.set_next(undefined);
     return this.m_pre! as ScopeList;
   }

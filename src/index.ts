@@ -8,7 +8,8 @@ import * as mut from "./mutators";
 import { config } from "./config";
 import * as fs from "fs";
 import { assert, pick_random_element } from "./utility";
-import { initType } from './type';
+import { initType, MappingType } from './type';
+import { decl_db } from './db';
 import {
   PrettyFormatter,
   ASTWriter,
@@ -90,6 +91,7 @@ program
   .option("--constructor_prob <float>", "The probability of generating a constructor.", `${config.constructor_prob}`)
   .option("--return_prob <float>", "The probability of generating a return statement.", `${config.return_prob}`)
   .option("--reuse_name_prob <float>", "The probability of reusing a name.", `${config.reuse_name_prob}`)
+  .option("--mapping_prob <float>", "The probability of generating a mapping.", `${config.mapping_prob}`)
   // Structured Statements
   .option("--for_init_cnt_upper_limit <number>", "The upper limit of the number of initialization in a for loop.", `${config.for_init_cnt_upper_limit}`)
   .option("--for_init_cnt_lower_limit <number>", "The lower limit of the number of initialization in a for loop.", `${config.for_init_cnt_lower_limit}`)
@@ -142,6 +144,7 @@ else if (program.args[0] === "generate") {
   config.constructor_prob = parseFloat(program.commands[1].opts().constructor_prob);
   config.return_prob = parseFloat(program.commands[1].opts().return_prob);
   config.reuse_name_prob = parseFloat(program.commands[1].opts().reuse_name_prob);
+  config.mapping_prob = parseFloat(program.commands[1].opts().mapping_prob);
   config.for_init_cnt_upper_limit = parseInt(program.commands[1].opts().for_init_cnt_upper_limit);
   config.for_init_cnt_lower_limit = parseInt(program.commands[1].opts().for_init_cnt_lower_limit);
   config.statement_complex_level = parseInt(program.commands[1].opts().statement_complex_level);
@@ -188,6 +191,7 @@ else if (program.args[0] === "generate") {
   assert(config.new_prob >= 0 && config.new_prob <= 1.0, "The probability of generating a variable declaration in place must be in the range [0,1].");
   assert(config.else_prob >= 0.0 && config.else_prob <= 1.0, "The probability of generating an else statement must be in the range [0,1].");
   assert(config.terminal_prob >= 0.0 && config.terminal_prob <= 1.0, "The probability of generating a terminal statement must be in the range [0,1].");
+  assert(config.mapping_prob >= 0.0 && config.mapping_prob <= 1.0, "The probability of generating a mapping must be in the range [0,1].");
   assert(config.return_count_of_function_lowerlimit <= config.return_count_of_function_upperlimit, "The lower limit of the number of return values of a function must be less than or equal to the upper limit.");
   assert(config.param_count_of_function_lowerlimit <= config.param_count_of_function_upperlimit, "The lower limit of the number of parameters of a function must be less than or equal to the upper limit.");
   assert(config.state_variable_count_lowerlimit <= config.state_variable_count_upperlimit, "state_variable_count_lowerlimit must be less than or equal to state_variable_count_upperlimit.");
@@ -323,7 +327,8 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
     if (irnodes.get(key)!.typeName !== "IRVariableDeclaration") {
       continue;
     }
-    (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
+    if ((irnodes.get(key)! as decl.IRVariableDeclaration).loc === undefined)
+      (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
   }
   //! Traverse type solutions
   let cnt = 0;
@@ -332,6 +337,11 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
     for (let [key, value] of type_solutions) {
       if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
         (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
+    }
+    for (const mapping_decl_id of decl_db.mapping_decl_id) {
+      const [key_id, value_id] = decl_db.kv_idpair_of_mapping_decl(mapping_decl_id);
+      (irnodes.get(mapping_decl_id) as decl.IRVariableDeclaration).type =
+        new MappingType(type_solutions.get(key_id)!, type_solutions.get(value_id)!);
     }
     const program = writer.write(source_unit_gen.irnode!.lower());
     if (program === pre_program) continue;
@@ -360,13 +370,19 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
     if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
       (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
   }
+  for (const mapping_decl_id of decl_db.mapping_decl_id) {
+    const [key_id, value_id] = decl_db.kv_idpair_of_mapping_decl(mapping_decl_id);
+    (irnodes.get(mapping_decl_id) as decl.IRVariableDeclaration).type =
+      new MappingType(type_solutions.get(key_id)!, type_solutions.get(value_id)!);
+  }
   //! Select storage location solution
   const storage_location_solutions = pick_random_element(gen.storage_location_dag.solutions_collection)!;
   for (let [key, value] of storage_location_solutions) {
     if (irnodes.get(key)!.typeName !== "IRVariableDeclaration") {
       continue;
     }
-    (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
+    if ((irnodes.get(key)! as decl.IRVariableDeclaration).loc === undefined)
+      (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
   }
   //! Traverse vismut solutions
   let cnt = 0;
@@ -405,9 +421,14 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
   console.log(`${gen.storage_location_dag.solutions_collection.length} storage location solutions`);
   //! Select one type solution
   const type_solutions = pick_random_element(gen.type_dag.solutions_collection)!;
-  for (let [key, value] of type_solutions) {
+  for (const [key, value] of type_solutions) {
     if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
       (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
+  }
+  for (const mapping_decl_id of decl_db.mapping_decl_id) {
+    const [key_id, value_id] = decl_db.kv_idpair_of_mapping_decl(mapping_decl_id);
+    (irnodes.get(mapping_decl_id) as decl.IRVariableDeclaration).type =
+      new MappingType(type_solutions.get(key_id)!, type_solutions.get(value_id)!);
   }
   //! Select one vismut solution
   const vismut_solutions = pick_random_element(gen.vismut_dag.solutions_collection)!;
@@ -429,7 +450,8 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
   for (let storage_location_solutions of gen.storage_location_dag.solutions_collection) {
     for (let [key, value] of storage_location_solutions) {
       if (irnodes.get(key)!.typeName !== "IRVariableDeclaration") continue;
-      (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
+      if ((irnodes.get(key)! as decl.IRVariableDeclaration).loc === undefined)
+        (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
     }
     let program = writer.write(source_unit_gen.irnode!.lower());
     if (program === pre_program) continue;

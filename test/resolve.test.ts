@@ -359,3 +359,23 @@ test("test check_property 2",
     }).rejects.toThrow("DominanceDAG: node 2 has more than one inbound edge");
   }
 )
+
+test("test node2leaf 1",
+  async () => {
+    const type_dag = new TypeDominanceDAG();
+    type_dag.insert(1, uinteger_types);
+    type_dag.insert(2, uinteger_types);
+    type_dag.insert(3, uinteger_types);
+    type_dag.connect(1, 2, "sub_dominance");
+    type_dag.connect(1, 3);
+    type_dag.connect(2, 3);
+    type_dag.initialize_resolve();
+    type_dag.get_roots_and_leaves(false);
+    type_dag.dfs4node2leaf();
+    for (let [id, leaf_infos] of type_dag.node2leaf) {
+      for (const leaf_info of leaf_infos) {
+        console.log(`node ${id} dominates leaf ${leaf_info.leaf_id}: sub_dominance: ${leaf_info.sub_dominance}, super_dominance: ${leaf_info.super_dominance}, subsuper_dominance: ${leaf_info.subsuper_dominance}, equal_dominance: ${leaf_info.equal_dominance}`);
+      }
+    }
+  }
+)
