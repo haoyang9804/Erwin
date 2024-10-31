@@ -14,5 +14,5 @@
 7. https://github.com/ethereum/solidity/issues/15469 (wait for confirmation)
 8. https://github.com/ethereum/solidity/issues/15483 (not a bug, but a workaround)
 9. https://github.com/ethereum/solidity/issues/15525 (documentation error, workaround) ✅
-10. https://github.com/ethereum/solidity/issues/15483 (documentation error, wait for confirmation)
+10. https://github.com/ethereum/solidity/issues/15483 (documentation error, wait for confirmation) ✅
 

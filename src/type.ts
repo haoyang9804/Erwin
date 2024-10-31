@@ -4,31 +4,51 @@ import { DominanceNode } from "./dominance";
 import { config } from './config';
 
 export enum TypeKind {
-  ElementaryType = "TypeKind::ElementaryType", // uint256, address, boolean,
-  FunctionType = "TypeKind::FunctionType", // function (uint256) pure external returns (uint256)
-  ArrayType = "TypeKind::ArrayType", // uint256[2], address[2], boolean[2]
-  MappingType = "TypeKind::MappingType", // mapping(uint256 => address), mapping(uint256 => boolean)
+  ElementaryType = "TypeKind::ElementaryType",
+  FunctionType = "TypeKind::FunctionType",
+  ArrayType = "TypeKind::ArrayType",
+  MappingType = "TypeKind::MappingType",
   UnionType = "TypeKind::UnionType",
-  EventType = "TypeKind::EventType",
   StructType = "TypeKind::StructType",
   ContractType = "TypeKind::ContractType",
-  ErrorType = "TypeKind::ErrorType",
   StringType = "TypeKind::StringType",
-}
-
-export function upperType(t1 : Type, t2 : Type) {
-  assert(t1.kind === t2.kind, `upperType: t1.kind !== t2.kind`);
-  assert(t1.issubof(t2) || t2.issubof(t1), `upperType: t1 is not subof t2 and t2 is not subof t1`);
-  return t1.issubof(t2) ? t2 : t1;
-}
-
-export function lowerType(t1 : Type, t2 : Type) {
-  assert(t1.kind === t2.kind, `upperType: t1.kind !== t2.kind`);
-  assert(t1.issubof(t2) || t2.issubof(t1), `upperType: t1 is not subof t2 and t2 is not subof t1`);
-  return t1.issuperof(t2) ? t2 : t1;
+  PlaceholderType = "TypeKind::PlaceholderType"
 }
 
 export abstract class Type extends DominanceNode<TypeKind> { }
+
+export class PlaceholderType extends Type {
+  constructor() {
+    super(TypeKind.ElementaryType);
+  }
+  str() : string {
+    return "_";
+  }
+  copy() : Type {
+    throw new Error("PlaceholderType::copy() not implemented.");
+  }
+  subs() : Type[] {
+    throw new Error("PlaceholderType::subs() not implemented.");
+  }
+  sub_with_lowerbound(lower_bound : Type) : Type[] {
+    throw new Error("PlaceholderType::sub_with_lowerbound() not implemented.");
+  }
+  supers() : Type[] {
+    throw new Error("PlaceholderType::supers() not implemented.");
+  }
+  super_with_upperbound(upper_bound : Type) : Type[] {
+    throw new Error("PlaceholderType::super_with_upperbound() not implemented.");
+  }
+  same(t : Type) : boolean {
+    throw new Error("PlaceholderType::same() not implemented.");
+  }
+  issubof(t : Type) : boolean {
+    throw new Error("PlaceholderType::issubof() not implemented.");
+  }
+  issuperof(t : Type) : boolean {
+    throw new Error("PlaceholderType::issuperof() not implemented.");
+  }
+}
 
 export abstract class UserDefinedType extends Type {
   _subs : UserDefinedType[] = [];
@@ -54,76 +74,6 @@ export abstract class UserDefinedType extends Type {
   }
   type_range() : UserDefinedType[] {
     return [...merge_set(new Set<UserDefinedType>(this._subs), new Set<UserDefinedType>(this._supers))];
-  }
-}
-
-export class EventType extends Type {
-  name : string;
-  constructor(name : string) {
-    super(TypeKind.EventType);
-    this.name = name;
-  }
-  str() : string {
-    return "event";
-  }
-  subs() : Type[] {
-    throw new Error("No sub_dominance for EventType");
-  }
-  sub_with_lowerbound(lower_bound : Type) : Type[] {
-    throw new Error("No sub_dominance for EventType");
-  }
-  supers() : Type[] {
-    throw new Error("No super_dominance for EventType");
-  }
-  super_with_upperbound(upper_bound : Type) : Type[] {
-    throw new Error("No super_dominance for EventType");
-  }
-  copy() : Type {
-    return new EventType(this.name);
-  }
-  same(t : Type) : boolean {
-    return t.kind === TypeKind.EventType;
-  }
-  issubof(t : Type) : boolean {
-    return this.same(t);
-  }
-  issuperof(t : Type) : boolean {
-    return this.same(t);
-  }
-}
-
-export class ErrorType extends Type {
-  name : string;
-  constructor(name : string) {
-    super(TypeKind.ErrorType);
-    this.name = name;
-  }
-  str() : string {
-    return "error";
-  }
-  subs() : Type[] {
-    throw new Error("No sub_dominance for ErrorType");
-  }
-  sub_with_lowerbound(lower_bound : Type) : Type[] {
-    throw new Error("No sub_dominance for ErrorType");
-  }
-  supers() : Type[] {
-    throw new Error("No super_dominance for ErrorType");
-  }
-  super_with_upperbound(upper_bound : Type) : Type[] {
-    throw new Error("No super_dominance for ErrorType");
-  }
-  copy() : Type {
-    return new EventType(this.name);
-  }
-  same(t : Type) : boolean {
-    return t.kind === TypeKind.ErrorType;
-  }
-  issubof(t : Type) : boolean {
-    return this.same(t);
-  }
-  issuperof(t : Type) : boolean {
-    return this.same(t);
   }
 }
 
@@ -876,4 +826,11 @@ export function initType() : void {
   all_integer_types = integer_types.concat(uinteger_types);
   elementary_types = all_integer_types.concat(bool_types).concat(address_types);
   size_of_type = sizeof(elementary_types[0]);
+}
+
+export class TypeRange {
+  range: Type[]
+  constructor(range: Type[]) {
+    this.range = range;
+  }
 }
