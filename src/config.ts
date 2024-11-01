@@ -49,11 +49,11 @@ export const config = {
   struct_prob: 0.5,
   contract_instance_prob: 0.1,
   struct_instance_prob: 0.1,
+  mapping_prob: 0.1,
   initialization_prob: 0.3,
   constructor_prob: 0.5,
   return_prob: 0.5,
   reuse_name_prob: 0.0,
-  mapping_prob: 0.5,
 
   // Structured Statements
   for_init_cnt_upper_limit: 1,

@@ -85,8 +85,10 @@ export function decide_function_visibility(kind : scopeKind, vis : FunctionVisib
     case scopeKind.DOWHILE_BODY:
     case scopeKind.DOWHILE_COND:
     case scopeKind.CONSTRUCTOR:
+    case scopeKind.CONSTRUCTOR_PARAMETERS:
     case scopeKind.STRUCT:
     case scopeKind.FUNC_PARAMETER:
+    case scopeKind.FUNC_RETURNS:
     case scopeKind.MAPPING:
       return erwin_visibility.NAV;
     default:
@@ -118,8 +120,10 @@ export function decide_variable_visibility(kind : scopeKind, vis : StateVariable
     case scopeKind.DOWHILE_BODY:
     case scopeKind.DOWHILE_COND:
     case scopeKind.CONSTRUCTOR:
+    case scopeKind.CONSTRUCTOR_PARAMETERS:
     case scopeKind.STRUCT:
     case scopeKind.FUNC_PARAMETER:
+    case scopeKind.FUNC_RETURNS:
     case scopeKind.MAPPING:
       return erwin_visibility.NAV;
     default:
@@ -150,8 +154,10 @@ class DeclDB {
   public called_function_decls_ids : Set<number> = new Set<number>();
   public getter_function_id_to_state_struct_instance_id : Map<number, number> = new Map<number, number>();
   public getter_function_id_to_struct_decl_id : Map<number, number> = new Map<number, number>();
-  public getter_function_id_for_mapping : Set<number> = new Set<number>();
+  public getter_function_id_to_state_mapping_decl : Map<number, number> = new Map<number, number>();
   public state_struct_instance_id_to_getter_function_ids : Map<number, number[]> = new Map<number, number[]>();
+  public contract_scope_id_to_contract_id : Map<number, number> = new Map<number, number>();
+  public struct_decl_that_contains_mapping_decl : Set<number> = new Set<number>();
   constructor() {
     this.scope_tree = new Tree();
     this.scope2irnodeinfo = new Map<number, irnodeInfo[]>();

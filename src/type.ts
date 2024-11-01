@@ -19,7 +19,7 @@ export abstract class Type extends DominanceNode<TypeKind> { }
 
 export class PlaceholderType extends Type {
   constructor() {
-    super(TypeKind.ElementaryType);
+    super(TypeKind.PlaceholderType);
   }
   str() : string {
     return "_";
@@ -28,25 +28,25 @@ export class PlaceholderType extends Type {
     throw new Error("PlaceholderType::copy() not implemented.");
   }
   subs() : Type[] {
-    throw new Error("PlaceholderType::subs() not implemented.");
+    return [TypeProvider.placeholder()];
   }
   sub_with_lowerbound(lower_bound : Type) : Type[] {
-    throw new Error("PlaceholderType::sub_with_lowerbound() not implemented.");
+    return [TypeProvider.placeholder()];
   }
   supers() : Type[] {
-    throw new Error("PlaceholderType::supers() not implemented.");
+    return [TypeProvider.placeholder()];
   }
   super_with_upperbound(upper_bound : Type) : Type[] {
-    throw new Error("PlaceholderType::super_with_upperbound() not implemented.");
+    return [TypeProvider.placeholder()];
   }
   same(t : Type) : boolean {
-    throw new Error("PlaceholderType::same() not implemented.");
+    return t.kind === TypeKind.PlaceholderType;
   }
   issubof(t : Type) : boolean {
-    throw new Error("PlaceholderType::issubof() not implemented.");
+    return this.same(t);
   }
   issuperof(t : Type) : boolean {
-    throw new Error("PlaceholderType::issuperof() not implemented.");
+    return this.same(t);
   }
 }
 
@@ -740,25 +740,25 @@ export class MappingType extends Type {
     return new MappingType(this.kType.copy(), this.vType.copy());
   }
   same(t : Type) : boolean {
-    throw new Error("MappingType::same() is disallowed.");
+    return t.kind === TypeKind.MappingType && (t as MappingType).kType.same(this.kType) && (t as MappingType).vType.same(this.vType);
   }
   subs() : Type[] {
-    throw new Error("MappingType::subs() is disallowed.");
+    return [this];
   }
   sub_with_lowerbound(lower_bound : Type) : Type[] {
-    throw new Error("MappingType::sub_with_lowerbound() is disallowed.");
+    return [this];
   }
   supers() : Type[] {
-    throw new Error("MappingType::supers() is disallowed.");
+    return [this];
   }
   super_with_upperbound(upper_bound : Type) : Type[] {
-    throw new Error("MappingType::super_with_upperbound() is disallowed.");
+    return [this];
   }
   issubof(t : Type) : boolean {
-    throw new Error("MappingType::issubof() is disallowed.");
+    return this.same(t);
   }
   issuperof(t : Type) : boolean {
-    throw new Error("MappingType::issuperof() is disallowed.");
+    return this.same(t);
   }
 }
 
@@ -778,6 +778,10 @@ export class TypeProvider {
   static bool() : Type { return this.m_bool; }
   static address() : Type { return this.m_address; }
   static payable_address() : Type { return this.m_payable_address; }
+  static placeholder() : Type { return this.m_placeholder; }
+  static trivial_mapping() : Type { return this.m_mapping; }
+  private static m_placeholder : Type = new PlaceholderType();
+  private static m_mapping : Type = new MappingType(this.m_placeholder, this.m_placeholder);
   private static m_int256 : Type = new ElementaryType("int256", "nonpayable");
   private static m_int128 : Type = new ElementaryType("int128", "nonpayable");
   private static m_int64 : Type = new ElementaryType("int64", "nonpayable");
@@ -795,8 +799,6 @@ export class TypeProvider {
   private static m_payable_address : Type = new ElementaryType("address", "payable");
 }
 
-// export const irnode2types = new Map<number, Type[]>();
-
 export let integer_types : Type[] = [
   TypeProvider.int256(),
   TypeProvider.int128(),
@@ -804,7 +806,8 @@ export let integer_types : Type[] = [
   TypeProvider.int32(),
   TypeProvider.int16(),
   TypeProvider.int8()
-]
+];
+
 export let uinteger_types : Type[] = [
   TypeProvider.uint256(),
   TypeProvider.uint128(),
@@ -812,7 +815,7 @@ export let uinteger_types : Type[] = [
   TypeProvider.uint32(),
   TypeProvider.uint16(),
   TypeProvider.uint8()
-]
+];
 
 export let all_integer_types : Type[];
 export let elementary_types : Type[];
@@ -829,8 +832,8 @@ export function initType() : void {
 }
 
 export class TypeRange {
-  range: Type[]
-  constructor(range: Type[]) {
+  range : Type[]
+  constructor(range : Type[]) {
     this.range = range;
   }
 }

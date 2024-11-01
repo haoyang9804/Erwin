@@ -339,7 +339,7 @@ async () => {
   type_dag.connect(2, 1);
   expect(async() => {
     await type_dag.check_property();
-  }).rejects.toThrow("DominanceDAG: no root");
+  }).rejects.toThrow("ConstraintDAG: no root");
 }
 )
 
@@ -356,7 +356,7 @@ test("test check_property 2",
     type_dag.connect(3, 4);
     expect(async() => {
       await type_dag.check_property();
-    }).rejects.toThrow("DominanceDAG: node 2 has more than one inbound edge");
+    }).rejects.toThrow("ConstraintDAG: node 2 has more than one inbound edge");
   }
 )
 

@@ -32,6 +32,8 @@ let virtual_env = false;
 let override_env = false;
 let noview_nopure_funcdecl = false;
 let name_id = 0;
+const mapping_type_exprs : number[] = [];
+const mapping_type_expr_to_key_value_pair : Map<number, [number, number]> = new Map<number, [number, number]>();
 let all_types : type.Type[] = [];
 // Record the statements that are not expected to be generated before the current statement.
 let unexpected_extra_stmt : Map<number, stmt.IRStatement[]> = new Map<number, stmt.IRStatement[]>();
@@ -48,9 +50,27 @@ const function_name_to_contract_id : Map<string, Set<number>> = new Map<string, 
 // Record which contract the state variable or the in-contract struct belongs to.
 const contract_member_variable_name_to_contract_ids : Map<string, Set<number>> = new Map<string, Set<number>>();
 const struct_member_variable_name_to_struct_ids : Map<string, Set<number>> = new Map<string, Set<number>>();
-// vardecl id to the id of the struct decl wrapping it
-const vardecl2structdecl : Map<number, number> = new Map<number, number>();
-const variable_id_to_mapping_type_components = new Map<number, [number, number]>();
+const member2structdecl : Map<number, number> = new Map<number, number>();
+const must_be_initialized : Map<number, number[]> = new Map<number, number[]>();
+function initialize_must_be_initialized(scope_id : number) : stmt.IRStatement[] {
+  if (!must_be_initialized.has(scope_id)) return [];
+  const initialized_stmts : stmt.IRStatement[] = [];
+  for (const id of must_be_initialized.get(scope_id)!) {
+    assert(irnodes.has(id), `initialize_must_be_initialized: id ${id} is not in irnodes`);
+    assert(irnodes.get(id) instanceof decl.IRVariableDeclaration,
+      `initialize_must_be_initialized: id ${id} is not an instance of IRVariableDeclaration`);
+    const vardecl = irnodes.get(id) as decl.IRVariableDeclaration;
+    const assignment = new expr.IRAssignment(global_id++, cur_scope.id(),
+      new expr.IRIdentifier(global_id++, cur_scope.id(), vardecl.name, vardecl.id),
+      new expr.IRIdentifier(global_id++, cur_scope.id(), vardecl.name, vardecl.id), '=');
+    const assignment_stmt = new stmt.IRExpressionStatement(global_id++, cur_scope.id(), assignment);
+    initialized_stmts.push(assignment_stmt);
+  }
+  must_be_initialized.delete(scope_id);
+  return initialized_stmts;
+}
+const function_scope_id_to_function_return_scope_id : Map<number, number> = new Map<number, number>();
+const function_scope_id_to_function_parameter_scope_id : Map<number, number> = new Map<number, number>();
 enum IDENTIFIER {
   FREE_VAR,
   FREE_FUNC,
@@ -262,6 +282,14 @@ function get_exprgenerator(type_range : type.Type[],
       }
     }
   }
+  if (type_range.some(t => t.typeName === "MappingType")) {
+    generator_candidates.add(IdentifierGenerator);
+    if (cur_expression_complex_level < config.expression_complex_level) {
+      generator_candidates.add(AssignmentGenerator);
+      generator_candidates.add(FunctionCallGenerator);
+      generator_candidates.add(ConditionalGenerator);
+    }
+  }
   const contain_element_types = type_range.some(t => t.typeName === "ElementaryType");
   if (contain_element_types) {
     if (cur_expression_complex_level >= config.expression_complex_level || Math.random() < config.terminal_prob) {
@@ -306,11 +334,20 @@ function get_available_vardecls_with_type_constraint(types : type.Type[]) : decl
   const available_irnode_ids = decl_db.get_irnodes_ids_recursively_from_a_scope(cur_scope.id());
   //! Then if the current scope is a contract, only search for state variables
   //! Currently mappings are all state variables
+  const get_final_value_from_a_mapping = (mapping_id : number) : number => {
+    const valueid = decl_db.value_id_of_mapping_decl(mapping_id);
+    if (decl_db.is_mapping_decl(valueid)) {
+      return get_final_value_from_a_mapping(valueid);
+    }
+    assert(type_dag.solution_range.has(valueid),
+      `get_final_value_from_a_mapping: valueid ${valueid} is not in type_dag.solution_range`);
+    return valueid;
+  }
   if (cur_scope.kind() === scopeKind.CONTRACT) {
     for (let id of available_irnode_ids) {
       if (decl_db.state_variables.has(id)) {
         if (decl_db.is_mapping_decl(id)) {
-          const valueid = decl_db.value_id_of_mapping_decl(id);
+          const valueid = get_final_value_from_a_mapping(id);
           collection.push(irnodes.get(valueid)! as decl.IRVariableDeclaration);
         }
         else {
@@ -351,6 +388,24 @@ function type_solution_alignment(dominator_id : number, dominatee_id : number) :
     dominatee_struct_type_range = type_dag.solution_range.get(dominatee_id)!;
   }
   type_dag.solution_range_alignment(dominator_id, dominatee_id);
+  if (decl_db.is_mapping_decl(dominatee_id)) {
+    const keyid = global_id++;
+    const valueid = global_id++;
+    type_dag.insert(keyid, type_dag.solution_range.get(decl_db.key_id_of_mapping_decl(dominatee_id))!);
+    type_dag.insert(valueid, type_dag.solution_range.get(decl_db.value_id_of_mapping_decl(dominatee_id))!);
+    type_dag.connect(keyid, decl_db.key_id_of_mapping_decl(dominatee_id));
+    type_dag.connect(valueid, decl_db.value_id_of_mapping_decl(dominatee_id));
+    mapping_type_exprs.push(dominator_id);
+    mapping_type_expr_to_key_value_pair.set(dominator_id, [keyid, valueid]);
+  }
+  else if (mapping_type_exprs.includes(dominatee_id)) {
+    assert(mapping_type_exprs.includes(dominator_id),
+      `type_solution_alignment: dominator_id ${dominator_id} is not in mapping_type_exprs but dominatee_id ${dominatee_id} is`);
+    const [dominatee_keyid, dominatee_valueid] = mapping_type_expr_to_key_value_pair.get(dominatee_id)!;
+    const [dominator_keyid, dominator_valueid] = mapping_type_expr_to_key_value_pair.get(dominator_id)!;
+    type_dag.connect(dominator_keyid, dominatee_keyid);
+    type_dag.connect(dominator_valueid, dominatee_valueid);
+  }
   if (dominator_struct_type_range !== undefined) {
     const new_dominator_struct_type_range = type_dag.solution_range.get(dominator_id)!;
     dominator_struct_type_range.forEach((t) => {
@@ -396,6 +451,7 @@ abstract class Generator {
 export class SourceUnitGenerator extends Generator {
   constructor() {
     super();
+    // all_types = [...type.elementary_types, type.TypeProvider.trivial_mapping()];
     all_types = [...type.elementary_types];
   }
   generate() : void {
@@ -434,21 +490,41 @@ abstract class DeclarationGenerator extends Generator {
 }
 
 class MappingDeclarationGenerator extends DeclarationGenerator {
-  constructor() {
+  type_range : type.Type[];
+  must_be_in_contract_scope : boolean;
+  constructor(type_range : type.Type[], must_be_in_contract_scope : boolean = false) {
     super();
+    this.type_range = type_range;
+    this.must_be_in_contract_scope = must_be_in_contract_scope;
   }
   generate() : void {
+    assert(this.type_range.some((t) => t.typeName === 'MappingType'),
+      `MappingDeclarationGenerator: type_range should contain mapping types, but is ${this.type_range.map(t => t.str())}`);
+    this.type_range = this.type_range.filter((t) => t.typeName === 'MappingType');
     const mappingid = global_id++;
+    const scope_snapshot = cur_scope.snapshot();
+    let rollback = false;
+    if (this.must_be_in_contract_scope && cur_scope.kind() !== scopeKind.CONTRACT) {
+      rollback = true;
+      while (cur_scope.kind() !== scopeKind.CONTRACT) {
+        cur_scope = cur_scope.rollback();
+      }
+    }
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Mapping Declaration, scope: ${cur_scope.kind()}, id: ${mappingid}`));
       indent += 2;
     }
-    assert(cur_scope.kind() === scopeKind.CONTRACT,
-      `MappingDeclarationGenerator: cur_scope.kind() !== scopeKind.CONTRACT, but is ${cur_scope.kind()}`);
+    assert(cur_scope.kind() !== scopeKind.STRUCT,
+      `MappingDeclarationGenerator: mapping decls should be in struct scope, but is in ${cur_scope.kind()}`);
     const mapping_name = generate_name(IDENTIFIER.MAPPING);
-    const key_type_range = all_types.filter((t) => t.typeName !== 'StructType' && t !== type.TypeProvider.payable_address());
+    const key_type_range = all_types.filter((t) =>
+      t.typeName !== 'StructType' &&
+      t !== type.TypeProvider.payable_address() &&
+      t.typeName != 'MappingType'
+    );
     const value_type_range = all_types;
     this.irnode = new decl.IRVariableDeclaration(mappingid, cur_scope.id(), mapping_name);
+    type_dag.insert(mappingid, this.type_range);
     cur_scope = cur_scope.new(scopeKind.MAPPING);
     const key_var_gen = new VariableDeclarationGenerator(key_type_range, true)
     key_var_gen.generate();
@@ -458,7 +534,22 @@ class MappingDeclarationGenerator extends DeclarationGenerator {
     const keyid = key_var_gen.irnode!.id;
     const valueid = value_var_gen.irnode!.id;
     decl_db.add_mapping_decl(mappingid, keyid, valueid);
-    variable_id_to_mapping_type_components.set(mappingid, [keyid, valueid]);
+    if (cur_scope.kind() === scopeKind.CONTRACT) {
+      (this.irnode as decl.IRVariableDeclaration).state = true;
+      decl_db.insert(this.irnode.id, erwin_visibility.INCONTRACT_UNKNOWN, cur_scope.id());
+      vismut_dag.insert(this.irnode.id, all_var_vismut);
+    }
+    else {
+      decl_db.insert(this.irnode.id, decide_variable_visibility(cur_scope.kind(), StateVariableVisibility.Default), cur_scope.id());
+    }
+    if (rollback) {
+      const contract_decl_id = decl_db.contract_scope_id_to_contract_id.get(cur_scope.id())!;
+      assert(irnodes.has(contract_decl_id),
+        `MappingDeclarationGenerator: contract_decl_id ${contract_decl_id} is not in irnodes`);
+      const contract_decl = irnodes.get(contract_decl_id) as decl.IRContractDefinition;
+      contract_decl.body.push(this.irnode!);
+      cur_scope = scope_snapshot;
+    }
     if (config.debug) {
       indent -= 2;
       console.log(color.yellowBG(`${" ".repeat(indent)}Mapping Declaration, name: ${mapping_name} scope: ${cur_scope.id()}, id: ${mappingid}`));
@@ -518,35 +609,61 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
       storage_location_dag.insert(this.irnode.id, [
         StorageLocationProvider.calldata(),
         StorageLocationProvider.memory(),
+        StorageLocationProvider.storage_pointer()
       ]);
-      if (initializer === undefined) {
-        storage_location_dag.update(this.irnode.id, [StorageLocationProvider.memory()]);
+      assert(initializer === undefined,
+        `StructInstanceDeclarationGenerator: initializer is not undefined in FUNC_PARAMETER scope`);
+      decl_db.insert(this.irnode.id, decide_variable_visibility(cur_scope.kind(), StateVariableVisibility.Default), cur_scope.id());
+    }
+    else if (cur_scope.kind() === scopeKind.FUNC_RETURNS) {
+      storage_location_dag.insert(this.irnode.id, [
+        StorageLocationProvider.calldata(),
+        StorageLocationProvider.memory(),
+        StorageLocationProvider.storage_pointer()
+      ]);
+      const function_scope = cur_scope.pre();
+      assert(function_scope.kind() === scopeKind.FUNC,
+        `StructInstanceDeclarationGenerator: function_scope.kind() is not FUNC, but a ${function_scope.kind()}`);
+      if (must_be_initialized.has(function_scope.id())) {
+        must_be_initialized.get(function_scope.id())!.push(this.irnode.id);
       }
+      else {
+        must_be_initialized.set(function_scope.id(), [this.irnode.id]);
+      }
+      assert(initializer === undefined,
+        `StructInstanceDeclarationGenerator: initializer is not undefined in FUNC_RETURNS scope`);
       decl_db.insert(this.irnode.id, decide_variable_visibility(cur_scope.kind(), StateVariableVisibility.Default), cur_scope.id());
     }
     else if (cur_scope.kind() === scopeKind.STRUCT) {
       (this.irnode as decl.IRVariableDeclaration).loc = DataLocation.Default;
       storage_location_dag.insert(this.irnode.id, [
-        StorageLocationProvider.memory(), //@haoyang9804: memory_default -> memory
+        StorageLocationProvider.memory(),
       ]);
       decl_db.insert(this.irnode.id, decide_variable_visibility(cur_scope.kind(), StateVariableVisibility.Default), cur_scope.id());
     }
     else {
-      if (initializer !== undefined) {
-        storage_location_dag.insert(this.irnode.id, [
-          StorageLocationProvider.calldata(),
-          StorageLocationProvider.memory(),
-          StorageLocationProvider.storage_pointer()
-        ]);
-      }
-      else {
-        // If there is no initializer, make the storage location non-calldata, referring to 
-        // https://github.com/ethereum/solidity/issues/15483#issuecomment-2396563287
-        storage_location_dag.insert(this.irnode.id, [
-          StorageLocationProvider.memory(),
-        ]);
+      storage_location_dag.insert(this.irnode.id, [
+        StorageLocationProvider.calldata(),
+        StorageLocationProvider.memory(),
+        StorageLocationProvider.storage_pointer()
+      ]);
+      if (initializer === undefined) {
+        assert(cur_scope.kind() !== scopeKind.FOR_CONDITION,
+          `StructInstanceDeclarationGenerator: current scope is FOR_CONDITION, but initializer is undefined`);
+        if (must_be_initialized.has(cur_scope.id())) {
+          must_be_initialized.get(cur_scope.id())!.push(this.irnode.id);
+        }
+        else {
+          must_be_initialized.set(cur_scope.id(), [this.irnode.id]);
+        }
       }
       decl_db.insert(this.irnode.id, decide_variable_visibility(cur_scope.kind(), StateVariableVisibility.Default), cur_scope.id());
+    }
+    if (cur_scope.kind() === scopeKind.CONSTRUCTOR_PARAMETERS) {
+      storage_location_dag.update(this.irnode.id, [
+        StorageLocationProvider.storage_pointer(),
+        StorageLocationProvider.memory()
+      ]);
     }
     if (initializer !== undefined) {
       const initializer_id = expr.tuple_extraction(initializer).id;
@@ -729,31 +846,43 @@ class ElementaryTypeVariableDeclarationGenerator extends DeclarationGenerator {
 
 class VariableDeclarationGenerator extends DeclarationGenerator {
   no_initializer : boolean;
+  must_be_in_contract_scope_if_mapping : boolean;
   type_range : type.Type[];
-  constructor(type_range : type.Type[], no_initializer : boolean = true) {
+  constructor(type_range : type.Type[], no_initializer : boolean = true, must_be_in_contract_scope_if_mapping : boolean = false) {
     super();
     this.no_initializer = no_initializer;
     this.type_range = type_range;
+    this.must_be_in_contract_scope_if_mapping = must_be_in_contract_scope_if_mapping
   }
   generate() : void {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Variable Declaration, scope: ${cur_scope.kind()}`));
       indent += 2;
     }
+    // Struct containing mapping is not allowed to be constructed.
+    // This may incur many implementation difficulties. So we just ignore this case.
+    if (cur_scope.kind() === scopeKind.STRUCT) {
+      this.type_range = this.type_range.filter((t) => t.typeName !== 'MappingType');
+    }
     const contain_element_types = this.type_range.some((t) => t.typeName === 'ElementaryType');
     const contain_contract_types = this.type_range.some((t) => t.typeName === 'ContractType');
     const contain_struct_types = this.type_range.some((t) => t.typeName === 'StructType');
-    assert(contain_element_types || contain_contract_types || contain_struct_types, `VariableDeclarationGenerator: type_range ${this.type_range.map(t => t.str())} should contain at least one elementary type or contract type`);
+    const contain_mapping_types = this.type_range.some((t) => t.typeName === 'MappingType');
+    assert(contain_element_types || contain_contract_types || contain_struct_types || contain_mapping_types,
+      `VariableDeclarationGenerator: type_range ${this.type_range.map(t => t.str())} should contain at least one elementary/contract/struct/mapping type`);
     let prob_sum = 0;
     let contract_type_prob = contain_contract_types ? config.contract_instance_prob : 0;
     prob_sum += contract_type_prob;
     let struct_type_prob = contain_struct_types ? config.struct_instance_prob : 0;
     prob_sum += struct_type_prob;
-    let elementary_type_prob = contain_element_types ? 1 - struct_type_prob - contract_type_prob : 0;
+    let mapping_type = contain_mapping_types ? config.mapping_prob : 0;
+    prob_sum += mapping_type;
+    let elementary_type_prob = contain_element_types ? 1 - struct_type_prob - contract_type_prob - mapping_type : 0;
     prob_sum += elementary_type_prob;
     contract_type_prob /= prob_sum;
     struct_type_prob /= prob_sum;
     elementary_type_prob /= prob_sum;
+    mapping_type /= prob_sum;
     if (contain_contract_types && Math.random() < contract_type_prob) {
       const contract_instance_gen = new ContractInstanceDeclarationGenerator(this.type_range, this.no_initializer);
       contract_instance_gen.generate();
@@ -764,8 +893,12 @@ class VariableDeclarationGenerator extends DeclarationGenerator {
       struct_instance_gen.generate();
       this.irnode = struct_instance_gen.irnode;
     }
+    else if (contain_mapping_types && Math.random() < contract_type_prob + struct_type_prob + mapping_type) {
+      const mapping_gen = new MappingDeclarationGenerator(this.type_range, this.must_be_in_contract_scope_if_mapping);
+      mapping_gen.generate();
+      this.irnode = mapping_gen.irnode;
+    }
     else {
-      // Generate elementary type variable declaration
       const variable_gen = new ElementaryTypeVariableDeclarationGenerator(this.type_range, this.no_initializer);
       variable_gen.generate();
       this.irnode = variable_gen.irnode;
@@ -927,12 +1060,14 @@ class StructGenerator extends DeclarationGenerator {
       variable_gen.generate();
       (variable_gen.irnode! as decl.IRVariableDeclaration).loc = DataLocation.Default;
       body.push(variable_gen.irnode! as decl.IRVariableDeclaration);
-      vardecl2structdecl.set(variable_gen.irnode!.id, thisid);
+      member2structdecl.set(variable_gen.irnode!.id, thisid);
+      if (decl_db.is_mapping_decl(variable_gen.irnode!.id)) {
+        decl_db.struct_decl_that_contains_mapping_decl.add(thisid);
+      }
     }
     this.irnode = new decl.IRStructDefinition(thisid, cur_scope.id(), struct_name, body);
     cur_scope = cur_scope.rollback();
     //! Add this struct type
-    all_types = [...all_types];
     const struct_type = new type.StructType(thisid, struct_name, `struct ${cur_contract_name}.${struct_name}`);
     all_types.push(struct_type);
     user_defined_types.push(struct_type);
@@ -1035,7 +1170,7 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
 
   build_connection_between_caller_and_callee(thisid : number) : void {
     /*
-      Follow the rule of DominanceDAG that if A dominates B, then the solution range of B
+      Follow the rule of ConstraintDAG that if A dominates B, then the solution range of B
       is a superset of the solution range of A.
     */
     for (const called_function_decl_ID of decl_db.called_function_decls_ids) {
@@ -1075,6 +1210,9 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Body for ${this.fid}`));
       indent += 2;
+    }
+    for (const init_stmt of initialize_must_be_initialized(cur_scope.id())) {
+      body.push(init_stmt);
     }
     for (let i = body.length; i < body_stmt_count; i++) {
       const stmt_gen_prototype = pick_random_element(statement_generators)!;
@@ -1227,12 +1365,14 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
     }
     cur_scope = this.function_scope.snapshot();
     cur_scope = cur_scope.new(scopeKind.FUNC_PARAMETER);
+    function_scope_id_to_function_parameter_scope_id.set(this.function_scope.id(), cur_scope.id());
     //! Generate parameters
     for (let i = 0; i < this.parameter_count; i++) {
-      const variable_gen = new VariableDeclarationGenerator(all_types);
+      const variable_gen = new VariableDeclarationGenerator(all_types, true);
       variable_gen.generate();
       this.parameters.push(variable_gen.irnode! as decl.IRVariableDeclaration);
     }
+    cur_scope = cur_scope.rollback();
     //! Generate return_decls
     if (config.debug) {
       indent -= 2;
@@ -1240,11 +1380,13 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Return Decls, ${this.return_count} in total`));
       indent += 2;
     }
+    cur_scope = cur_scope.new(scopeKind.FUNC_RETURNS);
+    function_scope_id_to_function_return_scope_id.set(this.function_scope.id(), cur_scope.id());
     for (let i = 0; i < this.return_count; i++) {
       //* Generate the returned vardecl. For instance, in the following code:
       //* function f() returns (uint a, uint b) { return (1, 2); }
       //* We generate two returned vardecls for a and b.
-      const variable_gen = new VariableDeclarationGenerator(all_types);
+      const variable_gen = new VariableDeclarationGenerator(all_types, true);
       variable_gen.generate();
       this.return_decls.push(variable_gen.irnode! as decl.IRVariableDeclaration);
     }
@@ -1269,6 +1411,92 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
 
 class ContractDeclarationGenerator extends DeclarationGenerator {
   constructor() { super(); }
+
+  // Generate getter functions for state variables
+  generate_getter_function(variable_decl : decl.IRVariableDeclaration) {
+    assert(type_dag.solution_range.has(variable_decl.id),
+      `ContractDeclarationGenerator: type_dag.solution_range should have ${variable_decl.id}`);
+    const type_range_of_vardecl = type_dag.solution_range.get(variable_decl.id)!;
+    const isstructdecl = type_range_of_vardecl.every((t) => t.typeName === 'StructType');
+    const iscontractdecl = type_range_of_vardecl.every((t) => t.typeName === 'ContractType');
+    const iselementarydecl = type_range_of_vardecl.every((t) => t.typeName === 'ElementaryType');
+    const ismappingdecl = type_range_of_vardecl.every((t) => t.typeName === 'MappingType');
+    assert((isstructdecl ? 1 : 0) + (iscontractdecl ? 1 : 0) + (iselementarydecl ? 1 : 0) + (ismappingdecl ? 1 : 0) === 1,
+      `ContractDeclarationGenerator: type_range_of_vardecl ${type_range_of_vardecl.map(t => t.str())} should contain only one type`);
+    if (iselementarydecl || iscontractdecl) {
+      const fid = global_id++;
+      if (config.debug) {
+        console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating getter function ${fid} for state variable ${variable_decl.name}`));
+        indent += 2;
+      }
+      decl_db.funcdecls.add(fid);
+      decl_db.insert(fid, erwin_visibility.INCONTRACT_EXTERNAL, cur_scope.id());
+      decl_db.getter_funcdecls.add(fid);
+      vismut_dag.insert(fid, [VisMutProvider.func_external_view()]);
+      new decl.IRFunctionDefinition(fid, cur_scope.id(), variable_decl.name, FunctionKind.Function,
+        false, false, [], [variable_decl], [], [], FunctionVisibility.External, FunctionStateMutability.View);
+      if (config.debug) {
+        indent -= 2;
+        console.log(color.yellowBG(`${" ".repeat(indent)} Getter function ${fid} for state variable ${variable_decl.name}`));
+      }
+    }
+    else if (isstructdecl) {
+      const struct_names = type_range_of_vardecl.map(t => (t as type.StructType).name).filter(name => !name.includes('.'));
+      for (const struct_name of struct_names) {
+        const fid = global_id++;
+        if (config.debug) {
+          console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating getter function ${fid} for state variable ${variable_decl.name}`));
+          indent += 2;
+        }
+        const struct_decl = decl_db.find_structdecl_by_name(struct_name)!;
+        const members = struct_decl.members.filter(
+          (member) => type_dag.solution_range.get(member.id)!.every(
+            (t) => t.typeName !== 'MappingType' && t.typeName !== 'ArrayType')
+        );
+        if (members.length === 0) {
+          continue;
+        }
+        decl_db.funcdecls.add(fid);
+        decl_db.insert(fid, erwin_visibility.INCONTRACT_EXTERNAL, cur_scope.id());
+        decl_db.getter_funcdecls.add(fid);
+        vismut_dag.insert(fid, [VisMutProvider.func_external_view()]);
+        new decl.IRFunctionDefinition(fid, cur_scope.id(), variable_decl.name, FunctionKind.Function,
+          false, false, [], members, [], [], FunctionVisibility.External, FunctionStateMutability.View);
+        decl_db.map_getter_function_to_state_struct_instance(fid, variable_decl.id, struct_decl.id);
+        if (config.debug) {
+          indent -= 2;
+          console.log(color.yellowBG(`${" ".repeat(indent)} Getter function ${fid} for state variable ${variable_decl.name}`));
+        }
+      }
+    }
+    else if (ismappingdecl) {
+      const fid = global_id++;
+      if (config.debug) {
+        console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating getter function ${fid} for state variable ${variable_decl.name}`));
+        indent += 2;
+      }
+      decl_db.funcdecls.add(fid);
+      decl_db.getter_function_id_to_state_mapping_decl.set(fid, variable_decl.id);
+      decl_db.getter_funcdecls.add(fid);
+      decl_db.insert(fid, erwin_visibility.INCONTRACT_EXTERNAL, cur_scope.id());
+      vismut_dag.insert(fid, [VisMutProvider.func_external_view()]);
+      const key_decl = irnodes.get(decl_db.key_id_of_mapping_decl(variable_decl.id)) as decl.IRVariableDeclaration;
+      const parameters : decl.IRVariableDeclaration[] = [key_decl];
+      let value_decl = irnodes.get(decl_db.value_id_of_mapping_decl(variable_decl.id)) as decl.IRVariableDeclaration;
+      while (value_decl.typeName === 'MappingType') {
+        const key_decl = irnodes.get(decl_db.key_id_of_mapping_decl(value_decl.id)) as decl.IRVariableDeclaration;
+        parameters.push(key_decl);
+        value_decl = irnodes.get(decl_db.value_id_of_mapping_decl(value_decl.id)) as decl.IRVariableDeclaration;
+      }
+      new decl.IRFunctionDefinition(fid, cur_scope.id(), variable_decl.name, FunctionKind.Function,
+        false, false, parameters, [value_decl], [], [], FunctionVisibility.External, FunctionStateMutability.View);
+      if (config.debug) {
+        indent -= 2;
+        console.log(color.yellowBG(`${" ".repeat(indent)} Getter function ${fid} for state variable ${variable_decl.name}`));
+      }
+    }
+  }
+
   generate() : void {
     //! Create the contract scope
     const thisid = global_id++;
@@ -1281,6 +1509,7 @@ class ContractDeclarationGenerator extends DeclarationGenerator {
       `Contracts' scope must be global, but is ${cur_scope.kind()}`);
     decl_db.insert(thisid, erwin_visibility.NAV, cur_scope.id());
     cur_scope = cur_scope.new(scopeKind.CONTRACT);
+    decl_db.contract_scope_id_to_contract_id.set(cur_scope.id(), thisid);
     //! Generate contract name
     const contract_name = generate_name(IDENTIFIER.CONTRACT);
     cur_contract_name = contract_name;
@@ -1299,16 +1528,6 @@ class ContractDeclarationGenerator extends DeclarationGenerator {
     }
     //* Generate state variables and randomly assigns values to these variables
     const local_state_variables : decl.IRVariableDeclaration[] = [];
-    if (Math.random() < config.mapping_prob) {
-      const mapping_gen = new MappingDeclarationGenerator();
-      mapping_gen.generate();
-      const variable_decl = mapping_gen.irnode as decl.IRVariableDeclaration;
-      variable_decl.state = true;
-      local_state_variables.push(variable_decl);
-      state_variable_count--;
-      body.push(variable_decl);
-      decl_db.state_variables.add(variable_decl.id);
-    }
     for (let i = 0; i < state_variable_count; i++) {
       const variable_gen = new VariableDeclarationGenerator(all_types, false);
       variable_gen.generate();
@@ -1317,13 +1536,13 @@ class ContractDeclarationGenerator extends DeclarationGenerator {
       local_state_variables.push(variable_decl);
       if (unexpected_extra_stmt.has(cur_scope.id())) {
         for (const stmt of unexpected_extra_stmt.get(cur_scope.id())!) {
-          assert(stmt.typeName === "IRVariableDeclareStatement",
-            `ContractDeclarationGenerator: stmt is not IRVariableDeclareStatement, but is ${stmt.typeName}`);
-          for (const vardecl of (stmt as stmt.IRVariableDeclareStatement).variable_declares) {
+          assert(stmt.typeName === "IRVariableDeclarationStatement",
+            `ContractDeclarationGenerator: stmt is not IRVariableDeclarationStatement, but is ${stmt.typeName}`);
+          for (const vardecl of (stmt as stmt.IRVariableDeclarationStatement).variable_declares) {
             assert(vardecl !== null, "ContractDeclarationGenerator: vardecl is null");
             decl_db.state_variables.add(vardecl.id);
             decl_db.vardecls.delete(vardecl.id);
-            vardecl.value = (stmt as stmt.IRVariableDeclareStatement).value;
+            vardecl.value = (stmt as stmt.IRVariableDeclarationStatement).value;
             body.push(vardecl);
             local_state_variables.push(vardecl);
           }
@@ -1339,63 +1558,7 @@ class ContractDeclarationGenerator extends DeclarationGenerator {
     }
     //* For each state variable, generate a external view function with the same identifier name as the state variable.
     for (let variable_decl of local_state_variables) {
-      let is_mapping = false;
-      if (decl_db.is_mapping_decl(variable_decl.id)) {
-        is_mapping = true;
-        variable_decl = irnodes.get(decl_db.value_id_of_mapping_decl(variable_decl.id))! as decl.IRVariableDeclaration;
-      }
-      const type_range_of_vardecl = type_dag.solution_range.get(variable_decl.id)!;
-      const isstructdecl = type_range_of_vardecl.every((t) => t.typeName === 'StructType');
-      const iscontractdecl = type_range_of_vardecl.every((t) => t.typeName === 'ContractType');
-      const iselementarydecl = type_range_of_vardecl.every((t) => t.typeName === 'ElementaryType');
-      assert((isstructdecl ? 1 : 0) + (iscontractdecl ? 1 : 0) + (iselementarydecl ? 1 : 0) === 1,
-        `ContractDeclarationGenerator: type_range_of_vardecl ${type_range_of_vardecl.map(t => t.str())} should contain only one type`);
-      if (iselementarydecl || iscontractdecl) {
-        const fid = global_id++;
-        if (is_mapping) {
-          decl_db.getter_function_id_for_mapping.add(fid);
-        }
-        if (config.debug) {
-          console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating getter function ${fid} for state variable ${variable_decl.name}`));
-          indent += 2;
-        }
-        decl_db.funcdecls.add(fid);
-        decl_db.insert(fid, erwin_visibility.INCONTRACT_EXTERNAL, cur_scope.id());
-        decl_db.getter_funcdecls.add(fid);
-        vismut_dag.insert(fid, [VisMutProvider.func_external_view()]);
-        new decl.IRFunctionDefinition(fid, cur_scope.id(), variable_decl.name, FunctionKind.Function,
-          false, false, [], [variable_decl], [], [], FunctionVisibility.External, FunctionStateMutability.View);
-        if (config.debug) {
-          indent -= 2;
-          console.log(color.yellowBG(`${" ".repeat(indent)} Getter function ${fid} for state variable ${variable_decl.name}`));
-        }
-      }
-      else if (isstructdecl) {
-        const struct_names = type_range_of_vardecl.map(t => (t as type.StructType).name).filter(name => !name.includes('.'));
-        for (const struct_name of struct_names) {
-          const fid = global_id++;
-          if (is_mapping) {
-            decl_db.getter_function_id_for_mapping.add(fid);
-          }
-          if (config.debug) {
-            console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating getter function ${fid} for state variable ${variable_decl.name}`));
-            indent += 2;
-          }
-          const struct_decl = decl_db.find_structdecl_by_name(struct_name)!;
-          const members = struct_decl.members;
-          decl_db.funcdecls.add(fid);
-          decl_db.insert(fid, erwin_visibility.INCONTRACT_EXTERNAL, cur_scope.id());
-          decl_db.getter_funcdecls.add(fid);
-          vismut_dag.insert(fid, [VisMutProvider.func_external_view()]);
-          new decl.IRFunctionDefinition(fid, cur_scope.id(), variable_decl.name, FunctionKind.Function,
-            false, false, [], members, [], [], FunctionVisibility.External, FunctionStateMutability.View);
-          decl_db.map_getter_function_to_state_struct_instance(fid, variable_decl.id, struct_decl.id);
-          if (config.debug) {
-            indent -= 2;
-            console.log(color.yellowBG(`${" ".repeat(indent)} Getter function ${fid} for state variable ${variable_decl.name}`));
-          }
-        }
-      }
+      this.generate_getter_function(variable_decl);
     }
     decl_db.insert_yin_contract(cur_scope.id(), thisid);
     //! Generator constructor declaration
@@ -1430,7 +1593,6 @@ class ContractDeclarationGenerator extends DeclarationGenerator {
     this.irnode = new decl.IRContractDefinition(thisid, cur_scope.id(), contract_name,
       ContractKind.Contract, false, false, body, [], [], [], constructor_parameters);
     //! Add this contract type
-    all_types = [...all_types];
     const contract_type = new type.ContractType(thisid, contract_name);
     all_types.push(contract_type);
     contract_types.set(thisid, contract_type);
@@ -1511,43 +1673,49 @@ class IdentifierGenerator extends LRValueGenerator {
     super(id);
     this.left = left;
   }
+
+  generate_var_decl() : void {
+    let roll_back = false;
+    let snapshot_scope = cur_scope.snapshot();
+    if (unexpected_extra_stmt_belong_to_the_parent_scope()) {
+      roll_back = true;
+      cur_scope = cur_scope.rollback();
+    }
+    const variable_decl_gen = new VariableDeclarationGenerator(this.type_range, false, true);
+    variable_decl_gen.generate();
+    this.variable_decl = variable_decl_gen.irnode! as decl.IRVariableDeclaration;
+    const variable_decl_stmt = new stmt.IRVariableDeclarationStatement(
+      global_id++, cur_scope.id(), [variable_decl_gen.irnode! as decl.IRVariableDeclaration],
+      this.variable_decl.value!
+    );
+    this.variable_decl.value = undefined;
+    if (unexpected_extra_stmt.has(cur_scope.id())) {
+      unexpected_extra_stmt.get(cur_scope.id())!.push(variable_decl_stmt);
+      for (const initialization of initialize_must_be_initialized(cur_scope.id())) {
+        unexpected_extra_stmt.get(cur_scope.id())!.push(initialization);
+      }
+    }
+    else {
+      unexpected_extra_stmt.set(cur_scope.id(), [variable_decl_stmt, ...initialize_must_be_initialized(cur_scope.id())]);
+    }
+    if (roll_back) {
+      cur_scope = snapshot_scope.snapshot();
+    }
+  }
+
   generate(cur_expression_complex_level : number) : void {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Identifier ${this.id}: ${this.type_range.map(t => t.str())}, scope: ${cur_scope.kind()}`));
       indent += 2;
-    }
-    let generate_var_decl = () => {
-      let roll_back = false;
-      let snapshot_scope = cur_scope.snapshot();
-      if (unexpected_extra_stmt_belong_to_the_parent_scope()) {
-        roll_back = true;
-        cur_scope = cur_scope.rollback();
-      }
-      const variable_decl_gen = new VariableDeclarationGenerator(this.type_range, false);
-      variable_decl_gen.generate();
-      this.variable_decl = variable_decl_gen.irnode! as decl.IRVariableDeclaration;
-      const variable_decl_stmt = new stmt.IRVariableDeclareStatement(
-        global_id++, cur_scope.id(), [variable_decl_gen.irnode! as decl.IRVariableDeclaration],
-        this.variable_decl.value!
-      );
-      this.variable_decl.value = undefined;
-      if (unexpected_extra_stmt.has(cur_scope.id())) {
-        unexpected_extra_stmt.get(cur_scope.id())!.push(variable_decl_stmt);
-      }
-      else {
-        unexpected_extra_stmt.set(cur_scope.id(), [variable_decl_stmt]);
-      }
-      if (roll_back) {
-        cur_scope = snapshot_scope.snapshot();
-      }
     }
     expr2read_variables.set(this.id, new Set<number>());
     let available_irdecl = get_available_vardecls_with_type_constraint(this.type_range);
     //! Generate a variable decl if there is no variable decl available.
     if (available_irdecl.length === 0 || Math.random() < config.vardecl_prob) {
       const contain_element_types = this.type_range.some(t => t.typeName === "ElementaryType");
-      if (contain_element_types) {
-        generate_var_decl();
+      const contain_mapping_types = this.type_range.some(t => t.typeName === "MappingType");
+      if (contain_element_types || contain_mapping_types) {
+        this.generate_var_decl();
       }
       else {
         let contain_contract_types = this.type_range.some(t => t.typeName === "ContractType");
@@ -1577,7 +1745,7 @@ class IdentifierGenerator extends LRValueGenerator {
             this.irnode = contract_instance_expr;
           }
           else {
-            generate_var_decl();
+            this.generate_var_decl();
           }
         }
         else if (contain_struct_types) {
@@ -1592,7 +1760,7 @@ class IdentifierGenerator extends LRValueGenerator {
             storage_location_dag.insert(this.id, [StorageLocationProvider.memory()]);
           }
           else {
-            generate_var_decl();
+            this.generate_var_decl();
           }
         }
       }
@@ -1606,45 +1774,58 @@ class IdentifierGenerator extends LRValueGenerator {
       assert(this.irnode === undefined, "IdentifierGenerator: this.irnode is not undefined");
       //! The selcted variable decl is the ghost variable decl for the value of a mapping.
       if (decl_db.value_id_to_mapping_decl_id.has(this.variable_decl.id)) {
-        const mapping_decl_id = decl_db.value_id_to_mapping_decl_id.get(this.variable_decl.id)!;
-        //* Generate an expr to be the key of the mapping.
-        const key_id = decl_db.key_id_of_mapping_decl(mapping_decl_id)!;
-        const type_range = type_dag.solution_range.get(key_id)!
-        const expr_gen_prototype = get_exprgenerator(type_range, cur_expression_complex_level + 1);
-        const expr_id = global_id++;
-        type_dag.insert(expr_id, type_range);
-        let ghost_id;
-        const expr_gen = new expr_gen_prototype(expr_id);
-        if (expr_gen.generator_name === "LiteralGenerator") {
-          ghost_id = global_id++;
-          new IRGhost(ghost_id, cur_scope.id());
-          type_dag.insert(ghost_id, type_range);
-          type_dag.connect(ghost_id, expr_id);
-          type_dag.connect(ghost_id, key_id, "super_dominance");
+        let index_access;
+        while (decl_db.value_id_to_mapping_decl_id.has(this.variable_decl.id)) {
+          const mapping_decl_id = decl_db.value_id_to_mapping_decl_id.get(this.variable_decl.id)!;
+          //* Generate an expr to be the key of the mapping.
+          const key_id = decl_db.key_id_of_mapping_decl(mapping_decl_id)!;
+          const type_range = type_dag.solution_range.get(key_id)!
+          const expr_gen_prototype = get_exprgenerator(type_range, cur_expression_complex_level + 1);
+          const expr_id = global_id++;
+          type_dag.insert(expr_id, type_range);
+          let ghost_id;
+          const expr_gen = new expr_gen_prototype(expr_id);
+          if (expr_gen.generator_name === "LiteralGenerator") {
+            ghost_id = global_id++;
+            new IRGhost(ghost_id, cur_scope.id());
+            type_dag.insert(ghost_id, type_range);
+            type_dag.connect(ghost_id, expr_id);
+            type_dag.connect(ghost_id, key_id, "super_dominance");
+          }
+          else {
+            type_dag.connect(expr_id, key_id, "super_dominance");
+          }
+          expr_gen.generate(cur_expression_complex_level + 1);
+          if (ghost_id === undefined) {
+            type_solution_alignment(expr_id, key_id);
+          }
+          else {
+            type_solution_alignment(ghost_id, expr_id);
+          }
+          if (index_access === undefined) {
+            index_access = new expr.IRIndexedAccess(global_id++, cur_scope.id(),
+              new expr.IRIdentifier(global_id++, cur_scope.id(),
+                (irnodes.get(mapping_decl_id)! as decl.IRVariableDeclaration).name,
+                mapping_decl_id),
+              expr_gen.irnode! as expr.IRExpression
+            );
+          }
+          else {
+            index_access = new expr.IRIndexedAccess(global_id++, cur_scope.id(), index_access,
+              expr_gen.irnode! as expr.IRExpression);
+          }
         }
-        else {
-          type_dag.connect(expr_id, key_id, "super_dominance");
-        }
-        expr_gen.generate(cur_expression_complex_level + 1);
-        if (ghost_id === undefined) {
-          type_solution_alignment(expr_id, key_id);
-        }
-        else {
-          type_solution_alignment(ghost_id, expr_id);
-        }
-        this.irnode = new expr.IRIndexedAccess(this.id, cur_scope.id(),
-          new expr.IRIdentifier(global_id++, cur_scope.id(),
-            (irnodes.get(mapping_decl_id)! as decl.IRVariableDeclaration).name, mapping_decl_id),
-          expr_gen.irnode! as expr.IRExpression);
+        this.irnode = index_access;
+        this.irnode!.id = this.id;
       }
       //! The selected variable decl is not the member of a struct, then generate an IRIdentifier.
-      else if (!vardecl2structdecl.has(this.variable_decl.id)) {
+      else if (!member2structdecl.has(this.variable_decl.id)) {
         this.irnode = new expr.IRIdentifier(this.id, cur_scope.id(), this.variable_decl.name, this.variable_decl.id);
       }
       //! Otherwise, select for the struct instance and generate an IRMemberAccess,
       //! or generate a temporary struct instance and generate an IRMemberAccess.
       else {
-        const struct_decl_id = vardecl2structdecl.get(this.variable_decl.id)!;
+        const struct_decl_id = member2structdecl.get(this.variable_decl.id)!;
         const available_possible_struct_instances = available_irdecl.filter(v =>
           type_dag.solution_range.get(v.id)!.some(
             t => t.typeName === "StructType" &&
@@ -1664,25 +1845,37 @@ class IdentifierGenerator extends LRValueGenerator {
               (t as type.StructType).referece_id === struct_decl_id);
             const struct_instance_gen = new StructInstanceDeclarationGenerator(type_range, false, struct_decl_id);
             struct_instance_gen.generate();
-            const vardeclstmt = new stmt.IRVariableDeclareStatement(global_id++, cur_scope.id(),
+            const vardeclstmt = new stmt.IRVariableDeclarationStatement(global_id++, cur_scope.id(),
               [struct_instance_gen.irnode! as decl.IRVariableDeclaration],
               (struct_instance_gen.irnode as decl.IRVariableDeclaration).value);
             (struct_instance_gen.irnode as decl.IRVariableDeclaration).value = undefined;
             if (unexpected_extra_stmt.has(cur_scope.id())) {
               unexpected_extra_stmt.get(cur_scope.id())!.push(vardeclstmt);
+              for (const initialization of initialize_must_be_initialized(cur_scope.id())) {
+                unexpected_extra_stmt.get(cur_scope.id())!.push(initialization);
+              }
             }
             else {
-              unexpected_extra_stmt.set(cur_scope.id(), [vardeclstmt]);
+              unexpected_extra_stmt.set(cur_scope.id(), [vardeclstmt, ...initialize_must_be_initialized(cur_scope.id())]);
             }
             if (rollback) {
               cur_scope = snapshot_scope.snapshot();
+            }
+            assert(storage_location_dag.solution_range.has(struct_instance_gen.irnode!.id),
+              `IdentifierGenerator: storage_location_dag.solution_range does not have ${struct_instance_gen.irnode!.id}`);
+            if (this.left) {
+              storage_location_dag.update(struct_instance_gen.irnode!.id, [
+                StorageLocationProvider.storage_pointer(),
+                StorageLocationProvider.memory(),
+                StorageLocationProvider.storage_ref()
+              ])
             }
             //* Generate an IRMemberAccess
             this.irnode = new expr.IRMemberAccess(this.id, cur_scope.id(), this.variable_decl.name,
               struct_decl_id, new expr.IRIdentifier(global_id++, cur_scope.id(),
                 (struct_instance_gen.irnode! as decl.IRVariableDeclaration).name, struct_instance_gen.irnode!.id));
           }
-          //! Otherwise, generate a new struct instance and then generate an IRMemberAccess.
+          //! Otherwise, generate a temporary struct instance and then generate an IRMemberAccess.
           else {
             const nsid = global_id++;
             type_dag.insert(nsid, [user_defined_types.find(t => t.typeName === "StructType" &&
@@ -1697,8 +1890,16 @@ class IdentifierGenerator extends LRValueGenerator {
           }
         }
         else {
-          // haoyang 
           const struct_instance = pick_random_element(available_possible_struct_instances)!;
+          assert(storage_location_dag.solution_range.has(struct_instance.id),
+            `IdentifierGenerator: storage_location_dag.solution_range does not have ${struct_instance.id}`);
+          if (this.left) {
+            storage_location_dag.update(struct_instance.id, [
+              StorageLocationProvider.storage_pointer(),
+              StorageLocationProvider.memory(),
+              StorageLocationProvider.storage_ref()
+            ])
+          }
           //* Generate an IRMemberAccess
           this.irnode = new expr.IRMemberAccess(this.id, cur_scope.id(), this.variable_decl.name,
             struct_decl_id, new expr.IRIdentifier(global_id++, cur_scope.id(),
@@ -2212,7 +2413,7 @@ class ConditionalGenerator extends RValueGenerator {
       storage_location_dag.insert(this.id,
         storage_location_dag.solution_range.get(extracted_e2.id)!
       );
-      storage_location_dag.connect(this.id, extracted_e2.id);
+      storage_location_dag.connect(this.id, extracted_e2.id, "sub_dominance");
       storage_location_dag.solution_range_alignment(this.id, extracted_e2.id);
       storage_location_dag.connect(this.id, extracted_e3.id, "sub_dominance");
       storage_location_dag.solution_range_alignment(this.id, extracted_e3.id);
@@ -2256,7 +2457,6 @@ class FunctionCallGenerator extends RValueGenerator {
       type_dag.solution_range.set(state_struct_instance_id,
         type_dag.solution_range.get(state_struct_instance_id)!.filter(t => (t as type.StructType).name === state_decl_name));
     }
-    //! Otherwise, first select a function declaration
     if (decl_db.is_getter_function(funcdecl_id)) {
       ghost_function_decl_calls.add(this.id);
     }
@@ -2280,8 +2480,20 @@ class FunctionCallGenerator extends RValueGenerator {
     decl_db.called_function_decls_ids.add(funcdecl_id);
     if (decl_db.is_getter_function(funcdecl_id)
       && !decl_db.getter_function_id_to_struct_decl_id.has(funcdecl_id)
-      && !decl_db.getter_function_id_for_mapping.has(funcdecl_id)) {
+      && !decl_db.getter_function_id_to_state_mapping_decl.has(funcdecl_id)) {
       vismut_dag.update((irnodes.get(funcdecl_id)! as decl.IRFunctionDefinition).returns[0].id, [
+        VisMutProvider.var_public()
+      ]);
+    }
+    else if (decl_db.getter_function_id_to_struct_decl_id.has(funcdecl_id)) {
+      const state_struct_instance_id = decl_db.getter_function_id_to_state_struct_instance_id.get(funcdecl_id)!;
+      vismut_dag.update(state_struct_instance_id, [
+        VisMutProvider.var_public()
+      ]);
+    }
+    else if (decl_db.getter_function_id_to_state_mapping_decl.has(funcdecl_id)) {
+      const state_mapping_decl_id = decl_db.getter_function_id_to_state_mapping_decl.get(funcdecl_id)!;
+      vismut_dag.update(state_mapping_decl_id, [
         VisMutProvider.var_public()
       ]);
     }
@@ -2316,7 +2528,9 @@ class FunctionCallGenerator extends RValueGenerator {
     expr2read_variables.set(this.id, new Set<number>());
     //! Generate arguments
     for (let i = 0; i < funcdecl.parameters.length; i++) {
-      const type_range = type_dag.solution_range.get(funcdecl.parameters[i].id)!;
+      const type_range = type_dag.solution_range.get(funcdecl.parameters[i].id)!.filter(
+        t => all_types.includes(t)
+      );
       let arg_gen_prototype = get_exprgenerator(type_range, cur_expression_complex_level + 1);
       const argid = global_id++;
       type_dag.insert(argid, type_range);
@@ -2522,16 +2736,18 @@ class NewStructGenerator extends ExpressionGenerator {
     const args : expr.IRExpression[] = [];
     expr2read_variables.set(this.id, new Set<number>());
     for (const member of struct_decl.members) {
-      const type_range = type_dag.solution_range.get(member.id)!;
+      const type_range = type_dag.solution_range.get(member.id)!.filter(
+        t => all_types.includes(t)
+      );
       let arg_gen_prototype = get_exprgenerator(type_range, cur_expression_complex_level + 1);
       const argid = global_id++;
-      type_dag.insert(argid, type_dag.solution_range.get(member.id)!);
+      type_dag.insert(argid, type_range);
       let ghost_id;
       const arg_gen = new arg_gen_prototype(argid);
       if (arg_gen.generator_name === "LiteralGenerator") {
         ghost_id = global_id++;
         new IRGhost(ghost_id, cur_scope.id());
-        type_dag.insert(ghost_id, type_dag.solution_range.get(member.id)!);
+        type_dag.insert(ghost_id, type_range);
         type_dag.connect(ghost_id, argid);
         type_dag.connect(ghost_id, member.id, "super_dominance");
       }
@@ -2597,23 +2813,24 @@ class NewContractGenerator extends ExpressionGenerator {
     const args : expr.IRExpression[] = [];
     expr2read_variables.set(this.id, new Set<number>());
     for (let i = 0; i < contract_decl.constructor_parameters.length; i++) {
-      const type_range = type_dag.solution_range.get(contract_decl.constructor_parameters[i].id)!;
+      const type_range = type_dag.solution_range.get(contract_decl.constructor_parameters[i].id)!.filter(
+        t => all_types.includes(t)
+      )
       let arg_gen_prototype = get_exprgenerator(type_range, cur_expression_complex_level + 1);
       const argid = global_id++;
-      type_dag.insert(argid, type_dag.solution_range.get(contract_decl.constructor_parameters[i].id)!);
+      type_dag.insert(argid, type_range);
       let ghost_id;
       const arg_gen = new arg_gen_prototype(argid);
       if (arg_gen.generator_name === "LiteralGenerator") {
         ghost_id = global_id++;
         new IRGhost(ghost_id, cur_scope.id());
-        type_dag.insert(ghost_id, type_dag.solution_range.get(contract_decl.constructor_parameters[i].id)!);
+        type_dag.insert(ghost_id, type_range);
         type_dag.connect(ghost_id, argid);
         type_dag.connect(ghost_id, contract_decl.constructor_parameters[i].id, "super_dominance");
       }
       else {
         type_dag.connect(argid, contract_decl.constructor_parameters[i].id, "super_dominance");
       }
-      type_dag.connect(argid, contract_decl.constructor_parameters[i].id);
       arg_gen.generate(cur_expression_complex_level + 1);
       if (ghost_id === undefined) {
         type_solution_alignment(argid, contract_decl.constructor_parameters[i].id);
@@ -2842,7 +3059,7 @@ class SingleVariableDeclareStatementGenerator extends NonExpressionStatementGene
       variable_gen.generate();
       this.vardecl = variable_gen.irnode! as decl.IRVariableDeclaration;
     }
-    this.irnode = new stmt.IRVariableDeclareStatement(global_id++, cur_scope.id(), [this.vardecl], this.expr);
+    this.irnode = new stmt.IRVariableDeclarationStatement(global_id++, cur_scope.id(), [this.vardecl], this.expr);
     let extracted_ir = expr.tuple_extraction(this.expr);
     if (extracted_ir.typeName === "IRLiteral") {
       const ghost_id = global_id++;
@@ -2896,7 +3113,7 @@ class MultipleVariableDeclareStatementGenerator extends NonExpressionStatementGe
       this.vardecls.push(variable_gen.irnode! as decl.IRVariableDeclaration);
     }
     const ir_tuple_exp = new expr.IRTuple(global_id++, cur_scope.id(), ir_exps);
-    this.irnode = new stmt.IRVariableDeclareStatement(global_id++, cur_scope.id(), this.vardecls, ir_tuple_exp);
+    this.irnode = new stmt.IRVariableDeclarationStatement(global_id++, cur_scope.id(), this.vardecls, ir_tuple_exp);
     for (let i = 0; i < this.var_count; i++) {
       let extracted_ir = expr.tuple_extraction(ir_exps[i]);
       if (extracted_ir.typeName === "IRLiteral") {
@@ -3057,12 +3274,12 @@ class ForStatementGenerator extends NonExpressionStatementGenerator {
       indent += 2;
     }
     //! Generate the initialization statement
-    let init_stmt_expr : stmt.IRVariableDeclareStatement | expr.IRExpression | undefined;
+    let init_stmt_expr : stmt.IRVariableDeclarationStatement | expr.IRExpression | undefined;
     const init_cnt = random_int(config.for_init_cnt_lower_limit, config.for_init_cnt_upper_limit);
     if (init_cnt > 0 && Math.random() < config.vardecl_prob) {
       const mul_vardecl_gen = new MultipleVariableDeclareStatementGenerator(init_cnt);
       mul_vardecl_gen.generate(0);
-      init_stmt_expr = mul_vardecl_gen.irnode! as stmt.IRVariableDeclareStatement;
+      init_stmt_expr = mul_vardecl_gen.irnode! as stmt.IRVariableDeclarationStatement;
       this.exprs = this.exprs.concat(mul_vardecl_gen.exprs);
     }
     else {

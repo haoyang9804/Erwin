@@ -191,7 +191,10 @@ else if (program.args[0] === "generate") {
   assert(config.new_prob >= 0 && config.new_prob <= 1.0, "The probability of generating a variable declaration in place must be in the range [0,1].");
   assert(config.else_prob >= 0.0 && config.else_prob <= 1.0, "The probability of generating an else statement must be in the range [0,1].");
   assert(config.terminal_prob >= 0.0 && config.terminal_prob <= 1.0, "The probability of generating a terminal statement must be in the range [0,1].");
-  assert(config.mapping_prob >= 0.0 && config.mapping_prob <= 1.0, "The probability of generating a mapping must be in the range [0,1].");
+  assert(config.mapping_prob > 0.0 && config.mapping_prob <= 1.0, "The probability of generating a mapping must be in the range (0,1].");
+  assert(config.contract_instance_prob >= 0.0 && config.contract_instance_prob <= 1.0, "The probability of generating a contract instance must be in the range [0,1].");
+  assert(config.struct_instance_prob >= 0.0 && config.struct_instance_prob <= 1.0, "The probability of generating a struct instance must be in the range [0,1].");
+  assert(config.mapping_prob + config.contract_instance_prob + config.struct_instance_prob < 1, "The sum of the probabilities of generating a contract/struct instance or a mapping declaration must be less than 1.");
   assert(config.return_count_of_function_lowerlimit <= config.return_count_of_function_upperlimit, "The lower limit of the number of return values of a function must be less than or equal to the upper limit.");
   assert(config.param_count_of_function_lowerlimit <= config.param_count_of_function_upperlimit, "The lower limit of the number of parameters of a function must be less than or equal to the upper limit.");
   assert(config.state_variable_count_lowerlimit <= config.state_variable_count_upperlimit, "state_variable_count_lowerlimit must be less than or equal to state_variable_count_upperlimit.");
@@ -214,7 +217,6 @@ else if (program.args[0] === "generate") {
   assert(config.struct_member_variable_count_lowerlimit >= 1, "The lower limit of the number of member variables in a struct must be not less than 1.");
   assert(config.struct_prob >= 0 && config.struct_prob <= 1, "The probability of generating a struct must be in the range [0,1].");
   assert(config.initialization_prob >= 0 && config.initialization_prob <= 1, "The probability of generating an initialization statement must be in the range [0,1].");
-  assert(config.contract_instance_prob >= 0 && config.struct_instance_prob >= 0 && config.contract_instance_prob + config.struct_instance_prob < 1, "The probability of generating a contract/struct instance must be in the range [0,1).");
   assert(config.constructor_prob >= 0 && config.constructor_prob <= 1, "The probability of generating a constructor must be in the range [0,1].");
   assert(config.return_prob >= 0 && config.return_prob <= 1, "The probability of generating a return statement must be in the range [0,1].");
   assert(config.reuse_name_prob >= 0 && config.reuse_name_prob < 1, "The probability of reusing a name must be in the range [0,1).");
@@ -340,6 +342,8 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
     }
     for (const mapping_decl_id of decl_db.mapping_decl_id) {
       const [key_id, value_id] = decl_db.kv_idpair_of_mapping_decl(mapping_decl_id);
+      assert(type_solutions.has(key_id), `The type solution does not have the key id ${key_id}.`);
+      assert(type_solutions.has(value_id), `The type solution does not have the value id ${value_id}.`);
       (irnodes.get(mapping_decl_id) as decl.IRVariableDeclaration).type =
         new MappingType(type_solutions.get(key_id)!, type_solutions.get(value_id)!);
     }

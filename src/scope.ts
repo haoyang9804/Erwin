@@ -4,8 +4,10 @@ import { assert } from './utility'
 
 export enum scopeKind {
   CONSTRUCTOR = "scopeKind::CONSTRUCTOR",
+  CONSTRUCTOR_PARAMETERS = "scopeKind::CONSTRUCTOR_PARAMETERS",
   FUNC = "scopeKind::FUNC",
   FUNC_PARAMETER = "scopeKind::FUNC_PARAMETER",
+  FUNC_RETURNS = "scopeKind::FUNC_RETURNS",
   CONTRACT = "scopeKind::CONTRACT",
   GLOBAL = "scopeKind::GLOBAL",
   IF_CONDITION = "scopeKind::IF_CONDITION",
