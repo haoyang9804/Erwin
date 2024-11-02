@@ -11,7 +11,7 @@ import { irnodes } from "./node";
 import { color } from "console-log-colors"
 import { is_super_set, is_equal_set } from "./dominance";
 import { ContractKind, DataLocation, FunctionCallKind, FunctionKind, FunctionStateMutability, FunctionVisibility, StateVariableVisibility } from "solc-typed-ast";
-import { ScopeList, scopeKind, initScope } from "./scope";
+import { ScopeList, scopeKind, initScope, inside_function_body } from "./scope";
 import { FuncStat, FuncStatProvider } from "./funcstat";
 import { FuncVis, FuncVisProvider } from "./visibility";
 import { StorageLocationProvider } from "./memory";
@@ -991,7 +991,7 @@ class ConstructorDeclarationGenerator extends DeclarationGenerator {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Parameters, ${this.parameter_count} in total`));
       indent += 2;
     }
-    cur_scope = cur_scope.new(scopeKind.FUNC_PARAMETER);
+    cur_scope = cur_scope.new(scopeKind.CONSTRUCTOR_PARAMETERS);
     for (let i = 0; i < this.parameter_count; i++) {
       const variable_gen = new VariableDeclarationGenerator(all_types);
       variable_gen.generate();
@@ -1921,6 +1921,7 @@ class IdentifierGenerator extends LRValueGenerator {
               .map(s => s === StorageLocationProvider.storage_ref() ? StorageLocationProvider.storage_pointer() : s)
           );
         }
+        storage_location_dag.connect(this.id, this.variable_decl.id);
       }
     }
     if (config.debug) {
@@ -2851,7 +2852,7 @@ class NewContractGenerator extends ExpressionGenerator {
         storage_location_dag.solution_range_alignment(argid, contract_decl.constructor_parameters[i].id);
       }
     }
-    if (cur_scope.kind() === scopeKind.FUNC) {
+    if (inside_function_body(cur_scope.kind())) {
       noview_nopure_funcdecl = true;
     }
     const new_function_expr = new expr.IRFunctionCall(this.id, cur_scope.id(), FunctionCallKind.FunctionCall, new_expr, args);

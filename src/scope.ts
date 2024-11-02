@@ -22,6 +22,18 @@ export enum scopeKind {
   MAPPING = "scopeKind::MAPPING",
 }
 
+export function inside_function_body(scope_kind : scopeKind) : boolean {
+  return scope_kind === scopeKind.FUNC ||
+    scope_kind === scopeKind.DOWHILE_BODY ||
+    scope_kind === scopeKind.DOWHILE_COND ||
+    scope_kind === scopeKind.WHILE_BODY ||
+    scope_kind === scopeKind.WHILE_CONDITION ||
+    scope_kind === scopeKind.FOR_BODY ||
+    scope_kind === scopeKind.FOR_CONDITION ||
+    scope_kind === scopeKind.IF_BODY ||
+    scope_kind === scopeKind.IF_CONDITION;
+}
+
 type scopeT = {
   id : number,
   kind : scopeKind
