@@ -411,8 +411,12 @@ function type_solution_alignment(dominator_id : number, dominatee_id : number) :
     dominator_struct_type_range.forEach((t) => {
       if (!new_dominator_struct_type_range.includes(t)) {
         const getter_func_ids = decl_db.state_struct_instance_id_to_getter_function_ids.get(dominator_id)!;
-        const struct_type_name = (t as type.StructType).name;
+        let struct_type_name = (t as type.StructType).name;
+        if (struct_type_name.includes(".")) {
+          struct_type_name = struct_type_name.split(".")[1];
+        }
         const struct_decl = decl_db.find_structdecl_by_name(struct_type_name)!;
+        assert(struct_decl !== undefined, `type_solution_alignment: struct_decl whose name is ${struct_type_name} is undefined`);
         getter_func_ids.forEach((getter_func_id) => {
           if (struct_decl.id === decl_db.getter_function_id_to_struct_decl_id.get(getter_func_id)!) {
             decl_db.remove_getter_function(getter_func_id);
@@ -426,8 +430,12 @@ function type_solution_alignment(dominator_id : number, dominatee_id : number) :
     dominatee_struct_type_range.forEach((t) => {
       if (!new_dominatee_struct_type_range.includes(t)) {
         const getter_func_ids = decl_db.state_struct_instance_id_to_getter_function_ids.get(dominatee_id)!;
-        const struct_type_name = (t as type.StructType).name;
+        let struct_type_name = (t as type.StructType).name;
+        if (struct_type_name.includes(".")) {
+          struct_type_name = struct_type_name.split(".")[1];
+        }
         const struct_decl = decl_db.find_structdecl_by_name(struct_type_name)!;
+        assert(struct_decl !== undefined, `type_solution_alignment: struct_decl whose name is ${struct_type_name} is undefined`);
         getter_func_ids.forEach((getter_func_id) => {
           if (struct_decl.id === decl_db.getter_function_id_to_struct_decl_id.get(getter_func_id)!) {
             decl_db.remove_getter_function(getter_func_id);
@@ -2336,7 +2344,8 @@ class UnaryOpGenerator extends RValueGenerator {
     type_dag.insert(identifier_id, this.type_range);
     type_dag.connect(this.id, identifier_id);
     //! Generate identifier
-    const identifier_gen = new IdentifierGenerator(identifier_id);
+    const is_left = this.op === "++" || this.op === "--";
+    const identifier_gen = new IdentifierGenerator(identifier_id, is_left);
     identifier_gen.generate(cur_expression_complex_level + 1);
     type_solution_alignment(this.id, identifier_id);
     let expression : expr.IRExpression = identifier_gen.irnode! as expr.IRExpression;
