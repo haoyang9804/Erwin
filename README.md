@@ -1,10 +1,8 @@
-<h1 style="text-align:center;">Erwin</h1>
-
 <p align="center">
 <img src="Erwin.png" alt="erwin" width="400"/>
 </p>
 
-<h2 style="text-align:center;">Detected Bugs</h2>
+## Detected Bugs
 
 1. https://github.com/ethereum/solidity/issues/14719 (medium impact, confirmed, fixed, type) ✅
 2. https://github.com/ethereum/solidity/issues/14720 (duplicate of 14719)
