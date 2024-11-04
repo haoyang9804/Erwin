@@ -910,6 +910,24 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
         if (decl_db.is_mapping_decl(leaf)) {
           this.leaves.delete(leaf);
           mapping_leaves.push(leaf);
+          for (const edge of this.leavesequal) {
+            const [leaf1, leaf2] = edge.split(" ");
+            if (parseInt(leaf1) === leaf || parseInt(leaf2) === leaf) {
+              this.leavesequal.delete(edge);
+            }
+          }
+          for (const edge of this.leavessub) {
+            const [leaf1, leaf2] = edge.split(" ");
+            if (parseInt(leaf1) === leaf || parseInt(leaf2) === leaf) {
+              this.leavessub.delete(edge);
+            }
+          }
+          for (const edge of this.leavesnotsure) {
+            const [leaf1, leaf2] = edge.split(" ");
+            if (parseInt(leaf1) === leaf || parseInt(leaf2) === leaf) {
+              this.leavesnotsure.delete(edge);
+            }
+          }
         }
       });
       for (let i = 0; i < mapping_leaves.length; i++) {

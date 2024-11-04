@@ -8,7 +8,7 @@ import * as mut from "./mutators";
 import { config } from "./config";
 import * as fs from "fs";
 import { assert, pick_random_element } from "./utility";
-import { initType, MappingType } from './type';
+import { initType, MappingType, Type } from './type';
 import { decl_db } from './db';
 import {
   PrettyFormatter,
@@ -307,6 +307,23 @@ async function mutate() {
   }
 }
 
+function assign_mapping_type(mapping_decl_id : number, type_solutions : Map<number, Type>) : void {
+  if ((irnodes.get(mapping_decl_id) as decl.IRVariableDeclaration).type !== undefined) return;
+  const [key_id, value_id] = decl_db.kv_idpair_of_mapping_decl(mapping_decl_id);
+  assert(type_solutions.has(key_id), `The type solution does not have the key id ${key_id}.`);
+  assert(type_solutions.has(value_id) || decl_db.is_mapping_decl(value_id),
+    `The type solution does not have the value id ${value_id} and this id doesn't belong to a mapping declaration.`);
+  if (type_solutions.has(value_id)) {
+    (irnodes.get(mapping_decl_id) as decl.IRVariableDeclaration).type =
+      new MappingType(type_solutions.get(key_id)!, type_solutions.get(value_id)!);
+  }
+  else {
+    assign_mapping_type(value_id, type_solutions);
+    (irnodes.get(mapping_decl_id) as decl.IRVariableDeclaration).type =
+      new MappingType(type_solutions.get(key_id)!, (irnodes.get(value_id) as decl.IRVariableDeclaration).type!);
+  }
+}
+
 function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
   console.log(`${gen.type_dag.solutions_collection.length} type solutions`);
   //! Select one vismut solution
@@ -341,11 +358,7 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
         (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
     }
     for (const mapping_decl_id of decl_db.mapping_decl_id) {
-      const [key_id, value_id] = decl_db.kv_idpair_of_mapping_decl(mapping_decl_id);
-      assert(type_solutions.has(key_id), `The type solution does not have the key id ${key_id}.`);
-      assert(type_solutions.has(value_id), `The type solution does not have the value id ${value_id}.`);
-      (irnodes.get(mapping_decl_id) as decl.IRVariableDeclaration).type =
-        new MappingType(type_solutions.get(key_id)!, type_solutions.get(value_id)!);
+      assign_mapping_type(mapping_decl_id, type_solutions);
     }
     const program = writer.write(source_unit_gen.irnode!.lower());
     if (program === pre_program) continue;
@@ -375,9 +388,7 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
       (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
   }
   for (const mapping_decl_id of decl_db.mapping_decl_id) {
-    const [key_id, value_id] = decl_db.kv_idpair_of_mapping_decl(mapping_decl_id);
-    (irnodes.get(mapping_decl_id) as decl.IRVariableDeclaration).type =
-      new MappingType(type_solutions.get(key_id)!, type_solutions.get(value_id)!);
+    assign_mapping_type(mapping_decl_id, type_solutions);
   }
   //! Select storage location solution
   const storage_location_solutions = pick_random_element(gen.storage_location_dag.solutions_collection)!;
@@ -430,9 +441,7 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
       (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
   }
   for (const mapping_decl_id of decl_db.mapping_decl_id) {
-    const [key_id, value_id] = decl_db.kv_idpair_of_mapping_decl(mapping_decl_id);
-    (irnodes.get(mapping_decl_id) as decl.IRVariableDeclaration).type =
-      new MappingType(type_solutions.get(key_id)!, type_solutions.get(value_id)!);
+    assign_mapping_type(mapping_decl_id, type_solutions);
   }
   //! Select one vismut solution
   const vismut_solutions = pick_random_element(gen.vismut_dag.solutions_collection)!;
