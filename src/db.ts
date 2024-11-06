@@ -158,6 +158,7 @@ class DeclDB {
   public state_struct_instance_id_to_getter_function_ids : Map<number, number[]> = new Map<number, number[]>();
   public contract_scope_id_to_contract_id : Map<number, number> = new Map<number, number>();
   public struct_decl_that_contains_mapping_decl : Set<number> = new Set<number>();
+  public member2structdecl : Map<number, number> = new Map<number, number>();
   constructor() {
     this.scope_tree = new Tree();
     this.scope2irnodeinfo = new Map<number, irnodeInfo[]>();

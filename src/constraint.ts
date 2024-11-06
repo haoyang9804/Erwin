@@ -115,7 +115,8 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
   update(nodeid : number, range : Node[]) : void {
     assert(this.dag_nodes.has(nodeid), `ConstraintDAG: node ${nodeid} is not in the graph`);
     assert(this.solution_range.has(nodeid), `ConstraintDAG: node ${nodeid} is not in the solution_range`);
-    this.solution_range.set(nodeid, [...intersection(new Set<Node>(this.solution_range.get(nodeid)), new Set<Node>(range))]);
+    const intersected_range = [...intersection(new Set<Node>(this.solution_range.get(nodeid)), new Set<Node>(range))];
+    this.solution_range.set(nodeid, intersected_range);
   }
 
   check_connection(from : number, to : number) : boolean {

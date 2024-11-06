@@ -14,8 +14,10 @@ import { IRVariableDeclaration } from "./declare";
 import { IRExpression, IRFunctionCall, IRTuple } from "./expression";
 
 export abstract class IRStatement extends IRNode {
-  constructor(id : number, scope : number) {
+  exprs : IRExpression[];
+  constructor(id : number, scope : number, exprs : IRExpression[] = []) {
     super(id, scope);
+    this.exprs = exprs;
   }
   abstract lower() : Statement;
 }
