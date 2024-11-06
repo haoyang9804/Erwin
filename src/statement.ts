@@ -14,8 +14,10 @@ import { IRVariableDeclaration } from "./declare";
 import { IRExpression, IRFunctionCall, IRTuple } from "./expression";
 
 export abstract class IRStatement extends IRNode {
-  constructor(id : number, scope : number) {
+  exprs : IRExpression[];
+  constructor(id : number, scope : number, exprs : IRExpression[] = []) {
     super(id, scope);
+    this.exprs = exprs;
   }
   abstract lower() : Statement;
 }
@@ -29,7 +31,7 @@ export class IRPlaceholderStatement extends IRStatement {
   }
 }
 
-export class IRVariableDeclareStatement extends IRStatement {
+export class IRVariableDeclarationStatement extends IRStatement {
   variable_declares : (IRVariableDeclaration | null)[];
   value : IRExpression | undefined;
   constructor(id : number, scope : number, variable_declares : (IRVariableDeclaration | null)[], value ?: IRExpression) {
@@ -38,9 +40,9 @@ export class IRVariableDeclareStatement extends IRStatement {
     this.value = value;
   }
   lower() : Statement {
-    assert(this.variable_declares.length > 0, `IRVariableDeclareStatement ${this.id}: variable_declares is empty`);
+    assert(this.variable_declares.length > 0, `IRVariableDeclarationStatement ${this.id}: variable_declares is empty`);
     if (this.variable_declares.length > 1) {
-      assert(this.value instanceof IRTuple, "IRVariableDeclareStatement: value is not IRTuple when there are more than one variable_declares");
+      assert(this.value instanceof IRTuple, "IRVariableDeclarationStatement: value is not IRTuple when there are more than one variable_declares");
     }
     const lowered_variable_declares = (this.variable_declares.filter(v => v !== null) as IRVariableDeclaration[]).map(v => v.lower() as VariableDeclaration);
     const assignments = lowered_variable_declares.map(v => v.id);
@@ -124,11 +126,11 @@ export class IRIf extends IRStatement {
 }
 
 export class IRFor extends IRStatement {
-  initial_stmt : IRVariableDeclareStatement | IRExpression | undefined;
+  initial_stmt : IRVariableDeclarationStatement | IRExpression | undefined;
   condition : IRExpression | undefined;
   loop : IRExpression | undefined;
   body : IRStatement[];
-  constructor(id : number, scope : number, initial_stmt : IRVariableDeclareStatement | IRExpression | undefined, condition : IRExpression | undefined, loop : IRExpression | undefined, body : IRStatement[]) {
+  constructor(id : number, scope : number, initial_stmt : IRVariableDeclarationStatement | IRExpression | undefined, condition : IRExpression | undefined, loop : IRExpression | undefined, body : IRStatement[]) {
     super(id, scope);
     this.initial_stmt = initial_stmt;
     this.condition = condition;
@@ -136,7 +138,7 @@ export class IRFor extends IRStatement {
     this.body = body;
   }
   lower() : Statement {
-    const lowered_initial_stmt = this.initial_stmt === undefined ? undefined : this.initial_stmt instanceof IRVariableDeclareStatement ? this.initial_stmt.lower() as VariableDeclarationStatement : factory.makeExpressionStatement(this.initial_stmt.lower());
+    const lowered_initial_stmt = this.initial_stmt === undefined ? undefined : this.initial_stmt instanceof IRVariableDeclarationStatement ? this.initial_stmt.lower() as VariableDeclarationStatement : factory.makeExpressionStatement(this.initial_stmt.lower());
     const lowered_condition = this.condition === undefined ? undefined : this.condition.lower();
     const lowered_loop = this.loop === undefined ? undefined : factory.makeExpressionStatement(this.loop.lower());
     const lowered_body = factory.makeBlock(this.body.map(function(stmt) {

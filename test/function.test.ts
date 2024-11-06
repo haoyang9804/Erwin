@@ -1,7 +1,7 @@
 import { TypeProvider, StructType } from "../src/type"
 import { IRModifier, IRVariableDeclaration, IRFunctionDefinition } from "../src/declare";
 import { IRIdentifier, IRBinaryOp, IRLiteral, IRTuple, IRFunctionCall } from "../src/expression";
-import { IRPlaceholderStatement, IRVariableDeclareStatement, IRExpressionStatement } from "../src/statement";
+import { IRPlaceholderStatement, IRVariableDeclarationStatement, IRExpressionStatement } from "../src/statement";
 import {
   PrettyFormatter,
   ASTWriter,
@@ -32,7 +32,7 @@ literal1.type = TypeProvider.uint256();
 const literal2 = new IRLiteral(3, 0);
 literal2.type = TypeProvider.uint256();
 const tuple = new IRTuple(5, 0, [literal1, literal2]);
-const variable_declare_stmt = new IRVariableDeclareStatement(4, 0, [variable1, variable2], tuple);
+const variable_declare_stmt = new IRVariableDeclarationStatement(4, 0, [variable1, variable2], tuple);
 
 const v1 = new IRVariableDeclaration(1, 0, "x");
 v1.type = TypeProvider.uint256();

@@ -1,5 +1,4 @@
 export class ConstaintNode {
-  // id of the irnode
   id : number;
   inbound : number = 0;
   outbound : number = 0;
@@ -23,6 +22,7 @@ import { FuncVis, VarVis } from "./visibility";
 import { StorageLocation } from "./memory";
 import { VisMut, VisMutKind } from "./vismut";
 import { LinkedListNode } from "./dataStructor";
+import { decl_db } from "./db";
 
 interface toLeaf {
   leaf_id : number;
@@ -32,7 +32,7 @@ interface toLeaf {
   equal_dominance : boolean; // node equal dominate leaf
 };
 
-export class DominanceDAG<T, Node extends DominanceNode<T>> {
+export class ConstraintDAG<T, Node extends DominanceNode<T>> {
   dag_nodes : Map<number, ConstaintNode> = new Map<number, ConstaintNode>();
   // If 'id1 id2' is installed in sub_dominance/super_dominance, then the solution of id2 is a sub_dominance/super_dominance of the solution of id1
   sub_dominance : Set<string> = new Set();
@@ -65,18 +65,18 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     // Check if the graph have roots and leaves
     if (this.roots.size === 0 && this.dag_nodes.size !== 0) {
       await this.draw("graph_for_check_property.svg");
-      throw new Error(`DominanceDAG: no root`);
+      throw new Error(`ConstraintDAG: no root`);
     }
     if (this.leaves.size === 0 && this.roots.size !== this.dag_nodes.size) {
       await this.draw("graph_for_check_property.svg");
-      throw new Error(`DominanceDAG: no leaf`);
+      throw new Error(`ConstraintDAG: no leaf`);
     }
     // Check if the non-leaf node has only one inbound edge or is a root
     for (const [nodeid, node] of this.dag_nodes) {
       if (!this.leaves.has(nodeid)) {
         if (!(node.inbound === 1 || node.inbound === 0 && this.roots.has(nodeid))) {
           await this.draw("graph_for_check_property.svg");
-          throw new Error(`DominanceDAG: node ${nodeid} has more than one inbound edge`);
+          throw new Error(`ConstraintDAG: node ${nodeid} has more than one inbound edge`);
         }
       }
     }
@@ -96,7 +96,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
 
   remove(nodeid : number) : void {
     if (config.debug) {
-      assert(this.dag_nodes.has(nodeid), `DominanceDAG: node ${nodeid} is not in the graph`);
+      assert(this.dag_nodes.has(nodeid), `ConstraintDAG: node ${nodeid} is not in the graph`);
     }
     this.solution_range.delete(nodeid);
     for (const innode of this.dag_nodes.get(nodeid)!.ins) {
@@ -113,15 +113,21 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   }
 
   update(nodeid : number, range : Node[]) : void {
-    assert(this.dag_nodes.has(nodeid), `DominanceDAG: node ${nodeid} is not in the graph`);
-    assert(this.solution_range.has(nodeid), `DominanceDAG: node ${nodeid} is not in the solution_range`);
-    this.solution_range.set(nodeid, [...intersection(new Set<Node>(this.solution_range.get(nodeid)), new Set<Node>(range))]);
+    assert(this.dag_nodes.has(nodeid), `ConstraintDAG: node ${nodeid} is not in the graph`);
+    assert(this.solution_range.has(nodeid), `ConstraintDAG: node ${nodeid} is not in the solution_range`);
+    const intersected_range = [...intersection(new Set<Node>(this.solution_range.get(nodeid)), new Set<Node>(range))];
+    this.solution_range.set(nodeid, intersected_range);
+  }
+
+  check_connection(from : number, to : number) : boolean {
+    return this.dag_nodes.get(from)!.outs.includes(to);
   }
 
   connect(from : number, to : number, rank ?: string) : void {
+    if (this.check_connection(from, to)) return;
     if (config.debug) {
-      assert(this.dag_nodes.has(from), `DominanceDAG: node ${from} is not in the graph`);
-      assert(this.dag_nodes.has(to), `DominanceDAG: node ${to} is not in the graph`);
+      assert(this.dag_nodes.has(from), `ConstraintDAG: node ${from} is not in the graph`);
+      assert(this.dag_nodes.has(to), `ConstraintDAG: node ${to} is not in the graph`);
     }
     if (from === to) return;
     this.dag_nodes.get(to)!.ins.push(from);
@@ -129,7 +135,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     this.dag_nodes.get(to)!.inbound++;
     this.dag_nodes.get(from)!.outbound++;
     if (config.debug)
-      assert(rank === undefined || rank === "sub_dominance" || rank === "super_dominance", `DominanceDAG: rank ${rank} is not supported`)
+      assert(rank === undefined || rank === "sub_dominance" || rank === "super_dominance", `ConstraintDAG: rank ${rank} is not supported`)
     if (rank === "sub_dominance") {
       this.sub_dominance.add(`${from} ${to}`);
     }
@@ -143,17 +149,25 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     let minimum_solution_range_of_dominator;
     const rank = this.sub_dominance.has(`${dominator_id} ${dominatee_id}`) ? "sub_dominance" :
       this.super_dominance.has(`${dominator_id} ${dominatee_id}`) ? "super_dominance" : undefined;
-    if (rank === undefined) minimum_solution_range_of_dominator = this.solution_range.get(dominatee_id)!;
+    if (rank === undefined) {
+      minimum_solution_range_of_dominator = [...
+        merge_set(new Set<Node>(this.solution_range.get(dominatee_id)!
+          .flatMap(t => t.supers() as Node[])), new Set<Node>(this.solution_range.get(dominatee_id)!
+            .flatMap(t => t.subs() as Node[])))
+      ];
+    }
     else if (rank === "sub_dominance") {
-      minimum_solution_range_of_dominator = [...new Set<Node>(this.solution_range.get(dominatee_id)!.flatMap(t => t.supers() as Node[]))];
+      minimum_solution_range_of_dominator = [...new Set<Node>(this.solution_range.get(dominatee_id)!
+        .flatMap(t => t.supers() as Node[]))];
     }
     else if (rank === "super_dominance") {
-      minimum_solution_range_of_dominator = [...new Set<Node>(this.solution_range.get(dominatee_id)!.flatMap(t => t.subs() as Node[]))];
+      minimum_solution_range_of_dominator = [...new Set<Node>(this.solution_range.get(dominatee_id)!
+        .flatMap(t => t.subs() as Node[]))];
     }
     else {
       throw new Error(`dominator_solution_range_should_be_shrinked: rank ${rank} is not supported`);
     }
-    const intersection = this.solution_range.get(dominator_id)!.filter(t => minimum_solution_range_of_dominator!.includes(t));
+    const intersection = this.solution_range.get(dominator_id)!.filter(t => minimum_solution_range_of_dominator.some(g => g.same(t)));
     assert(intersection.length > 0,
       `dominator_solution_range_should_be_shrinked: intersection is empty
       \ndominator_id: ${dominator_id}, solution_range is ${this.solution_range.get(dominator_id)!.map(t => t.str())}
@@ -168,17 +182,25 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     let minimum_solution_range_of_dominatee;
     const rank = this.sub_dominance.has(`${dominator_id} ${dominatee_id}`) ? "sub_dominance" :
       this.super_dominance.has(`${dominator_id} ${dominatee_id}`) ? "super_dominance" : undefined;
-    if (rank === undefined) minimum_solution_range_of_dominatee = this.solution_range.get(dominator_id)!;
+    if (rank === undefined) {
+      minimum_solution_range_of_dominatee = [...
+        merge_set(new Set<Node>(this.solution_range.get(dominator_id)!
+          .flatMap(t => t.subs() as Node[])), new Set<Node>(this.solution_range.get(dominator_id)!
+            .flatMap(t => t.supers() as Node[])))
+      ];
+    }
     else if (rank === "sub_dominance") {
-      minimum_solution_range_of_dominatee = [...new Set<Node>(this.solution_range.get(dominator_id)!.flatMap(t => t.subs() as Node[]))];
+      minimum_solution_range_of_dominatee = [...new Set<Node>(this.solution_range.get(dominator_id)!
+        .flatMap(t => t.subs() as Node[]))];
     }
     else if (rank === "super_dominance") {
-      minimum_solution_range_of_dominatee = [...new Set<Node>(this.solution_range.get(dominator_id)!.flatMap(t => t.supers() as Node[]))];
+      minimum_solution_range_of_dominatee = [...new Set<Node>(this.solution_range.get(dominator_id)!
+        .flatMap(t => t.supers() as Node[]))];
     }
     else {
       throw new Error(`dominatee_solution_range_should_be_shrinked: rank ${rank} is not supported`);
     }
-    const intersection = this.solution_range.get(dominatee_id)!.filter(t => minimum_solution_range_of_dominatee!.includes(t));
+    const intersection = this.solution_range.get(dominatee_id)!.filter(t => minimum_solution_range_of_dominatee.some(g => g.same(t)));
     assert(intersection.length > 0,
       `dominatee_solution_range_should_be_shrinked: intersection is empty
       \ndominator_id: ${dominator_id}, solution_range is ${this.solution_range.get(dominator_id)!.map(t => t.str())}
@@ -472,7 +494,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     else {
       throw new Error(`dominator_solution_range_should_be_shrinked: rank ${rank} is not supported`);
     }
-    const intersection = solution_range.get(dominator_id)!.filter(t => minimum_solution_range_of_dominator!.includes(t));
+    const intersection = solution_range.get(dominator_id)!.filter(t => minimum_solution_range_of_dominator.some(g => g.same(t)));
     return intersection;
   }
 
@@ -491,12 +513,11 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
     else {
       throw new Error(`dominatee_solution_range_should_be_shrinked: rank ${rank} is not supported`);
     }
-    const intersection = solution_range.get(dominatee_id)!.filter(t => minimum_solution_range_of_dominatee!.includes(t));
+    const intersection = solution_range.get(dominatee_id)!.filter(t => minimum_solution_range_of_dominatee!.some(g => g.same(t)));
     return intersection;
   }
 
   try_tighten_solution_range_middle_out(node : number, new_range : Node[]) : boolean {
-    // this.solution_range_alignment(node, node);
     const solution_range = new Map(this.solution_range);
     solution_range.set(node, new_range);
     let upwards = (node : number) : boolean => {
@@ -650,7 +671,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
           else {
             let leave_solution_range_node = narrowed_solution_range.get(leave_array[j])!;
             const leave_solution_range = leave_solution_range_node.value().filter(
-              t => solution.supers()!.includes(t)
+              t => solution.supers()!.some(g => g.same(t))
             );
             leave_solution_range_node = leave_solution_range_node.new(leave_solution_range);
             narrowed_solution_range.set(leave_array[j], leave_solution_range_node);
@@ -663,7 +684,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
           else {
             let leave_solution_range_node = narrowed_solution_range.get(leave_array[j])!;
             const leave_solution_range = leave_solution_range_node.value().filter(
-              t => solution.subs()!.includes(t)
+              t => solution.subs()!.some(g => g.same(t))
             );
             leave_solution_range_node = leave_solution_range_node.new(leave_solution_range);
             narrowed_solution_range.set(leave_array[j], leave_solution_range_node);
@@ -703,7 +724,7 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
         if (narrowed_solution_range.has(leave_array[j])) {
           const leave_solution_range_node = narrowed_solution_range.get(leave_array[j])!;
           let leave_solution_range = leave_solution_range_node.value();
-          leave_solution_range = leave_solution_range.filter(t => solution_range_copy.get(leave_array[j])!.includes(t));
+          leave_solution_range = leave_solution_range.filter(t => solution_range_copy.get(leave_array[j])!.some(g => g.same(t)));
           narrowed_solution_range.get(leave_array[j])!.update(leave_solution_range);
           if (narrowed_solution_range.get(leave_array[j])!.value().length === 0) {
             return false;
@@ -759,7 +780,6 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
             clear_narrowed_solution_for_leaves_behind(id);
             continue;
           }
-          console.log(`id is ${id}: ${leave_array[id]}, leave_array.length is ${leave_array.length}, solution is ${solution}`);
           yield* dfs(id + 1, leaf_resolution);
           clear_narrowed_solution_for_leaves_behind(id);
           leaf_resolution.delete(leave_array[id]);
@@ -906,6 +926,52 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
       }
     }
     this.build_leaves_relation();
+    if (this.name === "TypeDominanceDAG") {
+      const mapping_leaves : number[] = [];
+      this.leaves.forEach(leaf => {
+        if (decl_db.is_mapping_decl(leaf)) {
+          this.leaves.delete(leaf);
+          mapping_leaves.push(leaf);
+          for (const edge of this.leavesequal) {
+            const [leaf1, leaf2] = edge.split(" ");
+            if (parseInt(leaf1) === leaf || parseInt(leaf2) === leaf) {
+              this.leavesequal.delete(edge);
+            }
+          }
+          for (const edge of this.leavessub) {
+            const [leaf1, leaf2] = edge.split(" ");
+            if (parseInt(leaf1) === leaf || parseInt(leaf2) === leaf) {
+              this.leavessub.delete(edge);
+            }
+          }
+          for (const edge of this.leavesnotsure) {
+            const [leaf1, leaf2] = edge.split(" ");
+            if (parseInt(leaf1) === leaf || parseInt(leaf2) === leaf) {
+              this.leavesnotsure.delete(edge);
+            }
+          }
+        }
+      });
+      for (let i = 0; i < mapping_leaves.length; i++) {
+        const keyi = decl_db.key_id_of_mapping_decl(mapping_leaves[i]);
+        const valuei = decl_db.value_id_of_mapping_decl(mapping_leaves[i]);
+        for (let j = i + 1; j < mapping_leaves.length; j++) {
+          const keyj = decl_db.key_id_of_mapping_decl(mapping_leaves[j]);
+          const valuej = decl_db.value_id_of_mapping_decl(mapping_leaves[j]);
+          if (this.leavesequal.has(`${mapping_leaves[i]} ${mapping_leaves[j]}`)
+            || this.leavesequal.has(`${mapping_leaves[j]} ${mapping_leaves[i]}`)
+            || this.leavessub.has(`${mapping_leaves[i]} ${mapping_leaves[j]}`)
+            || this.leavessub.has(`${mapping_leaves[j]} ${mapping_leaves[i]}`)
+            || this.leavesnotsure.has(`${mapping_leaves[i]} ${mapping_leaves[j]}`)
+            || this.leavesnotsure.has(`${mapping_leaves[j]} ${mapping_leaves[i]}`)) {
+            this.leavesequal.add(`${keyi} ${keyj}`);
+            this.leavesequal.add(`${keyj} ${keyi}`);
+            this.leavesequal.add(`${valuei} ${valuej}`);
+            this.leavesequal.add(`${valuej} ${valuei}`);
+          }
+        }
+      }
+    }
     if (config.debug || config.unit_test_mode) {
       console.log(color.green("> leavessub:"));
       for (const edge of this.leavessub) {
@@ -1074,9 +1140,9 @@ export class DominanceDAG<T, Node extends DominanceNode<T>> {
   }
 }
 
-export class TypeDominanceDAG extends DominanceDAG<TypeKind, Type> { }
-export class FuncStateMutabilityDominanceDAG extends DominanceDAG<FunctionStateMutability, FuncStat> { }
-export class FuncVisibilityDominanceDAG extends DominanceDAG<FunctionVisibility, FuncVis> { }
-export class StateVariableVisibilityDominanceDAG extends DominanceDAG<StateVariableVisibility, VarVis> { }
-export class StorageLocationDominanceDAG extends DominanceDAG<DataLocation, StorageLocation> { }
-export class VisMutDominanceDAG extends DominanceDAG<VisMutKind, VisMut> { }
+export class TypeDominanceDAG extends ConstraintDAG<TypeKind, Type> { }
+export class FuncStateMutabilityDominanceDAG extends ConstraintDAG<FunctionStateMutability, FuncStat> { }
+export class FuncVisibilityDominanceDAG extends ConstraintDAG<FunctionVisibility, FuncVis> { }
+export class StateVariableVisibilityDominanceDAG extends ConstraintDAG<StateVariableVisibility, VarVis> { }
+export class StorageLocationDominanceDAG extends ConstraintDAG<DataLocation, StorageLocation> { }
+export class VisMutDominanceDAG extends ConstraintDAG<VisMutKind, VisMut> { }

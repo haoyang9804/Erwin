@@ -309,7 +309,8 @@ export class IRTuple extends IRExpression {
 export function tuple_extraction(tuple_expr : IRExpression) : IRExpression {
   let extracted_expression = tuple_expr;
   while (extracted_expression instanceof IRTuple) {
-    assert(extracted_expression.components.length === 1, "BinaryGenerator: right_extracted_expression.components.length is not 1");
+    assert(extracted_expression.components.length === 1,
+      `tuple_extraction: extracted_expression.components.length is ${extracted_expression.components.length}`);
     extracted_expression = extracted_expression.components[0] as IRExpression;
   }
   return extracted_expression;

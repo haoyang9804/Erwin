@@ -1,7 +1,7 @@
 import { TypeProvider } from "../src/type"
 import { IRVariableDeclaration, IRFunctionDefinition, IRContractDefinition } from "../src/declare";
 import { IRIdentifier, IRLiteral, IRTuple, IRFunctionCall, IRNew } from "../src/expression";
-import { IRVariableDeclareStatement } from "../src/statement";
+import { IRVariableDeclarationStatement } from "../src/statement";
 import {
   PrettyFormatter,
   ASTWriter,
@@ -31,7 +31,7 @@ literal1.type = TypeProvider.uint256()
 const literal2 = new IRLiteral(3, 0);
 literal2.type = TypeProvider.uint128();
 const tuple = new IRTuple(5, 0, [literal1, literal2]);
-const variable_declare_stmt = new IRVariableDeclareStatement(4, 0, [variable1, variable2], tuple);
+const variable_declare_stmt = new IRVariableDeclarationStatement(4, 0, [variable1, variable2], tuple);
 
 const v2 = new IRVariableDeclaration(6, 0, "y");
 v2.type = TypeProvider.uint256()

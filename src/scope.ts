@@ -4,8 +4,10 @@ import { assert } from './utility'
 
 export enum scopeKind {
   CONSTRUCTOR = "scopeKind::CONSTRUCTOR",
+  CONSTRUCTOR_PARAMETERS = "scopeKind::CONSTRUCTOR_PARAMETERS",
   FUNC = "scopeKind::FUNC",
   FUNC_PARAMETER = "scopeKind::FUNC_PARAMETER",
+  FUNC_RETURNS = "scopeKind::FUNC_RETURNS",
   CONTRACT = "scopeKind::CONTRACT",
   GLOBAL = "scopeKind::GLOBAL",
   IF_CONDITION = "scopeKind::IF_CONDITION",
@@ -18,6 +20,18 @@ export enum scopeKind {
   DOWHILE_COND = "scopeKind::DOWHILE_COND",
   STRUCT = "scopeKind::STRUCT",
   MAPPING = "scopeKind::MAPPING",
+}
+
+export function inside_function_body(scope_kind : scopeKind) : boolean {
+  return scope_kind === scopeKind.FUNC ||
+    scope_kind === scopeKind.DOWHILE_BODY ||
+    scope_kind === scopeKind.DOWHILE_COND ||
+    scope_kind === scopeKind.WHILE_BODY ||
+    scope_kind === scopeKind.WHILE_CONDITION ||
+    scope_kind === scopeKind.FOR_BODY ||
+    scope_kind === scopeKind.FOR_CONDITION ||
+    scope_kind === scopeKind.IF_BODY ||
+    scope_kind === scopeKind.IF_CONDITION;
 }
 
 type scopeT = {

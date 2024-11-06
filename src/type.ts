@@ -4,31 +4,51 @@ import { DominanceNode } from "./dominance";
 import { config } from './config';
 
 export enum TypeKind {
-  ElementaryType = "TypeKind::ElementaryType", // uint256, address, boolean,
-  FunctionType = "TypeKind::FunctionType", // function (uint256) pure external returns (uint256)
-  ArrayType = "TypeKind::ArrayType", // uint256[2], address[2], boolean[2]
-  MappingType = "TypeKind::MappingType", // mapping(uint256 => address), mapping(uint256 => boolean)
+  ElementaryType = "TypeKind::ElementaryType",
+  FunctionType = "TypeKind::FunctionType",
+  ArrayType = "TypeKind::ArrayType",
+  MappingType = "TypeKind::MappingType",
   UnionType = "TypeKind::UnionType",
-  EventType = "TypeKind::EventType",
   StructType = "TypeKind::StructType",
   ContractType = "TypeKind::ContractType",
-  ErrorType = "TypeKind::ErrorType",
   StringType = "TypeKind::StringType",
-}
-
-export function upperType(t1 : Type, t2 : Type) {
-  assert(t1.kind === t2.kind, `upperType: t1.kind !== t2.kind`);
-  assert(t1.issubof(t2) || t2.issubof(t1), `upperType: t1 is not subof t2 and t2 is not subof t1`);
-  return t1.issubof(t2) ? t2 : t1;
-}
-
-export function lowerType(t1 : Type, t2 : Type) {
-  assert(t1.kind === t2.kind, `upperType: t1.kind !== t2.kind`);
-  assert(t1.issubof(t2) || t2.issubof(t1), `upperType: t1 is not subof t2 and t2 is not subof t1`);
-  return t1.issuperof(t2) ? t2 : t1;
+  PlaceholderType = "TypeKind::PlaceholderType"
 }
 
 export abstract class Type extends DominanceNode<TypeKind> { }
+
+export class PlaceholderType extends Type {
+  constructor() {
+    super(TypeKind.PlaceholderType);
+  }
+  str() : string {
+    return "_";
+  }
+  copy() : Type {
+    throw new Error("PlaceholderType::copy() not implemented.");
+  }
+  subs() : Type[] {
+    return [TypeProvider.placeholder()];
+  }
+  sub_with_lowerbound(lower_bound : Type) : Type[] {
+    return [TypeProvider.placeholder()];
+  }
+  supers() : Type[] {
+    return [TypeProvider.placeholder()];
+  }
+  super_with_upperbound(upper_bound : Type) : Type[] {
+    return [TypeProvider.placeholder()];
+  }
+  same(t : Type) : boolean {
+    return t.kind === TypeKind.PlaceholderType;
+  }
+  issubof(t : Type) : boolean {
+    return this.same(t);
+  }
+  issuperof(t : Type) : boolean {
+    return this.same(t);
+  }
+}
 
 export abstract class UserDefinedType extends Type {
   _subs : UserDefinedType[] = [];
@@ -54,76 +74,6 @@ export abstract class UserDefinedType extends Type {
   }
   type_range() : UserDefinedType[] {
     return [...merge_set(new Set<UserDefinedType>(this._subs), new Set<UserDefinedType>(this._supers))];
-  }
-}
-
-export class EventType extends Type {
-  name : string;
-  constructor(name : string) {
-    super(TypeKind.EventType);
-    this.name = name;
-  }
-  str() : string {
-    return "event";
-  }
-  subs() : Type[] {
-    throw new Error("No sub_dominance for EventType");
-  }
-  sub_with_lowerbound(lower_bound : Type) : Type[] {
-    throw new Error("No sub_dominance for EventType");
-  }
-  supers() : Type[] {
-    throw new Error("No super_dominance for EventType");
-  }
-  super_with_upperbound(upper_bound : Type) : Type[] {
-    throw new Error("No super_dominance for EventType");
-  }
-  copy() : Type {
-    return new EventType(this.name);
-  }
-  same(t : Type) : boolean {
-    return t.kind === TypeKind.EventType;
-  }
-  issubof(t : Type) : boolean {
-    return this.same(t);
-  }
-  issuperof(t : Type) : boolean {
-    return this.same(t);
-  }
-}
-
-export class ErrorType extends Type {
-  name : string;
-  constructor(name : string) {
-    super(TypeKind.ErrorType);
-    this.name = name;
-  }
-  str() : string {
-    return "error";
-  }
-  subs() : Type[] {
-    throw new Error("No sub_dominance for ErrorType");
-  }
-  sub_with_lowerbound(lower_bound : Type) : Type[] {
-    throw new Error("No sub_dominance for ErrorType");
-  }
-  supers() : Type[] {
-    throw new Error("No super_dominance for ErrorType");
-  }
-  super_with_upperbound(upper_bound : Type) : Type[] {
-    throw new Error("No super_dominance for ErrorType");
-  }
-  copy() : Type {
-    return new EventType(this.name);
-  }
-  same(t : Type) : boolean {
-    return t.kind === TypeKind.ErrorType;
-  }
-  issubof(t : Type) : boolean {
-    return this.same(t);
-  }
-  issuperof(t : Type) : boolean {
-    return this.same(t);
   }
 }
 
@@ -790,25 +740,25 @@ export class MappingType extends Type {
     return new MappingType(this.kType.copy(), this.vType.copy());
   }
   same(t : Type) : boolean {
-    throw new Error("MappingType::same() is disallowed.");
+    return t.kind === TypeKind.MappingType && (t as MappingType).kType.same(this.kType) && (t as MappingType).vType.same(this.vType);
   }
   subs() : Type[] {
-    throw new Error("MappingType::subs() is disallowed.");
+    return [this];
   }
   sub_with_lowerbound(lower_bound : Type) : Type[] {
-    throw new Error("MappingType::sub_with_lowerbound() is disallowed.");
+    return [this];
   }
   supers() : Type[] {
-    throw new Error("MappingType::supers() is disallowed.");
+    return [this];
   }
   super_with_upperbound(upper_bound : Type) : Type[] {
-    throw new Error("MappingType::super_with_upperbound() is disallowed.");
+    return [this];
   }
   issubof(t : Type) : boolean {
-    throw new Error("MappingType::issubof() is disallowed.");
+    return this.same(t);
   }
   issuperof(t : Type) : boolean {
-    throw new Error("MappingType::issuperof() is disallowed.");
+    return this.same(t);
   }
 }
 
@@ -828,6 +778,10 @@ export class TypeProvider {
   static bool() : Type { return this.m_bool; }
   static address() : Type { return this.m_address; }
   static payable_address() : Type { return this.m_payable_address; }
+  static placeholder() : Type { return this.m_placeholder; }
+  static trivial_mapping() : Type { return this.m_mapping; }
+  private static m_placeholder : Type = new PlaceholderType();
+  private static m_mapping : Type = new MappingType(this.m_placeholder, this.m_placeholder);
   private static m_int256 : Type = new ElementaryType("int256", "nonpayable");
   private static m_int128 : Type = new ElementaryType("int128", "nonpayable");
   private static m_int64 : Type = new ElementaryType("int64", "nonpayable");
@@ -845,8 +799,6 @@ export class TypeProvider {
   private static m_payable_address : Type = new ElementaryType("address", "payable");
 }
 
-// export const irnode2types = new Map<number, Type[]>();
-
 export let integer_types : Type[] = [
   TypeProvider.int256(),
   TypeProvider.int128(),
@@ -854,7 +806,8 @@ export let integer_types : Type[] = [
   TypeProvider.int32(),
   TypeProvider.int16(),
   TypeProvider.int8()
-]
+];
+
 export let uinteger_types : Type[] = [
   TypeProvider.uint256(),
   TypeProvider.uint128(),
@@ -862,7 +815,7 @@ export let uinteger_types : Type[] = [
   TypeProvider.uint32(),
   TypeProvider.uint16(),
   TypeProvider.uint8()
-]
+];
 
 export let all_integer_types : Type[];
 export let elementary_types : Type[];
@@ -876,4 +829,11 @@ export function initType() : void {
   all_integer_types = integer_types.concat(uinteger_types);
   elementary_types = all_integer_types.concat(bool_types).concat(address_types);
   size_of_type = sizeof(elementary_types[0]);
+}
+
+export class TypeRange {
+  range : Type[]
+  constructor(range : Type[]) {
+    this.range = range;
+  }
 }

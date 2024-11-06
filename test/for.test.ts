@@ -1,7 +1,7 @@
 import { TypeProvider } from "../src/type"
 import { IRVariableDeclaration } from "../src/declare";
 import { IRIdentifier, IRUnaryOp, IRBinaryOp, IRLiteral } from "../src/expression";
-import { IRFor, IRVariableDeclareStatement, IRBreakStatement } from "../src/statement";
+import { IRFor, IRVariableDeclarationStatement, IRBreakStatement } from "../src/statement";
 import {
   PrettyFormatter,
   ASTWriter,
@@ -23,7 +23,7 @@ test("test if",
   v1.type = TypeProvider.uint256();
   const l1 = new IRLiteral(1, 0);
   l1.type = TypeProvider.uint256();
-  const initial = new IRVariableDeclareStatement(2, 0, [v1], l1);
+  const initial = new IRVariableDeclarationStatement(2, 0, [v1], l1);
   const v1id = new IRIdentifier(3, 0).from(v1);
   const loop = new IRUnaryOp(4, 0, true, v1id, "++"); // loop
   const v2id = new IRIdentifier(5, 0).from(v1);
