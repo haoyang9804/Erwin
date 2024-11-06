@@ -699,6 +699,15 @@ export const open_func_vismut = [
   VisMutProvider.func_public_empty()
 ];
 
+export const closed_func_vismut = [
+  VisMutProvider.func_internal_pure(),
+  VisMutProvider.func_internal_view(),
+  VisMutProvider.func_internal_empty(),
+  VisMutProvider.func_private_pure(),
+  VisMutProvider.func_private_view(),
+  VisMutProvider.func_private_empty()
+];
+
 export function from_state_mutability_range_to_vismut_range(state_mutability_range : FuncStat[]) : VisMut[] {
   let vismut_range : VisMut[] = [];
   for (const state_mutability of state_mutability_range) {

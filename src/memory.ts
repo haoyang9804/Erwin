@@ -36,10 +36,10 @@ export class StoragePointer extends StorageLocation {
     return new StoragePointer();
   }
   issubof(t : StorageLocation) : boolean {
-    return this.supers().includes(t);
+    return this.supers().some(g => g.same(t));
   }
   issuperof(t : StorageLocation) : boolean {
-    return this.subs().includes(t);
+    return this.subs().some(g => g.same(t));
   }
 }
 
@@ -78,10 +78,10 @@ export class StorageRef extends StorageLocation {
     return new StorageRef();
   }
   issubof(t : StorageLocation) : boolean {
-    return this.supers().includes(t);
+    return this.supers().some(g => g.same(t));
   }
   issuperof(t : StorageLocation) : boolean {
-    return this.subs().includes(t);
+    return this.subs().some(g => g.same(t));
   }
 }
 
@@ -119,10 +119,10 @@ export class Memory extends StorageLocation {
     return new Memory();
   }
   issubof(t : StorageLocation) : boolean {
-    return this.supers().includes(t);
+    return this.supers().some(g => g.same(t));
   }
   issuperof(t : StorageLocation) : boolean {
-    return this.subs().includes(t);
+    return this.subs().some(g => g.same(t));
   }
 }
 
@@ -156,10 +156,10 @@ export class Calldata extends StorageLocation {
     return new Calldata();
   }
   issubof(t : StorageLocation) : boolean {
-    return this.supers().includes(t);
+    return this.supers().some(g => g.same(t));
   }
   issuperof(t : StorageLocation) : boolean {
-    return this.subs().includes(t);
+    return this.subs().some(g => g.same(t));
   }
 }
 
@@ -199,10 +199,10 @@ export class MemoryDefault extends StorageLocation {
     return new MemoryDefault();
   }
   issubof(t : StorageLocation) : boolean {
-    return this.supers().includes(t);
+    return this.supers().some(g => g.same(t));
   }
   issuperof(t : StorageLocation) : boolean {
-    return this.subs().includes(t);
+    return this.subs().some(g => g.same(t));
   }
 }
 

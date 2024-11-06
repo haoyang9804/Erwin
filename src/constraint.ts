@@ -118,7 +118,12 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
     this.solution_range.set(nodeid, [...intersection(new Set<Node>(this.solution_range.get(nodeid)), new Set<Node>(range))]);
   }
 
+  check_connection(from : number, to : number) : boolean {
+    return this.dag_nodes.get(from)!.outs.includes(to);
+  }
+
   connect(from : number, to : number, rank ?: string) : void {
+    if (this.check_connection(from, to)) return;
     if (config.debug) {
       assert(this.dag_nodes.has(from), `ConstraintDAG: node ${from} is not in the graph`);
       assert(this.dag_nodes.has(to), `ConstraintDAG: node ${to} is not in the graph`);
@@ -143,17 +148,25 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
     let minimum_solution_range_of_dominator;
     const rank = this.sub_dominance.has(`${dominator_id} ${dominatee_id}`) ? "sub_dominance" :
       this.super_dominance.has(`${dominator_id} ${dominatee_id}`) ? "super_dominance" : undefined;
-    if (rank === undefined) minimum_solution_range_of_dominator = this.solution_range.get(dominatee_id)!;
+    if (rank === undefined) {
+      minimum_solution_range_of_dominator = [...
+        merge_set(new Set<Node>(this.solution_range.get(dominatee_id)!
+          .flatMap(t => t.supers() as Node[])), new Set<Node>(this.solution_range.get(dominatee_id)!
+            .flatMap(t => t.subs() as Node[])))
+      ];
+    }
     else if (rank === "sub_dominance") {
-      minimum_solution_range_of_dominator = [...new Set<Node>(this.solution_range.get(dominatee_id)!.flatMap(t => t.supers() as Node[]))];
+      minimum_solution_range_of_dominator = [...new Set<Node>(this.solution_range.get(dominatee_id)!
+        .flatMap(t => t.supers() as Node[]))];
     }
     else if (rank === "super_dominance") {
-      minimum_solution_range_of_dominator = [...new Set<Node>(this.solution_range.get(dominatee_id)!.flatMap(t => t.subs() as Node[]))];
+      minimum_solution_range_of_dominator = [...new Set<Node>(this.solution_range.get(dominatee_id)!
+        .flatMap(t => t.subs() as Node[]))];
     }
     else {
       throw new Error(`dominator_solution_range_should_be_shrinked: rank ${rank} is not supported`);
     }
-    const intersection = this.solution_range.get(dominator_id)!.filter(t => minimum_solution_range_of_dominator!.includes(t));
+    const intersection = this.solution_range.get(dominator_id)!.filter(t => minimum_solution_range_of_dominator.some(g => g.same(t)));
     assert(intersection.length > 0,
       `dominator_solution_range_should_be_shrinked: intersection is empty
       \ndominator_id: ${dominator_id}, solution_range is ${this.solution_range.get(dominator_id)!.map(t => t.str())}
@@ -168,17 +181,25 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
     let minimum_solution_range_of_dominatee;
     const rank = this.sub_dominance.has(`${dominator_id} ${dominatee_id}`) ? "sub_dominance" :
       this.super_dominance.has(`${dominator_id} ${dominatee_id}`) ? "super_dominance" : undefined;
-    if (rank === undefined) minimum_solution_range_of_dominatee = this.solution_range.get(dominator_id)!;
+    if (rank === undefined) {
+      minimum_solution_range_of_dominatee = [...
+        merge_set(new Set<Node>(this.solution_range.get(dominator_id)!
+          .flatMap(t => t.subs() as Node[])), new Set<Node>(this.solution_range.get(dominator_id)!
+            .flatMap(t => t.supers() as Node[])))
+      ];
+    }
     else if (rank === "sub_dominance") {
-      minimum_solution_range_of_dominatee = [...new Set<Node>(this.solution_range.get(dominator_id)!.flatMap(t => t.subs() as Node[]))];
+      minimum_solution_range_of_dominatee = [...new Set<Node>(this.solution_range.get(dominator_id)!
+        .flatMap(t => t.subs() as Node[]))];
     }
     else if (rank === "super_dominance") {
-      minimum_solution_range_of_dominatee = [...new Set<Node>(this.solution_range.get(dominator_id)!.flatMap(t => t.supers() as Node[]))];
+      minimum_solution_range_of_dominatee = [...new Set<Node>(this.solution_range.get(dominator_id)!
+        .flatMap(t => t.supers() as Node[]))];
     }
     else {
       throw new Error(`dominatee_solution_range_should_be_shrinked: rank ${rank} is not supported`);
     }
-    const intersection = this.solution_range.get(dominatee_id)!.filter(t => minimum_solution_range_of_dominatee!.includes(t));
+    const intersection = this.solution_range.get(dominatee_id)!.filter(t => minimum_solution_range_of_dominatee.some(g => g.same(t)));
     assert(intersection.length > 0,
       `dominatee_solution_range_should_be_shrinked: intersection is empty
       \ndominator_id: ${dominator_id}, solution_range is ${this.solution_range.get(dominator_id)!.map(t => t.str())}
@@ -472,7 +493,7 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
     else {
       throw new Error(`dominator_solution_range_should_be_shrinked: rank ${rank} is not supported`);
     }
-    const intersection = solution_range.get(dominator_id)!.filter(t => minimum_solution_range_of_dominator!.includes(t));
+    const intersection = solution_range.get(dominator_id)!.filter(t => minimum_solution_range_of_dominator.some(g => g.same(t)));
     return intersection;
   }
 
@@ -491,7 +512,7 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
     else {
       throw new Error(`dominatee_solution_range_should_be_shrinked: rank ${rank} is not supported`);
     }
-    const intersection = solution_range.get(dominatee_id)!.filter(t => minimum_solution_range_of_dominatee!.includes(t));
+    const intersection = solution_range.get(dominatee_id)!.filter(t => minimum_solution_range_of_dominatee!.some(g => g.same(t)));
     return intersection;
   }
 
@@ -649,7 +670,7 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
           else {
             let leave_solution_range_node = narrowed_solution_range.get(leave_array[j])!;
             const leave_solution_range = leave_solution_range_node.value().filter(
-              t => solution.supers()!.includes(t)
+              t => solution.supers()!.some(g => g.same(t))
             );
             leave_solution_range_node = leave_solution_range_node.new(leave_solution_range);
             narrowed_solution_range.set(leave_array[j], leave_solution_range_node);
@@ -662,7 +683,7 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
           else {
             let leave_solution_range_node = narrowed_solution_range.get(leave_array[j])!;
             const leave_solution_range = leave_solution_range_node.value().filter(
-              t => solution.subs()!.includes(t)
+              t => solution.subs()!.some(g => g.same(t))
             );
             leave_solution_range_node = leave_solution_range_node.new(leave_solution_range);
             narrowed_solution_range.set(leave_array[j], leave_solution_range_node);
@@ -702,7 +723,7 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
         if (narrowed_solution_range.has(leave_array[j])) {
           const leave_solution_range_node = narrowed_solution_range.get(leave_array[j])!;
           let leave_solution_range = leave_solution_range_node.value();
-          leave_solution_range = leave_solution_range.filter(t => solution_range_copy.get(leave_array[j])!.includes(t));
+          leave_solution_range = leave_solution_range.filter(t => solution_range_copy.get(leave_array[j])!.some(g => g.same(t)));
           narrowed_solution_range.get(leave_array[j])!.update(leave_solution_range);
           if (narrowed_solution_range.get(leave_array[j])!.value().length === 0) {
             return false;
@@ -905,7 +926,7 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
     }
     this.build_leaves_relation();
     if (this.name === "TypeDominanceDAG") {
-      const mapping_leaves : number[] = []
+      const mapping_leaves : number[] = [];
       this.leaves.forEach(leaf => {
         if (decl_db.is_mapping_decl(leaf)) {
           this.leaves.delete(leaf);
