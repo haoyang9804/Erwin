@@ -3813,6 +3813,7 @@ class ForStatementGenerator extends NonExpressionStatementGenerator {
     cur_scope = cur_scope.rollback();
     this.irnode = new stmt.IRFor(global_id++, cur_scope.id(), init_stmt_expr, conditional_gen.irnode! as expr.IRExpression,
       loop_gen.irnode! as expr.IRExpression, body);
+    (this.irnode as stmt.IRStatement).exprs = this.exprs;
     if (config.debug) {
       indent -= 2;
       console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode.id}: ForStatement, scope: ${cur_scope.kind()}`));
