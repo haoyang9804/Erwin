@@ -72,6 +72,8 @@ program
   .option("--contract_count <number>", "The upper limit of the number of contracts Erwin will generate.", `${config.contract_count}`)
   .option("--state_variable_count_upperlimit <number>", "The upper limit of the number of state variables in a contract.", `${config.state_variable_count_upperlimit}`)
   .option("--state_variable_count_lowerlimit <number>", "The lower limit of the number of state variables in a contract.", `${config.state_variable_count_lowerlimit}`)
+  // Array
+  .option("--array_length_upperlimit <number>", "The upper limit of the length of an array.", `${config.array_length_upperlimit}`)
   // Complexity
   .option("--expression_complex_level <number>", "The complex level of the expression Erwin will generate.\nThe suggedted range is [1,2,3]. The bigger, the more complex.", `${config.expression_complex_level}`)
   .option("--statement_complex_level <number>", "The complex level of the statement Erwin will generate.\nThe suggedted range is [1,2]. The bigger, the more complex.", `${config.statement_complex_level}`)
@@ -93,6 +95,8 @@ program
   .option("--return_prob <float>", "The probability of generating a return statement.", `${config.return_prob}`)
   .option("--reuse_name_prob <float>", "The probability of reusing a name.", `${config.reuse_name_prob}`)
   .option("--mapping_prob <float>", "The probability of generating a mapping.", `${config.mapping_prob}`)
+  .option("--array_prob <float>", "The probability of generating an array.", `${config.array_prob}`)
+  .option("--dynamic_array_prob <float>", "The probability of generating a dynamic array.", `${config.dynamic_array_prob}`)
   // Structured Statements
   .option("--for_init_cnt_upper_limit <number>", "The upper limit of the number of initialization in a for loop.", `${config.for_init_cnt_upper_limit}`)
   .option("--for_init_cnt_lower_limit <number>", "The lower limit of the number of initialization in a for loop.", `${config.for_init_cnt_lower_limit}`)
@@ -125,6 +129,7 @@ else if (program.args[0] === "generate") {
   config.literal_prob = parseFloat(program.commands[1].opts().literal_prob);
   config.maximum_solution_count = parseInt(program.commands[1].opts().maximum_solution_count);
   config.tuple_prob = parseFloat(program.commands[1].opts().tuple_prob);
+  config.array_length_upperlimit = parseInt(program.commands[1].opts().array_length_upperlimit);
   config.expression_complex_level = parseInt(program.commands[1].opts().expression_complex_level);
   config.state_variable_count_upperlimit = parseInt(program.commands[1].opts().state_variable_count_upperlimit);
   config.state_variable_count_lowerlimit = parseInt(program.commands[1].opts().state_variable_count_lowerlimit);
@@ -146,6 +151,8 @@ else if (program.args[0] === "generate") {
   config.return_prob = parseFloat(program.commands[1].opts().return_prob);
   config.reuse_name_prob = parseFloat(program.commands[1].opts().reuse_name_prob);
   config.mapping_prob = parseFloat(program.commands[1].opts().mapping_prob);
+  config.array_prob = parseFloat(program.commands[1].opts().array_prob);
+  config.dynamic_array_prob = parseFloat(program.commands[1].opts().dynamic_array_prob);
   config.for_init_cnt_upper_limit = parseInt(program.commands[1].opts().for_init_cnt_upper_limit);
   config.for_init_cnt_lower_limit = parseInt(program.commands[1].opts().for_init_cnt_lower_limit);
   config.statement_complex_level = parseInt(program.commands[1].opts().statement_complex_level);
@@ -172,6 +179,7 @@ if (program.args[0] === "mutate") {
 else if (program.args[0] === "generate") {
   assert(config.int_num >= 0, "The number of int types must be not less than 0.");
   assert(config.uint_num >= 0, "The number of uint types must be not less than 0.");
+  assert(config.array_length_upperlimit >= 1, "The upper limit of the length of an array must be not less than 0.");
   assert(config.function_body_stmt_cnt_upper_limit >= 0, "The upper limit of the number of statements of a function must be not less than 0.");
   assert(config.function_body_stmt_cnt_lower_limit >= 0, "The lower limit of the number of statements of a function must be not less than 0.");
   assert(config.return_count_of_function_upperlimit >= 0, "The upper limit of the number of return values of a function must be not less than 0.");
@@ -194,9 +202,11 @@ else if (program.args[0] === "generate") {
   assert(config.else_prob >= 0.0 && config.else_prob <= 1.0, "The probability of generating an else statement must be in the range [0,1].");
   assert(config.terminal_prob >= 0.0 && config.terminal_prob <= 1.0, "The probability of generating a terminal statement must be in the range [0,1].");
   assert(config.mapping_prob > 0.0 && config.mapping_prob <= 1.0, "The probability of generating a mapping must be in the range (0,1].");
+  assert(config.array_prob > 0.0 && config.array_prob <= 1.0, "The probability of generating an array must be in the range (0,1].");
   assert(config.contract_instance_prob >= 0.0 && config.contract_instance_prob <= 1.0, "The probability of generating a contract instance must be in the range [0,1].");
   assert(config.struct_instance_prob >= 0.0 && config.struct_instance_prob <= 1.0, "The probability of generating a struct instance must be in the range [0,1].");
-  assert(config.mapping_prob + config.contract_instance_prob + config.struct_instance_prob < 1, "The sum of the probabilities of generating a contract/struct instance or a mapping declaration must be less than 1.");
+  assert(config.array_prob + config.mapping_prob + config.contract_instance_prob + config.struct_instance_prob < 1, "The sum of the probabilities of generating a contract/struct instance, a mapping declaration, or an array declaration must be less than 1.");
+  assert(config.dynamic_array_prob >= 0.0 && config.dynamic_array_prob <= 1.0, "The probability of generating a dynamic array must be in the range [0,1].");
   assert(config.return_count_of_function_lowerlimit <= config.return_count_of_function_upperlimit, "The lower limit of the number of return values of a function must be less than or equal to the upper limit.");
   assert(config.param_count_of_function_lowerlimit <= config.param_count_of_function_upperlimit, "The lower limit of the number of parameters of a function must be less than or equal to the upper limit.");
   assert(config.state_variable_count_lowerlimit <= config.state_variable_count_upperlimit, "state_variable_count_lowerlimit must be less than or equal to state_variable_count_upperlimit.");
@@ -360,7 +370,7 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
       if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
         (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
     }
-    for (const mapping_decl_id of decl_db.mapping_decl_id) {
+    for (const mapping_decl_id of decl_db.mapping_decls_ids()) {
       assign_mapping_type(mapping_decl_id, type_solutions);
     }
     const program = writer.write(source_unit_gen.irnode!.lower());
@@ -390,7 +400,7 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
     if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
       (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
   }
-  for (const mapping_decl_id of decl_db.mapping_decl_id) {
+  for (const mapping_decl_id of decl_db.mapping_decls_ids()) {
     assign_mapping_type(mapping_decl_id, type_solutions);
   }
   //! Select storage location solution
@@ -443,7 +453,7 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
     if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
       (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
   }
-  for (const mapping_decl_id of decl_db.mapping_decl_id) {
+  for (const mapping_decl_id of decl_db.mapping_decls_ids()) {
     assign_mapping_type(mapping_decl_id, type_solutions);
   }
   //! Select one vismut solution

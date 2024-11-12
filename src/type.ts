@@ -685,13 +685,16 @@ export class FunctionType extends Type {
 
 export class ArrayType extends Type {
   base : Type;
-  length : number = 1
-  constructor(base : Type, length : number = 1) {
+  length : number | undefined = undefined;
+  constructor(base : Type, length : number | undefined = undefined) {
     super(TypeKind.ArrayType);
     this.base = base;
     this.length = length;
   }
   str() : string {
+    if (this.length === undefined) {
+      return `${this.base.str()}[]`;
+    }
     return `${this.base.str()}[${this.length}]`;
   }
   copy() : Type {
@@ -785,7 +788,7 @@ export class TypeProvider {
   static trivial_array() : Type { return this.m_array; }
   private static m_placeholder : Type = new PlaceholderType();
   private static m_mapping : Type = new MappingType(this.m_placeholder, this.m_placeholder);
-  private static m_array : Type = new ArrayType(this.m_placeholder, -1);
+  private static m_array : Type = new ArrayType(this.m_placeholder, undefined);
   private static m_int256 : Type = new ElementaryType("int256", "nonpayable");
   private static m_int128 : Type = new ElementaryType("int128", "nonpayable");
   private static m_int64 : Type = new ElementaryType("int64", "nonpayable");
