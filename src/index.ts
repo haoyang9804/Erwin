@@ -75,6 +75,7 @@ program
   // Complexity
   .option("--expression_complex_level <number>", "The complex level of the expression Erwin will generate.\nThe suggedted range is [1,2,3]. The bigger, the more complex.", `${config.expression_complex_level}`)
   .option("--statement_complex_level <number>", "The complex level of the statement Erwin will generate.\nThe suggedted range is [1,2]. The bigger, the more complex.", `${config.statement_complex_level}`)
+  .option("--type_complex_level <number>", "The complex level of the type Erwin will generate.\nThe suggedted range is [1,2]. The bigger, the more complex.", `${config.type_complex_level}`)
   // Probability
   .option("--nonstructured_statement_prob <float>", "The probability of generating a nonstructured statement, such as AssignmentStatment or FunctionCallAssignment.", `${config.nonstructured_statement_prob}`)
   .option("--literal_prob <float>", "The probability of generating a literal.", `${config.literal_prob}`)
@@ -148,6 +149,7 @@ else if (program.args[0] === "generate") {
   config.for_init_cnt_upper_limit = parseInt(program.commands[1].opts().for_init_cnt_upper_limit);
   config.for_init_cnt_lower_limit = parseInt(program.commands[1].opts().for_init_cnt_lower_limit);
   config.statement_complex_level = parseInt(program.commands[1].opts().statement_complex_level);
+  config.type_complex_level = parseInt(program.commands[1].opts().type_complex_level);
   config.for_body_stmt_cnt_lower_limit = parseInt(program.commands[1].opts().for_body_stmt_cnt_lower_limit);
   config.for_body_stmt_cnt_upper_limit = parseInt(program.commands[1].opts().for_body_stmt_cnt_upper_limit);
   config.while_body_stmt_cnt_lower_limit = parseInt(program.commands[1].opts().while_body_stmt_cnt_lower_limit);
@@ -202,6 +204,7 @@ else if (program.args[0] === "generate") {
   assert(config.function_body_stmt_cnt_lower_limit <= config.function_body_stmt_cnt_upper_limit, "The lower limit of the number of statements of a function must be less than or equal to the upper limit.");
   assert(config.function_body_stmt_cnt_lower_limit >= 0, "The lower limit of the number of statements of a function must be not less than 1.");
   assert(config.statement_complex_level >= 0, "The complex level of the statement must be not less than 0.");
+  assert(config.type_complex_level >= 0, "The complex level of the type must be not less than 0.");
   assert(config.for_init_cnt_lower_limit <= config.for_init_cnt_upper_limit, "The lower limit of the number of initialization in a for loop must be less than or equal to the upper limit.");
   assert(config.for_init_cnt_lower_limit >= 0, "The upper limit of the number of initialization in a for loop must be not less than 0.");
   assert(config.function_body_stmt_cnt_lower_limit <= config.function_body_stmt_cnt_upper_limit, "The lower limit of the number of statements of a function must be less than or equal to the upper limit.");

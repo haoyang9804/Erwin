@@ -35,6 +35,7 @@ export const config = {
   // Complexity
   expression_complex_level: 1,
   statement_complex_level: 1,
+  type_complex_level: 1,
 
   // Probability
   nonstructured_statement_prob: 0.05,

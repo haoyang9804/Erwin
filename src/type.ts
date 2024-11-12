@@ -701,13 +701,15 @@ export class ArrayType extends Type {
     return this.supers().filter(x => x.issubof(upper_bound));
   }
   supers() : Type[] {
-    return [this.copy()];
+    const base_supers = this.base.supers();
+    return base_supers.map(x => new ArrayType(x, this.length));
   }
   sub_with_lowerbound(lower_bound : Type) : Type[] {
     return this.subs().filter(x => x.issuperof(lower_bound));
   }
   subs() : Type[] {
-    return [this.copy()];
+    const base_subs = this.base.subs();
+    return base_subs.map(x => new ArrayType(x, this.length));
   }
   same(t : Type) : boolean {
     if (t.kind !== TypeKind.ArrayType) return false;
@@ -780,8 +782,10 @@ export class TypeProvider {
   static payable_address() : Type { return this.m_payable_address; }
   static placeholder() : Type { return this.m_placeholder; }
   static trivial_mapping() : Type { return this.m_mapping; }
+  static trivial_array() : Type { return this.m_array; }
   private static m_placeholder : Type = new PlaceholderType();
   private static m_mapping : Type = new MappingType(this.m_placeholder, this.m_placeholder);
+  private static m_array : Type = new ArrayType(this.m_placeholder, -1);
   private static m_int256 : Type = new ElementaryType("int256", "nonpayable");
   private static m_int128 : Type = new ElementaryType("int128", "nonpayable");
   private static m_int64 : Type = new ElementaryType("int64", "nonpayable");
