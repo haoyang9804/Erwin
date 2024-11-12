@@ -9,7 +9,7 @@ export class ConstaintNode {
   }
 }
 import { assert, intersection, merge_set } from "./utility";
-import { Type, TypeKind } from "./type"
+import { Type, TypeKind, MappingType, StructType } from "./type"
 import * as dot from 'ts-graphviz';
 import { config } from './config'
 // debug
@@ -22,7 +22,7 @@ import { FuncVis, VarVis } from "./visibility";
 import { StorageLocation } from "./memory";
 import { VisMut, VisMutKind } from "./vismut";
 import { LinkedListNode } from "./dataStructor";
-import { decl_db } from "./db";
+import { decl_db, expr_db } from "./db";
 
 interface toLeaf {
   leaf_id : number;
@@ -1140,7 +1140,339 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
   }
 }
 
-export class TypeDominanceDAG extends ConstraintDAG<TypeKind, Type> { }
+export class TypeDominanceDAG extends ConstraintDAG<TypeKind, Type> {
+
+  try_tighten_solution_range_middle_out(node : number, new_range : Type[]) : boolean {
+    const solution_range = new Map(this.solution_range);
+    solution_range.set(node, new_range);
+    let assign_new_type_range_if_node_is_of_mapping_type = (nodeid : number) : [number, number] | undefined => {
+      if (decl_db.is_mapping_decl(nodeid)) {
+        const valueid = decl_db.value_id_of_mapping_decl(nodeid);
+        const keyid = decl_db.key_id_of_mapping_decl(nodeid);
+        const range = solution_range.get(nodeid)!;
+        const value_type_range = range.filter(t => t.kind === TypeKind.MappingType).map(t => (t as MappingType).vType);
+        const key_type_range = range.filter(t => t.kind === TypeKind.MappingType).map(t => (t as MappingType).kType);
+        solution_range.set(valueid, value_type_range);
+        solution_range.set(keyid, key_type_range);
+        return [keyid, valueid];
+      }
+      if (expr_db.is_mapping_expr(nodeid)) {
+        const valueid = expr_db.value_expr_of_mapping_expr(nodeid);
+        const keyid = expr_db.key_expr_of_mapping_expr(nodeid);
+        const range = solution_range.get(nodeid)!;
+        const value_type_range = range.filter(t => t.kind === TypeKind.MappingType).map(t => (t as MappingType).vType);
+        const key_type_range = range.filter(t => t.kind === TypeKind.MappingType).map(t => (t as MappingType).kType);
+        solution_range.set(valueid, value_type_range);
+        solution_range.set(keyid, key_type_range);
+        return [keyid, valueid];
+      }
+      return undefined;
+    }
+    let assign_new_type_range_if_node_is_mapping_value = (nodeid : number) : number | undefined => {
+      if (decl_db.value_id_to_mapping_decl_id.has(nodeid)) {
+        const range = solution_range.get(nodeid)!;
+        const mapping_decl_id = decl_db.value_id_to_mapping_decl_id.get(nodeid)!;
+        const mapping_decl_type_range = solution_range.get(mapping_decl_id)!
+          .filter(t => t.kind === TypeKind.MappingType)
+          .filter(t => range.some(g => g.same((t as MappingType).vType)));
+        solution_range.set(mapping_decl_id, mapping_decl_type_range);
+        return mapping_decl_id;
+      }
+      if (expr_db.value_expr_to_mapping_expr.has(nodeid)) {
+        const range = solution_range.get(nodeid)!;
+        const mapping_expr_id = expr_db.value_expr_to_mapping_expr.get(nodeid)!;
+        const mapping_expr_type_range = solution_range.get(mapping_expr_id)!
+          .filter(t => t.kind === TypeKind.MappingType)
+          .filter(t => range.some(g => g.same((t as MappingType).vType)));
+        solution_range.set(mapping_expr_id, mapping_expr_type_range);
+        return mapping_expr_id;
+      }
+      return undefined;
+    }
+    let assign_new_type_range_if_node_is_mapping_key = (nodeid : number) : number | undefined => {
+      if (decl_db.key_id_to_mapping_decl_id.has(nodeid)) {
+        const range = solution_range.get(nodeid)!;
+        const mapping_decl_id = decl_db.key_id_to_mapping_decl_id.get(nodeid)!;
+        const mapping_decl_type_range = solution_range.get(mapping_decl_id)!
+          .filter(t => t.kind === TypeKind.MappingType)
+          .filter(t => range.some(g => g.same((t as MappingType).kType)));
+        solution_range.set(mapping_decl_id, mapping_decl_type_range);
+        return mapping_decl_id;
+      }
+      if (expr_db.key_expr_to_mapping_expr.has(nodeid)) {
+        const range = solution_range.get(nodeid)!;
+        const mapping_expr_id = expr_db.key_expr_to_mapping_expr.get(nodeid)!;
+        const mapping_expr_type_range = solution_range.get(mapping_expr_id)!
+          .filter(t => t.kind === TypeKind.MappingType)
+          .filter(t => range.some(g => g.same((t as MappingType).kType)));
+        solution_range.set(mapping_expr_id, mapping_expr_type_range);
+        return mapping_expr_id;
+      }
+      return undefined;
+    }
+    let updown = (node : number) : boolean => {
+      return downwards(node) && upwards(node);
+    }
+    let upwards = (node : number) : boolean => {
+      if (solution_range.get(node)!.length === 0) return false;
+      if (this.dag_nodes.get(node)!.ins.length === 0) {
+        if (this.dag_nodes.get(node)!.outs.length !== 0)
+          return downwards(node);
+      }
+      let res = true;
+      for (let parent of this.dag_nodes.get(node)!.ins) {
+        const minimum_solution_range_of_dominator = this.try_shrink_dominator_solution_range(solution_range, parent, node);
+        if (is_equal_set(solution_range.get(parent)!, minimum_solution_range_of_dominator)) {
+          continue;
+        }
+        if (minimum_solution_range_of_dominator.length === 0) {
+          return false;
+        }
+        solution_range.set(parent, minimum_solution_range_of_dominator);
+        let result1;
+        if (result1 = assign_new_type_range_if_node_is_of_mapping_type(parent)) {
+          res &&= updown(result1[0]);
+          if (!res) return false;
+          res &&= updown(result1[1]);
+          if (!res) return false;
+        }
+        let result2;
+        if (result2 = assign_new_type_range_if_node_is_mapping_value(parent)) {
+          res &&= updown(result2);
+          if (!res) return false;
+        }
+        let result3;
+        if (result3 = assign_new_type_range_if_node_is_mapping_key(parent)) {
+          res &&= updown(result3);
+          if (!res) return false;
+        }
+        res &&= upwards(parent);
+        if (!res) return false;
+        res &&= downwards(parent);
+        if (!res) return false;
+      }
+      return res;
+    }
+    let downwards = (node : number) : boolean => {
+      if (solution_range.get(node)!.length === 0) return false;
+      if (this.dag_nodes.get(node)!.outs.length === 0) {
+        if (this.dag_nodes.get(node)!.ins.length !== 0)
+          return upwards(node);
+      }
+      let res = true;
+      for (let child of this.dag_nodes.get(node)!.outs) {
+        const minimum_solution_range_of_dominatee = this.try_shrink_dominatee_solution_range(solution_range, node, child);
+        if (is_equal_set(solution_range.get(child)!, minimum_solution_range_of_dominatee)) {
+          continue;
+        }
+        if (minimum_solution_range_of_dominatee.length === 0) {
+          return false;
+        }
+        solution_range.set(child, minimum_solution_range_of_dominatee);
+        let result1;
+        if (result1 = assign_new_type_range_if_node_is_of_mapping_type(child)) {
+          res &&= updown(result1[0]);
+          if (!res) return false;
+          res &&= updown(result1[1]);
+          if (!res) return false;
+        }
+        let result2;
+        if (result2 = assign_new_type_range_if_node_is_mapping_value(child)) {
+          res &&= updown(result2);
+          if (!res) return false;
+        }
+        let result3;
+        if (result3 = assign_new_type_range_if_node_is_mapping_key(child)) {
+          res &&= updown(result3);
+          if (!res) return false;
+        }
+        res &&= upwards(child);
+        if (!res) return false;
+        res &&= downwards(child);
+        if (!res) return false;
+      }
+      return res;
+    }
+    return updown(node);
+  }
+
+  solution_range_alignment(dominator_id : number, dominatee_id : number) : void {
+    super.solution_range_alignment(dominator_id, dominatee_id);
+    //! Mapping
+    //* Align Mapping's key and value
+    // If the dominatee is a mapping declaration
+    if (decl_db.is_mapping_decl(dominatee_id)) {
+      const dominatee_keyid = decl_db.key_id_of_mapping_decl(dominatee_id);
+      const dominatee_valueid = decl_db.value_id_of_mapping_decl(dominatee_id);
+      assert(expr_db.mapping_type_exprs.has(dominator_id),
+        `solution_range_alignment: dominator_id ${dominator_id} is not in expr_db.mapping_type_exprs
+        domintee_id: ${dominatee_id}`);
+      const [dominator_keyid, dominator_valueid] = expr_db.mapping_type_expr_to_key_value_pair.get(dominator_id)!;
+      assert(this.check_connection(dominator_keyid, dominatee_keyid),
+        `solution_range_alignment: dominator_keyid ${dominator_keyid} is not connected to dominatee_keyid ${dominatee_keyid}`);
+      assert(this.check_connection(dominator_valueid, dominatee_valueid),
+        `solution_range_alignment: dominator_valueid ${dominator_valueid} is not connected to dominatee_valueid ${dominatee_valueid}`);
+      this.solution_range_alignment(dominator_keyid, dominatee_keyid);
+      this.solution_range_alignment(dominator_valueid, dominatee_valueid);
+    }
+    // If the dominatee is a mapping-type expression
+    else if (expr_db.mapping_type_exprs.has(dominatee_id)) {
+      const [dominatee_keyid, dominatee_valueid] = expr_db.mapping_type_expr_to_key_value_pair.get(dominatee_id)!;
+      assert(expr_db.mapping_type_exprs.has(dominator_id),
+        `solution_range_alignment: dominator_id ${dominator_id} is not in expr_db.mapping_type_exprs
+        domintee_id: ${dominatee_id}`);
+      const [dominator_keyid, dominator_valueid] = expr_db.mapping_type_expr_to_key_value_pair.get(dominator_id)!;
+      assert(this.check_connection(dominator_keyid, dominatee_keyid),
+        `solution_range_alignment: dominator_keyid ${dominator_keyid} is not connected to dominatee_keyid ${dominatee_keyid}`);
+      assert(this.check_connection(dominator_valueid, dominatee_valueid),
+        `solution_range_alignment: dominator_valueid ${dominator_valueid} is not connected to dominatee_valueid ${dominatee_valueid}`);
+      this.solution_range_alignment(dominator_keyid, dominatee_keyid);
+      this.solution_range_alignment(dominator_valueid, dominatee_valueid);
+    }
+    // If the dominator is a mapping-type expression
+    else if (expr_db.mapping_type_exprs.has(dominator_id)) {
+      const [dominator_keyid, dominator_valueid] = expr_db.mapping_type_expr_to_key_value_pair.get(dominator_id)!;
+      assert(expr_db.mapping_type_exprs.has(dominatee_id),
+        `solution_range_alignment: dominatee_id ${dominatee_id} is not in expr_db.mapping_type_exprs
+        \n dominator_id: ${dominator_id}`);
+      const [dominatee_keyid, dominatee_valueid] = expr_db.mapping_type_expr_to_key_value_pair.get(dominatee_id)!;
+      assert(this.check_connection(dominator_keyid, dominatee_keyid),
+        `solution_range_alignment: dominator_keyid ${dominator_keyid} is not connected to dominatee_keyid ${dominatee_keyid}`);
+      assert(this.check_connection(dominator_valueid, dominatee_valueid),
+        `solution_range_alignment: dominator_valueid ${dominator_valueid} is not connected to dominatee_valueid ${dominatee_valueid}`);
+      this.solution_range_alignment(dominator_keyid, dominatee_keyid);
+      this.solution_range_alignment(dominator_valueid, dominatee_valueid);
+    }
+
+    //* Align the mapping from its key or value
+    // If the dominatee is the value of a mapping-type expression
+    if (expr_db.value_expr_to_mapping_expr.has(dominatee_id)) {
+      const range = this.solution_range.get(dominatee_id)!;
+      const mapping_expr_id = expr_db.value_expr_to_mapping_expr.get(dominatee_id)!;
+      const mapping_expr_type_range = this.solution_range.get(mapping_expr_id)!
+        .filter(t => t.kind === TypeKind.MappingType)
+        .filter(t => range.some(g => g.same((t as MappingType).vType)));
+      assert(mapping_expr_type_range.length !== 0,
+        `solution_range_alignment: mapping_expr_type_range of ${mapping_expr_id} is empty`);
+      this.solution_range.set(mapping_expr_id, mapping_expr_type_range);
+      super.tighten_solution_range_middle_out(mapping_expr_id);
+    }
+    else if (decl_db.value_id_to_mapping_decl_id.has(dominatee_id)) {
+      const range = this.solution_range.get(dominatee_id)!;
+      const mapping_decl_id = decl_db.value_id_to_mapping_decl_id.get(dominatee_id)!;
+      const mapping_decl_type_range = this.solution_range.get(mapping_decl_id)!
+        .filter(t => t.kind === TypeKind.MappingType)
+        .filter(t => range.some(g => g.same((t as MappingType).vType)));
+      assert(mapping_decl_type_range.length !== 0,
+        `solution_range_alignment: mapping_decl_type_range of ${mapping_decl_id} is empty`
+      )
+      this.solution_range.set(mapping_decl_id, mapping_decl_type_range);
+      super.tighten_solution_range_middle_out(mapping_decl_id);
+    }
+    else if (expr_db.key_expr_to_mapping_expr.has(dominatee_id)) {
+      const range = this.solution_range.get(dominatee_id)!;
+      const mapping_expr_id = expr_db.key_expr_to_mapping_expr.get(dominatee_id)!;
+      const mapping_expr_type_range = this.solution_range.get(mapping_expr_id)!
+        .filter(t => t.kind === TypeKind.MappingType)
+        .filter(t => range.some(g => g.same((t as MappingType).kType)));
+      this.solution_range.set(mapping_expr_id, mapping_expr_type_range);
+      super.tighten_solution_range_middle_out(mapping_expr_id);
+    }
+    else if (decl_db.key_id_to_mapping_decl_id.has(dominatee_id)) {
+      const range = this.solution_range.get(dominatee_id)!;
+      const mapping_decl_id = decl_db.key_id_to_mapping_decl_id.get(dominatee_id)!;
+      const mapping_decl_type_range = this.solution_range.get(mapping_decl_id)!
+        .filter(t => t.kind === TypeKind.MappingType)
+        .filter(t => range.some(g => g.same((t as MappingType).kType)));
+      this.solution_range.set(mapping_decl_id, mapping_decl_type_range);
+      super.tighten_solution_range_middle_out(mapping_decl_id);
+    }
+
+    if (expr_db.value_expr_to_mapping_expr.has(dominator_id)) {
+      const range = this.solution_range.get(dominator_id)!;
+      const mapping_expr_id = expr_db.value_expr_to_mapping_expr.get(dominator_id)!;
+      const mapping_expr_type_range = this.solution_range.get(mapping_expr_id)!
+        .filter(t => t.kind === TypeKind.MappingType)
+        .filter(t => range.some(g => g.same((t as MappingType).vType)));
+      this.solution_range.set(mapping_expr_id, mapping_expr_type_range);
+      super.tighten_solution_range_middle_out(mapping_expr_id);
+    }
+    else if (decl_db.value_id_to_mapping_decl_id.has(dominator_id)) {
+      const range = this.solution_range.get(dominator_id)!;
+      const mapping_decl_id = decl_db.value_id_to_mapping_decl_id.get(dominator_id)!;
+      const mapping_decl_type_range = this.solution_range.get(mapping_decl_id)!
+        .filter(t => t.kind === TypeKind.MappingType)
+        .filter(t => range.some(g => g.same((t as MappingType).vType)));
+      this.solution_range.set(mapping_decl_id, mapping_decl_type_range);
+      super.tighten_solution_range_middle_out(mapping_decl_id);
+    }
+    else if (expr_db.key_expr_to_mapping_expr.has(dominator_id)) {
+      const range = this.solution_range.get(dominator_id)!;
+      const mapping_expr_id = expr_db.key_expr_to_mapping_expr.get(dominator_id)!;
+      const mapping_expr_type_range = this.solution_range.get(mapping_expr_id)!
+        .filter(t => t.kind === TypeKind.MappingType)
+        .filter(t => range.some(g => g.same((t as MappingType).kType)));
+      this.solution_range.set(mapping_expr_id, mapping_expr_type_range);
+      super.tighten_solution_range_middle_out(mapping_expr_id);
+    }
+    else if (decl_db.key_id_to_mapping_decl_id.has(dominator_id)) {
+      const range = this.solution_range.get(dominator_id)!;
+      const mapping_decl_id = decl_db.key_id_to_mapping_decl_id.get(dominator_id)!;
+      const mapping_decl_type_range = this.solution_range.get(mapping_decl_id)!
+        .filter(t => t.kind === TypeKind.MappingType)
+        .filter(t => range.some(g => g.same((t as MappingType).kType)));
+      this.solution_range.set(mapping_decl_id, mapping_decl_type_range);
+      super.tighten_solution_range_middle_out(mapping_decl_id);
+    }
+
+    //! Struct
+    let dominator_struct_type_range, dominatee_struct_type_range;
+    if (decl_db.is_state_struct_instance(dominator_id)) {
+      dominator_struct_type_range = this.solution_range.get(dominator_id)!;
+    }
+    if (decl_db.is_state_struct_instance(dominatee_id)) {
+      dominatee_struct_type_range = this.solution_range.get(dominatee_id)!;
+    }
+    if (dominator_struct_type_range !== undefined) {
+      const new_dominator_struct_type_range = this.solution_range.get(dominator_id)!;
+      dominator_struct_type_range.forEach((t) => {
+        if (!new_dominator_struct_type_range.includes(t)) {
+          const getter_func_ids = decl_db.state_struct_instance_id_to_getter_function_ids.get(dominator_id)!;
+          let struct_type_name = (t as StructType).name;
+          if (struct_type_name.includes(".")) {
+            struct_type_name = struct_type_name.split(".")[1];
+          }
+          const struct_decl = decl_db.find_structdecl_by_name(struct_type_name)!;
+          assert(struct_decl !== undefined, `solution_range_alignment: struct_decl whose name is ${struct_type_name} is undefined`);
+          getter_func_ids.forEach((getter_func_id) => {
+            if (struct_decl.id === decl_db.getter_function_id_to_struct_decl_id.get(getter_func_id)!) {
+              decl_db.remove_getter_function(getter_func_id);
+            }
+          });
+        }
+      });
+    }
+    if (dominatee_struct_type_range !== undefined) {
+      const new_dominatee_struct_type_range = this.solution_range.get(dominatee_id)!;
+      dominatee_struct_type_range.forEach((t) => {
+        if (!new_dominatee_struct_type_range.includes(t)) {
+          const getter_func_ids = decl_db.state_struct_instance_id_to_getter_function_ids.get(dominatee_id)!;
+          let struct_type_name = (t as StructType).name;
+          if (struct_type_name.includes(".")) {
+            struct_type_name = struct_type_name.split(".")[1];
+          }
+          const struct_decl = decl_db.find_structdecl_by_name(struct_type_name)!;
+          assert(struct_decl !== undefined, `solution_range_alignment: struct_decl whose name is ${struct_type_name} is undefined`);
+          getter_func_ids.forEach((getter_func_id) => {
+            if (struct_decl.id === decl_db.getter_function_id_to_struct_decl_id.get(getter_func_id)!) {
+              decl_db.remove_getter_function(getter_func_id);
+            }
+          });
+        }
+      });
+    }
+  }
+}
 export class FuncStateMutabilityDominanceDAG extends ConstraintDAG<FunctionStateMutability, FuncStat> { }
 export class FuncVisibilityDominanceDAG extends ConstraintDAG<FunctionVisibility, FuncVis> { }
 export class StateVariableVisibilityDominanceDAG extends ConstraintDAG<StateVariableVisibility, VarVis> { }

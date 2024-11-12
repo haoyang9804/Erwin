@@ -139,8 +139,6 @@ type irnodeInfo = {
 class DeclDB {
   private scope_tree : Tree<number>;
   private scope2irnodeinfo : Map<number, irnodeInfo[]>;
-  // contractdecl_id_to_scope is a map from node ID to scope ID
-  // It's records the scope that contract instance node exposes to the outside world.
   private contractdecl_id_to_scope : Map<number, number>;
   public vardecls : Set<number> = new Set<number>();
   public structdecls : Set<number> = new Set<number>();
@@ -151,6 +149,7 @@ class DeclDB {
   public mapping_decl_id : Set<number> = new Set<number>();
   public mapping_decl_id_to_kv_ids : Map<number, [number, number]> = new Map<number, [number, number]>();
   public value_id_to_mapping_decl_id : Map<number, number> = new Map<number, number>();
+  public key_id_to_mapping_decl_id : Map<number, number> = new Map<number, number>();
   public called_function_decls_ids : Set<number> = new Set<number>();
   public getter_function_id_to_state_struct_instance_id : Map<number, number> = new Map<number, number>();
   public getter_function_id_to_struct_decl_id : Map<number, number> = new Map<number, number>();
@@ -159,6 +158,8 @@ class DeclDB {
   public contract_scope_id_to_contract_id : Map<number, number> = new Map<number, number>();
   public struct_decl_that_contains_mapping_decl : Set<number> = new Set<number>();
   public member2structdecl : Map<number, number> = new Map<number, number>();
+  public cannot_be_assigned_to : Set<number> = new Set<number>();
+  public must_be_initialized : Map<number, number[]> = new Map<number, number[]>();
   constructor() {
     this.scope_tree = new Tree();
     this.scope2irnodeinfo = new Map<number, irnodeInfo[]>();
@@ -203,6 +204,7 @@ class DeclDB {
     this.mapping_decl_id.add(mapping_decl_id);
     this.mapping_decl_id_to_kv_ids.set(mapping_decl_id, [key_id, value_id]);
     this.value_id_to_mapping_decl_id.set(value_id, mapping_decl_id);
+    this.key_id_to_mapping_decl_id.set(key_id, mapping_decl_id);
   }
 
   is_mapping_decl(mapping_decl_id : number) : boolean {
@@ -319,3 +321,33 @@ class DeclDB {
 }
 
 export let decl_db = new DeclDB();
+
+class ExprDB {
+  public mapping_type_exprs : Set<number> = new Set<number>();
+  public mapping_type_expr_to_key_value_pair : Map<number, [number, number]> = new Map<number, [number, number]>();
+  public key_expr_to_mapping_expr : Map<number, number> = new Map<number, number>();
+  public value_expr_to_mapping_expr : Map<number, number> = new Map<number, number>();
+  public expr2read_variables : Map<number, Set<number>> = new Map<number, Set<number>>();
+  public expr2write_variables : Map<number, Set<number>> = new Map<number, Set<number>>();
+  add_mapping_expr(mapping_expr_id : number, key_id : number, value_id : number) : void {
+    this.mapping_type_exprs.add(mapping_expr_id);
+    this.mapping_type_expr_to_key_value_pair.set(mapping_expr_id, [key_id, value_id]);
+    this.key_expr_to_mapping_expr.set(key_id, mapping_expr_id);
+    this.value_expr_to_mapping_expr.set(value_id, mapping_expr_id);
+  }
+  is_mapping_expr(expr_id : number) : boolean {
+    return this.mapping_type_exprs.has(expr_id);
+  }
+  value_expr_of_mapping_expr(mapping_expr_id : number) : number {
+    assert(this.mapping_type_expr_to_key_value_pair.has(mapping_expr_id),
+      `The mapping expression ${mapping_expr_id} does not exist.`);
+    return this.mapping_type_expr_to_key_value_pair.get(mapping_expr_id)![1];
+  }
+  key_expr_of_mapping_expr(mapping_expr_id : number) : number {
+    assert(this.mapping_type_expr_to_key_value_pair.has(mapping_expr_id),
+      `The mapping expression ${mapping_expr_id} does not exist.`);
+    return this.mapping_type_expr_to_key_value_pair.get(mapping_expr_id)![0];
+  }
+}
+
+export let expr_db = new ExprDB();
