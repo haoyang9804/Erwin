@@ -585,8 +585,6 @@ class MappingDeclarationGenerator extends DeclarationGenerator {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Mapping Declaration, scope: ${cur_scope.kind()}, id: ${mappingid}`));
       indent += 2;
     }
-    assert(cur_scope.kind() !== scopeKind.STRUCT,
-      `MappingDeclarationGenerator: mapping decls should be in struct scope, but is in ${cur_scope.kind()}`);
     const mapping_name = generate_name(IDENTIFIER.MAPPING);
     let [key_type_range, value_type_range] = this.extract_key_value_type_range_from_mapping_type_range(this.type_range);
     if (key_type_range.length === 0) {
@@ -676,7 +674,6 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
     const array_name = generate_name(IDENTIFIER.VAR);
     this.irnode = new decl.IRVariableDeclaration(arrayid, cur_scope.id(), array_name);
 
-
     let length : number | undefined;
     if (this.type_range.length > 0) {
       const all_lengths = [...new Set<number | undefined>(this.type_range.map((t) => (t as type.ArrayType).length))];
@@ -693,6 +690,11 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
     }
     else {
       base_type_range = this.type_range.map((t) => (t as type.ArrayType).base);
+    }
+    if (cur_scope.kind() === scopeKind.FUNC_PARAMETER ||
+      cur_scope.kind() === scopeKind.FUNC_RETURNS ||
+      cur_scope.kind() === scopeKind.CONSTRUCTOR_PARAMETERS) {
+      base_type_range = base_type_range.filter((t) => t.typeName !== 'MappingType');
     }
     cur_scope = cur_scope.new(scopeKind.ARRAY);
     const base_gen = new VariableDeclarationGenerator(this.cur_type_complex_level + 1, base_type_range, true);
@@ -778,6 +780,7 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
         StorageLocationProvider.storage_pointer(),
         StorageLocationProvider.storage_ref()
       ]);
+      decl_db.set_vardecl_as_nonassignable(arrayid);
     }
     if (initializer !== undefined) {
       const initializer_id = expr.tuple_extraction(initializer).id;
@@ -792,7 +795,7 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
     }
     if (config.debug) {
       indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}Array Declaration, scope: ${cur_scope.kind()}`));
+      console.log(color.yellowBG(`${" ".repeat(indent)}Array Declaration, scope: ${cur_scope.kind()}, name: ${array_name}, id: ${arrayid}`));
     }
   }
 }
@@ -898,6 +901,7 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
         StorageLocationProvider.storage_pointer(),
         StorageLocationProvider.storage_ref()
       ]);
+      decl_db.set_vardecl_as_nonassignable(this.irnode.id);
     }
     if (initializer !== undefined) {
       const initializer_id = expr.tuple_extraction(initializer).id;
@@ -1096,10 +1100,17 @@ class VariableDeclarationGenerator extends DeclarationGenerator {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Variable Declaration, scope: ${cur_scope.kind()}`));
       indent += 2;
     }
-    // Struct containing mapping is not allowed to be constructed.
-    // This may incur many implementation difficulties. So we just ignore this case.
-    if (cur_scope.kind() === scopeKind.STRUCT) {
-      this.type_range = this.type_range.filter((t) => t.typeName !== 'MappingType');
+    //! Types containing (nested) mappings can only be parameters or return variables of internal or library functions.
+    if (cur_scope.kind() === scopeKind.FUNC_PARAMETER ||
+      cur_scope.kind() === scopeKind.FUNC_RETURNS ||
+      cur_scope.kind() === scopeKind.CONSTRUCTOR_PARAMETERS) {
+      this.type_range = this.type_range.filter((t) => {
+        if (t.typeName !== "StructType") return true;
+        const struct_type = t as type.StructType;
+        const struct_decl_id = struct_type.referece_id;
+        if (decl_db.is_struct_decl_that_contains_mapping_decl(struct_decl_id)) return false;
+        return true;
+      })
     }
     const contain_element_types = this.type_range.some((t) => t.typeName === 'ElementaryType');
     const contain_contract_types = this.type_range.some((t) => t.typeName === 'ContractType');
@@ -2242,6 +2253,49 @@ class IdentifierGenerator extends LRValueGenerator {
         }
         this.irnode = index_access;
         this.irnode!.id = this.id;
+      }
+      else if (decl_db.is_base_decl(this.variable_decl.id)) {
+        let cur_id = this.variable_decl.id;
+        let index_access;
+        while (decl_db.is_base_decl(cur_id)) {
+          const array_decl_id = decl_db.array_of_base(cur_id)!;
+          const array_type_range = type_dag.solution_range.get(array_decl_id)!;
+          const lengths = [...new Set<number | undefined>(array_type_range.map(t => (t as type.ArrayType).length))];
+          assert(lengths.length === 1, `IdentifierGenerator: more than one length ${lengths} for array_decl_id ${array_decl_id}`);
+          const length = lengths[0];
+          const expr_type_range = type.uinteger_types.filter(t => all_types.some(g => g.same(t)));
+          const expr_gen_prototype = get_exprgenerator(
+            expr_type_range,
+            cur_expression_complex_level + 1
+          );
+          const expr_id = new_global_id();
+          type_dag.insert(expr_id, expr_type_range);
+          const expr_gen = new expr_gen_prototype(expr_id);
+          expr_gen.generate(cur_expression_complex_level + 1);
+          if (expr_gen.generator_name === "LiteralGenerator") {
+            const literal_expr = expr_gen.irnode as expr.IRLiteral;
+            if (length !== undefined) {
+              literal_expr.value = `${random_int(0, length - 1)}`;
+            }
+          }
+          if (index_access === undefined) {
+            index_access = new expr.IRIndexedAccess(new_global_id(), cur_scope.id(),
+              new expr.IRIdentifier(new_global_id(), cur_scope.id(),
+                (irnodes.get(array_decl_id)! as decl.IRVariableDeclaration).name, array_decl_id),
+              expr_gen.irnode! as expr.IRExpression
+            );
+          }
+          else {
+            const this_index_access = new expr.IRIndexedAccess(new_global_id(), cur_scope.id(),
+              new expr.IRIdentifier(new_global_id(), cur_scope.id(),
+                (irnodes.get(array_decl_id)! as decl.IRVariableDeclaration).name,
+                array_decl_id),
+              expr_gen.irnode! as expr.IRExpression);
+            index_access = new expr.IRIndexedAccess(new_global_id(), cur_scope.id(),
+              this_index_access, index_access.indexed!);
+          }
+          cur_id = array_decl_id;
+        }
       }
       //! The selected variable decl is not the member of a struct, then generate an IRIdentifier.
       else if (!decl_db.is_member_of_struct_decl(this.variable_decl.id)) {

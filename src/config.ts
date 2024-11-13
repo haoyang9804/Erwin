@@ -33,7 +33,7 @@ export const config = {
   state_variable_count_lowerlimit: 1,
 
   // Array
-  array_length_upperlimit: 1000000,
+  array_length_upperlimit: 10,
 
   // Complexity
   expression_complex_level: 1,
