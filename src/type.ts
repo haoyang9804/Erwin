@@ -838,9 +838,28 @@ export function initType() : void {
   size_of_type = sizeof(elementary_types[0]);
 }
 
-export class TypeRange {
-  range : Type[]
-  constructor(range : Type[]) {
-    this.range = range;
+export function contain_mapping_type(type : Type) : boolean {
+  if (type.kind === TypeKind.MappingType) return true;
+  if (type.kind === TypeKind.ArrayType) {
+    return contain_mapping_type((type as ArrayType).base);
   }
+  if (type.kind === TypeKind.UnionType) {
+    return (type as UnionType).types.some(x => contain_mapping_type(x));
+  }
+  if (type.kind === TypeKind.FunctionType) {
+    return contain_mapping_type((type as FunctionType).parameterTypes) || contain_mapping_type((type as FunctionType).returnTypes);
+  }
+  if (type.kind === TypeKind.StructType) {
+    return false;
+  }
+  if (type.kind === TypeKind.ContractType) {
+    return false;
+  }
+  if (type.kind === TypeKind.ElementaryType) {
+    return false;
+  }
+  if (type.kind === TypeKind.PlaceholderType) {
+    return false;
+  }
+  throw new Error(`contain_mapping_type: unrecognized type kind: ${type.kind}`);
 }

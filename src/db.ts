@@ -7,6 +7,8 @@ import { assert } from 'console';
 import { config } from './config';
 import { IRFunctionDefinition, IRStructDefinition } from './declare';
 import { irnodes } from './node';
+import { contain_mapping_type } from './type';
+import { type_dag } from './generator';
 
 // Deprecated Database
 export class DeprecatedDB {
@@ -169,9 +171,12 @@ class DeclDB {
   private array_decl_id : Set<number> = new Set<number>();
   private array_decl_id_to_base_id : Map<number, number> = new Map<number, number>();
   private base_id_to_array_decl_id : Map<number, number> = new Map<number, number>();
+  private array_decl_that_contains_mapping_decl : Set<number> = new Set<number>();
 
   private struct_decl_that_contains_mapping_decl : Set<number> = new Set<number>();
   private member2structdecl : Map<number, number> = new Map<number, number>();
+  private structdecl2members : Map<number, number[]> = new Map<number, number[]>();
+
 
   private cannot_be_assigned_to : Set<number> = new Set<number>();
   private must_be_initialized : Map<number, number[]> = new Map<number, number[]>();
@@ -322,8 +327,18 @@ class DeclDB {
     return struct_decl === undefined ? undefined : irnodes.get(struct_decl)! as IRStructDefinition;
   }
 
-  add_struct_decl_that_contains_mapping_decl(struct_decl_id : number) : void {
-    this.struct_decl_that_contains_mapping_decl.add(struct_decl_id);
+  if_struct_decl_contain_mapping_decl(struct_decl_id : number) : void {
+    let stop = false;
+    for (const member of this.members_of_struct_decl(struct_decl_id)) {
+      for (const t of type_dag.solution_range.get(member)!) {
+        if (contain_mapping_type(t)) {
+          this.struct_decl_that_contains_mapping_decl.add(struct_decl_id);
+          stop = true;
+          break;
+        }
+      }
+      if (stop) break;
+    }
   }
 
   remove_struct_decl_that_contains_mapping_decl(struct_decl_id : number) : void {
@@ -336,6 +351,12 @@ class DeclDB {
 
   add_member_to_struct_decl(member_id : number, struct_decl_id : number) : void {
     this.member2structdecl.set(member_id, struct_decl_id);
+    if (this.structdecl2members.has(struct_decl_id)) {
+      this.structdecl2members.get(struct_decl_id)!.push(member_id);
+    }
+    else {
+      this.structdecl2members.set(struct_decl_id, [member_id]);
+    }
   }
 
   is_member_of_struct_decl(member_id : number) : boolean {
@@ -345,6 +366,11 @@ class DeclDB {
   struct_decl_of_member(member_id : number) : number {
     assert(this.member2structdecl.has(member_id), `The member ${member_id} does not exist.`);
     return this.member2structdecl.get(member_id)!;
+  }
+
+  members_of_struct_decl(struct_decl_id : number) : number[] {
+    assert(this.structdecl2members.has(struct_decl_id), `The struct declaration ${struct_decl_id} does not exist.`);
+    return this.structdecl2members.get(struct_decl_id)!;
   }
 
   //* struct instance
@@ -452,6 +478,20 @@ class DeclDB {
     return this.array_decl_id_to_base_id.get(array_decl_id)!;
   }
 
+  if_array_decl_contain_mapping_decl(array_decl_id : number) : void {
+    for (const t of type_dag.solution_range.get(array_decl_id)!) {
+      if (contain_mapping_type(t)) {
+        this.array_decl_that_contains_mapping_decl.add(array_decl_id);
+        break;
+      }
+    }
+  }
+
+  is_array_decl_that_contains_mapping_decl(array_decl_id : number) : boolean {
+    return this.array_decl_that_contains_mapping_decl.has(array_decl_id);
+  }
+
+  //* mapping decl
   add_mapping_decl(mapping_decl_id : number, key_id : number, value_id : number) : void {
     this.mapping_decls.add(mapping_decl_id);
     this.mapping_decl_id_to_kv_ids.set(mapping_decl_id, [key_id, value_id]);

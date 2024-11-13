@@ -595,7 +595,8 @@ class MappingDeclarationGenerator extends DeclarationGenerator {
       key_type_range = all_types.filter((t) =>
         t.typeName !== 'StructType' &&
         t !== type.TypeProvider.payable_address() &&
-        t.typeName != 'MappingType'
+        t.typeName != 'MappingType' &&
+        t.typeName != 'ArrayType'
       );
       value_type_range = all_types;
     }
@@ -674,6 +675,18 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
     const arrayid = new_global_id();
     const array_name = generate_name(IDENTIFIER.VAR);
     this.irnode = new decl.IRVariableDeclaration(arrayid, cur_scope.id(), array_name);
+
+
+    let length : number | undefined;
+    if (this.type_range.length > 0) {
+      const all_lengths = [...new Set<number | undefined>(this.type_range.map((t) => (t as type.ArrayType).length))];
+      length = pick_random_element(all_lengths);
+      this.type_range = this.type_range.filter((t) => (t as type.ArrayType).length === length);
+    }
+    else {
+      length = Math.random() < config.dynamic_array_prob ? undefined : random_int(1, config.array_length_upperlimit);
+    }
+
     let base_type_range;
     if (this.type_range.length === 0) {
       base_type_range = all_types;
@@ -686,19 +699,11 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
     base_gen.generate();
     cur_scope = cur_scope.rollback();
     const base = base_gen.irnode!;
+    base_type_range = type_dag.solution_range.get(base.id)!;
     decl_db.add_array_decl(arrayid, base.id);
-    let length : number | undefined;
-    if (this.type_range.length > 0) {
-      const all_lengths = [...new Set<number | undefined>(this.type_range.map((t) => (t as type.ArrayType).length))];
-      length = pick_random_element(all_lengths);
-      this.type_range = this.type_range.filter((t) => (t as type.ArrayType).length === length);
-    }
-    else {
-      length = Math.random() < config.dynamic_array_prob ? undefined : random_int(1, config.array_length_upperlimit);
-    }
     this.type_range = base_type_range.map((t) => new type.ArrayType(t, length));
-    type_dag.insert(this.irnode.id, this.type_range);
-
+    type_dag.insert(arrayid, this.type_range);
+    decl_db.if_array_decl_contain_mapping_decl(arrayid);
     let initializer : expr.IRExpression | undefined;
     if (!this.no_initializer && Math.random() < config.initialization_prob) {
       const nid = new_global_id();
@@ -768,7 +773,7 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
         StorageLocationProvider.memory()
       ]);
     }
-    if (type_dag.solution_range.get(base.id)!.every(t => t.typeName === 'MappingType')) {
+    if (decl_db.is_array_decl_that_contains_mapping_decl(arrayid)) {
       storage_location_dag.update(this.irnode.id, [
         StorageLocationProvider.storage_pointer(),
         StorageLocationProvider.storage_ref()
@@ -1324,10 +1329,8 @@ class StructGenerator extends DeclarationGenerator {
       (variable_gen.irnode! as decl.IRVariableDeclaration).loc = DataLocation.Default;
       body.push(variable_gen.irnode! as decl.IRVariableDeclaration);
       decl_db.add_member_to_struct_decl(variable_gen.irnode!.id, thisid);
-      if (decl_db.is_mapping_decl(variable_gen.irnode!.id)) {
-        decl_db.add_struct_decl_that_contains_mapping_decl(thisid);
-      }
     }
+    decl_db.if_struct_decl_contain_mapping_decl(thisid);
     this.irnode = new decl.IRStructDefinition(thisid, cur_scope.id(), struct_name, body);
     cur_scope = cur_scope.rollback();
     //! Add this struct type
@@ -1622,13 +1625,6 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
     }
     else if (this.storage_parameters.length > 0 || this.storage_return_decls.length > 0) {
       const vismut_solution = vismut_dag.solution_range.get(this.fid)!;
-      assert(vismut_solution.some((v) => open_func_vismut.includes(v)),
-        `FunctionDeclarationGenerator: vismut_dag.solution_range[${this.fid}] should contain at least one open_func_vismut.
-         read_state_variables is ${read_state_variables}, write_state_variables is ${write_state_variables}
-         noview_nopure_funcdecl is ${noview_nopure_funcdecl},
-         forbid_external_call is ${forbid_external_call},
-         external_call is ${external_call},
-         debug_vismug_range is ${debug_vismug_range.map(f => f.str())}`);
       if (forbid_external_call) {
         // If forbid_external_call is set to true, then one of the storage parameters or return decls cannot be in memory or calldata.
         // Therefore, set this function's visibility to internal or private
@@ -3341,7 +3337,7 @@ class NewStructGenerator extends ExpressionGenerator {
     expr_db.expr2write_variables.set(this.id, new Set<number>());
     for (const member of struct_decl.members) {
       const type_range = type_dag.solution_range.get(member.id)!.filter(
-        t => all_types.some(g => g.same(t)) || t.typeName === "MappingType"
+        t => all_types.some(g => g.same(t)) || t.typeName === "MappingType" || t.typeName === "ArrayType"
       );
       let arg_gen_prototype = get_exprgenerator(type_range, cur_expression_complex_level + 1);
       const argid = new_global_id();
