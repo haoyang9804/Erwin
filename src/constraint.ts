@@ -912,6 +912,7 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
     let mul = 1n;
     for (let id of this.solution_range.keys()) {
       if (!this.leaves.has(id)) continue;
+      if (this.solution_range.get(id)!.length === 0) continue;
       mul *= BigInt(this.solution_range.get(id)!.length)
     }
     console.log(color.cyan(`The size of solution candidate of ${this.name} is ${mul}`));

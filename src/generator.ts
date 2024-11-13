@@ -71,6 +71,22 @@ function initialize_the_vardecls_that_must_be_initialized(scope_id : number) : s
   decl_db.remove_vardecl_from_must_be_initialized(scope_id);
   return initialized_stmts;
 }
+
+//! Struct instances and array declarations that contain nested mappings are not supported
+//! in parameters and returns of functions.
+function parameter_return_type_rule(type_range : type.Type[]) : type.Type[] {
+  return type_range.filter((t) => {
+    if (t.typeName !== "StructType" && t.typeName !== "ArrayType") return true;
+    if (t.typeName === "ArrayType") {
+      const array_type = t as type.ArrayType;
+      return array_type.base.typeName !== "MappingType";
+    }
+    const struct_type = t as type.StructType;
+    const struct_decl_id = struct_type.referece_id;
+    if (decl_db.is_struct_decl_that_contains_mapping_decl(struct_decl_id)) return false;
+    return true;
+  })
+}
 enum IDENTIFIER {
   FREE_VAR,
   FREE_FUNC,
@@ -684,17 +700,18 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
       length = Math.random() < config.dynamic_array_prob ? undefined : random_int(1, config.array_length_upperlimit);
     }
 
+    if (cur_scope.kind() === scopeKind.FUNC_PARAMETER ||
+      cur_scope.kind() === scopeKind.FUNC_RETURNS ||
+      cur_scope.kind() === scopeKind.CONSTRUCTOR_PARAMETERS) {
+      this.type_range = parameter_return_type_rule(this.type_range);
+    }
+
     let base_type_range;
     if (this.type_range.length === 0) {
       base_type_range = all_types;
     }
     else {
       base_type_range = this.type_range.map((t) => (t as type.ArrayType).base);
-    }
-    if (cur_scope.kind() === scopeKind.FUNC_PARAMETER ||
-      cur_scope.kind() === scopeKind.FUNC_RETURNS ||
-      cur_scope.kind() === scopeKind.CONSTRUCTOR_PARAMETERS) {
-      base_type_range = base_type_range.filter((t) => t.typeName !== 'MappingType');
     }
     cur_scope = cur_scope.new(scopeKind.ARRAY);
     const base_gen = new VariableDeclarationGenerator(this.cur_type_complex_level + 1, base_type_range, true);
@@ -755,6 +772,12 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
       ]);
       decl_db.insert(this.irnode.id, decide_variable_visibility(cur_scope.kind(), StateVariableVisibility.Default), cur_scope.id());
     }
+    else if (cur_scope.kind() === scopeKind.ARRAY || cur_scope.kind() === scopeKind.MAPPING) {
+      storage_location_dag.insert(this.irnode.id, [
+        StorageLocationProvider.memory(),
+      ]);
+      decl_db.insert(this.irnode.id, decide_variable_visibility(cur_scope.kind(), StateVariableVisibility.Default), cur_scope.id());
+    }
     else {
       storage_location_dag.insert(this.irnode.id, [
         StorageLocationProvider.calldata(),
@@ -781,6 +804,9 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
         StorageLocationProvider.storage_ref()
       ]);
       decl_db.set_vardecl_as_nonassignable(arrayid);
+    }
+    if (storage_location_dag.solution_range.get(this.irnode.id)!.length === 0) {
+      (this.irnode as decl.IRVariableDeclaration).loc = DataLocation.Default;
     }
     if (initializer !== undefined) {
       const initializer_id = expr.tuple_extraction(initializer).id;
@@ -829,7 +855,8 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
     this.irnode = new decl.IRVariableDeclaration(new_global_id(), cur_scope.id(), struct_instance_name);
     type_dag.insert(this.irnode.id, this.type_range);
     let initializer : expr.IRExpression | undefined;
-    if (!this.no_initializer && Math.random() < config.initialization_prob) {
+    if (!this.no_initializer && Math.random() < config.initialization_prob &&
+      !decl_db.is_struct_decl_that_contains_mapping_decl(this.struct_id)) {
       const nid = new_global_id();
       type_dag.insert(nid, type_dag.solution_range.get(this.irnode.id)!);
       type_dag.connect(nid, this.irnode.id, "super_dominance");
@@ -877,6 +904,12 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
       ]);
       decl_db.insert(this.irnode.id, decide_variable_visibility(cur_scope.kind(), StateVariableVisibility.Default), cur_scope.id());
     }
+    else if (cur_scope.kind() === scopeKind.ARRAY || cur_scope.kind() === scopeKind.MAPPING) {
+      storage_location_dag.insert(this.irnode.id, [
+        StorageLocationProvider.memory(),
+      ]);
+      decl_db.insert(this.irnode.id, decide_variable_visibility(cur_scope.kind(), StateVariableVisibility.Default), cur_scope.id());
+    }
     else {
       storage_location_dag.insert(this.irnode.id, [
         StorageLocationProvider.calldata(),
@@ -902,6 +935,9 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
         StorageLocationProvider.storage_ref()
       ]);
       decl_db.set_vardecl_as_nonassignable(this.irnode.id);
+    }
+    if (storage_location_dag.solution_range.get(this.irnode.id)!.length === 0) {
+      (this.irnode as decl.IRVariableDeclaration).loc = DataLocation.Default;
     }
     if (initializer !== undefined) {
       const initializer_id = expr.tuple_extraction(initializer).id;
@@ -1104,13 +1140,7 @@ class VariableDeclarationGenerator extends DeclarationGenerator {
     if (cur_scope.kind() === scopeKind.FUNC_PARAMETER ||
       cur_scope.kind() === scopeKind.FUNC_RETURNS ||
       cur_scope.kind() === scopeKind.CONSTRUCTOR_PARAMETERS) {
-      this.type_range = this.type_range.filter((t) => {
-        if (t.typeName !== "StructType") return true;
-        const struct_type = t as type.StructType;
-        const struct_decl_id = struct_type.referece_id;
-        if (decl_db.is_struct_decl_that_contains_mapping_decl(struct_decl_id)) return false;
-        return true;
-      })
+      this.type_range = parameter_return_type_rule(this.type_range);
     }
     const contain_element_types = this.type_range.some((t) => t.typeName === 'ElementaryType');
     const contain_contract_types = this.type_range.some((t) => t.typeName === 'ContractType');
@@ -1648,7 +1678,7 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
         vismut_dag.update(this.fid, closed_func_vismut);
       }
       else {
-        // Otherwise, we force the storage parmaeters and return decls to be in memory or calldata.
+        // Otherwise, we force the storage parameters and return decls to be in memory or calldata.
         // If any of the storage parameters or return decls cannot be in memory or calldata,
         // forbid_external_call is set to true, which is handled in the previous if block.
         for (const p of this.storage_parameters) {
@@ -2124,8 +2154,13 @@ class IdentifierGenerator extends LRValueGenerator {
     if (this.left) {
       available_irdecl = available_irdecl.filter(irdecl => !decl_db.is_vardecl_nonassignable(irdecl.id));
     }
+    let all_available_irdecls_are_struct_members_of_array_or_mapping_type = () : boolean => {
+      return available_irdecl.every(irdecl => decl_db.is_member_of_struct_decl(irdecl.id) &&
+        (decl_db.is_array_decl(irdecl.id) || decl_db.is_mapping_decl(irdecl.id)));
+    }
     //! Generate a variable decl if there is no variable decl available.
-    if (available_irdecl.length === 0 || Math.random() < config.vardecl_prob) {
+    if (available_irdecl.length === 0 || Math.random() < config.vardecl_prob
+      || all_available_irdecls_are_struct_members_of_array_or_mapping_type() && Math.random() < 0.5) {
       const contain_element_types = this.type_range.some(t => t.typeName === "ElementaryType");
       const contain_mapping_types = this.type_range.some(t => t.typeName === "MappingType");
       const contain_array_types = this.type_range.some(t => t.typeName === "ArrayType");
@@ -2167,7 +2202,12 @@ class IdentifierGenerator extends LRValueGenerator {
           }
         }
         else if (contain_struct_types) {
-          if (!this.left && Math.random() < config.new_prob) {
+          assert(this.type_range.length === 1,
+            `IdentifierGenerator: this.type_range.length should be 1, but is ${this.type_range.length}`);
+          const struct_type = this.type_range[0] as type.StructType;
+          const struct_decl = decl_db.find_structdecl_by_name(struct_type.name)!;
+          if (!this.left && Math.random() < config.new_prob &&
+            !decl_db.is_struct_decl_that_contains_mapping_decl(struct_decl.id)) {
             // Generate an instance of the struct type
             const new_struct_gen = new NewStructGenerator(this.id);
             new_struct_gen.generate(cur_expression_complex_level + 1);
@@ -2296,6 +2336,8 @@ class IdentifierGenerator extends LRValueGenerator {
           }
           cur_id = array_decl_id;
         }
+        this.irnode = index_access;
+        this.irnode!.id = this.id;
       }
       //! The selected variable decl is not the member of a struct, then generate an IRIdentifier.
       else if (!decl_db.is_member_of_struct_decl(this.variable_decl.id)) {
@@ -2312,7 +2354,7 @@ class IdentifierGenerator extends LRValueGenerator {
         if (available_possible_struct_instances.length === 0) {
           //! If no available struct instance to expose this variable decl and the identifier is a left value,
           //! then first generate a struct instance of a specified struct type and then generate an IRMemberAccess.
-          if (this.left || Math.random() > config.new_prob) {
+          if (this.left || Math.random() > config.new_prob || decl_db.is_struct_decl_that_contains_mapping_decl(struct_decl_id)) {
             //* Generate a struct instance
             let rollback = false;
             let snapshot_scope = cur_scope.snapshot();

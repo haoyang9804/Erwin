@@ -341,16 +341,18 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
   console.log(`${gen.type_dag.solutions_collection.length} type solutions`);
   //! Select one vismut solution
   const vismut_solutions = pick_random_element(gen.vismut_dag.solutions_collection)!;
-  for (let [key, value] of vismut_solutions) {
-    if (irnodes.get(key)!.typeName === "IRVariableDeclaration") {
-      (irnodes.get(key)! as decl.IRVariableDeclaration).visibility =
-        varvis2statevisibility((value.kind as VarVisKind).visibility);
-    }
-    else if (irnodes.get(key)!.typeName === "IRFunctionDefinition") {
-      (irnodes.get(key)! as decl.IRFunctionDefinition).visibility =
-        funcvis2funcvisibility((value.kind as FuncVisMutKind).visibility);
-      (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability =
-        funcstat2functionstatemutability((value.kind as FuncVisMutKind).state_mutability);
+  if (vismut_solutions.size > 0) {
+    for (let [key, value] of vismut_solutions) {
+      if (irnodes.get(key)!.typeName === "IRVariableDeclaration") {
+        (irnodes.get(key)! as decl.IRVariableDeclaration).visibility =
+          varvis2statevisibility((value.kind as VarVisKind).visibility);
+      }
+      else if (irnodes.get(key)!.typeName === "IRFunctionDefinition") {
+        (irnodes.get(key)! as decl.IRFunctionDefinition).visibility =
+          funcvis2funcvisibility((value.kind as FuncVisMutKind).visibility);
+        (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability =
+          funcstat2functionstatemutability((value.kind as FuncVisMutKind).state_mutability);
+      }
     }
   }
   //! Select one storage location solution
@@ -366,6 +368,7 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
   let cnt = 0;
   let pre_program = "";
   for (let type_solutions of gen.type_dag.solutions_collection) {
+    if (type_solutions.size === 0) continue;
     for (let [key, value] of type_solutions) {
       if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
         (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
@@ -396,26 +399,31 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
   console.log(`${gen.vismut_dag.solutions_collection.length} state variable visibility solutions`);
   //! Select one type solution
   const type_solutions = pick_random_element(gen.type_dag.solutions_collection)!;
-  for (let [key, value] of type_solutions) {
-    if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
-      (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
-  }
-  for (const mapping_decl_id of decl_db.mapping_decls_ids()) {
-    assign_mapping_type(mapping_decl_id, type_solutions);
+  if (type_solutions.size > 0) {
+    for (let [key, value] of type_solutions) {
+      if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
+        (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
+    }
+    for (const mapping_decl_id of decl_db.mapping_decls_ids()) {
+      assign_mapping_type(mapping_decl_id, type_solutions);
+    }
   }
   //! Select storage location solution
   const storage_location_solutions = pick_random_element(gen.storage_location_dag.solutions_collection)!;
-  for (let [key, value] of storage_location_solutions) {
-    if (irnodes.get(key)!.typeName !== "IRVariableDeclaration") {
-      continue;
+  if (storage_location_solutions.size > 0) {
+    for (let [key, value] of storage_location_solutions) {
+      if (irnodes.get(key)!.typeName !== "IRVariableDeclaration") {
+        continue;
+      }
+      if ((irnodes.get(key)! as decl.IRVariableDeclaration).loc === undefined)
+        (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
     }
-    if ((irnodes.get(key)! as decl.IRVariableDeclaration).loc === undefined)
-      (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
   }
   //! Traverse vismut solutions
   let cnt = 0;
   let pre_program = "";
   for (const vismut_solutions of gen.vismut_dag.solutions_collection) {
+    if (vismut_solutions.size === 0) continue;
     for (let [key, value] of vismut_solutions) {
       if (irnodes.get(key)!.typeName === "IRVariableDeclaration") {
         (irnodes.get(key)! as decl.IRVariableDeclaration).visibility =
@@ -458,22 +466,25 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
   }
   //! Select one vismut solution
   const vismut_solutions = pick_random_element(gen.vismut_dag.solutions_collection)!;
-  for (let [key, value] of vismut_solutions) {
-    if (irnodes.get(key)!.typeName === "IRVariableDeclaration") {
-      (irnodes.get(key)! as decl.IRVariableDeclaration).visibility =
-        varvis2statevisibility((value.kind as VarVisKind).visibility);
-    }
-    else if (irnodes.get(key)!.typeName === "IRFunctionDefinition") {
-      (irnodes.get(key)! as decl.IRFunctionDefinition).visibility =
-        funcvis2funcvisibility((value.kind as FuncVisMutKind).visibility);
-      (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability =
-        funcstat2functionstatemutability((value.kind as FuncVisMutKind).state_mutability);
+  if (vismut_solutions.size > 0) {
+    for (let [key, value] of vismut_solutions) {
+      if (irnodes.get(key)!.typeName === "IRVariableDeclaration") {
+        (irnodes.get(key)! as decl.IRVariableDeclaration).visibility =
+          varvis2statevisibility((value.kind as VarVisKind).visibility);
+      }
+      else if (irnodes.get(key)!.typeName === "IRFunctionDefinition") {
+        (irnodes.get(key)! as decl.IRFunctionDefinition).visibility =
+          funcvis2funcvisibility((value.kind as FuncVisMutKind).visibility);
+        (irnodes.get(key)! as decl.IRFunctionDefinition).stateMutability =
+          funcstat2functionstatemutability((value.kind as FuncVisMutKind).state_mutability);
+      }
     }
   }
   //! Traverse storage location solutions
   let cnt = 0;
   let pre_program = "";
   for (let storage_location_solutions of gen.storage_location_dag.solutions_collection) {
+    if (storage_location_solutions.size === 0) continue;
     for (let [key, value] of storage_location_solutions) {
       if (irnodes.get(key)!.typeName !== "IRVariableDeclaration") continue;
       if ((irnodes.get(key)! as decl.IRVariableDeclaration).loc === undefined)

@@ -2,6 +2,8 @@ import { assert, cartesian_product, pick_random_subarray, merge_set } from "./ut
 import { sizeof } from "sizeof";
 import { DominanceNode } from "./dominance";
 import { config } from './config';
+import { decl_db } from "./db";
+import { type_dag } from "./generator";
 
 export enum TypeKind {
   ElementaryType = "TypeKind::ElementaryType",
@@ -850,6 +852,11 @@ export function contain_mapping_type(type : Type) : boolean {
     return contain_mapping_type((type as FunctionType).parameterTypes) || contain_mapping_type((type as FunctionType).returnTypes);
   }
   if (type.kind === TypeKind.StructType) {
+    for (const member of decl_db.members_of_struct_decl((type as StructType).referece_id)) {
+      for (const t of type_dag.solution_range.get(member)!) {
+        if (contain_mapping_type(t)) return true;
+      }
+    }
     return false;
   }
   if (type.kind === TypeKind.ContractType) {
