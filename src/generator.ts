@@ -401,7 +401,7 @@ function get_available_vardecls_with_type_constraint(types : type.Type[]) : decl
   //! Search for mappings' values
   // Currently mappings are all state variables. 
   const get_value_from_a_mapping = (mapping_id : number) : number[] => {
-    const valueid = decl_db.value_id_of_mapping_decl(mapping_id);
+    const valueid = decl_db.value_of_mapping(mapping_id);
     let result = [valueid];
     if (decl_db.is_mapping_decl(valueid)) {
       result = result.concat(get_value_from_a_mapping(valueid));
@@ -412,7 +412,7 @@ function get_available_vardecls_with_type_constraint(types : type.Type[]) : decl
   }
   //! Search for arrays' bases
   const get_bases_from_an_array = (array_id : number) : number[] => {
-    const baseid = decl_db.base_id_of_array_decl(array_id);
+    const baseid = decl_db.base_of_array(array_id);
     let result = [baseid];
     if (decl_db.is_array_decl(baseid)) {
       result = result.concat(get_bases_from_an_array(baseid));
@@ -733,8 +733,10 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
       initializer = new_struct_gen.irnode as expr.IRExpression;
     }
     (this.irnode as decl.IRVariableDeclaration).value = initializer;
+    (this.irnode as decl.IRVariableDeclaration).type = new type.ArrayType(type.TypeProvider.placeholder(), length);
     if (cur_scope.kind() === scopeKind.CONTRACT) {
       (this.irnode as decl.IRVariableDeclaration).state = true;
+      (this.irnode as decl.IRVariableDeclaration).loc = DataLocation.Default;
       decl_db.insert(this.irnode.id, erwin_visibility.INCONTRACT_UNKNOWN, cur_scope.id());
       vismut_dag.insert(this.irnode.id, all_var_vismut);
       storage_location_dag.insert(this.irnode.id, [
@@ -867,6 +869,7 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
     (this.irnode as decl.IRVariableDeclaration).value = initializer;
     if (cur_scope.kind() === scopeKind.CONTRACT) {
       (this.irnode as decl.IRVariableDeclaration).state = true;
+      (this.irnode as decl.IRVariableDeclaration).loc = DataLocation.Default;
       decl_db.insert(this.irnode.id, erwin_visibility.INCONTRACT_UNKNOWN, cur_scope.id());
       vismut_dag.insert(this.irnode.id, all_var_vismut);
       storage_location_dag.insert(this.irnode.id, [
@@ -1904,13 +1907,13 @@ class ContractDeclarationGenerator extends DeclarationGenerator {
       decl_db.add_getter_function(fid);
       decl_db.insert(fid, erwin_visibility.INCONTRACT_EXTERNAL, cur_scope.id());
       vismut_dag.insert(fid, [VisMutProvider.func_external_view()]);
-      const key_decl = irnodes.get(decl_db.key_id_of_mapping_decl(variable_decl.id)) as decl.IRVariableDeclaration;
+      const key_decl = irnodes.get(decl_db.key_of_mapping(variable_decl.id)) as decl.IRVariableDeclaration;
       const parameters : decl.IRVariableDeclaration[] = [key_decl];
-      let value_decl = irnodes.get(decl_db.value_id_of_mapping_decl(variable_decl.id)) as decl.IRVariableDeclaration;
+      let value_decl = irnodes.get(decl_db.value_of_mapping(variable_decl.id)) as decl.IRVariableDeclaration;
       while (value_decl.typeName === 'MappingType') {
-        const key_decl = irnodes.get(decl_db.key_id_of_mapping_decl(value_decl.id)) as decl.IRVariableDeclaration;
+        const key_decl = irnodes.get(decl_db.key_of_mapping(value_decl.id)) as decl.IRVariableDeclaration;
         parameters.push(key_decl);
-        value_decl = irnodes.get(decl_db.value_id_of_mapping_decl(value_decl.id)) as decl.IRVariableDeclaration;
+        value_decl = irnodes.get(decl_db.value_of_mapping(value_decl.id)) as decl.IRVariableDeclaration;
       }
       new decl.IRFunctionDefinition(fid, cur_scope.id(), variable_decl.name, FunctionKind.Function,
         false, false, parameters, [value_decl], [], [], FunctionVisibility.External, FunctionStateMutability.View);
@@ -2245,10 +2248,12 @@ class IdentifierGenerator extends LRValueGenerator {
         }
         let index_access;
         let cur_id = this.variable_decl.id;
+        let real_variable_decl_id;
         while (decl_db.is_mapping_value(cur_id)) {
           const mapping_decl_id = decl_db.mapping_of_value(cur_id)!;
+          real_variable_decl_id = mapping_decl_id;
           //* Generate an expr to be the key of the mapping.
-          const key_id = decl_db.key_id_of_mapping_decl(mapping_decl_id)!;
+          const key_id = decl_db.key_of_mapping(mapping_decl_id)!;
           const type_range = type_dag.solution_range.get(key_id)!
           const expr_gen_prototype = get_exprgenerator(type_range, cur_expression_complex_level + 1);
           const expr_id = new_global_id();
@@ -2293,12 +2298,22 @@ class IdentifierGenerator extends LRValueGenerator {
         }
         this.irnode = index_access;
         this.irnode!.id = this.id;
+        assert(real_variable_decl_id !== undefined,
+          `IdentifierGenerator: real_variable_decl_id is undefined when the variable_decl is of mapping type`);
+        expr_db.expr2read_variables.set(this.id,
+          merge_set(expr_db.expr2read_variables.get(this.id)!, new Set<number>([real_variable_decl_id!])));
+        if (this.left) {
+          expr_db.expr2write_variables.set(this.id,
+            merge_set(expr_db.expr2write_variables.get(this.id)!, new Set<number>([real_variable_decl_id!])));
+        }
       }
       else if (decl_db.is_base_decl(this.variable_decl.id)) {
         let cur_id = this.variable_decl.id;
         let index_access;
+        let real_variable_decl_id;
         while (decl_db.is_base_decl(cur_id)) {
           const array_decl_id = decl_db.array_of_base(cur_id)!;
+          real_variable_decl_id = array_decl_id;
           const array_type_range = type_dag.solution_range.get(array_decl_id)!;
           const lengths = [...new Set<number | undefined>(array_type_range.map(t => (t as type.ArrayType).length))];
           assert(lengths.length === 1, `IdentifierGenerator: more than one length ${lengths} for array_decl_id ${array_decl_id}`);
@@ -2338,6 +2353,14 @@ class IdentifierGenerator extends LRValueGenerator {
         }
         this.irnode = index_access;
         this.irnode!.id = this.id;
+        assert(real_variable_decl_id !== undefined,
+          `IdentifierGenerator: real_variable_decl_id is undefined when the variable_decl is of array type`);
+        expr_db.expr2read_variables.set(this.id,
+          merge_set(expr_db.expr2read_variables.get(this.id)!, new Set<number>([real_variable_decl_id!])));
+        if (this.left) {
+          expr_db.expr2write_variables.set(this.id,
+            merge_set(expr_db.expr2write_variables.get(this.id)!, new Set<number>([real_variable_decl_id!])));
+        }
       }
       //! The selected variable decl is not the member of a struct, then generate an IRIdentifier.
       else if (!decl_db.is_member_of_struct_decl(this.variable_decl.id)) {

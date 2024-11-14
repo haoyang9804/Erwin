@@ -930,10 +930,16 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
     this.build_leaves_relation();
     if (this.name === "TypeDominanceDAG") {
       const mapping_leaves : number[] = [];
+      const array_leaves : number[] = [];
       this.leaves.forEach(leaf => {
-        if (decl_db.is_mapping_decl(leaf)) {
+        if (decl_db.is_mapping_decl(leaf) || decl_db.is_array_decl(leaf)) {
           this.leaves.delete(leaf);
-          mapping_leaves.push(leaf);
+          if (decl_db.is_mapping_decl(leaf)) {
+            mapping_leaves.push(leaf);
+          }
+          else if (decl_db.is_array_decl(leaf)) {
+            array_leaves.push(leaf);
+          }
           for (const edge of this.leavesequal) {
             const [leaf1, leaf2] = edge.split(" ");
             if (parseInt(leaf1) === leaf || parseInt(leaf2) === leaf) {
@@ -954,25 +960,6 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
           }
         }
       });
-      for (let i = 0; i < mapping_leaves.length; i++) {
-        const keyi = decl_db.key_id_of_mapping_decl(mapping_leaves[i]);
-        const valuei = decl_db.value_id_of_mapping_decl(mapping_leaves[i]);
-        for (let j = i + 1; j < mapping_leaves.length; j++) {
-          const keyj = decl_db.key_id_of_mapping_decl(mapping_leaves[j]);
-          const valuej = decl_db.value_id_of_mapping_decl(mapping_leaves[j]);
-          if (this.leavesequal.has(`${mapping_leaves[i]} ${mapping_leaves[j]}`)
-            || this.leavesequal.has(`${mapping_leaves[j]} ${mapping_leaves[i]}`)
-            || this.leavessub.has(`${mapping_leaves[i]} ${mapping_leaves[j]}`)
-            || this.leavessub.has(`${mapping_leaves[j]} ${mapping_leaves[i]}`)
-            || this.leavesnotsure.has(`${mapping_leaves[i]} ${mapping_leaves[j]}`)
-            || this.leavesnotsure.has(`${mapping_leaves[j]} ${mapping_leaves[i]}`)) {
-            this.leavesequal.add(`${keyi} ${keyj}`);
-            this.leavesequal.add(`${keyj} ${keyi}`);
-            this.leavesequal.add(`${valuei} ${valuej}`);
-            this.leavesequal.add(`${valuej} ${valuei}`);
-          }
-        }
-      }
     }
     if (config.debug || config.unit_test_mode) {
       console.log(color.green("> leavessub:"));
@@ -1149,8 +1136,8 @@ export class TypeDominanceDAG extends ConstraintDAG<TypeKind, Type> {
     solution_range.set(node, new_range);
     let assign_new_type_range_if_node_is_of_mapping_type = (nodeid : number) : [number, number] | undefined => {
       if (decl_db.is_mapping_decl(nodeid)) {
-        const valueid = decl_db.value_id_of_mapping_decl(nodeid);
-        const keyid = decl_db.key_id_of_mapping_decl(nodeid);
+        const valueid = decl_db.value_of_mapping(nodeid);
+        const keyid = decl_db.key_of_mapping(nodeid);
         const range = solution_range.get(nodeid)!;
         const value_type_range = range.filter(t => t.kind === TypeKind.MappingType).map(t => (t as MappingType).vType);
         const key_type_range = range.filter(t => t.kind === TypeKind.MappingType).map(t => (t as MappingType).kType);
@@ -1212,6 +1199,44 @@ export class TypeDominanceDAG extends ConstraintDAG<TypeKind, Type> {
       }
       return undefined;
     }
+    let assign_new_type_range_if_node_is_array_type = (nodeid : number) : number | undefined => {
+      if (decl_db.is_array_decl(nodeid)) {
+        const range = solution_range.get(nodeid)!;
+        const baseid = decl_db.base_of_array(nodeid);
+        const base_type_range = range.filter(t => t.kind === TypeKind.ArrayType).map(t => (t as ArrayType).base);
+        solution_range.set(baseid, base_type_range);
+        return baseid;
+      }
+      if (expr_db.is_array_expr(nodeid)) {
+        const range = solution_range.get(nodeid)!;
+        const baseid = expr_db.base_of_array(nodeid);
+        const base_type_range = range.filter(t => t.kind === TypeKind.ArrayType).map(t => (t as ArrayType).base);
+        solution_range.set(baseid, base_type_range);
+        return baseid;
+      }
+      return undefined;
+    }
+    let assign_new_type_range_if_node_is_array_base = (nodeid : number) : number | undefined => {
+      if (decl_db.is_base_decl(nodeid)) {
+        const range = solution_range.get(nodeid)!;
+        const array_decl_id = decl_db.array_of_base(nodeid)!;
+        const array_decl_type_range = solution_range.get(array_decl_id)!
+          .filter(t => t.kind === TypeKind.ArrayType)
+          .filter(t => range.some(g => g.same((t as ArrayType).base)));
+        solution_range.set(array_decl_id, array_decl_type_range);
+        return array_decl_id;
+      }
+      if (expr_db.is_base_expr(nodeid)) {
+        const range = solution_range.get(nodeid)!;
+        const array_expr_id = expr_db.array_of_base(nodeid)!;
+        const array_expr_type_range = solution_range.get(array_expr_id)!
+          .filter(t => t.kind === TypeKind.ArrayType)
+          .filter(t => range.some(g => g.same((t as ArrayType).base)));
+        solution_range.set(array_expr_id, array_expr_type_range);
+        return array_expr_id;
+      }
+      return undefined;
+    }
     let updown = (node : number) : boolean => {
       return downwards(node) && upwards(node);
     }
@@ -1246,6 +1271,16 @@ export class TypeDominanceDAG extends ConstraintDAG<TypeKind, Type> {
         let result3;
         if (result3 = assign_new_type_range_if_node_is_mapping_key(parent)) {
           res &&= updown(result3);
+          if (!res) return false;
+        }
+        let result4;
+        if (result4 = assign_new_type_range_if_node_is_array_type(parent)) {
+          res &&= updown(result4);
+          if (!res) return false;
+        }
+        let result5;
+        if (result5 = assign_new_type_range_if_node_is_array_base(parent)) {
+          res &&= updown(result5);
           if (!res) return false;
         }
         res &&= upwards(parent);
@@ -1288,6 +1323,16 @@ export class TypeDominanceDAG extends ConstraintDAG<TypeKind, Type> {
           res &&= updown(result3);
           if (!res) return false;
         }
+        let result4;
+        if (result4 = assign_new_type_range_if_node_is_array_type(child)) {
+          res &&= updown(result4);
+          if (!res) return false;
+        }
+        let result5;
+        if (result5 = assign_new_type_range_if_node_is_array_base(child)) {
+          res &&= updown(result5);
+          if (!res) return false;
+        }
         res &&= upwards(child);
         if (!res) return false;
         res &&= downwards(child);
@@ -1304,8 +1349,8 @@ export class TypeDominanceDAG extends ConstraintDAG<TypeKind, Type> {
     //* Align Mapping's key and value
     // If the dominatee is a mapping declaration
     if (decl_db.is_mapping_decl(dominatee_id)) {
-      const dominatee_keyid = decl_db.key_id_of_mapping_decl(dominatee_id);
-      const dominatee_valueid = decl_db.value_id_of_mapping_decl(dominatee_id);
+      const dominatee_keyid = decl_db.key_of_mapping(dominatee_id);
+      const dominatee_valueid = decl_db.value_of_mapping(dominatee_id);
       assert(expr_db.is_mapping_expr(dominator_id),
         `solution_range_alignment: dominator_id ${dominator_id} is not in expr_db.mapping_type_exprs
         domintee_id: ${dominatee_id}`);
@@ -1345,7 +1390,6 @@ export class TypeDominanceDAG extends ConstraintDAG<TypeKind, Type> {
       this.solution_range_alignment(dominator_keyid, dominatee_keyid);
       this.solution_range_alignment(dominator_valueid, dominatee_valueid);
     }
-
 
     //* Align mapping from its key and value
     // If the dominatee is the value of a mapping-type expression
@@ -1438,7 +1482,7 @@ export class TypeDominanceDAG extends ConstraintDAG<TypeKind, Type> {
     //! Array
     //* Align array's base
     if (decl_db.is_array_decl(dominatee_id)) {
-      const dominatee_baseid = decl_db.base_id_of_array_decl(dominatee_id);
+      const dominatee_baseid = decl_db.base_of_array(dominatee_id);
       assert(expr_db.is_array_expr(dominator_id),
         `solution_range_alignment: dominator_id ${dominator_id} is not in expr_db.array_exprs
         domintee_id: ${dominatee_id}`);
@@ -1557,8 +1601,8 @@ export class TypeDominanceDAG extends ConstraintDAG<TypeKind, Type> {
     rank ?: "sub_dominance" | "super_dominance") : void {
     // If the dominatee is a mapping declaration
     if (decl_db.is_mapping_decl(dominatee_id)) {
-      const dominatee_keyid = decl_db.key_id_of_mapping_decl(dominatee_id);
-      const dominatee_valueid = decl_db.value_id_of_mapping_decl(dominatee_id);
+      const dominatee_keyid = decl_db.key_of_mapping(dominatee_id);
+      const dominatee_valueid = decl_db.value_of_mapping(dominatee_id);
       if (!expr_db.is_mapping_expr(dominator_id)) {
         const keyid = new_global_id();
         const valueid = new_global_id();
@@ -1600,14 +1644,14 @@ export class TypeDominanceDAG extends ConstraintDAG<TypeKind, Type> {
     }
     // If the dominatee is an array declaration
     else if (decl_db.is_array_decl(dominatee_id)) {
-      const dominatee_baseid = decl_db.base_id_of_array_decl(dominatee_id);
+      const dominatee_baseid = decl_db.base_of_array(dominatee_id);
       if (!expr_db.is_array_expr(dominator_id)) {
         const baseid = new_global_id();
         this.insert(baseid, this.solution_range.get(dominatee_baseid)!);
         expr_db.add_array_expr(dominator_id, baseid);
       }
       const dominator_baseid = expr_db.base_of_array(dominator_id)!;
-      this.connect(dominator_baseid, dominatee_baseid);
+      this.connect(dominator_baseid, dominatee_baseid, rank);
     }
     // If the dominatee is an array-type expression
     else if (expr_db.is_array_expr(dominatee_id)) {
@@ -1618,7 +1662,7 @@ export class TypeDominanceDAG extends ConstraintDAG<TypeKind, Type> {
         expr_db.add_array_expr(dominator_id, baseid);
       }
       const dominator_baseid = expr_db.base_of_array(dominator_id)!;
-      this.connect(dominator_baseid, dominatee_baseid);
+      this.connect(dominator_baseid, dominatee_baseid, rank);
     }
     // If the dominator is an array-type expression
     else if (expr_db.is_array_expr(dominator_id)) {
@@ -1629,7 +1673,7 @@ export class TypeDominanceDAG extends ConstraintDAG<TypeKind, Type> {
         expr_db.add_array_expr(dominatee_id, baseid);
       }
       const dominatee_baseid = expr_db.base_of_array(dominatee_id)!;
-      this.connect(dominator_baseid, dominatee_baseid);
+      this.connect(dominator_baseid, dominatee_baseid, rank);
     }
     super.connect(dominator_id, dominatee_id, rank);
   }

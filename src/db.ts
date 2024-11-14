@@ -471,10 +471,10 @@ class DeclDB {
   remove_array_decl(array_decl_id : number) : void {
     this.array_decl_id.delete(array_decl_id);
     this.array_decl_id_to_base_id.delete(array_decl_id);
-    this.base_id_to_array_decl_id.delete(this.base_id_of_array_decl(array_decl_id));
+    this.base_id_to_array_decl_id.delete(this.base_of_array(array_decl_id));
   }
 
-  base_id_of_array_decl(array_decl_id : number) : number {
+  base_of_array(array_decl_id : number) : number {
     return this.array_decl_id_to_base_id.get(array_decl_id)!;
   }
 
@@ -489,6 +489,10 @@ class DeclDB {
 
   is_array_decl_that_contains_mapping_decl(array_decl_id : number) : boolean {
     return this.array_decl_that_contains_mapping_decl.has(array_decl_id);
+  }
+
+  array_decls_ids() : number[] {
+    return Array.from(this.array_decl_id);
   }
 
   //* mapping decl
@@ -510,21 +514,21 @@ class DeclDB {
   remove_mapping_decl(mapping_decl_id : number) : void {
     this.mapping_decls.delete(mapping_decl_id);
     this.mapping_decl_id_to_kv_ids.delete(mapping_decl_id);
-    this.value_id_to_mapping_decl_id.delete(this.value_id_of_mapping_decl(mapping_decl_id));
-    this.key_id_to_mapping_decl_id.delete(this.key_id_of_mapping_decl(mapping_decl_id));
+    this.value_id_to_mapping_decl_id.delete(this.value_of_mapping(mapping_decl_id));
+    this.key_id_to_mapping_decl_id.delete(this.key_of_mapping(mapping_decl_id));
   }
 
-  kv_idpair_of_mapping_decl(mapping_decl_id : number) : [number, number] {
+  kvpair_of_mapping(mapping_decl_id : number) : [number, number] {
     assert(this.mapping_decl_id_to_kv_ids.has(mapping_decl_id), `The mapping declaration ${mapping_decl_id} does not exist.`);
     return this.mapping_decl_id_to_kv_ids.get(mapping_decl_id)!;
   }
 
-  key_id_of_mapping_decl(mapping_decl_id : number) : number {
-    return this.kv_idpair_of_mapping_decl(mapping_decl_id)[0];
+  key_of_mapping(mapping_decl_id : number) : number {
+    return this.kvpair_of_mapping(mapping_decl_id)[0];
   }
 
-  value_id_of_mapping_decl(mapping_decl_id : number) : number {
-    return this.kv_idpair_of_mapping_decl(mapping_decl_id)[1];
+  value_of_mapping(mapping_decl_id : number) : number {
+    return this.kvpair_of_mapping(mapping_decl_id)[1];
   }
 
   is_mapping_value(value_id : number) : boolean {

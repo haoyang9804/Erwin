@@ -717,6 +717,7 @@ export class ArrayType extends Type {
     return base_subs.map(x => new ArrayType(x, this.length));
   }
   same(t : Type) : boolean {
+    if (t === TypeProvider.trivial_array()) return true;
     if (t.kind !== TypeKind.ArrayType) return false;
     if ((t as ArrayType).base.same(this.base) && (t as ArrayType).length === this.length) {
       return true;
@@ -747,7 +748,10 @@ export class MappingType extends Type {
     return new MappingType(this.kType.copy(), this.vType.copy());
   }
   same(t : Type) : boolean {
-    return t.kind === TypeKind.MappingType && (t as MappingType).kType.same(this.kType) && (t as MappingType).vType.same(this.vType);
+    return t.kind === TypeKind.MappingType &&
+      (t as MappingType).kType.same(this.kType) &&
+      (t as MappingType).vType.same(this.vType) ||
+      t === TypeProvider.trivial_mapping();
   }
   subs() : Type[] {
     return [this];
