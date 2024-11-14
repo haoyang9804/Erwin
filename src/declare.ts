@@ -13,7 +13,7 @@ import {
 } from "solc-typed-ast";
 
 import { assert } from "./utility";
-import { TypeKind, Type, ElementaryType, UnionType, FunctionType, ContractType, StructType, MappingType } from "./type";
+import { TypeKind, Type, ElementaryType, UnionType, FunctionType, ContractType, StructType, MappingType, ArrayType } from "./type";
 import { IRNode, factory } from "./node";
 import { IRStatement, IRPlaceholderStatement } from "./statement";
 import { IRExpression } from "./expression";
@@ -77,6 +77,10 @@ export class IRVariableDeclaration extends IRDeclare {
       const type = this.type as MappingType;
       return factory.makeElementaryTypeName(type.str(), type.str());
     }
+    if (type.kind === TypeKind.ArrayType) {
+      const type = this.type as ArrayType;
+      return factory.makeElementaryTypeName(type.str(), type.str());
+    }
     else {
       throw new Error(`IRVariableDeclaration: type ${type.kind} is not supported`);
     }
@@ -86,14 +90,16 @@ export class IRVariableDeclaration extends IRDeclare {
     let typename : TypeName;
     if (this.type !== undefined) {
       typename = this.lower_type(this.type);
-      if (this.type.kind === TypeKind.MappingType
-        || this.type.kind === TypeKind.ContractType
+      if (this.type.kind === TypeKind.ContractType
         || this.type.kind === TypeKind.ElementaryType
       ) {
         if (this.loc === undefined)
           this.loc = DataLocation.Default;
       }
-      else if (this.type.kind === TypeKind.StructType) {
+      else if (this.type.kind === TypeKind.StructType
+        || this.type.kind === TypeKind.ArrayType
+        || this.type.kind === TypeKind.MappingType
+      ) {
       }
       else {
         throw new Error(`IRVariableDeclaration: type ${this.type.kind} is not supported`);

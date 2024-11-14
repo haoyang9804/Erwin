@@ -20,6 +20,7 @@ export enum scopeKind {
   DOWHILE_COND = "scopeKind::DOWHILE_COND",
   STRUCT = "scopeKind::STRUCT",
   MAPPING = "scopeKind::MAPPING",
+  ARRAY = "scopeKind::ARRAY",
 }
 
 export function inside_function_body(scope_kind : scopeKind) : boolean {

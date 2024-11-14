@@ -1,5 +1,5 @@
 <p align="center">
-<img src="Erwin.png" alt="erwin" width="400"/>
+<img src="Erwin_icon.png" alt="erwin" width="200"/>
 </p>
 
 ## Detected Bugs

@@ -2,6 +2,8 @@ import { assert, cartesian_product, pick_random_subarray, merge_set } from "./ut
 import { sizeof } from "sizeof";
 import { DominanceNode } from "./dominance";
 import { config } from './config';
+import { decl_db } from "./db";
+import { type_dag } from "./generator";
 
 export enum TypeKind {
   ElementaryType = "TypeKind::ElementaryType",
@@ -685,13 +687,16 @@ export class FunctionType extends Type {
 
 export class ArrayType extends Type {
   base : Type;
-  length : number = 1
-  constructor(base : Type, length : number = 1) {
+  length : number | undefined = undefined;
+  constructor(base : Type, length : number | undefined = undefined) {
     super(TypeKind.ArrayType);
     this.base = base;
     this.length = length;
   }
   str() : string {
+    if (this.length === undefined) {
+      return `${this.base.str()}[]`;
+    }
     return `${this.base.str()}[${this.length}]`;
   }
   copy() : Type {
@@ -712,6 +717,7 @@ export class ArrayType extends Type {
     return base_subs.map(x => new ArrayType(x, this.length));
   }
   same(t : Type) : boolean {
+    if (t === TypeProvider.trivial_array()) return true;
     if (t.kind !== TypeKind.ArrayType) return false;
     if ((t as ArrayType).base.same(this.base) && (t as ArrayType).length === this.length) {
       return true;
@@ -742,7 +748,10 @@ export class MappingType extends Type {
     return new MappingType(this.kType.copy(), this.vType.copy());
   }
   same(t : Type) : boolean {
-    return t.kind === TypeKind.MappingType && (t as MappingType).kType.same(this.kType) && (t as MappingType).vType.same(this.vType);
+    return t.kind === TypeKind.MappingType &&
+      (t as MappingType).kType.same(this.kType) &&
+      (t as MappingType).vType.same(this.vType) ||
+      t === TypeProvider.trivial_mapping();
   }
   subs() : Type[] {
     return [this];
@@ -785,7 +794,7 @@ export class TypeProvider {
   static trivial_array() : Type { return this.m_array; }
   private static m_placeholder : Type = new PlaceholderType();
   private static m_mapping : Type = new MappingType(this.m_placeholder, this.m_placeholder);
-  private static m_array : Type = new ArrayType(this.m_placeholder, -1);
+  private static m_array : Type = new ArrayType(this.m_placeholder, undefined);
   private static m_int256 : Type = new ElementaryType("int256", "nonpayable");
   private static m_int128 : Type = new ElementaryType("int128", "nonpayable");
   private static m_int64 : Type = new ElementaryType("int64", "nonpayable");
@@ -835,9 +844,33 @@ export function initType() : void {
   size_of_type = sizeof(elementary_types[0]);
 }
 
-export class TypeRange {
-  range : Type[]
-  constructor(range : Type[]) {
-    this.range = range;
+export function contain_mapping_type(type : Type) : boolean {
+  if (type.kind === TypeKind.MappingType) return true;
+  if (type.kind === TypeKind.ArrayType) {
+    return contain_mapping_type((type as ArrayType).base);
   }
+  if (type.kind === TypeKind.UnionType) {
+    return (type as UnionType).types.some(x => contain_mapping_type(x));
+  }
+  if (type.kind === TypeKind.FunctionType) {
+    return contain_mapping_type((type as FunctionType).parameterTypes) || contain_mapping_type((type as FunctionType).returnTypes);
+  }
+  if (type.kind === TypeKind.StructType) {
+    for (const member of decl_db.members_of_struct_decl((type as StructType).referece_id)) {
+      for (const t of type_dag.solution_range.get(member)!) {
+        if (contain_mapping_type(t)) return true;
+      }
+    }
+    return false;
+  }
+  if (type.kind === TypeKind.ContractType) {
+    return false;
+  }
+  if (type.kind === TypeKind.ElementaryType) {
+    return false;
+  }
+  if (type.kind === TypeKind.PlaceholderType) {
+    return false;
+  }
+  throw new Error(`contain_mapping_type: unrecognized type kind: ${type.kind}`);
 }

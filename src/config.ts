@@ -32,6 +32,9 @@ export const config = {
   state_variable_count_upperlimit: 2,
   state_variable_count_lowerlimit: 1,
 
+  // Array
+  array_length_upperlimit: 10,
+
   // Complexity
   expression_complex_level: 1,
   statement_complex_level: 1,
@@ -51,10 +54,12 @@ export const config = {
   contract_instance_prob: 0.1,
   struct_instance_prob: 0.1,
   mapping_prob: 0.1,
+  array_prob: 0.1,
   initialization_prob: 0.3,
   constructor_prob: 0.5,
   return_prob: 0.5,
   reuse_name_prob: 0.0,
+  dynamic_array_prob: 0.5,
 
   // Structured Statements
   for_init_cnt_upper_limit: 1,
