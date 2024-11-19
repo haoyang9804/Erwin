@@ -30,7 +30,7 @@ export class StoragePointer extends StorageLocation {
     throw new Error("Method not implemented.");
   }
   same(t : StorageLocation) : boolean {
-    return t instanceof StoragePointer;
+    return t instanceof StoragePointer || t instanceof StorageRef;
   }
   copy() : StorageLocation {
     return new StoragePointer();
@@ -72,7 +72,7 @@ export class StorageRef extends StorageLocation {
     throw new Error("Method not implemented.");
   }
   same(t : StorageLocation) : boolean {
-    return t instanceof StorageRef;
+    return t instanceof StorageRef || t instanceof StoragePointer;
   }
   copy() : StorageLocation {
     return new StorageRef();

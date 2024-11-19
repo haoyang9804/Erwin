@@ -394,7 +394,8 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
   if (gen.storage_location_dag.solutions_collection.length > 0) {
     const storage_location_solutions = pick_random_element(gen.storage_location_dag.solutions_collection)!;
     for (let [key, value] of storage_location_solutions) {
-      console.log(key, value.str());
+      //! key may be ghost and is not in irnodes
+      if (!irnodes.has(key)) continue;
       if (irnodes.get(key)!.typeName !== "IRVariableDeclaration") {
         continue;
       }
@@ -456,6 +457,8 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
   if (gen.storage_location_dag.solutions_collection.length > 0) {
     const storage_location_solutions = pick_random_element(gen.storage_location_dag.solutions_collection)!;
     for (let [key, value] of storage_location_solutions) {
+      //! key may be ghost and is not in irnodes
+      if (!irnodes.has(key)) continue;
       if (irnodes.get(key)!.typeName !== "IRVariableDeclaration") {
         continue;
       }
@@ -533,6 +536,8 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
   for (let storage_location_solutions of gen.storage_location_dag.solutions_collection) {
     if (storage_location_solutions.size === 0) continue;
     for (let [key, value] of storage_location_solutions) {
+      //! key may be ghost and is not in irnodes
+      if (!irnodes.has(key)) continue;
       if (irnodes.get(key)!.typeName !== "IRVariableDeclaration") continue;
       if ((irnodes.get(key)! as decl.IRVariableDeclaration).loc === undefined)
         (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);

@@ -1,14 +1,13 @@
 import * as sqlite from 'sqlite';
 import * as sqlite3 from 'sqlite3';
 import { Tree } from './dataStructor';
-import { scopeKind } from './scope';
-import { FunctionVisibility, StateVariableVisibility } from 'solc-typed-ast';
+import { scopeKind, ScopeList } from './scope';
 import { assert } from 'console';
-import { config } from './config';
 import { IRFunctionDefinition, IRStructDefinition } from './declare';
 import { irnodes } from './node';
 import { contain_mapping_type } from './type';
 import { type_dag } from './generator';
+import { merge_set } from './utility';
 
 // Deprecated Database
 export class DeprecatedDB {
@@ -49,112 +48,56 @@ export class DeprecatedDB {
   }
 }
 
-export enum erwin_visibility {
-  INCONTRACT_INTERNAL = "erwin_visibility::INCONTRACT_INTERNAL",
-  INCONTRACT_EXTERNAL = "erwin_visibility::INCONTRACT_EXTERNAL",
-  INCONTRACT_PUBLIC = "erwin_visibility::INCONTRACT_PUBLIC",
-  INCONTRACT_PRIVATE = "erwin_visibility::INCONTRACT_PRIVATE",
-  INCONTRACT_UNKNOWN = "erwin_visibility::INCONTRACT_UNKNOWN",
-  NAV = "erwin_visibility::NAV", // visibility does not apply
-}
-
-export function decide_function_visibility(kind : scopeKind, vis : FunctionVisibility) : erwin_visibility {
-  switch (kind) {
-    case scopeKind.GLOBAL:
-      if (config.debug)
-        assert(vis === FunctionVisibility.Default, "When the scope is global, the visibiliity is not FunctionVisibility.Default");
-      return erwin_visibility.NAV;
-    case scopeKind.CONTRACT:
-      switch (vis) {
-        case FunctionVisibility.External:
-          return erwin_visibility.INCONTRACT_EXTERNAL;
-        case FunctionVisibility.Internal:
-          return erwin_visibility.INCONTRACT_INTERNAL;
-        case FunctionVisibility.Private:
-          return erwin_visibility.INCONTRACT_PRIVATE;
-        case FunctionVisibility.Public:
-          return erwin_visibility.INCONTRACT_PUBLIC;
-        default:
-          throw new Error(`Unsupported FunctionVisibility: ${vis}`);
-      }
-    case scopeKind.FUNC:
-    case scopeKind.IF_CONDITION:
-    case scopeKind.IF_BODY:
-    case scopeKind.FOR_CONDITION:
-    case scopeKind.FOR_BODY:
-    case scopeKind.WHILE_CONDITION:
-    case scopeKind.WHILE_BODY:
-    case scopeKind.DOWHILE_BODY:
-    case scopeKind.DOWHILE_COND:
-    case scopeKind.CONSTRUCTOR:
-    case scopeKind.CONSTRUCTOR_PARAMETERS:
-    case scopeKind.STRUCT:
-    case scopeKind.FUNC_PARAMETER:
-    case scopeKind.FUNC_RETURNS:
-    case scopeKind.MAPPING:
-    case scopeKind.ARRAY:
-      return erwin_visibility.NAV;
-    default:
-      throw new Error(`Unsupported scopeKind: ${kind}`);
-  }
-}
-
-export function decide_variable_visibility(kind : scopeKind, vis : StateVariableVisibility) : erwin_visibility {
-  switch (kind) {
-    case scopeKind.CONTRACT:
-      switch (vis) {
-        case StateVariableVisibility.Internal:
-          return erwin_visibility.INCONTRACT_INTERNAL;
-        case StateVariableVisibility.Private:
-          return erwin_visibility.INCONTRACT_PRIVATE;
-        case StateVariableVisibility.Public:
-          return erwin_visibility.INCONTRACT_PUBLIC;
-        default:
-          throw new Error(`Unsupported StateVariableVisibility: ${vis}`);
-      }
-    case scopeKind.FUNC:
-    case scopeKind.GLOBAL:
-    case scopeKind.IF_BODY:
-    case scopeKind.IF_CONDITION:
-    case scopeKind.FOR_BODY:
-    case scopeKind.FOR_CONDITION:
-    case scopeKind.WHILE_BODY:
-    case scopeKind.WHILE_CONDITION:
-    case scopeKind.DOWHILE_BODY:
-    case scopeKind.DOWHILE_COND:
-    case scopeKind.CONSTRUCTOR:
-    case scopeKind.CONSTRUCTOR_PARAMETERS:
-    case scopeKind.STRUCT:
-    case scopeKind.FUNC_PARAMETER:
-    case scopeKind.FUNC_RETURNS:
-    case scopeKind.MAPPING:
-    case scopeKind.ARRAY:
-      return erwin_visibility.NAV;
-    default:
-      throw new Error(`Unsupported scopeKind: ${kind}`);
-  }
-}
-
-type irnodeInfo = {
-  id : number,
-  vis : erwin_visibility
-}
-
 class DeclDB {
 
   //! Scope-Related
-  private scope_tree : Tree<number>;
-  private scope2irnodeinfo : Map<number, irnodeInfo[]>;
-  private contractdecl_id_to_scope : Map<number, number>;
+  private scope_tree : Tree<number> = new Tree();
+  private scope2irnode : Map<number, number[]> = new Map<number, number[]>();
+  private irnode2scope : Map<number, number> = new Map<number, number>();
+  private contractdecl_id_to_scope : Map<number, number> = new Map<number, number>();
   private scope_id_to_contractdecl_id : Map<number, number> = new Map<number, number>();
 
   //! Decl-Related
   private vardecls : Set<number> = new Set<number>();
   private structdecls : Set<number> = new Set<number>();
   private funcdecls : Set<number> = new Set<number>();
+  private struct_instance_decls : Set<number> = new Set<number>();
+  private temporary_struct_instance_decls : Set<number> = new Set<number>();
   private contractdecls : Set<number> = new Set<number>();
   private state_variables : Set<number> = new Set<number>();
   private getter_funcdecls : Set<number> = new Set<number>();
+
+  /*
+  ! For any struct declaration, different struct instances may have different storage location ranges.
+  ! Such ranges may influence the storage location ranges of the members.
+  ! To address this issue, Erwin creates a member ghost for each member when constructing a struct
+  ! instance from a struct declaration. If the member is of compound type, e.g., struct, array, or mapping,
+  ! the member ghost creation will be recursive.
+  ! For instance:
+  !  struct A {
+  !    B b;
+  !  }
+  !  struct B {
+  !    int[] arr;
+  !  }
+  ! If there is a struct instance of A, named Ains, then Ains's ghost members will be:
+  ! Ains.b, Ains.b.arr.
+  */
+  private ghost_members_of_struct_instance : Map<number, number[]> = new Map<number, number[]>();
+  private ghost_member_to_member : Map<number, number> = new Map<number, number>();
+
+
+  /*
+  ! Suppose the context only has a mapping-type variable
+  ! mapping(uint => uint) m;
+  ! I want to generate an identifier to m[{expr}], where the expr is an identifier since
+  ! the expression complexity reaches the upper limit.
+  ! Then expr is also m[{expr}], possibly causing an infinite recursion under some hyperparemeter settings.
+  ! Therefore, Erwin forbides such resorting to itself to fullfil its hole.
+  ! */
+  forbidden_vardecls : Set<number> = new Set<number>();
+
+  private storage_qualified_struct_members_of_struct_instance : Map<number, number[]> = new Map<number, number[]>();
 
   private getter_function_id_to_state_struct_instance_id : Map<number, number> = new Map<number, number>();
   private getter_function_id_to_struct_decl_id : Map<number, number> = new Map<number, number>();
@@ -176,20 +119,26 @@ class DeclDB {
   private struct_decl_that_contains_mapping_decl : Set<number> = new Set<number>();
   private member2structdecl : Map<number, number> = new Map<number, number>();
   private structdecl2members : Map<number, number[]> = new Map<number, number[]>();
-
+  private struct_instance_to_struct_decl : Map<number, number> = new Map<number, number>();
 
   private cannot_be_assigned_to : Set<number> = new Set<number>();
   private must_be_initialized : Map<number, number[]> = new Map<number, number[]>();
 
-  constructor() {
-    this.scope_tree = new Tree();
-    this.scope2irnodeinfo = new Map<number, irnodeInfo[]>();
-    this.contractdecl_id_to_scope = new Map<number, number>();
-  }
+  constructor() { }
 
   //! ================ Decl-Related ================
 
   //* vardecl
+  add_vardecl_with_scope(vardecl_id : number, scope : ScopeList) : void {
+    if (scope.kind() === scopeKind.CONTRACT) {
+      this.add_state_variable(vardecl_id);
+    }
+    else {
+      this.add_vardecl(vardecl_id);
+    }
+    this.insert(vardecl_id, scope.id());
+  }
+
   add_vardecl(vardecl_id : number) : void {
     this.vardecls.add(vardecl_id);
   }
@@ -208,6 +157,18 @@ class DeclDB {
 
   vardecl_size() : number {
     return this.vardecls.size;
+  }
+
+  lock_vardecl(vardecl_id : number) : void {
+    this.forbidden_vardecls.add(vardecl_id);
+  }
+
+  unlock_vardecl(vardecl_id : number) : void {
+    this.forbidden_vardecls.delete(vardecl_id);
+  }
+
+  is_locked_vardecl(vardecl_id : number) : boolean {
+    return this.forbidden_vardecls.has(vardecl_id);
   }
 
   //* structdecl
@@ -264,8 +225,84 @@ class DeclDB {
     return Array.from(this.called_function_decls_ids);
   }
 
-  //* contractdecl
+  //* struct instance
+  add_struct_instance_decl(struct_instance_id : number) : void {
+    this.struct_instance_decls.add(struct_instance_id);
+  }
 
+  remove_struct_instance_decl(struct_instance_id : number) : void {
+    this.struct_instance_decls.delete(struct_instance_id);
+  }
+
+  is_struct_instance_decl(struct_instance_id : number) : boolean {
+    return this.struct_instance_decls.has(struct_instance_id);
+  }
+
+  pair_struct_instance_with_struct_decl(struct_instance_id : number, struct_decl_id : number) : void {
+    this.struct_instance_to_struct_decl.set(struct_instance_id, struct_decl_id);
+  }
+
+  struct_decl_of_struct_instance(struct_instance_id : number) : number {
+    assert(this.struct_instance_to_struct_decl.has(struct_instance_id),
+      `The struct instance ${struct_instance_id} does not exist.`);
+    return this.struct_instance_to_struct_decl.get(struct_instance_id)!;
+  }
+
+  members_of_struct_instance(struct_instance_id : number) : number[] {
+    assert(this.struct_instance_decls.has(struct_instance_id),
+      `The struct instance ${struct_instance_id} does not exist.`);
+    return this.members_of_struct_decl(this.struct_decl_of_struct_instance(struct_instance_id))!;
+  }
+
+  pair_storage_qualified_ghost_members_with_struct_instance(struct_instance_id : number, member_id : number) : void {
+    if (this.storage_qualified_struct_members_of_struct_instance.has(struct_instance_id)) {
+      this.storage_qualified_struct_members_of_struct_instance.get(struct_instance_id)!.push(member_id);
+    }
+    else {
+      this.storage_qualified_struct_members_of_struct_instance.set(struct_instance_id, [member_id]);
+    }
+  }
+
+  get_storage_qualified_ghost_members_from_struct_instance(struct_instance_id : number) : number[] {
+    assert(this.struct_instance_decls.has(struct_instance_id),
+      `Node ${struct_instance_id} is not a struct instance.`);
+    assert(this.storage_qualified_struct_members_of_struct_instance.has(struct_instance_id),
+      `Struct instance ${struct_instance_id} does not exist in storage_qualified_struct_members_of_struct_instance.`);
+    return this.storage_qualified_struct_members_of_struct_instance.get(struct_instance_id)!;
+  }
+
+  update_ghost_members_of_struct_instance(struct_instance_id : number,
+    member_id : number, ghost_member_id : number) : void {
+    if (this.ghost_members_of_struct_instance.has(struct_instance_id)) {
+      this.ghost_members_of_struct_instance.get(struct_instance_id)!.push(ghost_member_id);
+    }
+    else {
+      this.ghost_members_of_struct_instance.set(struct_instance_id, [ghost_member_id]);
+    }
+    this.ghost_member_to_member.set(ghost_member_id, member_id);
+  }
+
+  ghost_member_of_member_inside_struct_instance(member_id : number, struct_instance_id : number) : number {
+    assert(this.ghost_members_of_struct_instance.has(struct_instance_id),
+      `Struct instance ${struct_instance_id} does not exist in ghost_members_of_struct_instance.`);
+    const ghost_members = this.ghost_members_of_struct_instance.get(struct_instance_id);
+    for (const ghost_member of ghost_members!) {
+      if (this.ghost_member_to_member.get(ghost_member) === member_id) {
+        return ghost_member;
+      }
+    }
+    throw new Error(`The member ${member_id} does not have a ghost member in struct instance ${struct_instance_id}.`);
+  }
+
+  add_temporary_struct_instance_decl(struct_instance_id : number) : void {
+    this.temporary_struct_instance_decls.add(struct_instance_id);
+  }
+
+  is_temporary_struct_instance_decl(struct_instance_id : number) : boolean {
+    return this.temporary_struct_instance_decls.has(struct_instance_id);
+  }
+
+  //* contractdecl
   add_contractdecl_scope(scope_id : number, contractdecl_id : number) : void {
     this.scope_id_to_contractdecl_id.set(scope_id, contractdecl_id);
   }
@@ -373,7 +410,7 @@ class DeclDB {
     return this.structdecl2members.get(struct_decl_id)!;
   }
 
-  //* struct instance
+  //* state struct instance
   is_state_struct_instance(node_id : number) : boolean {
     return this.state_struct_instance_id_to_getter_function_ids.has(node_id);
   }
@@ -580,23 +617,36 @@ class DeclDB {
     return this.must_be_initialized.get(scope_id)!;
   }
 
+  qualifed_by_storage_qualifier(vardecl_id : number) : boolean {
+    return this.is_mapping_decl(vardecl_id) ||
+      this.is_array_decl(vardecl_id) ||
+      this.is_struct_instance_decl(vardecl_id) ||
+      this.is_temporary_struct_instance_decl(vardecl_id);
+  }
+
   //! ================ Scope-Related ================
   new_scope(cur_scope_id : number, parent_scope_id : number) : void {
     this.scope_tree.insert(parent_scope_id, cur_scope_id);
   }
 
-  insert(node_id : number, ervis : erwin_visibility, scope_id : number) : void {
-    if (this.scope2irnodeinfo.has(scope_id)) {
-      this.scope2irnodeinfo.set(scope_id, this.scope2irnodeinfo.get(scope_id)!.concat({ id: node_id, vis: ervis }));
+  insert(node_id : number, scope_id : number) : void {
+    if (this.scope2irnode.has(scope_id)) {
+      this.scope2irnode.get(scope_id)!.push(node_id);
     }
     else {
-      this.scope2irnodeinfo.set(scope_id, [{ id: node_id, vis: ervis }]);
+      this.scope2irnode.set(scope_id, [node_id]);
     }
+    this.irnode2scope.set(node_id, scope_id);
+  }
+
+  scope_of_irnode(node_id : number) : number {
+    assert(this.irnode2scope.has(node_id), `The node ${node_id} does not exist.`);
+    return this.irnode2scope.get(node_id)!;
   }
 
   remove(node_id : number, scope_id : number) : void {
-    if (this.scope2irnodeinfo.has(scope_id)) {
-      this.scope2irnodeinfo.set(scope_id, this.scope2irnodeinfo.get(scope_id)!.filter(x => x.id !== node_id));
+    if (this.scope2irnode.has(scope_id)) {
+      this.scope2irnode.set(scope_id, this.scope2irnode.get(scope_id)!.filter(x => x !== node_id));
     }
     else {
       throw new Error(`The scope ${scope_id} does not exist.`);
@@ -606,9 +656,9 @@ class DeclDB {
   // Get IRNodes from a scope but not the scope's ancestors
   get_irnodes_ids_nonrecursively_from_a_scope(scope_id : number) : number[] {
     let irnodes_ids : number[] = [];
-    if (this.scope2irnodeinfo.has(scope_id)) {
+    if (this.scope2irnode.has(scope_id)) {
       irnodes_ids = irnodes_ids.concat(
-        this.scope2irnodeinfo.get(scope_id)!.map(x => x.id)
+        this.scope2irnode.get(scope_id)!
       );
     }
     return irnodes_ids;
@@ -618,9 +668,9 @@ class DeclDB {
   get_irnodes_ids_recursively_from_a_scope(scope_id : number) : number[] {
     let irnodes_ids : number[] = [];
     while (true) {
-      if (this.scope2irnodeinfo.has(scope_id))
+      if (this.scope2irnode.has(scope_id))
         irnodes_ids = irnodes_ids.concat(
-          this.scope2irnodeinfo.get(scope_id)!.map(x => x.id)
+          this.scope2irnode.get(scope_id)!
         );
       if (this.scope_tree.has_parent(scope_id)) {
         scope_id = this.scope_tree.get_parent(scope_id);
@@ -667,6 +717,92 @@ class ExprDB {
   private array_type_exprs : Set<number> = new Set<number>();
   private array_type_expr_id_to_base_expr_id : Map<number, number> = new Map<number, number>();
   private base_expr_id_to_array_type_expr_id : Map<number, number> = new Map<number, number>();
+
+  //! Read-Write-Related
+
+  expr_reads_variable(expr_id : number, var_id : number | number[] | Set<number>) : void {
+    if (var_id instanceof Set) {
+      if (this.expr2read_variables.has(expr_id)) {
+        this.expr2read_variables.set(expr_id,
+          merge_set(this.expr2read_variables.get(expr_id)!, var_id)
+        )
+      }
+      else {
+        this.expr2read_variables.set(expr_id, var_id);
+      }
+    }
+    else if (Array.isArray(var_id)) {
+      for (const id of var_id) {
+        if (this.expr2read_variables.has(expr_id)) {
+          this.expr2read_variables.get(expr_id)!.add(id);
+        }
+        else {
+          this.expr2read_variables.set(expr_id, new Set<number>([id]));
+        }
+      }
+    }
+    else {
+      if (this.expr2read_variables.has(expr_id)) {
+        this.expr2read_variables.get(expr_id)!.add(var_id);
+      }
+      else {
+        this.expr2read_variables.set(expr_id, new Set<number>([var_id]));
+      }
+    }
+  }
+
+  transfer_read_variables(expr_id : number, from_expr_id : number) : void {
+    this.expr_reads_variable(expr_id, this.read_variables_of_expr(from_expr_id));
+  }
+
+  expr_writes_variable(expr_id : number, var_id : number | number[] | Set<number>) : void {
+    if (var_id instanceof Set) {
+      if (this.expr2write_variables.has(expr_id)) {
+        this.expr2write_variables.set(expr_id,
+          merge_set(this.expr2write_variables.get(expr_id)!, var_id)
+        )
+      }
+      else {
+        this.expr2write_variables.set(expr_id, var_id);
+      }
+    }
+    else if (Array.isArray(var_id)) {
+      for (const id of var_id) {
+        if (this.expr2write_variables.has(expr_id)) {
+          this.expr2write_variables.get(expr_id)!.add(id);
+        }
+        else {
+          this.expr2write_variables.set(expr_id, new Set<number>([id]));
+        }
+      }
+    }
+    else {
+      if (this.expr2write_variables.has(expr_id)) {
+        this.expr2write_variables.get(expr_id)!.add(var_id);
+      }
+      else {
+        this.expr2write_variables.set(expr_id, new Set<number>([var_id]));
+      }
+    }
+  }
+
+  transfer_write_variables(expr_id : number, from_expr_id : number) : void {
+    this.expr_writes_variable(expr_id, this.write_variables_of_expr(from_expr_id));
+  }
+
+  read_variables_of_expr(expr_id : number) : number[] {
+    if (!this.expr2read_variables.has(expr_id)) {
+      return [];
+    }
+    return Array.from(this.expr2read_variables.get(expr_id)!);
+  }
+
+  write_variables_of_expr(expr_id : number) : number[] {
+    if (!this.expr2write_variables.has(expr_id)) {
+      return [];
+    }
+    return Array.from(this.expr2write_variables.get(expr_id)!);
+  }
 
   //! Mapping-Related
 

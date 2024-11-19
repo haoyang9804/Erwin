@@ -16,9 +16,7 @@ import { config } from './config'
 import { toFile } from "@ts-graphviz/adapter";
 import { color } from "console-log-colors"
 import { DominanceNode, is_equal_set, is_super_set } from "./dominance";
-import { DataLocation, FunctionStateMutability, FunctionVisibility, StateVariableVisibility } from "solc-typed-ast";
-import { FuncStat } from "./funcstat";
-import { FuncVis, VarVis } from "./visibility";
+import { DataLocation } from "solc-typed-ast";
 import { StorageLocation } from "./memory";
 import { VisMut, VisMutKind } from "./vismut";
 import { LinkedListNode } from "./dataStructor";
@@ -57,6 +55,7 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
   leavesequal : Set<string> = new Set<string>();
   leavesnotsure : Set<string> = new Set<string>();
   name : string;
+
   constructor() {
     this.name = this.constructor.name;
   }
@@ -118,6 +117,7 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
     assert(this.solution_range.has(nodeid), `ConstraintDAG: node ${nodeid} is not in the solution_range`);
     const intersected_range = [...intersection(new Set<Node>(this.solution_range.get(nodeid)), new Set<Node>(range))];
     this.solution_range.set(nodeid, intersected_range);
+    this.tighten_solution_range_middle_out(nodeid);
   }
 
   check_connection(from : number, to : number) : boolean {
@@ -146,7 +146,20 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
     this.solution_range_alignment(from, to);
   }
 
-  dominator_solution_range_should_be_shrinked(dominator_id : number, dominatee_id : number) : Node[] | undefined {
+  solution_range_of(nodeid : number) : Node[] {
+    assert(this.solution_range.has(nodeid), `${this.name}: node ${nodeid} is not in solution_range`);
+    return this.solution_range.get(nodeid)!;
+  }
+
+  non_empty_solution_range_of(nodeid : number) : boolean {
+    return this.solution_range_of(nodeid).length > 0;
+  }
+
+  has_solution_range(nodeid : number) : boolean {
+    return this.solution_range.has(nodeid);
+  }
+
+  protected dominator_solution_range_should_be_shrinked(dominator_id : number, dominatee_id : number) : Node[] | undefined {
     let minimum_solution_range_of_dominator;
     const rank = this.sub_dominance.has(`${dominator_id} ${dominatee_id}`) ? "sub_dominance" :
       this.super_dominance.has(`${dominator_id} ${dominatee_id}`) ? "super_dominance" : undefined;
@@ -179,7 +192,7 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
     return undefined;
   }
 
-  dominatee_solution_range_should_be_shrinked(dominator_id : number, dominatee_id : number) : Node[] | undefined {
+  protected dominatee_solution_range_should_be_shrinked(dominator_id : number, dominatee_id : number) : Node[] | undefined {
     let minimum_solution_range_of_dominatee;
     const rank = this.sub_dominance.has(`${dominator_id} ${dominatee_id}`) ? "sub_dominance" :
       this.super_dominance.has(`${dominator_id} ${dominatee_id}`) ? "super_dominance" : undefined;
@@ -237,7 +250,7 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
     this.leavesnotsure = new Set<string>();
   }
 
-  get_roots_and_leaves(isolated_node_is_root : boolean = true) : void {
+  protected get_roots_and_leaves(isolated_node_is_root : boolean = true) : void {
     for (let [_, node] of this.dag_nodes) {
       if (node.inbound === 0) {
         this.roots.add(node.id);
@@ -266,7 +279,7 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
     }
   }
 
-  dfs4node2leaf() : void {
+  protected dfs4node2leaf() : void {
     let broadcast_from_leaves_upwards = (id : number, leaf_id : number, pre_sub_dominance_path : boolean,
       pre_super_dominance_path : boolean,
       pre_subsuper_dominance_path : boolean, pre_equal_dominance_path : boolean
@@ -462,7 +475,7 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
     }
   }
 
-  dfs4edge2leaf() : void {
+  protected dfs4edge2leaf() : void {
     let broadcast_from_leaves_upwards = (id : number, leaf_id : number) : void => {
       for (let parent of this.dag_nodes.get(id)!.ins) {
         const edge = `${parent} ${id}`;
@@ -568,7 +581,7 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
     return downwards(node) && upwards(node);
   }
 
-  tighten_solution_range_middle_out(node : number) {
+  protected tighten_solution_range_middle_out(node : number) {
     let upwards = (node : number) : void => {
       if (this.dag_nodes.get(node)!.ins.length === 0) {
         if (this.dag_nodes.get(node)!.outs.length !== 0)
@@ -611,7 +624,7 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
     downwards(node);
   }
 
-  allocate_solutions_for_leaves_in_stream() : Generator<Map<number, Node>> {
+  protected allocate_solutions_for_leaves_in_stream() : Generator<Map<number, Node>> {
     for (let leaf of this.leaves) this.solution_range.set(leaf, this.solution_range.get(leaf)!);
     const leave_array = Array.from(this.leaves);
     const solution_range_copy = this.solution_range;
@@ -790,7 +803,7 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
     return dfs(0, new Map<number, Node>());
   }
 
-  build_leaves_relation() : void {
+  protected build_leaves_relation() : void {
     for (let [_, leaf_infos] of this.node2leaf) {
       const leaf_infos_array = [...leaf_infos];
       const leaf_infos_length = leaf_infos_array.length;
@@ -903,6 +916,10 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
     }
   }
 
+  protected remove_irrelevant_leaves() : void { }
+
+  protected get_maximum_solution_count() : number { return -1; }
+
   async resolve() : Promise<void> {
     // !initialize the resolution
     this.initialize_resolve();
@@ -928,39 +945,7 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
       }
     }
     this.build_leaves_relation();
-    if (this.name === "TypeDominanceDAG") {
-      const mapping_leaves : number[] = [];
-      const array_leaves : number[] = [];
-      this.leaves.forEach(leaf => {
-        if (decl_db.is_mapping_decl(leaf) || decl_db.is_array_decl(leaf)) {
-          this.leaves.delete(leaf);
-          if (decl_db.is_mapping_decl(leaf)) {
-            mapping_leaves.push(leaf);
-          }
-          else if (decl_db.is_array_decl(leaf)) {
-            array_leaves.push(leaf);
-          }
-          for (const edge of this.leavesequal) {
-            const [leaf1, leaf2] = edge.split(" ");
-            if (parseInt(leaf1) === leaf || parseInt(leaf2) === leaf) {
-              this.leavesequal.delete(edge);
-            }
-          }
-          for (const edge of this.leavessub) {
-            const [leaf1, leaf2] = edge.split(" ");
-            if (parseInt(leaf1) === leaf || parseInt(leaf2) === leaf) {
-              this.leavessub.delete(edge);
-            }
-          }
-          for (const edge of this.leavesnotsure) {
-            const [leaf1, leaf2] = edge.split(" ");
-            if (parseInt(leaf1) === leaf || parseInt(leaf2) === leaf) {
-              this.leavesnotsure.delete(edge);
-            }
-          }
-        }
-      });
-    }
+    this.remove_irrelevant_leaves();
     if (config.debug || config.unit_test_mode) {
       console.log(color.green("> leavessub:"));
       for (const edge of this.leavessub) {
@@ -975,32 +960,14 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
         console.log(edge);
       }
     }
-    if (this.name === "TypeDominanceDAG" && config.debug || config.unit_test_mode) {
-      await this.draw("./type_constraint.svg");
-    }
-    else if (this.name === "StorageLocationDominanceDAG" && config.debug || config.unit_test_mode) {
-      await this.draw("./storage_constraint.svg");
-    }
-    else if (this.name === "VisMutDominanceDAG" && config.debug || config.unit_test_mode) {
-      await this.draw("./scope_constraint.svg");
+    if (config.debug || config.unit_test_mode) {
+      await this.draw_for_debug();
     }
     // !Assign solutions to roots
     let should_stop = false;
-    let maximum_solution_count;
-    if (config.mode === 'scope' && this.name === "TypeDominanceDAG"
-      || config.mode === 'scope' && this.name === "StorageLocationDominanceDAG"
-    ) {
-      maximum_solution_count = 1;
-    }
-    else if (config.mode === 'type' && this.name !== "TypeDominanceDAG") {
-      maximum_solution_count = 1;
-    }
-    else if (config.mode === 'loc' && this.name !== "StorageLocationDominanceDAG") {
-      maximum_solution_count = 1;
-    }
-    else {
-      maximum_solution_count = config.maximum_solution_count;
-    }
+    let maximum_solution_count = this.get_maximum_solution_count();
+    assert(maximum_solution_count !== -1, "maximum_solution_count should be set.");
+
     for (const leaf_solution of this.allocate_solutions_for_leaves_in_stream()) {
       this.solutions.clear();
       if (should_stop) break;
@@ -1065,6 +1032,10 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
           Here are solutions to all nodes:\n${[...solutions].sort((a, b) => a[0] - b[0]).map(([id, t]) => `${id}: ${t.str()}`).join("\n")}`);
       }
     }
+  }
+
+  protected async draw_for_debug() : Promise<void> {
+    await this.draw("./debug.svg");
   }
 
   //! This function should be called after getting roots and leaves
@@ -1677,9 +1648,65 @@ export class TypeDominanceDAG extends ConstraintDAG<TypeKind, Type> {
     }
     super.connect(dominator_id, dominatee_id, rank);
   }
+
+  protected async draw_for_debug() : Promise<void> {
+    await this.draw("./type_constraint.svg");
+  }
+
+  protected remove_irrelevant_leaves() : void {
+    this.leaves.forEach(leaf => {
+      if (decl_db.is_mapping_decl(leaf) || decl_db.is_array_decl(leaf)) {
+        this.leaves.delete(leaf);
+        for (const edge of this.leavesequal) {
+          const [leaf1, leaf2] = edge.split(" ");
+          if (parseInt(leaf1) === leaf || parseInt(leaf2) === leaf) {
+            this.leavesequal.delete(edge);
+          }
+        }
+        for (const edge of this.leavessub) {
+          const [leaf1, leaf2] = edge.split(" ");
+          if (parseInt(leaf1) === leaf || parseInt(leaf2) === leaf) {
+            this.leavessub.delete(edge);
+          }
+        }
+        for (const edge of this.leavesnotsure) {
+          const [leaf1, leaf2] = edge.split(" ");
+          if (parseInt(leaf1) === leaf || parseInt(leaf2) === leaf) {
+            this.leavesnotsure.delete(edge);
+          }
+        }
+      }
+    });
+  }
+
+  protected get_maximum_solution_count() {
+    if (config.mode === 'type') {
+      return config.maximum_solution_count;
+    }
+    return 1;
+  }
 }
-export class FuncStateMutabilityDominanceDAG extends ConstraintDAG<FunctionStateMutability, FuncStat> { }
-export class FuncVisibilityDominanceDAG extends ConstraintDAG<FunctionVisibility, FuncVis> { }
-export class StateVariableVisibilityDominanceDAG extends ConstraintDAG<StateVariableVisibility, VarVis> { }
-export class StorageLocationDominanceDAG extends ConstraintDAG<DataLocation, StorageLocation> { }
-export class VisMutDominanceDAG extends ConstraintDAG<VisMutKind, VisMut> { }
+export class StorageLocationDominanceDAG extends ConstraintDAG<DataLocation, StorageLocation> {
+  protected async draw_for_debug() : Promise<void> {
+    await this.draw("./storage_constraint.svg");
+  }
+
+  protected get_maximum_solution_count() {
+    if (config.mode === 'loc') {
+      return config.maximum_solution_count;
+    }
+    return 1;
+  }
+}
+export class VisMutDominanceDAG extends ConstraintDAG<VisMutKind, VisMut> {
+  protected async draw_for_debug() : Promise<void> {
+    await this.draw("./vismut_constraint.svg");
+  }
+
+  protected get_maximum_solution_count() {
+    if (config.mode === 'scope') {
+      return config.maximum_solution_count;
+    }
+    return 1;
+  }
+}

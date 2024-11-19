@@ -42,6 +42,7 @@ type scopeT = {
 
 export const global_scope : number = 1;
 let scope_id : number = global_scope;
+const scope_id_to_scope : Map<number, ScopeList> = new Map();
 
 export class ScopeList extends LinkedListNode<scopeT> {
   constructor(value : scopeT) {
@@ -57,6 +58,7 @@ export class ScopeList extends LinkedListNode<scopeT> {
     };
     decl_db.new_scope(new_scope.id, this.m_value!.id);
     this.m_next = new ScopeList(new_scope);
+    scope_id_to_scope.set(new_scope.id, this.m_next as ScopeList);
     this.m_next.set_pre(this);
     return this.m_next as ScopeList;
   }
@@ -86,6 +88,23 @@ export class ScopeList extends LinkedListNode<scopeT> {
 }
 
 export function initScope() {
-  return new ScopeList({ id: scope_id, kind: scopeKind.GLOBAL })
+  const scope = new ScopeList({ id: scope_id, kind: scopeKind.GLOBAL })
+  scope_id_to_scope.set(scope_id, scope);
+  return scope;
 }
 
+export function inside_struct_scope(cur_scope : ScopeList) : boolean {
+  while (cur_scope.kind() !== scopeKind.GLOBAL) {
+    if (cur_scope.kind() === scopeKind.STRUCT) {
+      return true;
+    }
+    cur_scope = cur_scope.pre();
+  }
+  return false;
+}
+
+export function get_scope_from_scope_id(scope_id : number) : ScopeList {
+  const scope = scope_id_to_scope.get(scope_id);
+  assert(scope !== undefined, "The scope must exist.");
+  return scope;
+}
