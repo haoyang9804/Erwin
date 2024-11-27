@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import * as gen from "./generator"
+import { vismut_dag, storage_location_dag, type_dag } from "./constraint";
 import { irnodes } from "./node";
 import * as expr from "./expression";
 import * as decl from "./declare";
@@ -196,7 +197,12 @@ else if (program.args[0] === "generate") {
   assert(config.state_variable_count_upperlimit >= 0, "state_variable_count_upperlimit must be not less than 0.");
   assert(config.state_variable_count_lowerlimit >= 0, "state_variable_count_lowerlimit must be not less than 0.");
   assert(config.contract_count >= 0, "contract_count must be not less than 0.");
-  assert(["type", "scope", "loc"].includes(config.mode), "The mode is not either 'type' or 'scope', instead it is " + config.mode);
+  if (config.mode === "") {
+    console.warn("You didn't specify the mode of Erwin. Therefore, Erwin will generate trivially, without exhaustively enumerating test programs in the search space.");
+    config.mode = "type";
+    config.maximum_solution_count = 1;
+  }
+  assert(["type", "scope", "loc"].includes(config.mode), "The mode is not either 'type', 'scope', 'loc', instead it is " + config.mode);
   assert(config.vardecl_prob >= 0 && config.vardecl_prob <= 1.0, "The probability of generating a variable declaration must be in the range [0,1].");
   assert(config.new_prob >= 0 && config.new_prob <= 1.0, "The probability of generating a variable declaration in place must be in the range [0,1].");
   assert(config.else_prob >= 0.0 && config.else_prob <= 1.0, "The probability of generating an else statement must be in the range [0,1].");
@@ -321,7 +327,6 @@ async function mutate() {
 }
 
 function assign_mapping_type(mapping_decl_id : number, type_solutions : Map<number, Type>) : void {
-  if ((irnodes.get(mapping_decl_id) as decl.IRVariableDeclaration).type !== undefined) return;
   const [key_id, value_id] = decl_db.kvpair_of_mapping(mapping_decl_id);
   assert(type_solutions.has(key_id), `The type solution does not have the key id ${key_id}.`);
   assert(type_solutions.has(value_id) || decl_db.is_mapping_decl(value_id) || decl_db.is_array_decl(value_id),
@@ -373,11 +378,12 @@ function assign_array_type(array_decl_id : number, type_solutions : Map<number, 
 }
 
 function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
-  console.log(`${gen.type_dag.solutions_collection.length} type solutions`);
+  console.log(`${type_dag.solutions_collection.length} solution(s)`);
   //! Select one vismut solution
-  if (gen.vismut_dag.solutions_collection.length > 0) {
-    const vismut_solutions = pick_random_element(gen.vismut_dag.solutions_collection)!;
+  if (vismut_dag.solutions_collection.length > 0) {
+    const vismut_solutions = pick_random_element(vismut_dag.solutions_collection)!;
     for (let [key, value] of vismut_solutions) {
+      if (irnodes.has(key) === false) continue;
       if (irnodes.get(key)!.typeName === "IRVariableDeclaration") {
         (irnodes.get(key)! as decl.IRVariableDeclaration).visibility =
           varvis2statevisibility((value.kind as VarVisKind).visibility);
@@ -391,22 +397,23 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
     }
   }
   //! Select one storage location solution
-  if (gen.storage_location_dag.solutions_collection.length > 0) {
-    const storage_location_solutions = pick_random_element(gen.storage_location_dag.solutions_collection)!;
+  if (storage_location_dag.solutions_collection.length > 0) {
+    const storage_location_solutions = pick_random_element(storage_location_dag.solutions_collection)!;
     for (let [key, value] of storage_location_solutions) {
       //! key may be ghost and is not in irnodes
       if (!irnodes.has(key)) continue;
       if (irnodes.get(key)!.typeName !== "IRVariableDeclaration") {
         continue;
       }
-      if ((irnodes.get(key)! as decl.IRVariableDeclaration).loc === undefined)
+      if ((irnodes.get(key)! as decl.IRVariableDeclaration).loc === undefined) {
         (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
+      }
     }
   }
   //! Traverse type solutions
   let cnt = 0;
   let pre_program = "";
-  for (let type_solutions of gen.type_dag.solutions_collection) {
+  for (let type_solutions of type_dag.solutions_collection) {
     if (type_solutions.size === 0) continue;
     for (let [key, value] of type_solutions) {
       if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
@@ -438,10 +445,10 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
 }
 
 function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
-  console.log(`${gen.vismut_dag.solutions_collection.length} state variable visibility solutions`);
+  console.log(`${vismut_dag.solutions_collection.length} solution(s)`);
   //! Select one type solution
-  if (gen.type_dag.solutions_collection.length > 0) {
-    const type_solutions = pick_random_element(gen.type_dag.solutions_collection)!;
+  if (type_dag.solutions_collection.length > 0) {
+    const type_solutions = pick_random_element(type_dag.solutions_collection)!;
     for (let [key, value] of type_solutions) {
       if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
         (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
@@ -454,8 +461,8 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
     }
   }
   //! Select storage location solution
-  if (gen.storage_location_dag.solutions_collection.length > 0) {
-    const storage_location_solutions = pick_random_element(gen.storage_location_dag.solutions_collection)!;
+  if (storage_location_dag.solutions_collection.length > 0) {
+    const storage_location_solutions = pick_random_element(storage_location_dag.solutions_collection)!;
     for (let [key, value] of storage_location_solutions) {
       //! key may be ghost and is not in irnodes
       if (!irnodes.has(key)) continue;
@@ -469,9 +476,10 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
   //! Traverse vismut solutions
   let cnt = 0;
   let pre_program = "";
-  for (const vismut_solutions of gen.vismut_dag.solutions_collection) {
+  for (const vismut_solutions of vismut_dag.solutions_collection) {
     if (vismut_solutions.size === 0) continue;
     for (let [key, value] of vismut_solutions) {
+      if (irnodes.has(key) === false) continue;
       if (irnodes.get(key)!.typeName === "IRVariableDeclaration") {
         (irnodes.get(key)! as decl.IRVariableDeclaration).visibility =
           varvis2statevisibility((value.kind as VarVisKind).visibility);
@@ -501,9 +509,9 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
 }
 
 function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
-  console.log(`${gen.storage_location_dag.solutions_collection.length} storage location solutions`);
+  console.log(`${storage_location_dag.solutions_collection.length} solution(s)`);
   //! Select one type solution
-  const type_solutions = pick_random_element(gen.type_dag.solutions_collection)!;
+  const type_solutions = pick_random_element(type_dag.solutions_collection)!;
   for (const [key, value] of type_solutions) {
     if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
       (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
@@ -515,9 +523,10 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
     assign_array_type(array_decl_id, type_solutions);
   }
   //! Select one vismut solution
-  if (gen.vismut_dag.solutions_collection.length > 0) {
-    const vismut_solutions = pick_random_element(gen.vismut_dag.solutions_collection)!;
+  if (vismut_dag.solutions_collection.length > 0) {
+    const vismut_solutions = pick_random_element(vismut_dag.solutions_collection)!;
     for (let [key, value] of vismut_solutions) {
+      if (irnodes.has(key) === false) continue;
       if (irnodes.get(key)!.typeName === "IRVariableDeclaration") {
         (irnodes.get(key)! as decl.IRVariableDeclaration).visibility =
           varvis2statevisibility((value.kind as VarVisKind).visibility);
@@ -533,7 +542,7 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
   //! Traverse storage location solutions
   let cnt = 0;
   let pre_program = "";
-  for (let storage_location_solutions of gen.storage_location_dag.solutions_collection) {
+  for (let storage_location_solutions of storage_location_dag.solutions_collection) {
     if (storage_location_solutions.size === 0) continue;
     for (let [key, value] of storage_location_solutions) {
       //! key may be ghost and is not in irnodes
@@ -567,21 +576,20 @@ async function generate() {
   source_unit.generate();
   try {
     let startTime = performance.now()
-    // gen.type_dag.resolve();
-    await gen.type_dag.resolve();
+    await type_dag.resolve();
     let endTime = performance.now();
     console.log(`Time cost of resolving type constraints: ${endTime - startTime} ms`);
     startTime = performance.now();
-    await gen.vismut_dag.resolve();
+    await vismut_dag.resolve();
     endTime = performance.now();
     console.log(`Time cost of resolving visibility and state mutability constraints: ${endTime - startTime} ms`);
     startTime = performance.now();
-    await gen.storage_location_dag.resolve();
+    await storage_location_dag.resolve();
     endTime = performance.now();
     console.log(`Time cost of resolving storage location constraints: ${endTime - startTime} ms`);
-    gen.type_dag.verify();
-    gen.vismut_dag.verify();
-    gen.storage_location_dag.verify();
+    type_dag.verify();
+    vismut_dag.verify();
+    storage_location_dag.verify();
     if (config.mode === "type") {
       generate_type_mode(source_unit);
     }

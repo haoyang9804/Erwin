@@ -3,7 +3,7 @@ import { sizeof } from "sizeof";
 import { DominanceNode } from "./dominance";
 import { config } from './config';
 import { decl_db } from "./db";
-import { type_dag } from "./generator";
+import { type_dag } from "./constraint";
 
 export enum TypeKind {
   ElementaryType = "TypeKind::ElementaryType",
@@ -42,7 +42,7 @@ export class PlaceholderType extends Type {
     return [TypeProvider.placeholder()];
   }
   same(t : Type) : boolean {
-    return t.kind === TypeKind.PlaceholderType;
+    return t === TypeProvider.placeholder();
   }
   issubof(t : Type) : boolean {
     return this.same(t);
@@ -700,12 +700,13 @@ export class ArrayType extends Type {
     return `${this.base.str()}[${this.length}]`;
   }
   copy() : Type {
-    return new ArrayType(this.base.copy(), this.length);
+    throw new Error("ArrayType::copy() not implemented.");
   }
   super_with_upperbound(upper_bound : Type) : Type[] {
     return this.supers().filter(x => x.issubof(upper_bound));
   }
   supers() : Type[] {
+    if (this === TypeProvider.trivial_array()) return [this];
     const base_supers = this.base.supers();
     return base_supers.map(x => new ArrayType(x, this.length));
   }
@@ -713,6 +714,7 @@ export class ArrayType extends Type {
     return this.subs().filter(x => x.issuperof(lower_bound));
   }
   subs() : Type[] {
+    if (this === TypeProvider.trivial_array()) return [this];
     const base_subs = this.base.subs();
     return base_subs.map(x => new ArrayType(x, this.length));
   }
@@ -722,13 +724,30 @@ export class ArrayType extends Type {
     if ((t as ArrayType).base.same(this.base) && (t as ArrayType).length === this.length) {
       return true;
     }
+    if (this === TypeProvider.trivial_array() && t.kind === TypeKind.ArrayType) return true;
     return false;
   }
   issubof(t : Type) : boolean {
-    return this.same(t);
+    const supers = this.supers();
+    let flag = false;
+    supers.forEach(x => {
+      if (x.same(t)) {
+        flag = true;
+        return;
+      }
+    });
+    return flag;
   }
   issuperof(t : Type) : boolean {
-    return this.same(t);
+    const subs = this.subs();
+    let flag = false;
+    subs.forEach(x => {
+      if (x.same(t)) {
+        flag = true;
+        return;
+      }
+    });
+    return flag;
   }
 }
 
@@ -751,18 +770,20 @@ export class MappingType extends Type {
     return t.kind === TypeKind.MappingType &&
       (t as MappingType).kType.same(this.kType) &&
       (t as MappingType).vType.same(this.vType) ||
-      t === TypeProvider.trivial_mapping();
+      t === TypeProvider.trivial_mapping() ||
+      this === TypeProvider.trivial_mapping() &&
+      t.kind === TypeKind.MappingType;
   }
   subs() : Type[] {
     return [this];
   }
-  sub_with_lowerbound(lower_bound : Type) : Type[] {
+  sub_with_lowerbound(_ : Type) : Type[] {
     return [this];
   }
   supers() : Type[] {
     return [this];
   }
-  super_with_upperbound(upper_bound : Type) : Type[] {
+  super_with_upperbound(_ : Type) : Type[] {
     return [this];
   }
   issubof(t : Type) : boolean {
@@ -774,42 +795,42 @@ export class MappingType extends Type {
 }
 
 export class TypeProvider {
-  static int256() : Type { return this.m_int256; }
-  static int128() : Type { return this.m_int128; }
-  static int64() : Type { return this.m_int64; }
-  static int32() : Type { return this.m_int32; }
-  static int16() : Type { return this.m_int16; }
-  static int8() : Type { return this.m_int8; }
-  static uint256() : Type { return this.m_uint256; }
-  static uint128() : Type { return this.m_uint128; }
-  static uint64() : Type { return this.m_uint64; }
-  static uint32() : Type { return this.m_uint32; }
-  static uint16() : Type { return this.m_uint16; }
-  static uint8() : Type { return this.m_uint8; }
-  static bool() : Type { return this.m_bool; }
-  static address() : Type { return this.m_address; }
-  static payable_address() : Type { return this.m_payable_address; }
-  static placeholder() : Type { return this.m_placeholder; }
-  static trivial_mapping() : Type { return this.m_mapping; }
-  static trivial_array() : Type { return this.m_array; }
-  private static m_placeholder : Type = new PlaceholderType();
-  private static m_mapping : Type = new MappingType(this.m_placeholder, this.m_placeholder);
-  private static m_array : Type = new ArrayType(this.m_placeholder, undefined);
-  private static m_int256 : Type = new ElementaryType("int256", "nonpayable");
-  private static m_int128 : Type = new ElementaryType("int128", "nonpayable");
-  private static m_int64 : Type = new ElementaryType("int64", "nonpayable");
-  private static m_int32 : Type = new ElementaryType("int32", "nonpayable");
-  private static m_int16 : Type = new ElementaryType("int16", "nonpayable");
-  private static m_int8 : Type = new ElementaryType("int8", "nonpayable");
-  private static m_uint256 : Type = new ElementaryType("uint256", "nonpayable");
-  private static m_uint128 : Type = new ElementaryType("uint128", "nonpayable");
-  private static m_uint64 : Type = new ElementaryType("uint64", "nonpayable");
-  private static m_uint32 : Type = new ElementaryType("uint32", "nonpayable");
-  private static m_uint16 : Type = new ElementaryType("uint16", "nonpayable");
-  private static m_uint8 : Type = new ElementaryType("uint8", "nonpayable");
-  private static m_bool : Type = new ElementaryType("bool", "nonpayable");
-  private static m_address : Type = new ElementaryType("address", "nonpayable");
-  private static m_payable_address : Type = new ElementaryType("address", "payable");
+  static int256() : ElementaryType { return this.m_int256; }
+  static int128() : ElementaryType { return this.m_int128; }
+  static int64() : ElementaryType { return this.m_int64; }
+  static int32() : ElementaryType { return this.m_int32; }
+  static int16() : ElementaryType { return this.m_int16; }
+  static int8() : ElementaryType { return this.m_int8; }
+  static uint256() : ElementaryType { return this.m_uint256; }
+  static uint128() : ElementaryType { return this.m_uint128; }
+  static uint64() : ElementaryType { return this.m_uint64; }
+  static uint32() : ElementaryType { return this.m_uint32; }
+  static uint16() : ElementaryType { return this.m_uint16; }
+  static uint8() : ElementaryType { return this.m_uint8; }
+  static bool() : ElementaryType { return this.m_bool; }
+  static address() : ElementaryType { return this.m_address; }
+  static payable_address() : ElementaryType { return this.m_payable_address; }
+  static placeholder() : PlaceholderType { return this.m_placeholder; }
+  static trivial_mapping() : MappingType { return this.m_mapping; }
+  static trivial_array() : ArrayType { return this.m_array; }
+  private static m_placeholder : PlaceholderType = new PlaceholderType();
+  private static m_mapping : MappingType = new MappingType(this.m_placeholder, this.m_placeholder);
+  private static m_array : ArrayType = new ArrayType(this.m_placeholder, undefined);
+  private static m_int256 : ElementaryType = new ElementaryType("int256", "nonpayable");
+  private static m_int128 : ElementaryType = new ElementaryType("int128", "nonpayable");
+  private static m_int64 : ElementaryType = new ElementaryType("int64", "nonpayable");
+  private static m_int32 : ElementaryType = new ElementaryType("int32", "nonpayable");
+  private static m_int16 : ElementaryType = new ElementaryType("int16", "nonpayable");
+  private static m_int8 : ElementaryType = new ElementaryType("int8", "nonpayable");
+  private static m_uint256 : ElementaryType = new ElementaryType("uint256", "nonpayable");
+  private static m_uint128 : ElementaryType = new ElementaryType("uint128", "nonpayable");
+  private static m_uint64 : ElementaryType = new ElementaryType("uint64", "nonpayable");
+  private static m_uint32 : ElementaryType = new ElementaryType("uint32", "nonpayable");
+  private static m_uint16 : ElementaryType = new ElementaryType("uint16", "nonpayable");
+  private static m_uint8 : ElementaryType = new ElementaryType("uint8", "nonpayable");
+  private static m_bool : ElementaryType = new ElementaryType("bool", "nonpayable");
+  private static m_address : ElementaryType = new ElementaryType("address", "nonpayable");
+  private static m_payable_address : ElementaryType = new ElementaryType("address", "payable");
 }
 
 export let integer_types : Type[] = [
@@ -873,4 +894,20 @@ export function contain_mapping_type(type : Type) : boolean {
     return false;
   }
   throw new Error(`contain_mapping_type: unrecognized type kind: ${type.kind}`);
+}
+
+export function all_mapping(types : Type[]) : boolean {
+  return types.every(x => x.kind === TypeKind.MappingType);
+}
+
+export function all_array(types : Type[]) : boolean {
+  return types.every(x => x.kind === TypeKind.ArrayType);
+}
+
+export function contains_trivial_mapping(types : Type[]) : boolean {
+  return types.some(x => x === TypeProvider.trivial_mapping());
+}
+
+export function contains_trivial_array(types : Type[]) : boolean {
+  return types.some(x => x === TypeProvider.trivial_array());
 }

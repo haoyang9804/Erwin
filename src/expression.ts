@@ -21,6 +21,7 @@ export class IRLiteral extends IRExpression {
   type : Type | undefined;
   kind : LiteralKind | undefined;
   value : string | undefined;
+  fixed_value : boolean = false;
   str : string | undefined;
   mustBeNegaitive : boolean = false;
   mustHaveIntTypeConversion : boolean = false;
@@ -81,8 +82,7 @@ export class IRLiteral extends IRExpression {
           else {
             if (typename === "int256" || typename === "int128" || typename === "int64" ||
               typename === "int32" || typename === "int16" || typename === "int8") {
-              if (Math.random() > 0.5)
-                this.value = "-" + this.value;
+              this.value = "-" + this.value;
               this.mustHaveIntTypeConversion = true;
             }
           }
@@ -151,8 +151,10 @@ export class IRLiteral extends IRExpression {
     const kind = this.kind;
     const mustHaveIntTypeConversion = this.mustHaveIntTypeConversion;
     if (!config.unit_test_mode) {
-      this.value = undefined;
       this.mustBeNegaitive = false;
+      if (!this.fixed_value) {
+        this.value = undefined;
+      }
       this.kind = undefined;
       this.mustHaveIntTypeConversion = false;
     }
@@ -273,8 +275,6 @@ export class IRConditional extends IRExpression {
   }
 }
 
-//WARNING: UNTESTED!!
-//TODO: test it after implementing IRFunctionDefinition
 export class IRFunctionCall extends IRExpression {
   kind : FunctionCallKind;
   //TODO: I think the type of function_expression can be further narrowed down

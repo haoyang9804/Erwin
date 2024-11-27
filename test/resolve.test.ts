@@ -1,10 +1,12 @@
-import { TypeDominanceDAG } from "../src/constraint";
-import { uinteger_types } from "../src/type";
+import { type_dag, storage_location_dag, TypeDominanceDAG } from "../src/constraint";
+import { MappingType, Type, uinteger_types } from "../src/type";
 import { config } from "../src/config";
+import { StorageLocationProvider } from "../src/memory";
+import { TypeProvider } from "../src/type";
 config.unit_test_mode = true;
 test("test dominance dag 1",
 async () => {
-  const type_dag = new TypeDominanceDAG();
+  console.log('========== test dominance dag 1 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -17,12 +19,13 @@ async () => {
   type_dag.connect(3, 5, "sub_dominance");
   await type_dag.resolve();
   type_dag.verify();
+  type_dag.clear();
 }
 )
 
 test("test dominance dag 2",
 async () => {
-  const type_dag = new TypeDominanceDAG();
+  console.log('========== test dominance dag 2 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -39,12 +42,13 @@ async () => {
   type_dag.connect(6, 4);
   await type_dag.resolve();
   type_dag.verify();
+  type_dag.clear();
 }
 )
 
 test("test dominance dag 3",
 async () => {
-  const type_dag = new TypeDominanceDAG();
+  console.log('========== test dominance dag 3 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -70,12 +74,13 @@ async () => {
   type_dag.connect(11, 9);
   await type_dag.resolve();
   type_dag.verify();
+  type_dag.clear();
 }
 )
 
 test("test dominance dag 4",
 async () => {
-  const type_dag = new TypeDominanceDAG();
+  console.log('========== test dominance dag 4 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -103,6 +108,7 @@ async () => {
   type_dag.connect(11, 12, "sub_dominance");
   await type_dag.resolve();
   type_dag.verify();
+  type_dag.clear();
 }
 )
 
@@ -110,7 +116,7 @@ async () => {
 test("test dominance pyramids 1",
 // graph: constraintDAGs/constraint2
 async () => {
-  const type_dag = new TypeDominanceDAG();
+  console.log('========== test dominance pyramids 1 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -125,158 +131,166 @@ async () => {
   type_dag.connect(6, 3);
   await type_dag.resolve();
   type_dag.verify();
+  type_dag.clear();
 }
 )
 
 test("test dominance pyramids 2",
   // graph: constraintDAGs/constraint3
 async () => {
-    const type_dag = new TypeDominanceDAG();
-    type_dag.insert(1, uinteger_types);
-    type_dag.insert(2, uinteger_types);
-    type_dag.insert(3, uinteger_types);
-    type_dag.insert(4, uinteger_types);
-    type_dag.insert(5, uinteger_types);
-    type_dag.insert(6, uinteger_types);
-    type_dag.insert(7, uinteger_types);
-    type_dag.connect(4, 1);
-    type_dag.connect(4, 7);
-    type_dag.connect(7, 2, "sub_dominance");
-    type_dag.connect(5, 2);
-    type_dag.connect(5, 3);
-    type_dag.connect(6, 1);
-    type_dag.connect(6, 3);
-    await type_dag.resolve();
-    type_dag.verify();
-  }
+  console.log('========== test dominance pyramids 2 ==========');
+  type_dag.insert(1, uinteger_types);
+  type_dag.insert(2, uinteger_types);
+  type_dag.insert(3, uinteger_types);
+  type_dag.insert(4, uinteger_types);
+  type_dag.insert(5, uinteger_types);
+  type_dag.insert(6, uinteger_types);
+  type_dag.insert(7, uinteger_types);
+  type_dag.connect(4, 1);
+  type_dag.connect(4, 7);
+  type_dag.connect(7, 2, "sub_dominance");
+  type_dag.connect(5, 2);
+  type_dag.connect(5, 3);
+  type_dag.connect(6, 1);
+  type_dag.connect(6, 3);
+  await type_dag.resolve();
+  type_dag.verify();
+  type_dag.clear();
+}
 )
 
 test("test dominance pyramids 3",
   // mutation of test dominance pyramids 2
 async () => {
-    const type_dag = new TypeDominanceDAG();
-    type_dag.insert(1, uinteger_types);
-    type_dag.insert(2, uinteger_types);
-    type_dag.insert(3, uinteger_types);
-    type_dag.insert(4, uinteger_types);
-    type_dag.insert(5, uinteger_types);
-    type_dag.insert(6, uinteger_types);
-    type_dag.insert(7, uinteger_types);
-    type_dag.connect(4, 1);
-    type_dag.connect(4, 7, "sub_dominance");
-    type_dag.connect(7, 2, "sub_dominance");
-    type_dag.connect(5, 2);
-    type_dag.connect(5, 3);
-    type_dag.connect(6, 1);
-    type_dag.connect(6, 3);
-    await type_dag.resolve();
-    type_dag.verify();
-  }
+  console.log('========== test dominance pyramids 3 ==========');
+  type_dag.insert(1, uinteger_types);
+  type_dag.insert(2, uinteger_types);
+  type_dag.insert(3, uinteger_types);
+  type_dag.insert(4, uinteger_types);
+  type_dag.insert(5, uinteger_types);
+  type_dag.insert(6, uinteger_types);
+  type_dag.insert(7, uinteger_types);
+  type_dag.connect(4, 1);
+  type_dag.connect(4, 7, "sub_dominance");
+  type_dag.connect(7, 2, "sub_dominance");
+  type_dag.connect(5, 2);
+  type_dag.connect(5, 3);
+  type_dag.connect(6, 1);
+  type_dag.connect(6, 3);
+  await type_dag.resolve();
+  type_dag.verify();
+  type_dag.clear();
+}
 )
    
 test("test dominance multi-dominance",
   // graph: constraintDAGs/constraint1
 async () => {
-    const type_dag = new TypeDominanceDAG();
-    type_dag.insert(1, uinteger_types);
-    type_dag.insert(2, uinteger_types);
-    type_dag.insert(3, uinteger_types);
-    type_dag.insert(4, uinteger_types);
-    type_dag.insert(5, uinteger_types);
-    type_dag.connect(1, 2);
-    type_dag.connect(1, 3, "sub_dominance");
-    type_dag.connect(3, 4, "sub_dominance");
-    type_dag.connect(4, 2);
-    type_dag.connect(4, 5);
-    await type_dag.resolve();
-    type_dag.verify();
-  }
+  console.log('========== test dominance multi-dominance ==========');
+  type_dag.insert(1, uinteger_types);
+  type_dag.insert(2, uinteger_types);
+  type_dag.insert(3, uinteger_types);
+  type_dag.insert(4, uinteger_types);
+  type_dag.insert(5, uinteger_types);
+  type_dag.connect(1, 2);
+  type_dag.connect(1, 3, "sub_dominance");
+  type_dag.connect(3, 4, "sub_dominance");
+  type_dag.connect(4, 2);
+  type_dag.connect(4, 5);
+  await type_dag.resolve();
+  type_dag.verify();
+  type_dag.clear();
+}
 )
 
 test("test resolve 1",
 async () => {
-    const type_dag = new TypeDominanceDAG();
-    type_dag.insert(1, uinteger_types);
-    type_dag.insert(2, uinteger_types);
-    type_dag.insert(3, uinteger_types);
-    type_dag.insert(4, uinteger_types);
-    type_dag.insert(5, uinteger_types);
-    type_dag.insert(6, uinteger_types);
-    type_dag.connect(1, 2);
-    type_dag.connect(2, 3);
-    type_dag.connect(1, 3);
-    type_dag.connect(1, 4);
-    type_dag.connect(4, 3);
-    type_dag.connect(4, 5);
-    type_dag.connect(5, 6);
-    type_dag.connect(4, 6);
-    type_dag.connect(1, 6);
-    await type_dag.resolve();
-    type_dag.verify();
-  }
+  console.log('========== test resolve 1 ==========');
+  type_dag.insert(1, uinteger_types);
+  type_dag.insert(2, uinteger_types);
+  type_dag.insert(3, uinteger_types);
+  type_dag.insert(4, uinteger_types);
+  type_dag.insert(5, uinteger_types);
+  type_dag.insert(6, uinteger_types);
+  type_dag.connect(1, 2);
+  type_dag.connect(2, 3);
+  type_dag.connect(1, 3);
+  type_dag.connect(1, 4);
+  type_dag.connect(4, 3);
+  type_dag.connect(4, 5);
+  type_dag.connect(5, 6);
+  type_dag.connect(4, 6);
+  type_dag.connect(1, 6);
+  await type_dag.resolve();
+  type_dag.verify();
+  type_dag.clear();
+}
 )
 
 test("test resolve 2",
 async () => {
-    const type_dag = new TypeDominanceDAG();
-    type_dag.insert(1, uinteger_types);
-    type_dag.insert(2, uinteger_types);
-    type_dag.insert(3, uinteger_types);
-    type_dag.insert(4, uinteger_types);
-    type_dag.insert(5, uinteger_types);
-    type_dag.insert(6, uinteger_types);
-    type_dag.insert(7, uinteger_types);
-    type_dag.insert(8, uinteger_types);
-    type_dag.connect(1, 2);
-    type_dag.connect(1, 3);
-    type_dag.connect(3, 2);
-    type_dag.connect(1, 4);
-    type_dag.connect(4, 2);
-    type_dag.connect(4, 6);
-    type_dag.connect(5, 6);
-    type_dag.connect(7, 2);
-    type_dag.connect(7, 8);
-    await type_dag.resolve();
-    type_dag.verify();
-  }
+  console.log('========== test resolve 2 ==========');
+  type_dag.insert(1, uinteger_types);
+  type_dag.insert(2, uinteger_types);
+  type_dag.insert(3, uinteger_types);
+  type_dag.insert(4, uinteger_types);
+  type_dag.insert(5, uinteger_types);
+  type_dag.insert(6, uinteger_types);
+  type_dag.insert(7, uinteger_types);
+  type_dag.insert(8, uinteger_types);
+  type_dag.connect(1, 2);
+  type_dag.connect(1, 3);
+  type_dag.connect(3, 2);
+  type_dag.connect(1, 4);
+  type_dag.connect(4, 2);
+  type_dag.connect(4, 6);
+  type_dag.connect(5, 6);
+  type_dag.connect(7, 2);
+  type_dag.connect(7, 8);
+  await type_dag.resolve();
+  type_dag.verify();
+  type_dag.clear();
+}
 )
 
 test("test resolve 3",
 async () => {
-    const type_dag = new TypeDominanceDAG();
-    type_dag.insert(1, uinteger_types);
-    type_dag.insert(2, uinteger_types);
-    type_dag.insert(3, uinteger_types);
-    type_dag.insert(4, uinteger_types);
-    type_dag.connect(1, 2, "sub_dominance");
-    type_dag.connect(3, 2, "super_dominance");
-    type_dag.connect(4, 3);
-    type_dag.connect(4, 2, "super_dominance");
-    await type_dag.resolve();
-    type_dag.verify();
-  }
+  console.log('========== test resolve 3 ==========');
+  type_dag.insert(1, uinteger_types);
+  type_dag.insert(2, uinteger_types);
+  type_dag.insert(3, uinteger_types);
+  type_dag.insert(4, uinteger_types);
+  type_dag.connect(1, 2, "sub_dominance");
+  type_dag.connect(3, 2, "super_dominance");
+  type_dag.connect(4, 3);
+  type_dag.connect(4, 2, "super_dominance");
+  await type_dag.resolve();
+  type_dag.verify();
+  type_dag.clear();
+}
 )
 
 test("test resolve 4",
-  async () => {
-      const type_dag = new TypeDominanceDAG();
-      type_dag.insert(1, uinteger_types);
-      type_dag.insert(2, uinteger_types);
-      type_dag.insert(3, uinteger_types);
-      type_dag.insert(4, uinteger_types);
-      type_dag.insert(5, uinteger_types);
-      type_dag.connect(1, 2, "super_dominance");
-      type_dag.connect(2, 3, "super_dominance");
-      type_dag.connect(2, 4);
-      type_dag.connect(2, 5, "super_dominance");
-      await type_dag.resolve();
-      type_dag.verify();
-    }
-  )
+async () => {
+  console.log('========== test resolve 4 ==========');
+  type_dag.insert(1, uinteger_types);
+  type_dag.insert(2, uinteger_types);
+  type_dag.insert(3, uinteger_types);
+  type_dag.insert(4, uinteger_types);
+  type_dag.insert(5, uinteger_types);
+  type_dag.connect(1, 2, "super_dominance");
+  type_dag.connect(2, 3, "super_dominance");
+  type_dag.connect(2, 4);
+  type_dag.connect(2, 5, "super_dominance");
+  await type_dag.resolve();
+  type_dag.verify();
+  type_dag.clear();
+}
+)
 
 test("test subsuper support 1",
 async () => {
-  const type_dag = new TypeDominanceDAG();
+  console.log('========== test subsuper support 1 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -285,54 +299,58 @@ async () => {
   type_dag.connect(1, 3);
   await type_dag.resolve();
   type_dag.verify();
+  type_dag.clear();
 }
 )
 
 test("test subsuper support 2",
-  async () => {
-    const type_dag = new TypeDominanceDAG();
-    type_dag.insert(1, uinteger_types);
-    type_dag.insert(2, uinteger_types);
-    type_dag.insert(3, uinteger_types);
-    type_dag.connect(1, 2, "super_dominance");
-    type_dag.connect(2, 3, "sub_dominance");
-    type_dag.connect(1, 3);
-    await type_dag.resolve();
-    type_dag.verify();
-  }
+async () => {
+  console.log('========== test subsuper support 2 ==========');
+  type_dag.insert(1, uinteger_types);
+  type_dag.insert(2, uinteger_types);
+  type_dag.insert(3, uinteger_types);
+  type_dag.connect(1, 2, "super_dominance");
+  type_dag.connect(2, 3, "sub_dominance");
+  type_dag.connect(1, 3);
+  await type_dag.resolve();
+  type_dag.verify();
+  type_dag.clear();
+}
 )
 
 test("test subsuper support 3",
-  async () => {
-    const type_dag = new TypeDominanceDAG();
-    type_dag.insert(1, uinteger_types);
-    type_dag.insert(2, uinteger_types);
-    type_dag.insert(3, uinteger_types);
-    type_dag.connect(1, 2, "sub_dominance");
-    type_dag.connect(2, 3, "super_dominance");
-    type_dag.connect(1, 3, "sub_dominance");
-    await type_dag.resolve();
-    type_dag.verify();
-  }
+async () => {
+  console.log('========== test subsuper support 3 ==========');
+  type_dag.insert(1, uinteger_types);
+  type_dag.insert(2, uinteger_types);
+  type_dag.insert(3, uinteger_types);
+  type_dag.connect(1, 2, "sub_dominance");
+  type_dag.connect(2, 3, "super_dominance");
+  type_dag.connect(1, 3, "sub_dominance");
+  await type_dag.resolve();
+  type_dag.verify();
+  type_dag.clear();
+}
 )
 
 test("test subsuper support 4",
-  async () => {
-    const type_dag = new TypeDominanceDAG();
-    type_dag.insert(1, uinteger_types);
-    type_dag.insert(2, uinteger_types);
-    type_dag.insert(3, uinteger_types);
-    type_dag.connect(1, 2, "sub_dominance");
-    type_dag.connect(2, 3, "super_dominance");
-    type_dag.connect(1, 3, "super_dominance");
-    await type_dag.resolve();
-    type_dag.verify();
-  }
+async () => {
+  console.log('========== test subsuper support 4 ==========');
+  type_dag.insert(1, uinteger_types);
+  type_dag.insert(2, uinteger_types);
+  type_dag.insert(3, uinteger_types);
+  type_dag.connect(1, 2, "sub_dominance");
+  type_dag.connect(2, 3, "super_dominance");
+  type_dag.connect(1, 3, "super_dominance");
+  await type_dag.resolve();
+  type_dag.verify();
+  type_dag.clear();
+}
 )
 
 test("test check_property 1",
 async () => {
-  const type_dag = new TypeDominanceDAG();
+  console.log('========== test check_property 1 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.connect(1, 2);
@@ -340,42 +358,142 @@ async () => {
   expect(async() => {
     await type_dag.check_property();
   }).rejects.toThrow("ConstraintDAG: no root");
+  type_dag.clear();
 }
 )
 
 test("test check_property 2",
-  async () => {
-    const type_dag = new TypeDominanceDAG();
-    type_dag.insert(1, uinteger_types);
-    type_dag.insert(2, uinteger_types);
-    type_dag.insert(3, uinteger_types);
-    type_dag.insert(4, uinteger_types);
-    type_dag.connect(1, 2);
-    type_dag.connect(2, 3);
-    type_dag.connect(3, 2);
-    type_dag.connect(3, 4);
-    expect(async() => {
-      await type_dag.check_property();
-    }).rejects.toThrow("ConstraintDAG: node 2 has more than one inbound edge");
-  }
+async () => {
+  console.log('========== test check_property 2 ==========');
+  type_dag.insert(1, uinteger_types);
+  type_dag.insert(2, uinteger_types);
+  type_dag.insert(3, uinteger_types);
+  type_dag.insert(4, uinteger_types);
+  type_dag.connect(1, 2);
+  type_dag.connect(2, 3);
+  type_dag.connect(3, 2);
+  type_dag.connect(3, 4);
+  expect(async() => {
+    await type_dag.check_property();
+  }).rejects.toThrow("ConstraintDAG: node 2 has more than one inbound edge");
+  type_dag.clear();
+}
 )
 
-test("test node2leaf 1",
-  async () => {
-    const type_dag = new TypeDominanceDAG();
-    type_dag.insert(1, uinteger_types);
-    type_dag.insert(2, uinteger_types);
-    type_dag.insert(3, uinteger_types);
-    type_dag.connect(1, 2, "sub_dominance");
-    type_dag.connect(1, 3);
-    type_dag.connect(2, 3);
-    type_dag.initialize_resolve();
-    type_dag.get_roots_and_leaves(false);
-    type_dag.dfs4node2leaf();
-    for (let [id, leaf_infos] of type_dag.node2leaf) {
-      for (const leaf_info of leaf_infos) {
-        console.log(`node ${id} dominates leaf ${leaf_info.leaf_id}: sub_dominance: ${leaf_info.sub_dominance}, super_dominance: ${leaf_info.super_dominance}, subsuper_dominance: ${leaf_info.subsuper_dominance}, equal_dominance: ${leaf_info.equal_dominance}`);
-      }
-    }
+test("test align storage loc range 1",
+async() => {
+  console.log('========== test align storage loc range 1 ==========');
+  storage_location_dag.insert(1, [
+    StorageLocationProvider.calldata(),
+    StorageLocationProvider.memory(),
+    StorageLocationProvider.storage_pointer(),
+    StorageLocationProvider.storage_ref()
+  ]);
+  storage_location_dag.insert(2, [
+    StorageLocationProvider.storage_ref()
+  ]);
+  storage_location_dag.connect(1, 2);
+  console.log(storage_location_dag.solution_range_of(1).map(x => x.str()));
+  console.log(storage_location_dag.solution_range_of(2).map(x => x.str()));
+  expect(storage_location_dag.solution_range_of(1)).toEqual(
+    [
+      StorageLocationProvider.calldata(),
+      StorageLocationProvider.memory(),
+      StorageLocationProvider.storage_pointer(),
+      StorageLocationProvider.storage_ref(),
+    ]
+  )
+  expect(storage_location_dag.solution_range_of(2)).toEqual(
+    [
+      StorageLocationProvider.storage_ref()
+    ]
+  )
+  storage_location_dag.clear();
+}
+)
+
+test("test align storage loc range 2",
+async() => {
+  console.log('========== test align storage loc range 2 ==========');
+  storage_location_dag.insert(1, [
+    StorageLocationProvider.calldata(),
+    StorageLocationProvider.memory(),
+    StorageLocationProvider.storage_pointer(),
+    StorageLocationProvider.storage_ref()
+  ]);
+  storage_location_dag.insert(2, [
+    StorageLocationProvider.storage_ref()
+  ]);
+  storage_location_dag.insert(3, storage_location_dag.solution_range_of(2));
+  storage_location_dag.connect(3, 2);
+  storage_location_dag.connect(3, 1);
+  console.log(storage_location_dag.solution_range_of(1).map(x => x.str()));
+  console.log(storage_location_dag.solution_range_of(2).map(x => x.str()));
+  console.log(storage_location_dag.solution_range_of(3).map(x => x.str()));
+  expect(storage_location_dag.solution_range_of(1)).toEqual(
+    [
+      StorageLocationProvider.calldata(),
+      StorageLocationProvider.memory(),
+      StorageLocationProvider.storage_pointer(),
+      StorageLocationProvider.storage_ref()
+    ]
+  );
+  expect(storage_location_dag.solution_range_of(2)).toEqual(
+    [
+      StorageLocationProvider.storage_ref()
+    ]
+  );
+  expect(storage_location_dag.solution_range_of(3)).toEqual(
+    [
+      StorageLocationProvider.storage_ref()
+    ]
+  );
+  storage_location_dag.clear();
+}
+)
+
+class TestStorageLocationDominanceDAG extends TypeDominanceDAG {
+  dominatee_solution_range_should_be_shrinked(dominator_id : number, dominatee_id : number) : Type[] | undefined {
+    return super.dominatee_solution_range_should_be_shrinked(dominator_id, dominatee_id);
   }
+  dominator_solution_range_should_be_shrinked(dominator_id: number, dominatee_id: number): Type[] | undefined {
+    return super.dominator_solution_range_should_be_shrinked(dominator_id, dominatee_id);
+  }
+}
+
+test("test align type range 1",
+async() => {
+  console.log('========== test align type range 1 ==========');
+  let dominance_dag = new TestStorageLocationDominanceDAG();
+  dominance_dag.insert(1, [TypeProvider.trivial_mapping()]);
+  dominance_dag.insert(2, [new MappingType(TypeProvider.int128(), TypeProvider.int128())]);
+  console.log(dominance_dag.solution_range_of(1).map(x => x.str()));
+  console.log(dominance_dag.solution_range_of(2).map(x => x.str()));
+  // dominance_dag.force_update(1, dominance_dag.solution_range_of(2));
+  dominance_dag.connect(1, 2);
+  console.log(dominance_dag.dominatee_solution_range_should_be_shrinked(1, 2));
+  console.log(dominance_dag.dominator_solution_range_should_be_shrinked(1, 2));
+  dominance_dag.clear();
+}
+)
+
+test("test align type range 2",
+async() => {
+  console.log('========== test align type range 2 ==========');
+  let dominance_dag = new TestStorageLocationDominanceDAG();
+  dominance_dag.insert(1, [
+    new MappingType(TypeProvider.int128(), TypeProvider.int128())
+  ]);
+  dominance_dag.insert(2, [
+    new MappingType(TypeProvider.int128(), TypeProvider.int128()),
+    new MappingType(TypeProvider.int64(), TypeProvider.int128()),
+    new MappingType(TypeProvider.bool(), TypeProvider.int128())
+  ]);
+  console.log(dominance_dag.solution_range_of(1).map(x => x.str()));
+  console.log(dominance_dag.solution_range_of(2).map(x => x.str()));
+  dominance_dag.connect(1, 2);
+  console.log(dominance_dag.dominatee_solution_range_should_be_shrinked(1, 2));
+  console.log(dominance_dag.dominator_solution_range_should_be_shrinked(1, 2));
+  dominance_dag.clear();
+}
 )

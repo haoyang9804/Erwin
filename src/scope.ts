@@ -8,6 +8,7 @@ export enum scopeKind {
   FUNC = "scopeKind::FUNC",
   FUNC_PARAMETER = "scopeKind::FUNC_PARAMETER",
   FUNC_RETURNS = "scopeKind::FUNC_RETURNS",
+  FUNC_ARGUMENTS = "scopeKind::FUNC_ARGUMENTS",
   CONTRACT = "scopeKind::CONTRACT",
   GLOBAL = "scopeKind::GLOBAL",
   IF_CONDITION = "scopeKind::IF_CONDITION",
@@ -23,16 +24,15 @@ export enum scopeKind {
   ARRAY = "scopeKind::ARRAY",
 }
 
-export function inside_function_body(scope_kind : scopeKind) : boolean {
-  return scope_kind === scopeKind.FUNC ||
-    scope_kind === scopeKind.DOWHILE_BODY ||
-    scope_kind === scopeKind.DOWHILE_COND ||
-    scope_kind === scopeKind.WHILE_BODY ||
-    scope_kind === scopeKind.WHILE_CONDITION ||
-    scope_kind === scopeKind.FOR_BODY ||
-    scope_kind === scopeKind.FOR_CONDITION ||
-    scope_kind === scopeKind.IF_BODY ||
-    scope_kind === scopeKind.IF_CONDITION;
+export function inside_function_body(scope : ScopeList) : boolean {
+  let s = scope;
+  while (s.kind() !== scopeKind.FUNC && s.kind() !== scopeKind.GLOBAL) {
+    s = s.pre();
+  }
+  if (s.kind() === scopeKind.FUNC) {
+    return true;
+  }
+  return false;
 }
 
 type scopeT = {
@@ -93,7 +93,7 @@ export function initScope() {
   return scope;
 }
 
-export function inside_struct_scope(cur_scope : ScopeList) : boolean {
+export function inside_struct_decl_scope(cur_scope : ScopeList) : boolean {
   while (cur_scope.kind() !== scopeKind.GLOBAL) {
     if (cur_scope.kind() === scopeKind.STRUCT) {
       return true;
@@ -107,4 +107,54 @@ export function get_scope_from_scope_id(scope_id : number) : ScopeList {
   const scope = scope_id_to_scope.get(scope_id);
   assert(scope !== undefined, "The scope must exist.");
   return scope;
+}
+
+export function unexpected_extra_stmt_belong_to_the_parent_scope(scope : ScopeList) : boolean {
+  return scope.kind() === scopeKind.FOR_CONDITION ||
+    scope.kind() === scopeKind.WHILE_CONDITION ||
+    scope.kind() === scopeKind.DOWHILE_COND ||
+    scope.kind() === scopeKind.IF_CONDITION ||
+    scope.kind() === scopeKind.MAPPING ||
+    scope.kind() === scopeKind.ARRAY ||
+    scope.kind() === scopeKind.FUNC_ARGUMENTS;
+}
+
+export function inside_contract(cur_scope : ScopeList) : boolean {
+  while (cur_scope.kind() !== scopeKind.GLOBAL) {
+    if (cur_scope.kind() === scopeKind.CONTRACT) {
+      return true;
+    }
+    cur_scope = cur_scope.pre();
+  }
+  return false;
+}
+
+export function inside_constructor_scope(cur_scope : ScopeList) : boolean {
+  while (cur_scope.kind() !== scopeKind.GLOBAL) {
+    if (cur_scope.kind() === scopeKind.CONSTRUCTOR) {
+      return true;
+    }
+    cur_scope = cur_scope.pre();
+  }
+  return false;
+}
+
+export function inside_constructor_parameter_scope(cur_scope : ScopeList) : boolean {
+  while (cur_scope.kind() !== scopeKind.GLOBAL) {
+    if (cur_scope.kind() === scopeKind.CONSTRUCTOR_PARAMETERS) {
+      return true;
+    }
+    cur_scope = cur_scope.pre();
+  }
+  return false;
+}
+
+export function inside_function_parameter_scope(cur_scope : ScopeList) : boolean {
+  while (cur_scope.kind() !== scopeKind.GLOBAL) {
+    if (cur_scope.kind() === scopeKind.FUNC_PARAMETER) {
+      return true;
+    }
+    cur_scope = cur_scope.pre();
+  }
+  return false;
 }

@@ -207,24 +207,24 @@ export class MemoryDefault extends StorageLocation {
 }
 
 export class StorageLocationProvider {
-  private static m_storage_pointer : StorageLocation = new StoragePointer();
-  private static m_storage_ref : StorageLocation = new StorageRef();
-  private static m_memory_location : StorageLocation = new Memory();
-  private static m_calldata_location : StorageLocation = new Calldata();
-  private static m_memory_default_lcoation : StorageLocation = new MemoryDefault();
-  static storage_pointer() : StorageLocation {
+  private static m_storage_pointer : StoragePointer = new StoragePointer();
+  private static m_storage_ref : StorageRef = new StorageRef();
+  private static m_memory_location : Memory = new Memory();
+  private static m_calldata_location : Calldata = new Calldata();
+  private static m_memory_default_lcoation : MemoryDefault = new MemoryDefault();
+  static storage_pointer() : StoragePointer {
     return this.m_storage_pointer;
   }
-  static storage_ref() : StorageLocation {
+  static storage_ref() : StorageRef {
     return this.m_storage_ref;
   }
-  static memory() : StorageLocation {
+  static memory() : Memory {
     return this.m_memory_location;
   }
-  static calldata() : StorageLocation {
+  static calldata() : Calldata {
     return this.m_calldata_location;
   }
-  static memory_default() : StorageLocation {
+  static memory_default() : MemoryDefault {
     return this.m_memory_default_lcoation;
   }
 }

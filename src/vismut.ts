@@ -516,76 +516,76 @@ class VarDefault extends VarVisMut {
 }
 
 export class VisMutProvider {
-  private static m_func_internal_pure : VisMut = new FuncInternalPure();
-  static func_internal_pure() : VisMut {
+  private static m_func_internal_pure : FuncInternalPure = new FuncInternalPure();
+  static func_internal_pure() : FuncInternalPure {
     return this.m_func_internal_pure;
   }
-  private static m_func_internal_view : VisMut = new FuncInternalView();
-  static func_internal_view() : VisMut {
+  private static m_func_internal_view : FuncInternalView = new FuncInternalView();
+  static func_internal_view() : FuncInternalView {
     return this.m_func_internal_view;
   }
-  private static m_func_internal_empty : VisMut = new FuncInternalEmpty();
-  static func_internal_empty() : VisMut {
+  private static m_func_internal_empty : FuncInternalEmpty = new FuncInternalEmpty();
+  static func_internal_empty() : FuncInternalEmpty {
     return this.m_func_internal_empty;
   }
-  private static m_func_external_pure : VisMut = new FuncExternalPure();
-  static func_external_pure() : VisMut {
+  private static m_func_external_pure : FuncExternalPure = new FuncExternalPure();
+  static func_external_pure() : FuncExternalPure {
     return this.m_func_external_pure;
   }
-  private static m_func_external_view : VisMut = new FuncExternalView();
-  static func_external_view() : VisMut {
+  private static m_func_external_view : FuncExternalView = new FuncExternalView();
+  static func_external_view() : FuncExternalView {
     return this.m_func_external_view;
   }
-  private static m_func_external_empty : VisMut = new FuncExternalEmpty();
-  static func_external_empty() : VisMut {
+  private static m_func_external_empty : FuncExternalEmpty = new FuncExternalEmpty();
+  static func_external_empty() : FuncExternalEmpty {
     return this.m_func_external_empty;
   }
-  private static m_func_external_payable : VisMut = new FuncExternalPayable();
-  static func_external_payable() : VisMut {
+  private static m_func_external_payable : FuncExternalPayable = new FuncExternalPayable();
+  static func_external_payable() : FuncExternalPayable {
     return this.m_func_external_payable;
   }
-  private static m_func_public_pure : VisMut = new FuncPublicPure();
-  static func_public_pure() : VisMut {
+  private static m_func_public_pure : FuncPublicPure = new FuncPublicPure();
+  static func_public_pure() : FuncPublicPure {
     return this.m_func_public_pure;
   }
-  private static m_func_public_view : VisMut = new FuncPublicView();
-  static func_public_view() : VisMut {
+  private static m_func_public_view : FuncPublicView = new FuncPublicView();
+  static func_public_view() : FuncPublicView {
     return this.m_func_public_view;
   }
-  private static m_func_public_payable : VisMut = new FuncPublicPayable();
-  static func_public_payable() : VisMut {
+  private static m_func_public_payable : FuncPublicPayable = new FuncPublicPayable();
+  static func_public_payable() : FuncPublicPayable {
     return this.m_func_public_payable;
   }
-  private static m_func_public_empty : VisMut = new FuncPublicEmpty();
-  static func_public_empty() : VisMut {
+  private static m_func_public_empty : FuncPublicEmpty = new FuncPublicEmpty();
+  static func_public_empty() : FuncPublicEmpty {
     return this.m_func_public_empty;
   }
-  private static m_func_private_pure : VisMut = new FuncPrivatePure();
-  static func_private_pure() : VisMut {
+  private static m_func_private_pure : FuncPrivatePure = new FuncPrivatePure();
+  static func_private_pure() : FuncPrivatePure {
     return this.m_func_private_pure;
   }
-  private static m_func_private_view : VisMut = new FuncPrivateView();
-  static func_private_view() : VisMut {
+  private static m_func_private_view : FuncPrivateView = new FuncPrivateView();
+  static func_private_view() : FuncPrivateView {
     return this.m_func_private_view;
   }
-  private static m_func_private_empty : VisMut = new FuncPrivateEmpty();
-  static func_private_empty() : VisMut {
+  private static m_func_private_empty : FuncPrivateEmpty = new FuncPrivateEmpty();
+  static func_private_empty() : FuncPrivateEmpty {
     return this.m_func_private_empty;
   }
-  private static m_var_internal : VisMut = new VarInternal();
-  static var_internal() : VisMut {
+  private static m_var_internal : VarInternal = new VarInternal();
+  static var_internal() : VarInternal {
     return this.m_var_internal
   }
-  private static m_var_public : VisMut = new VarPublic();
-  static var_public() : VisMut {
+  private static m_var_public : VarPublic = new VarPublic();
+  static var_public() : VarPublic {
     return this.m_var_public;
   }
-  private static m_var_private : VisMut = new VarPrivate();
-  static var_private() : VisMut {
+  private static m_var_private : VarPrivate = new VarPrivate();
+  static var_private() : VarPrivate {
     return this.m_var_private;
   }
-  private static m_var_default : VisMut = new VarDefault();
-  static var_default() : VisMut {
+  private static m_var_default : VarDefault = new VarDefault();
+  static var_default() : VarDefault {
     return this.m_var_default;
   }
   static from_kind(kind : VisMutKind) : VisMut {
@@ -706,6 +706,42 @@ export const closed_func_vismut = [
   VisMutProvider.func_private_pure(),
   VisMutProvider.func_private_view(),
   VisMutProvider.func_private_empty()
+];
+
+export const nonpure_func_vismut = [
+  VisMutProvider.func_internal_view(),
+  VisMutProvider.func_internal_empty(),
+  VisMutProvider.func_external_view(),
+  VisMutProvider.func_external_empty(),
+  VisMutProvider.func_external_payable(),
+  VisMutProvider.func_public_view(),
+  VisMutProvider.func_public_payable(),
+  VisMutProvider.func_public_empty(),
+  VisMutProvider.func_private_view(),
+  VisMutProvider.func_private_empty()
+];
+
+export const nonpure_nonview_func_vismut = [
+  VisMutProvider.func_internal_empty(),
+  VisMutProvider.func_external_empty(),
+  VisMutProvider.func_external_payable(),
+  VisMutProvider.func_public_payable(),
+  VisMutProvider.func_public_empty(),
+  VisMutProvider.func_private_empty()
+];
+
+export const pure_func_vismut = [
+  VisMutProvider.func_internal_pure(),
+  VisMutProvider.func_external_pure(),
+  VisMutProvider.func_public_pure(),
+  VisMutProvider.func_private_pure()
+];
+
+export const view_func_vismut = [
+  VisMutProvider.func_internal_view(),
+  VisMutProvider.func_external_view(),
+  VisMutProvider.func_public_view(),
+  VisMutProvider.func_private_view()
 ];
 
 export function from_state_mutability_range_to_vismut_range(state_mutability_range : FuncStat[]) : VisMut[] {

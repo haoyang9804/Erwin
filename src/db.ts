@@ -1,13 +1,15 @@
 import * as sqlite from 'sqlite';
 import * as sqlite3 from 'sqlite3';
 import { Tree } from './dataStructor';
-import { scopeKind, ScopeList } from './scope';
+import { inside_contract, scopeKind, ScopeList } from './scope';
 import { assert } from 'console';
-import { IRFunctionDefinition, IRStructDefinition } from './declare';
+import { IRContractDefinition, IRStructDefinition } from './declare';
 import { irnodes } from './node';
-import { contain_mapping_type } from './type';
-import { type_dag } from './generator';
+import * as type from './type';
+import { type_dag } from './constraint';
 import { merge_set } from './utility';
+import { IRStatement } from './statement';
+import { initialize_variable } from './generator';
 
 // Deprecated Database
 export class DeprecatedDB {
@@ -62,7 +64,6 @@ class DeclDB {
   private structdecls : Set<number> = new Set<number>();
   private funcdecls : Set<number> = new Set<number>();
   private struct_instance_decls : Set<number> = new Set<number>();
-  private temporary_struct_instance_decls : Set<number> = new Set<number>();
   private contractdecls : Set<number> = new Set<number>();
   private state_variables : Set<number> = new Set<number>();
   private getter_funcdecls : Set<number> = new Set<number>();
@@ -99,10 +100,8 @@ class DeclDB {
 
   private storage_qualified_struct_members_of_struct_instance : Map<number, number[]> = new Map<number, number[]>();
 
-  private getter_function_id_to_state_struct_instance_id : Map<number, number> = new Map<number, number>();
-  private getter_function_id_to_struct_decl_id : Map<number, number> = new Map<number, number>();
-  private getter_function_id_to_state_mapping_decl : Map<number, number> = new Map<number, number>();
-  private state_struct_instance_id_to_getter_function_ids : Map<number, number[]> = new Map<number, number[]>();
+  private getter_function_id_to_state_var_id : Map<number, number> = new Map<number, number>();
+  private state_var_id_to_getter_function_id : Map<number, number> = new Map<number, number>();
 
   private mapping_decls : Set<number> = new Set<number>();
   private mapping_decl_id_to_kv_ids : Map<number, [number, number]> = new Map<number, [number, number]>();
@@ -116,13 +115,13 @@ class DeclDB {
   private base_id_to_array_decl_id : Map<number, number> = new Map<number, number>();
   private array_decl_that_contains_mapping_decl : Set<number> = new Set<number>();
 
-  private struct_decl_that_contains_mapping_decl : Set<number> = new Set<number>();
   private member2structdecl : Map<number, number> = new Map<number, number>();
   private structdecl2members : Map<number, number[]> = new Map<number, number[]>();
   private struct_instance_to_struct_decl : Map<number, number> = new Map<number, number>();
 
   private cannot_be_assigned_to : Set<number> = new Set<number>();
   private must_be_initialized : Map<number, number[]> = new Map<number, number[]>();
+  private has_be_initialized : Set<number> = new Set<number>();
 
   constructor() { }
 
@@ -294,21 +293,35 @@ class DeclDB {
     throw new Error(`The member ${member_id} does not have a ghost member in struct instance ${struct_instance_id}.`);
   }
 
-  add_temporary_struct_instance_decl(struct_instance_id : number) : void {
-    this.temporary_struct_instance_decls.add(struct_instance_id);
-  }
-
-  is_temporary_struct_instance_decl(struct_instance_id : number) : boolean {
-    return this.temporary_struct_instance_decls.has(struct_instance_id);
+  is_ghost_member(ghost_member_id : number) : boolean {
+    return this.ghost_member_to_member.has(ghost_member_id);
   }
 
   //* contractdecl
-  add_contractdecl_scope(scope_id : number, contractdecl_id : number) : void {
+  pair_contractdecl_to_scope(scope_id : number, contractdecl_id : number) : void {
     this.scope_id_to_contractdecl_id.set(scope_id, contractdecl_id);
   }
 
-  get_contractdecl_by_scope(scope_id : number) : number {
+  get_contractdecl_by_scope(scope_id : number) : number | undefined {
+    if (!this.scope_id_to_contractdecl_id.has(scope_id)) {
+      return undefined;
+    }
     return this.scope_id_to_contractdecl_id.get(scope_id)!;
+  }
+
+  get_current_contractdecl_id(scope : ScopeList) : number | undefined {
+    if (scope.kind() === scopeKind.GLOBAL) {
+      return undefined;
+    }
+    while (scope.kind() !== scopeKind.CONTRACT && scope.pre().kind() !== scopeKind.GLOBAL) {
+      scope = scope.pre();
+    }
+    if (scope.kind() === scopeKind.CONTRACT) {
+      assert(scope.pre().kind() === scopeKind.GLOBAL,
+        `contract scope's previous scope is not global scope, but is ${scope.pre().kind()}`);
+      return this.get_contractdecl_by_scope(scope.id());
+    }
+    return undefined;
   }
 
   insert_yin_contract(scope_id : number, contractdecl_id : number) : void {
@@ -360,30 +373,9 @@ class DeclDB {
 
   //* struct decl
   find_structdecl_by_name(name : string) : IRStructDefinition | undefined {
-    const struct_decl = Array.from(this.structdecls).find(x => (irnodes.get(x)! as IRStructDefinition).name === name);
+    let struct_name = name.includes(".") ? name.split(".")[1] : name;
+    const struct_decl = Array.from(this.structdecls).find(x => (irnodes.get(x)! as IRStructDefinition).name === struct_name);
     return struct_decl === undefined ? undefined : irnodes.get(struct_decl)! as IRStructDefinition;
-  }
-
-  if_struct_decl_contain_mapping_decl(struct_decl_id : number) : void {
-    let stop = false;
-    for (const member of this.members_of_struct_decl(struct_decl_id)) {
-      for (const t of type_dag.solution_range.get(member)!) {
-        if (contain_mapping_type(t)) {
-          this.struct_decl_that_contains_mapping_decl.add(struct_decl_id);
-          stop = true;
-          break;
-        }
-      }
-      if (stop) break;
-    }
-  }
-
-  remove_struct_decl_that_contains_mapping_decl(struct_decl_id : number) : void {
-    this.struct_decl_that_contains_mapping_decl.delete(struct_decl_id);
-  }
-
-  is_struct_decl_that_contains_mapping_decl(struct_decl_id : number) : boolean {
-    return this.struct_decl_that_contains_mapping_decl.has(struct_decl_id);
   }
 
   add_member_to_struct_decl(member_id : number, struct_decl_id : number) : void {
@@ -410,79 +402,29 @@ class DeclDB {
     return this.structdecl2members.get(struct_decl_id)!;
   }
 
-  //* state struct instance
-  is_state_struct_instance(node_id : number) : boolean {
-    return this.state_struct_instance_id_to_getter_function_ids.has(node_id);
-  }
-
-  getter_functions_of_state_struct_instance(state_struct_instance_id : number) : number[] {
-    assert(this.state_struct_instance_id_to_getter_function_ids.has(state_struct_instance_id),
-      `The state struct instance ${state_struct_instance_id} does not exist.`);
-    return this.state_struct_instance_id_to_getter_function_ids.get(state_struct_instance_id)!;
-  }
-
   //* getter function
-  add_getter_function(funcdecl_id : number) : void {
+  add_getter_function(funcdecl_id : number, var_decl_id : number) : void {
     this.getter_funcdecls.add(funcdecl_id);
+    this.getter_function_id_to_state_var_id.set(funcdecl_id, var_decl_id);
+    this.state_var_id_to_getter_function_id.set(var_decl_id, funcdecl_id);
   }
 
-  remove_getter_function(funcdecl_id : number) : void {
-    this.getter_funcdecls.delete(funcdecl_id);
-    this.funcdecls.delete(funcdecl_id);
-    this.remove(funcdecl_id, (irnodes.get(funcdecl_id)! as IRFunctionDefinition).scope);
-    const state_struct_instance = this.getter_function_id_to_state_struct_instance_id.get(funcdecl_id);
-    this.getter_function_id_to_state_struct_instance_id.delete(funcdecl_id);
-    if (state_struct_instance !== undefined) {
-      const getter_functions = this.state_struct_instance_id_to_getter_function_ids.get(state_struct_instance)!;
-      this.state_struct_instance_id_to_getter_function_ids.set(state_struct_instance, getter_functions.filter(x => x !== funcdecl_id));
-    }
-    this.getter_function_id_to_struct_decl_id.delete(funcdecl_id);
+  state_var_of_getter_function(funcdecl_id : number) : number {
+    assert(this.getter_function_id_to_state_var_id.has(funcdecl_id), `The getter function ${funcdecl_id} does not exist.`);
+    return this.getter_function_id_to_state_var_id.get(funcdecl_id)!;
   }
 
-  add_getter_function_to_state_mapping_decl(funcdecl_id : number, mapping_decl_id : number) : void {
-    this.getter_function_id_to_state_mapping_decl.set(funcdecl_id, mapping_decl_id);
+  getter_function_of_state_var(vardecl_id : number) : number {
+    assert(this.state_var_id_to_getter_function_id.has(vardecl_id), `The state variable ${vardecl_id} does not exist.`);
+    return this.state_var_id_to_getter_function_id.get(vardecl_id)!;
   }
 
-  is_getter_function_for_state_mapping_decl(funcdecl_id : number) : boolean {
-    return this.getter_function_id_to_state_mapping_decl.has(funcdecl_id);
-  }
-
-  state_mapping_decl_of_getter_function(funcdecl_id : number) : number {
-    assert(this.getter_function_id_to_state_mapping_decl.has(funcdecl_id),
-      `The getter function ${funcdecl_id} does not exist.`);
-    return this.getter_function_id_to_state_mapping_decl.get(funcdecl_id)!;
-  }
-
-  map_getter_function_to_state_struct_instance(funcdecl_id : number, state_struct_instance_id : number, struct_decl_id : number) : void {
-    this.getter_function_id_to_state_struct_instance_id.set(funcdecl_id, state_struct_instance_id);
-    this.getter_function_id_to_struct_decl_id.set(funcdecl_id, struct_decl_id);
-    if (this.state_struct_instance_id_to_getter_function_ids.has(state_struct_instance_id)) {
-      this.state_struct_instance_id_to_getter_function_ids.set(state_struct_instance_id,
-        this.state_struct_instance_id_to_getter_function_ids.get(state_struct_instance_id)!.concat(funcdecl_id));
-    }
-    else {
-      this.state_struct_instance_id_to_getter_function_ids.set(state_struct_instance_id, [funcdecl_id]);
-    }
+  has_getter_function(vardecl_id : number) : boolean {
+    return this.state_var_id_to_getter_function_id.has(vardecl_id);
   }
 
   is_getter_function(funcdecl_id : number) : boolean {
     return this.getter_funcdecls.has(funcdecl_id);
-  }
-
-  is_getter_function_for_state_struct_instance(funcdecl_id : number) : boolean {
-    return this.getter_function_id_to_state_struct_instance_id.has(funcdecl_id);
-  }
-
-  state_struct_instance_of_getter_function(funcdecl_id : number) : number {
-    assert(this.getter_function_id_to_state_struct_instance_id.has(funcdecl_id),
-      `The getter function ${funcdecl_id} does not exist.`);
-    return this.getter_function_id_to_state_struct_instance_id.get(funcdecl_id)!;
-  }
-
-  state_decl_of_getter_function(funcdecl_id : number) : number {
-    assert(this.getter_function_id_to_struct_decl_id.has(funcdecl_id),
-      `The getter function ${funcdecl_id} does not exist.`);
-    return this.getter_function_id_to_struct_decl_id.get(funcdecl_id)!;
   }
 
   //* array decl
@@ -517,7 +459,7 @@ class DeclDB {
 
   if_array_decl_contain_mapping_decl(array_decl_id : number) : void {
     for (const t of type_dag.solution_range.get(array_decl_id)!) {
-      if (contain_mapping_type(t)) {
+      if (type.contain_mapping_type(t)) {
         this.array_decl_that_contains_mapping_decl.add(array_decl_id);
         break;
       }
@@ -612,16 +554,42 @@ class DeclDB {
     return this.must_be_initialized.has(scope_id);
   }
 
-  exist_vardecls_that_must_be_initialized(scope_id : number) : number[] {
-    assert(this.must_be_initialized.has(scope_id), `The scope ${scope_id} does not exist.`);
+  get_vardecls_that_must_be_initialized(scope_id : number) : number[] {
+    if (!this.must_be_initialized.has(scope_id)) {
+      return [];
+    }
     return this.must_be_initialized.get(scope_id)!;
   }
 
-  qualifed_by_storage_qualifier(vardecl_id : number) : boolean {
-    return this.is_mapping_decl(vardecl_id) ||
-      this.is_array_decl(vardecl_id) ||
-      this.is_struct_instance_decl(vardecl_id) ||
-      this.is_temporary_struct_instance_decl(vardecl_id);
+  set_vardecl_as_initialized(vardecl_id : number) : void {
+    this.has_be_initialized.add(vardecl_id);
+  }
+
+  is_vardecl_initialized(vardecl_id : number) : boolean {
+    return this.has_be_initialized.has(vardecl_id);
+  }
+
+  qualifed_by_storage_qualifier(id : number) : boolean {
+    return this.is_mapping_decl(id) ||
+      this.is_array_decl(id) ||
+      this.is_struct_instance_decl(id) ||
+      expr_db.is_new_struct_expr(id);
+  }
+
+  contains_mapping_decl(id : number) : boolean {
+    if (this.is_structdecl(id)) {
+      return this.structdecl2members.get(id)!.some(x => this.contains_mapping_decl(x));
+    }
+    if (this.is_array_decl(id)) {
+      return this.contains_mapping_decl(this.base_of_array(id));
+    }
+    if (this.is_mapping_decl(id)) {
+      return true;
+    }
+    if (this.is_struct_instance_decl(id)) {
+      return this.contains_mapping_decl(this.struct_decl_of_struct_instance(id));
+    }
+    return false;
   }
 
   //! ================ Scope-Related ================
@@ -703,8 +671,6 @@ class DeclDB {
   }
 }
 
-export let decl_db = new DeclDB();
-
 class ExprDB {
   public expr2read_variables : Map<number, Set<number>> = new Map<number, Set<number>>();
   public expr2write_variables : Map<number, Set<number>> = new Map<number, Set<number>>();
@@ -717,6 +683,11 @@ class ExprDB {
   private array_type_exprs : Set<number> = new Set<number>();
   private array_type_expr_id_to_base_expr_id : Map<number, number> = new Map<number, number>();
   private base_expr_id_to_array_type_expr_id : Map<number, number> = new Map<number, number>();
+
+  private new_struct_exprs : Set<number> = new Set<number>();
+  private new_struct_to_struct_decl : Map<number, number> = new Map<number, number>();
+  private ghost_members_of_new_struct_expr : Map<number, number[]> = new Map<number, number[]>();
+  private ghost_member_to_member : Map<number, number> = new Map<number, number>();
 
   //! Read-Write-Related
 
@@ -882,6 +853,253 @@ class ExprDB {
       `The base expression ${base_expr_id} does not exist.`);
     return this.base_expr_id_to_array_type_expr_id.get(base_expr_id)!;
   }
+
+  //! Struct-Related
+  add_new_struct_expr(expr_id : number) : void {
+    this.new_struct_exprs.add(expr_id);
+  }
+
+  is_new_struct_expr(expr_id : number) : boolean {
+    return this.new_struct_exprs.has(expr_id);
+  }
+
+  remove_new_struct_expr(expr_id : number) : void {
+    this.new_struct_exprs.delete(expr_id);
+  }
+
+  new_struct_exprs_ids() : number[] {
+    return Array.from(this.new_struct_exprs);
+  }
+
+  pair_new_struct_expr_with_struct_decl(newstruct_id : number, struct_decl_id : number) : void {
+    this.new_struct_to_struct_decl.set(newstruct_id, struct_decl_id);
+  }
+
+  struct_decl_of_new_struct_expr(newstruct_id : number) : number {
+    assert(this.new_struct_to_struct_decl.has(newstruct_id),
+      `The new struct expr ${newstruct_id} does not exist.`);
+    return this.new_struct_to_struct_decl.get(newstruct_id)!;
+  }
+
+  members_of_new_struct_expr(newstruct_id : number) : number[] {
+    assert(this.new_struct_to_struct_decl.has(newstruct_id),
+      `The new struct expr ${newstruct_id} does not exist.`);
+    return decl_db.members_of_struct_decl(this.struct_decl_of_new_struct_expr(newstruct_id))!;
+  }
+
+  update_ghost_members_of_new_struct_expr(newstruct_id : number,
+    member_id : number, ghost_member_id : number) : void {
+    if (this.ghost_members_of_new_struct_expr.has(newstruct_id)) {
+      this.ghost_members_of_new_struct_expr.get(newstruct_id)!.push(ghost_member_id);
+    }
+    else {
+      this.ghost_members_of_new_struct_expr.set(newstruct_id, [ghost_member_id]);
+    }
+    this.ghost_member_to_member.set(ghost_member_id, member_id);
+  }
+
+  is_ghost_member(ghost_member_id : number) : boolean {
+    return this.ghost_member_to_member.has(ghost_member_id);
+  }
+
+  ghost_member_of_member_inside_new_struct_expr(member_id : number, newstruct_id : number) : number {
+    assert(this.ghost_members_of_new_struct_expr.has(newstruct_id),
+      `The new struct expr ${newstruct_id} does not exist.`);
+    const ghost_members = this.ghost_members_of_new_struct_expr.get(newstruct_id);
+    for (const ghost_member of ghost_members!) {
+      if (this.ghost_member_to_member.get(ghost_member) === member_id) {
+        return ghost_member;
+      }
+    }
+    throw new Error(`The member ${member_id} does not have a ghost member in new struct expr ${newstruct_id}.`);
+  }
 }
 
-export let expr_db = new ExprDB();
+export enum IDENTIFIER {
+  CONTRACT,
+  FUNC,
+  STRUCT,
+  VAR,
+  CONTRACT_INSTANCE,
+  STRUCT_INSTANCE,
+  MAPPING,
+  ARRAY
+};
+
+class NameDB {
+  private name_id : number = 0;
+
+  //TODO: support name shallowing.
+  public generate_name(identifier : IDENTIFIER) : string {
+    switch (identifier) {
+      case IDENTIFIER.CONTRACT:
+        return `contract${this.name_id++}`;
+      case IDENTIFIER.MAPPING:
+        return `mapping${this.name_id++}`;
+      case IDENTIFIER.ARRAY:
+        return `array${this.name_id++}`;
+      case IDENTIFIER.VAR:
+        return `var${this.name_id++}`;
+      case IDENTIFIER.CONTRACT_INSTANCE:
+        return `contract_instance${this.name_id++}`;
+      case IDENTIFIER.STRUCT_INSTANCE:
+        return `struct_instance${this.name_id++}`;
+      case IDENTIFIER.STRUCT:
+        return `struct${this.name_id++}`;
+      case IDENTIFIER.FUNC:
+        return `func${this.name_id++}`;
+      default:
+        throw new Error(`generate_name: identifier ${identifier} is not supported`);
+    }
+  }
+}
+
+class StmtDB {
+  // Record the statements that are not expected to be generated before the current statement.
+  private unexpected_extra_stmt : Map<number, IRStatement[]> = new Map<number, IRStatement[]>();
+
+  public initialize_the_vardecls_that_must_be_initialized(scope_id : number) : void {
+    for (const id of decl_db.get_vardecls_that_must_be_initialized(scope_id)!) {
+      if (decl_db.is_vardecl_initialized(id)) {
+        continue;
+      }
+      this.add_unexpected_extra_stmt(scope_id, initialize_variable(id));
+      decl_db.set_vardecl_as_initialized(id);
+    }
+    decl_db.remove_vardecl_from_must_be_initialized(scope_id);
+  }
+
+  public add_unexpected_extra_stmt(scope_id : number, stmt : IRStatement) : void {
+    if (this.unexpected_extra_stmt.has(scope_id)) {
+      this.unexpected_extra_stmt.get(scope_id)!.push(stmt);
+    }
+    else {
+      this.unexpected_extra_stmt.set(scope_id, [stmt]);
+    }
+  }
+
+  public unexpected_extra_stmts_of_scope(scope_id : number) : IRStatement[] {
+    if (!this.unexpected_extra_stmt.has(scope_id)) {
+      return [];
+    }
+    return this.unexpected_extra_stmt.get(scope_id)!;
+  }
+
+  public remove_unexpected_extra_stmt_from_scope(scope_id : number) : void {
+    this.unexpected_extra_stmt.delete(scope_id);
+  }
+
+  public has_unexpected_extra_stmt(scope_id : number) : boolean {
+    return this.unexpected_extra_stmt.has(scope_id);
+  }
+}
+
+class TypeDB {
+  private all_types : type.Type[] = [];
+  private contract_types : Map<number, type.ContractType> = new Map<number, type.ContractType>();
+  private internal_struct_types = new Set<type.StructType>();
+  private internal_struct_type_to_external_struct_type = new Map<type.StructType, type.StructType>();
+  private user_defined_types : type.UserDefinedType[] = [];
+
+  public init_types() : void {
+    this.all_types = [...type.elementary_types,
+    type.TypeProvider.trivial_mapping(),
+    type.TypeProvider.trivial_array(),
+    ];
+  }
+
+  public remove_internal_struct_types() : void {
+    const all_types_set = new Set([...this.all_types]);
+    const user_defined_types_set = new Set([...this.user_defined_types]);
+    this.internal_struct_types.forEach((t) => {
+      all_types_set.delete(t)
+      user_defined_types_set.delete(t);
+    });
+    this.all_types = [...all_types_set];
+    this.user_defined_types = [...user_defined_types_set];
+    this.internal_struct_types.clear();
+  }
+
+  public types() : type.Type[] {
+    return [...this.all_types];
+  }
+
+  public update_types(types : type.Type[]) : void {
+    this.all_types = types;
+  }
+
+  public add_type(t : type.Type) : void {
+    this.all_types.push(t);
+  }
+
+  public add_contract_type(contract_id : number, t : type.ContractType) : void {
+    this.contract_types.set(contract_id, t);
+  }
+
+  public contract_type_of(contract_id : number) : type.ContractType {
+    return this.contract_types.get(contract_id)!;
+  }
+
+  public add_internal_struct_type(t : type.StructType) : void {
+    this.internal_struct_types.add(t);
+  }
+
+  public is_internal_struct_type(t : type.StructType) : boolean {
+    return this.internal_struct_types.has(t);
+  }
+
+  public add_external_struct_type(internal : type.StructType, external : type.StructType) : void {
+    this.internal_struct_type_to_external_struct_type.set(internal, external);
+  }
+
+  public add_user_defined_type(t : type.UserDefinedType) : void {
+    this.user_defined_types.push(t);
+  }
+
+  public userdefined_types() : type.UserDefinedType[] {
+    return [...this.user_defined_types];
+  }
+
+  public get_struct_type(struct_decl_id : number) : type.UserDefinedType[] {
+    return this.userdefined_types().filter(t => t.typeName === "StructType" &&
+      (t as type.StructType).referece_id === struct_decl_id);
+  }
+
+  public add_struct_type(struct_type : type.StructType, scope : ScopeList) : void {
+    this.add_type(struct_type);
+    this.add_user_defined_type(struct_type);
+    if (inside_contract(scope)) {
+      this.add_internal_struct_type(struct_type);
+      const cur_contract_id = decl_db.get_current_contractdecl_id(scope);
+      assert(cur_contract_id !== undefined, `The current scope ${scope.id()} is not inside a contract.`);
+      const cur_contract_name = (irnodes.get(cur_contract_id!) as IRContractDefinition).name;
+      const external_struct_name = cur_contract_name + "." + struct_type.name;
+      const external_struct_type = new type.StructType(struct_type.referece_id, external_struct_name, `struct ${cur_contract_name}.${struct_type.name}`);
+      external_struct_type.add_sub(struct_type);
+      external_struct_type.add_super(struct_type);
+      struct_type.add_sub(external_struct_type);
+      struct_type.add_super(external_struct_type);
+      this.add_external_struct_type(struct_type, external_struct_type);
+      this.add_type(external_struct_type);
+      this.add_user_defined_type(external_struct_type);
+    }
+  }
+}
+
+export const decl_db = new DeclDB();
+export const expr_db = new ExprDB();
+export const stmt_db = new StmtDB();
+export const name_db = new NameDB();
+export const type_db = new TypeDB();
+
+export function ghost_member_of_member_inside_struct_instantiation(member_id : number, struct_instantiation_id : number) : number {
+  if (decl_db.is_struct_instance_decl(struct_instantiation_id)) {
+    return decl_db.ghost_member_of_member_inside_struct_instance(member_id, struct_instantiation_id);
+  }
+  else if (expr_db.is_new_struct_expr(struct_instantiation_id)) {
+    return expr_db.ghost_member_of_member_inside_new_struct_expr(member_id, struct_instantiation_id);
+  }
+  else {
+    throw new Error(`The struct instantiation ${struct_instantiation_id} is not a struct instance declaration or a new struct expression.`);
+  }
+}

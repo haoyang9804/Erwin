@@ -25,7 +25,7 @@ export function includes<T>(arr : DominanceNode<T>[], item : DominanceNode<T>) :
   return false;
 }
 
-export function is_super_set<T>(set : DominanceNode<T>[], subset : DominanceNode<T>[]) : boolean {
+export function is_super_range<T>(set : DominanceNode<T>[], subset : DominanceNode<T>[]) : boolean {
   for (const element of subset) {
     if (!includes(set, element)) {
       return false;
@@ -34,7 +34,7 @@ export function is_super_set<T>(set : DominanceNode<T>[], subset : DominanceNode
   return true;
 }
 
-export function is_equal_set<T>(s1 : DominanceNode<T>[], s2 : DominanceNode<T>[]) : boolean {
+export function is_equal_range<T>(s1 : DominanceNode<T>[], s2 : DominanceNode<T>[]) : boolean {
   if (s1.length !== s2.length) {
     return false;
   }
@@ -44,4 +44,14 @@ export function is_equal_set<T>(s1 : DominanceNode<T>[], s2 : DominanceNode<T>[]
     }
   }
   return true;
+}
+
+export function intersection_range<T>(s1 : DominanceNode<T>[], s2 : DominanceNode<T>[]) : DominanceNode<T>[] {
+  const result : DominanceNode<T>[] = [];
+  for (const element of s1) {
+    if (includes(s2, element)) {
+      result.push(element);
+    }
+  }
+  return result;
 }

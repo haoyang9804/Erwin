@@ -18,3 +18,25 @@
 12. https://github.com/ethereum/solidity/issues/15564 (wait for confirmation, error handling)
 13. https://github.com/ethereum/solidity/issues/15567 (wait for comfirmation, error handling)
 14. https://github.com/ethereum/solidity/pull/15566 (wait for confirmation, documentation error)
+15. https://github.com/ethereum/solidity/issues/15583 (wait for confirmation)
+
+## Weird Language Features
+
+Besides bugs, Erwin only plays a role of examining the design of language features. Until now, Erwin has found the following features that may be confusing to Solidity users.
+
+1. Solidity has a weird type inference on `int_const`, `int`, and `uint`. Many intuitive operations on int literals and (u)int variables are forbidden.
+   ```solidity
+    int8 var21;
+    false ? var21 : 62;
+   ```
+   The second line raises an type error:  `TypeError: True expression's type int8 does not match false expression's type uint8.`.
+
+## TODO
+
+- [ ] :hammer: Rebuild getter function generations.
+- [ ] :hammer: Finish test script that test all compilation flags.
+- [ ] :hammer: When generating identifiers, Erwin currently collects vardecls from variable declarations. But some available vardecls may hide in mappings/arrays/struct instances returned by functions. Consider them also.
+- [ ] :hammer: Support strings.
+- [ ] :hammer: Support byte and bytes (similar to array).
+- [ ] :hammer: Support Event and Error.
+- [ ] :hammer: Support contract inheritance.
