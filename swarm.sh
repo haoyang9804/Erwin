@@ -35,7 +35,7 @@ test_validity() {
 cnt=0
 while true; do
     # Run the command
-    rm -rf generated_programs && NODE_OPTIONS="--max-old-space-size=8192" npx erwin generate -d -m type --maximum_solution_count 100 --type_complex_level 2 > log.txt
+    rm -rf generated_programs && NODE_OPTIONS="--max-old-space-size=8192" npx erwin generate -d -m loc --maximum_solution_count 100 --type_complex_level 2 > log.txt
     exit_status=$?
     # Check if the command crashed (non-zero exit status)
     if [ $exit_status -ne 0 ]; then

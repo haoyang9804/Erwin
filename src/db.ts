@@ -241,6 +241,10 @@ class DeclDB {
     this.struct_instance_to_struct_decl.set(struct_instance_id, struct_decl_id);
   }
 
+  struct_instance_has_paired_struct_decl(struct_instance_id : number) : boolean {
+    return this.struct_instance_to_struct_decl.has(struct_instance_id);
+  }
+
   struct_decl_of_struct_instance(struct_instance_id : number) : number {
     assert(this.struct_instance_to_struct_decl.has(struct_instance_id),
       `The struct instance ${struct_instance_id} does not exist.`);
@@ -290,7 +294,8 @@ class DeclDB {
         return ghost_member;
       }
     }
-    throw new Error(`The member ${member_id} does not have a ghost member in struct instance ${struct_instance_id}.`);
+    throw new Error(`The member ${member_id} does not have a ghost member in struct instance ${struct_instance_id}.
+                     ghost_members: ${ghost_members}`);
   }
 
   is_ghost_member(ghost_member_id : number) : boolean {
@@ -911,7 +916,8 @@ class ExprDB {
         return ghost_member;
       }
     }
-    throw new Error(`The member ${member_id} does not have a ghost member in new struct expr ${newstruct_id}.`);
+    throw new Error(`The member ${member_id} does not have a ghost member in new struct expr ${newstruct_id}.
+                     ghost_members: ${ghost_members}`);
   }
 }
 
@@ -1098,6 +1104,18 @@ export function ghost_member_of_member_inside_struct_instantiation(member_id : n
   }
   else if (expr_db.is_new_struct_expr(struct_instantiation_id)) {
     return expr_db.ghost_member_of_member_inside_new_struct_expr(member_id, struct_instantiation_id);
+  }
+  else {
+    throw new Error(`The struct instantiation ${struct_instantiation_id} is not a struct instance declaration or a new struct expression.`);
+  }
+}
+
+export function update_ghost_members_of_struct_instantiation(struct_instantiation_id : number, member_id : number, ghost_member_id : number) {
+  if (decl_db.is_struct_instance_decl(struct_instantiation_id)) {
+    decl_db.update_ghost_members_of_struct_instance(struct_instantiation_id, member_id, ghost_member_id);
+  }
+  else if (expr_db.is_new_struct_expr(struct_instantiation_id)) {
+    expr_db.update_ghost_members_of_new_struct_expr(struct_instantiation_id, member_id, ghost_member_id);
   }
   else {
     throw new Error(`The struct instantiation ${struct_instantiation_id} is not a struct instance declaration or a new struct expression.`);

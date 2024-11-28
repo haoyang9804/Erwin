@@ -4,7 +4,7 @@ import * as expr from "./expression";
 import * as decl from "./declare";
 import * as stmt from "./statement";
 import * as type from "./type";
-import { IDENTIFIER, decl_db, expr_db, ghost_member_of_member_inside_struct_instantiation, name_db, stmt_db, type_db } from "./db";
+import { IDENTIFIER, decl_db, expr_db, ghost_member_of_member_inside_struct_instantiation, name_db, stmt_db, type_db, update_ghost_members_of_struct_instantiation } from "./db";
 import { type_dag, storage_location_dag, vismut_dag } from "./constraint";
 import { config } from './config';
 import { irnodes } from "./node";
@@ -87,24 +87,58 @@ Mapping, array, and struct all have constituent variable declarations.
 Storage loc range of such compound-type variable declaration is constrained by
 and constraints the storage loc range of its constituent variable declarations.
 */
-function update_storage_loc_range_for_compound_type(id : number) {
+function update_storage_loc_range_for_compound_type(id : number, struct_instantiation_id = -1, ghost_id = -1) {
   assert(decl_db.qualifed_by_storage_qualifier(id),
     `update_storage_loc_range_recursively: id ${id} is not qualified by storage qualifier`);
-  if (decl_db.is_vardecl(id) &&
-    inside_struct_decl_scope(get_scope_from_scope_id(decl_db.scope_of_irnode(id)))) return;
+  assert(decl_db.is_vardecl(id) || decl_db.is_state_variable(id) || expr_db.is_new_struct_expr(id),
+    `update_storage_loc_range_recursively: id ${id} is not a variable declaration or a new struct expression`);
+  if (!expr_db.is_new_struct_expr(id) &&
+    inside_struct_decl_scope(get_scope_from_scope_id(decl_db.scope_of_irnode(id))) &&
+    struct_instantiation_id === -1) {
+    return;
+  }
   if (decl_db.is_array_decl(id)) {
     const baseid = decl_db.base_of_array(id);
     if (decl_db.qualifed_by_storage_qualifier(baseid)) {
-      storage_location_dag.insert(baseid,
-        loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'equal'));
-      const bridge_id = new_global_id();
-      storage_location_dag.insert(bridge_id,
-        loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'equal'));
-      storage_location_dag.connect(bridge_id, id);
-      storage_location_dag.connect(bridge_id, baseid);
-      storage_location_dag.solution_range_alignment(bridge_id, baseid);
-      if (config.debug) {
-        console.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: bridge id: ${bridge_id}, base id: ${baseid}, array id: ${id}`);
+      if (ghost_id === -1) {
+        assert(struct_instantiation_id === -1,
+          `update_storage_loc_range_for_compound_type: ghost_id is -1 but struct_instantiation_id (${struct_instantiation_id}) is not -1`);
+        if (storage_location_dag.has_solution_range(baseid)) {
+          storage_location_dag.update(baseid,
+            loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'equal'));
+        }
+        else {
+          storage_location_dag.insert(baseid,
+            loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'equal'));
+        }
+        const bridge_id = new_global_id();
+        storage_location_dag.insert(bridge_id,
+          loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'equal'));
+        storage_location_dag.connect(bridge_id, id);
+        storage_location_dag.connect(bridge_id, baseid);
+        storage_location_dag.solution_range_alignment(bridge_id, baseid);
+        if (config.debug) {
+          console.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: bridge id: ${bridge_id}, base id: ${baseid}, array id: ${id}`);
+        }
+      }
+      else {
+        assert(!storage_location_dag.has_solution_range(baseid),
+          `update_storage_loc_range_for_compound_type: baseid ${baseid} has solution range`);
+        assert(struct_instantiation_id !== -1,
+          `update_storage_loc_range_for_compound_type: struct_instantiation_id is -1 but ghost_id is not -1`);
+        const base_ghost_id = new_global_id();
+        const bridge_id = new_global_id();
+        storage_location_dag.insert(base_ghost_id,
+          loc.range_of_locs(storage_location_dag.solution_range_of(ghost_id)!, 'equal'));
+        storage_location_dag.insert(bridge_id,
+          loc.range_of_locs(storage_location_dag.solution_range_of(ghost_id)!, 'equal'));
+        storage_location_dag.connect(bridge_id, ghost_id);
+        storage_location_dag.connect(bridge_id, base_ghost_id);
+        update_ghost_members_of_struct_instantiation(struct_instantiation_id, baseid, base_ghost_id);
+        if (config.debug) {
+          console.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: bridge id: ${bridge_id}, base ghost id: ${base_ghost_id}, base id: ${baseid}, ghost array id: ${ghost_id}, array id: ${id}`);
+        }
+        update_storage_loc_range_for_compound_type(baseid, struct_instantiation_id, base_ghost_id);
       }
     }
   }
@@ -112,18 +146,39 @@ function update_storage_loc_range_for_compound_type(id : number) {
     const members = decl_db.members_of_struct_instance(id);
     members.forEach((member) => {
       if (decl_db.qualifed_by_storage_qualifier(member)) {
-        const member_ghost_id = new_global_id();
-        storage_location_dag.insert(member_ghost_id,
-          loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'equal'));
-        const bridge_id = new_global_id();
-        storage_location_dag.insert(bridge_id,
-          loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'equal'));
-        storage_location_dag.connect(bridge_id, id);
-        storage_location_dag.connect(bridge_id, member_ghost_id);
-        storage_location_dag.solution_range_alignment(bridge_id, member_ghost_id);
-        decl_db.update_ghost_members_of_struct_instance(id, member, member_ghost_id);
-        if (config.debug) {
-          console.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: bridge id: ${bridge_id}, member id: ${member}, struct instance id: ${id} member ghost id: ${member_ghost_id}`);
+        if (ghost_id === -1) {
+          const member_ghost_id = new_global_id();
+          storage_location_dag.insert(member_ghost_id,
+            loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'equal'));
+          const bridge_id = new_global_id();
+          storage_location_dag.insert(bridge_id,
+            loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'equal'));
+          storage_location_dag.connect(bridge_id, id);
+          storage_location_dag.connect(bridge_id, member_ghost_id);
+          update_ghost_members_of_struct_instantiation(id, member, member_ghost_id);
+          if (config.debug) {
+            console.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: bridge id: ${bridge_id}, member id: ${member}, struct instance id: ${id}, member ghost id: ${member_ghost_id}`);
+          }
+          update_storage_loc_range_for_compound_type(member, id, member_ghost_id);
+        }
+        else {
+          assert(!storage_location_dag.has_solution_range(member),
+            `update_storage_loc_range_for_compound_type: member ${member} has solution range`);
+          assert(struct_instantiation_id !== -1,
+            `update_storage_loc_range_for_compound_type: struct_instantiation_id is -1 but ghost_id is not -1`);
+          const member_ghost_id = new_global_id();
+          const bridge_id = new_global_id();
+          storage_location_dag.insert(member_ghost_id,
+            loc.range_of_locs(storage_location_dag.solution_range_of(ghost_id)!, 'equal'));
+          storage_location_dag.insert(bridge_id,
+            loc.range_of_locs(storage_location_dag.solution_range_of(ghost_id)!, 'equal'));
+          storage_location_dag.connect(bridge_id, ghost_id);
+          storage_location_dag.connect(bridge_id, member_ghost_id);
+          update_ghost_members_of_struct_instantiation(struct_instantiation_id, member, member_ghost_id);
+          if (config.debug) {
+            console.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: bridge id: ${bridge_id}, member id: ${member}, struct instance id: ${id}, member ghost id: ${member_ghost_id}, stuct instance ghost id: ${ghost_id}, struct instantiation id: ${struct_instantiation_id}`);
+          }
+          update_storage_loc_range_for_compound_type(member, struct_instantiation_id, member_ghost_id);
         }
       }
     });
@@ -136,26 +191,54 @@ function update_storage_loc_range_for_compound_type(id : number) {
         storage_location_dag.insert(member_ghost_id,
           loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'equal'));
         storage_location_dag.connect(id, member_ghost_id);
-        expr_db.update_ghost_members_of_new_struct_expr(id, member, member_ghost_id);
+        update_ghost_members_of_struct_instantiation(id, member, member_ghost_id);
         if (config.debug) {
-          console.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: member id: ${member}, struct instance id: ${id}, member ghost id: ${member_ghost_id}`);
+          console.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: member id: ${member}, struct expr id: ${id}, member ghost id: ${member_ghost_id}`);
         }
+        update_storage_loc_range_for_compound_type(member, id, member_ghost_id);
       }
     });
   }
   else if (decl_db.is_mapping_decl(id)) {
     const value = decl_db.value_of_mapping(id);
     if (decl_db.qualifed_by_storage_qualifier(value)) {
-      storage_location_dag.insert(value,
-        loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'equal'));
-      const bridge_id = new_global_id();
-      storage_location_dag.insert(bridge_id,
-        loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'equal'));
-      storage_location_dag.connect(bridge_id, id);
-      storage_location_dag.connect(bridge_id, value);
-      storage_location_dag.solution_range_alignment(bridge_id, value);
-      if (config.debug) {
-        console.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: bridge id: ${bridge_id}, value id: ${value}, mapping id: ${id}`);
+      if (ghost_id === -1) {
+        if (storage_location_dag.has_solution_range(value)) {
+          storage_location_dag.update(value,
+            loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'equal'));
+        }
+        else {
+          storage_location_dag.insert(value,
+            loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'equal'));
+        }
+        const bridge_id = new_global_id();
+        storage_location_dag.insert(bridge_id,
+          loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'equal'));
+        storage_location_dag.connect(bridge_id, id);
+        storage_location_dag.connect(bridge_id, value);
+        storage_location_dag.solution_range_alignment(bridge_id, value);
+        if (config.debug) {
+          console.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: bridge id: ${bridge_id}, value id: ${value}, mapping id: ${id}`);
+        }
+      }
+      else {
+        assert(!storage_location_dag.has_solution_range(value),
+          `update_storage_loc_range_for_compound_type: value ${value} has solution range`);
+        assert(struct_instantiation_id !== -1,
+          `update_storage_loc_range_for_compound_type: struct_instantiation_id is -1 but ghost_id is not -1`);
+        const value_ghost_id = new_global_id();
+        const bridge_id = new_global_id();
+        storage_location_dag.insert(value_ghost_id,
+          loc.range_of_locs(storage_location_dag.solution_range_of(ghost_id)!, 'equal'));
+        storage_location_dag.insert(bridge_id,
+          loc.range_of_locs(storage_location_dag.solution_range_of(ghost_id)!, 'equal'));
+        storage_location_dag.connect(bridge_id, value_ghost_id);
+        storage_location_dag.connect(bridge_id, ghost_id);
+        update_ghost_members_of_struct_instantiation(struct_instantiation_id, value, value_ghost_id);
+        if (config.debug) {
+          console.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: bridge id: ${bridge_id}, value ghost id: ${value_ghost_id}, ghost mapping id: ${ghost_id}, mapping id: ${id}`);
+        }
+        update_storage_loc_range_for_compound_type(value, struct_instantiation_id, value_ghost_id);
       }
     }
   }
@@ -196,6 +279,20 @@ function connect_arguments_to_parameters(arg_id : number,
     storage_location_dag.connect(arg_id, param_id, "super_dominance");
   }
   return ghost_id;
+}
+
+
+function remove_storage_is_dumb(id : number) {
+  if (!storage_location_dag.has_solution_range(id)) {
+    return false;
+  }
+  const shrinked_loc_range = storage_location_dag.solution_range_of(id)!.filter(
+    s => s !== loc.StorageLocationProvider.storage_pointer() &&
+      s !== loc.StorageLocationProvider.storage_ref());
+  if (shrinked_loc_range.length === 0 || !vardecl_storage_loc_range_is_ok(id, shrinked_loc_range)) {
+    return true;
+  }
+  return !storage_location_dag.try_tighten_solution_range_middle_out(id, shrinked_loc_range);
 }
 
 function align_solution_ranges_of_arguments_and_parameters(arg_id : number,
@@ -255,20 +352,23 @@ function get_funcdecls(type_range : type.Type[], storage_range : loc.StorageLoca
   for (let contract_id of decl_db.contractdecls_ids()) {
     const funcdecl_ids = decl_db.get_funcdecls_ids_recursively_from_a_contract(contract_id);
     for (let irnode_id of funcdecl_ids) {
+      const funcdecl = (irnodes.get(irnode_id)! as decl.IRFunctionDefinition);
+      const returns = funcdecl.returns;
+      const params = funcdecl.parameters;
       // internal call
       if (contract_id === decl_db.get_current_contractdecl_id(cur_scope)) {
         if (vismut_dag.solution_range_of(irnode_id)!.some(t => closed_func_vismut.includes(t)) &&
-          (sig.allow_empty_return || (irnodes.get(irnode_id)! as decl.IRFunctionDefinition).returns.length > 0)) {
+          (sig.allow_empty_return || returns.length > 0)) {
           if (sig.allow_empty_return) {
             contractdecl_id_plus_funcdecl_id.push([contract_id, irnode_id]);
           }
-          else if ((irnodes.get(irnode_id)! as decl.IRFunctionDefinition).returns.length > 1) {
+          else if (returns.length > 1) {
             // In this case, we must use an identifier to relay the function returns, such as 
             // (, identifier) = func(x, y);
             // However, if the functio' return variable are all of mapping-containing types, we cannot use this way
             // since we cannot assign a mapping to a mapping.
-            if ((irnodes.get(irnode_id)! as decl.IRFunctionDefinition).returns.some((ret) => !decl_db.contains_mapping_decl(ret.id))) {
-              for (const ret_decl of (irnodes.get(irnode_id)! as decl.IRFunctionDefinition).returns) {
+            if (returns.some((ret) => !decl_db.contains_mapping_decl(ret.id))) {
+              for (const ret_decl of returns) {
                 if (vardecl_type_range_is_ok(ret_decl.id, type_range) && vardecl_storage_loc_range_is_ok(ret_decl.id, storage_range)) {
                   contractdecl_id_plus_funcdecl_id.push([contract_id, irnode_id]);
                   break;
@@ -277,7 +377,7 @@ function get_funcdecls(type_range : type.Type[], storage_range : loc.StorageLoca
             }
           }
           else {
-            for (const ret_decl of (irnodes.get(irnode_id)! as decl.IRFunctionDefinition).returns) {
+            for (const ret_decl of returns) {
               if (vardecl_type_range_is_ok(ret_decl.id, type_range) && vardecl_storage_loc_range_is_ok(ret_decl.id, storage_range)) {
                 contractdecl_id_plus_funcdecl_id.push([contract_id, irnode_id]);
                 break;
@@ -293,12 +393,16 @@ function get_funcdecls(type_range : type.Type[], storage_range : loc.StorageLoca
       // external call
       else {
         if (vismut_dag.solution_range_of(irnode_id)!.some(t => open_func_vismut.includes(t)) &&
-          (sig.allow_empty_return || (irnodes.get(irnode_id)! as decl.IRFunctionDefinition).returns.length > 0)) {
+          (sig.allow_empty_return || returns.length > 0) &&
+          // external call makes the callee's return values and parameters non-storage
+          // so we need to assure every return value and parameter can affort the loss of storage
+          returns.every(ret => !remove_storage_is_dumb(ret.id)) &&
+          params.every(param => !remove_storage_is_dumb(param.id))) {
           if (sig.allow_empty_return) {
             contractdecl_id_plus_funcdecl_id.push([contract_id, irnode_id]);
           }
           else {
-            for (const ret_decl of (irnodes.get(irnode_id)! as decl.IRFunctionDefinition).returns) {
+            for (const ret_decl of returns) {
               if (vardecl_type_range_is_ok(ret_decl.id, type_range) && vardecl_storage_loc_range_is_ok(ret_decl.id, storage_range)) {
                 contractdecl_id_plus_funcdecl_id.push([contract_id, irnode_id]);
                 break;
@@ -956,8 +1060,8 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
     }
     this.generate_initializer();
     this.initialize_array_length();
-    this.update_storage_location_range();
     decl_db.add_vardecl_with_scope(arrayid, cur_scope);
+    this.update_storage_location_range();
     this.update_vismut_dag(arrayid);
     this.array_must_be_initialized_if_in_function_return_scope_or_funcbody();
     this.end_flag(array_name, arrayid);
@@ -1087,6 +1191,8 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
     assert(this.irnode !== undefined, `StructInstanceDeclarationGenerator: this.irnode is undefined`);
     assert(storage_location_dag.has_solution_range(this.irnode!.id),
       `StructInstanceDeclarationGenerator: storage_location_dag doesn't have solution range of ${this.irnode!.id}`);
+    assert(decl_db.struct_instance_has_paired_struct_decl(this.irnode!.id),
+      `StructInstanceDeclarationGenerator: not pair this struct instance against a struct declaration`);
     update_storage_loc_range_for_compound_type(this.irnode!.id);
   }
 
@@ -1838,24 +1944,8 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
   }
 
   private removing_storage_from_parameters_or_returns_leads_to_broken_storage_location_constraint() : boolean {
-    return this.storage_parameters.some(p => {
-      const shrinked_loc_range = storage_location_dag.solution_range_of(p.id)!.filter(
-        s => s !== loc.StorageLocationProvider.storage_pointer() &&
-          s !== loc.StorageLocationProvider.storage_ref());
-      if (shrinked_loc_range.length === 0) {
-        return true;
-      }
-      return !storage_location_dag.try_tighten_solution_range_middle_out(p.id, shrinked_loc_range);
-    }) ||
-      this.storage_return_decls.some(r => {
-        const shrinked_loc_range = storage_location_dag.solution_range_of(r.id)!.filter(
-          s => s !== loc.StorageLocationProvider.storage_pointer() &&
-            s !== loc.StorageLocationProvider.storage_ref());
-        if (shrinked_loc_range.length === 0) {
-          return true;
-        }
-        return !storage_location_dag.try_tighten_solution_range_middle_out(r.id, shrinked_loc_range);
-      });
+    return this.storage_parameters.some(p => remove_storage_is_dumb(p.id)) ||
+      this.storage_return_decls.some(r => remove_storage_is_dumb(r.id));
   }
 
   private update_vismut_dag_and_storage_dag_based_on_read_vardecls_and_write_vardecls() {
@@ -1931,21 +2021,21 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
         // If sig.forbid_external_call is set to true, then storage parameters or return decls cannot be in memory or calldata.
         // Therefore, set this function's visibility to internal or private
         assert(vismut_solution.some((v) => closed_func_vismut.includes(v)),
-          `FunctionDeclarationGenerator: vismut_dag.solution_range[${this.fid}] should contain ${closed_func_vismut}, but is ${vismut_solution}`);
+          `FunctionDeclarationGenerator: vismut_dag.solution_range[${this.fid}] should contain ${closed_func_vismut.map(f => f.str())}, but is ${vismut_solution.map(f => f.str())}`);
         vismut_dag.update(this.fid, closed_func_vismut);
       }
       else if (this.removing_storage_from_parameters_or_returns_leads_to_broken_storage_location_constraint()) {
         // If removing the storage possibility from a storage parameter or return decl leads
         // to a broken storage location constraint, then the function visibility is internal or private.
         assert(vismut_solution.some((v) => closed_func_vismut.includes(v)),
-          `FunctionDeclarationGenerator: vismut_dag.solution_range[${this.fid}] should contain ${closed_func_vismut}, but is ${vismut_solution}`);
+          `FunctionDeclarationGenerator: vismut_dag.solution_range[${this.fid}] should contain ${closed_func_vismut.map(f => f.str())}, but is ${vismut_solution.map(f => f.str())}`);
         vismut_dag.update(this.fid, closed_func_vismut);
       }
       else if (vismut_solution.some((v) => closed_func_vismut.includes(v)) && Math.random() < 0.5) {
         // If this function can be internal or private, then with 50% probability,
         // we force the function to be internal or private.
         assert(vismut_solution.some((v) => closed_func_vismut.includes(v)),
-          `FunctionDeclarationGenerator: vismut_dag.solution_range[${this.fid}] should contain ${closed_func_vismut}, but is ${vismut_solution}`);
+          `FunctionDeclarationGenerator: vismut_dag.solution_range[${this.fid}] should contain ${closed_func_vismut.map(f => f.str())}, but is ${vismut_solution.map(f => f.str())}`);
         vismut_dag.update(this.fid, closed_func_vismut);
       }
       else {
@@ -3017,10 +3107,9 @@ class IdentifierGenerator extends ExpressionGenerator {
     const struct_instance_gen = new NewStructGenerator(nsid);
     struct_instance_gen.generate(this.cur_expression_complex_level + 1);
     const struct_instance_expr = struct_instance_gen.irnode as expr.IRExpression;
-    const extracted_struct_instance_expr = expr.tuple_extraction(struct_instance_expr);
-    this.struct_instantiation_id = extracted_struct_instance_expr.id;
-    expr_db.transfer_read_variables(this.id, extracted_struct_instance_expr.id);
-    expr_db.transfer_write_variables(this.id, extracted_struct_instance_expr.id);
+    this.struct_instantiation_id = nsid;
+    expr_db.transfer_read_variables(this.id, nsid);
+    expr_db.transfer_write_variables(this.id, nsid);
     return new expr.IRMemberAccess(this.id, cur_scope.id(), member.name,
       struct_decl_id, struct_instance_expr);
   }
@@ -3045,6 +3134,7 @@ class IdentifierGenerator extends ExpressionGenerator {
     }
     else {
       const struct_instance = pick_random_element(available_possible_struct_instances)!;
+      this.struct_instantiation_id = struct_instance.id;
       if (this.left) {
         storage_location_dag.update(struct_instance.id, [
           loc.StorageLocationProvider.storage_pointer(),
@@ -3060,24 +3150,20 @@ class IdentifierGenerator extends ExpressionGenerator {
         const [struct_instance_access_expr, outermost_vardecl_id] = this.generate_expr_when_selected_vardecl_is_a_struct_member(irnodes.get(struct_instance.id) as decl.IRVariableDeclaration);
         change_node_id(member_access, this.id);
         member_access.expression = struct_instance_access_expr;
-        this.struct_instantiation_id = struct_instance.id;
         return [member_access, outermost_vardecl_id];
       }
       if (decl_db.is_base_decl(struct_instance.id)) {
         const [array_element_access_expr, outermost_vardecl_id] = this.generate_expr_when_selected_vardecl_is_an_array_element(struct_instance.id);
         change_node_id(member_access, this.id);
         member_access.expression = array_element_access_expr;
-        this.struct_instantiation_id = struct_instance.id;
         return [member_access, outermost_vardecl_id];
       }
       if (decl_db.is_mapping_value(struct_instance.id)) {
         const [mapping_value_access_expr, outermost_vardecl_id] = this.generate_expr_when_selected_vardecl_is_a_mapping_value(struct_instance.id);
         change_node_id(member_access, this.id);
         member_access.expression = mapping_value_access_expr;
-        this.struct_instantiation_id = struct_instance.id;
         return [member_access, outermost_vardecl_id];
       }
-      this.struct_instantiation_id = struct_instance.id;
       return [member_access, struct_instance.id];
     }
   }
@@ -3497,7 +3583,6 @@ class BinaryOpGenerator extends ExpressionGenerator {
       left_expression_gen_prototype = get_exprgenerator(type_dag.solution_range_of(leftid)!,
         cur_expression_complex_level + 1);
     }
-    left_expression_gen = new left_expression_gen_prototype(leftid);
     /*
     Two literals may induce some wield issues, such as 912 > int8(73).
     So in the current version, Erwin bans it.
@@ -3513,6 +3598,7 @@ class BinaryOpGenerator extends ExpressionGenerator {
     else if (ghostid !== undefined) {
       type_dag.solution_range_alignment(ghostid, rightid);
     }
+    left_expression_gen = new left_expression_gen_prototype(leftid);
     left_expression_gen.generate(cur_expression_complex_level + 1);
     if (this.this_dominates_left()) {
       type_dag.solution_range_alignment(this.id, leftid);

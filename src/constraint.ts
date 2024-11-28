@@ -658,7 +658,7 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
     const leave_array = Array.from(this.leaves);
     if (config.debug) {
       console.log(`leave_array: ${leave_array}`);
-      console.log("====== solution_range of tails before allocating solutions======\n", Array.from(this.solution_range).filter(t => this.leaves.has(t[0])).map(t => [t[0], t[1].map(g => g.str())]));
+      console.log("====== solution_range of tails before allocating solutions ======\n", Array.from(this.solution_range).filter(t => this.leaves.has(t[0])).map(t => [t[0], t[1].map(g => g.str())]));
     }
     const solution_range_copy = this.solution_range;
     let check_leaf_solution = (leaf_solution : Map<number, Node>) : boolean => {
@@ -1013,6 +1013,7 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
       if (config.debug) {
         console.log(`leaf_solution${solution_id++}`, Array.from(leaf_solution).map(t => [t[0], t[1].str()]));
       }
+      if (leaf_solution.size === 0) continue;
       this.solutions_collection.push(new Map(leaf_solution));
     }
   }

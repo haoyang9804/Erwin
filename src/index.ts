@@ -52,11 +52,11 @@ program
   .option("-e --exprimental", "Enable the exprimental mode.", `${config.experimental}`)
   .option("-m --mode <string>", "The mode of Erwin. The value can be 'type', 'scope', or 'loc'.", `${config.mode}`)
   .option("-d --debug", "Enable the debug mode.", `${config.debug}`)
+  // Dominance Constraint Solution
+  .option("-max --maximum_solution_count <number>", "The maximum number of solutions Erwin will consider.", `${config.maximum_solution_count}`)
   // Type
   .option("--int_types_num <number>", "The number of int types Erwin will consider in resolving type dominance.", `${config.int_num}`)
   .option("--uint_types_num <number>", "The number of uint types Erwin will consider in resolving type dominance.", `${config.uint_num}`)
-  // Dominance Constraint Solution
-  .option("--maximum_solution_count <number>", "The maximum number of solutions Erwin will consider.", `${config.maximum_solution_count}`)
   // Function
   .option("--function_body_stmt_cnt_upper_limit <number>", "The upper limit of the number of non-declaration statements of a function. This value is suggested to be bigger than tha value of var_count", `${config.function_body_stmt_cnt_upper_limit}`)
   .option("--function_body_stmt_cnt_lower_limit <number>", "The lower limit of the number of non-declaration statements of a function.", `${config.function_body_stmt_cnt_lower_limit}`)
@@ -75,6 +75,17 @@ program
   .option("--state_variable_count_lowerlimit <number>", "The lower limit of the number of state variables in a contract.", `${config.state_variable_count_lowerlimit}`)
   // Array
   .option("--array_length_upperlimit <number>", "The upper limit of the length of an array.", `${config.array_length_upperlimit}`)
+  // Structured Statements
+  .option("--for_init_cnt_upper_limit <number>", "The upper limit of the number of initialization in a for loop.", `${config.for_init_cnt_upper_limit}`)
+  .option("--for_init_cnt_lower_limit <number>", "The lower limit of the number of initialization in a for loop.", `${config.for_init_cnt_lower_limit}`)
+  .option("--for_body_stmt_cnt_upper_limit <number>", "The upper limit of the number of statements in the body of a for loop.", `${config.for_body_stmt_cnt_upper_limit}`)
+  .option("--for_body_stmt_cnt_lower_limit <number>", "The lower limit of the number of statements in the body of a for loop.", `${config.for_body_stmt_cnt_lower_limit}`)
+  .option("--while_body_stmt_cnt_upper_limit <number>", "The upper limit of the number of statements in the body of a while loop.", `${config.while_body_stmt_cnt_upper_limit}`)
+  .option("--while_body_stmt_cnt_lower_limit <number>", "The lower limit of the number of statements in the body of a while loop.", `${config.while_body_stmt_cnt_lower_limit}`)
+  .option("--do_while_body_stmt_cnt_upper_limit <number>", "The upper limit of the number of statements in the body of a do while loop.", `${config.do_while_body_stmt_cnt_upper_limit}`)
+  .option("--do_while_body_stmt_cnt_lower_limit <number>", "The lower limit of the number of statements in the body of a do while loop.", `${config.do_while_body_stmt_cnt_lower_limit}`)
+  .option("--if_body_stmt_cnt_upper_limit <number>", "The upper limit of the number of statements in the body of an if statement.", `${config.if_body_stmt_cnt_upper_limit}`)
+  .option("--if_body_stmt_cnt_lower_limit <number>", "The lower limit of the number of statements in the body of an if statement.", `${config.if_body_stmt_cnt_lower_limit}`)
   // Complexity
   .option("--expression_complex_level <number>", "The complex level of the expression Erwin will generate.\nThe suggedted range is [1,2,3]. The bigger, the more complex.", `${config.expression_complex_level}`)
   .option("--statement_complex_level <number>", "The complex level of the statement Erwin will generate.\nThe suggedted range is [1,2]. The bigger, the more complex.", `${config.statement_complex_level}`)
@@ -98,17 +109,6 @@ program
   .option("--mapping_prob <float>", "The probability of generating a mapping.", `${config.mapping_prob}`)
   .option("--array_prob <float>", "The probability of generating an array.", `${config.array_prob}`)
   .option("--dynamic_array_prob <float>", "The probability of generating a dynamic array.", `${config.dynamic_array_prob}`)
-  // Structured Statements
-  .option("--for_init_cnt_upper_limit <number>", "The upper limit of the number of initialization in a for loop.", `${config.for_init_cnt_upper_limit}`)
-  .option("--for_init_cnt_lower_limit <number>", "The lower limit of the number of initialization in a for loop.", `${config.for_init_cnt_lower_limit}`)
-  .option("--for_body_stmt_cnt_upper_limit <number>", "The upper limit of the number of statements in the body of a for loop.", `${config.for_body_stmt_cnt_upper_limit}`)
-  .option("--for_body_stmt_cnt_lower_limit <number>", "The lower limit of the number of statements in the body of a for loop.", `${config.for_body_stmt_cnt_lower_limit}`)
-  .option("--while_body_stmt_cnt_upper_limit <number>", "The upper limit of the number of statements in the body of a while loop.", `${config.while_body_stmt_cnt_upper_limit}`)
-  .option("--while_body_stmt_cnt_lower_limit <number>", "The lower limit of the number of statements in the body of a while loop.", `${config.while_body_stmt_cnt_lower_limit}`)
-  .option("--do_while_body_stmt_cnt_upper_limit <number>", "The upper limit of the number of statements in the body of a do while loop.", `${config.do_while_body_stmt_cnt_upper_limit}`)
-  .option("--do_while_body_stmt_cnt_lower_limit <number>", "The lower limit of the number of statements in the body of a do while loop.", `${config.do_while_body_stmt_cnt_lower_limit}`)
-  .option("--if_body_stmt_cnt_upper_limit <number>", "The upper limit of the number of statements in the body of an if statement.", `${config.if_body_stmt_cnt_upper_limit}`)
-  .option("--if_body_stmt_cnt_lower_limit <number>", "The lower limit of the number of statements in the body of an if statement.", `${config.if_body_stmt_cnt_lower_limit}`);
 program.parse(process.argv);
 // Set the configuration
 if (program.args[0] === "mutate") {
@@ -411,23 +411,8 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
     }
   }
   //! Traverse type solutions
-  let cnt = 0;
-  let pre_program = "";
-  for (let type_solutions of type_dag.solutions_collection) {
-    if (type_solutions.size === 0) continue;
-    for (let [key, value] of type_solutions) {
-      if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
-        (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
-    }
-    for (const mapping_decl_id of decl_db.mapping_decls_ids()) {
-      assign_mapping_type(mapping_decl_id, type_solutions);
-    }
-    for (const array_decl_id of decl_db.array_decls_ids()) {
-      assign_array_type(array_decl_id, type_solutions);
-    }
+  if (type_dag.solutions_collection.length === 0) {
     const program = writer.write(source_unit_gen.irnode!.lower());
-    if (program === pre_program) continue;
-    pre_program = program;
     if (!fs.existsSync("./generated_programs")) {
       fs.mkdirSync("./generated_programs");
     }
@@ -438,9 +423,41 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
     let hour = date.getHours();
     let minute = date.getMinutes();
     let second = date.getSeconds();
-    let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_${cnt}.sol`;
-    cnt++;
+    let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_0.sol`;
     fs.writeFileSync(`./generated_programs/${program_name}`, program, "utf-8");
+  }
+  else {
+    let cnt = 0;
+    let pre_program = "";
+    for (let type_solutions of type_dag.solutions_collection) {
+      if (type_solutions.size === 0) continue;
+      for (let [key, value] of type_solutions) {
+        if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
+          (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
+      }
+      for (const mapping_decl_id of decl_db.mapping_decls_ids()) {
+        assign_mapping_type(mapping_decl_id, type_solutions);
+      }
+      for (const array_decl_id of decl_db.array_decls_ids()) {
+        assign_array_type(array_decl_id, type_solutions);
+      }
+      const program = writer.write(source_unit_gen.irnode!.lower());
+      if (program === pre_program) continue;
+      pre_program = program;
+      if (!fs.existsSync("./generated_programs")) {
+        fs.mkdirSync("./generated_programs");
+      }
+      let date = new Date();
+      let year = date.getFullYear();
+      let month = date.getMonth() + 1;
+      let day = date.getDate();
+      let hour = date.getHours();
+      let minute = date.getMinutes();
+      let second = date.getSeconds();
+      let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_${cnt}.sol`;
+      cnt++;
+      fs.writeFileSync(`./generated_programs/${program_name}`, program, "utf-8");
+    }
   }
 }
 
@@ -474,24 +491,8 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
     }
   }
   //! Traverse vismut solutions
-  let cnt = 0;
-  let pre_program = "";
-  for (const vismut_solutions of vismut_dag.solutions_collection) {
-    if (vismut_solutions.size === 0) continue;
-    for (let [key, value] of vismut_solutions) {
-      if (irnodes.has(key) === false) continue;
-      if (irnodes.get(key)!.typeName === "IRVariableDeclaration") {
-        (irnodes.get(key)! as decl.IRVariableDeclaration).visibility =
-          varvis2statevisibility((value.kind as VarVisKind).visibility);
-      }
-      else if (irnodes.get(key)!.typeName === "IRFunctionDefinition") {
-        (irnodes.get(key)! as decl.IRFunctionDefinition).visibility =
-          funcvis2funcvisibility((value.kind as FuncVisMutKind).visibility);
-      }
-    }
+  if (vismut_dag.solutions_collection.length === 0) {
     const program = writer.write(source_unit_gen.irnode!.lower());
-    if (program === pre_program) continue;
-    pre_program = program;
     if (!fs.existsSync("./generated_programs")) {
       fs.mkdirSync("./generated_programs");
     }
@@ -502,9 +503,42 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
     let hour = date.getHours();
     let minute = date.getMinutes();
     let second = date.getSeconds();
-    let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_${cnt}.sol`;
-    cnt++;
+    let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_0.sol`;
     fs.writeFileSync(`./generated_programs/${program_name}`, program, "utf-8");
+  }
+  else {
+    let cnt = 0;
+    let pre_program = "";
+    for (const vismut_solutions of vismut_dag.solutions_collection) {
+      if (vismut_solutions.size === 0) continue;
+      for (let [key, value] of vismut_solutions) {
+        if (irnodes.has(key) === false) continue;
+        if (irnodes.get(key)!.typeName === "IRVariableDeclaration") {
+          (irnodes.get(key)! as decl.IRVariableDeclaration).visibility =
+            varvis2statevisibility((value.kind as VarVisKind).visibility);
+        }
+        else if (irnodes.get(key)!.typeName === "IRFunctionDefinition") {
+          (irnodes.get(key)! as decl.IRFunctionDefinition).visibility =
+            funcvis2funcvisibility((value.kind as FuncVisMutKind).visibility);
+        }
+      }
+      const program = writer.write(source_unit_gen.irnode!.lower());
+      if (program === pre_program) continue;
+      pre_program = program;
+      if (!fs.existsSync("./generated_programs")) {
+        fs.mkdirSync("./generated_programs");
+      }
+      let date = new Date();
+      let year = date.getFullYear();
+      let month = date.getMonth() + 1;
+      let day = date.getDate();
+      let hour = date.getHours();
+      let minute = date.getMinutes();
+      let second = date.getSeconds();
+      let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_${cnt}.sol`;
+      cnt++;
+      fs.writeFileSync(`./generated_programs/${program_name}`, program, "utf-8");
+    }
   }
 }
 
@@ -540,20 +574,8 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
     }
   }
   //! Traverse storage location solutions
-  let cnt = 0;
-  let pre_program = "";
-  for (let storage_location_solutions of storage_location_dag.solutions_collection) {
-    if (storage_location_solutions.size === 0) continue;
-    for (let [key, value] of storage_location_solutions) {
-      //! key may be ghost and is not in irnodes
-      if (!irnodes.has(key)) continue;
-      if (irnodes.get(key)!.typeName !== "IRVariableDeclaration") continue;
-      if ((irnodes.get(key)! as decl.IRVariableDeclaration).loc === undefined)
-        (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
-    }
+  if (storage_location_dag.solutions_collection.length === 0) {
     let program = writer.write(source_unit_gen.irnode!.lower());
-    if (program === pre_program) continue;
-    pre_program = program;
     if (!fs.existsSync("./generated_programs")) {
       fs.mkdirSync("./generated_programs");
     }
@@ -564,9 +586,40 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
     let hour = date.getHours();
     let minute = date.getMinutes();
     let second = date.getSeconds();
-    let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_${cnt}.sol`;
-    cnt++;
+    let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_0.sol`;
     fs.writeFileSync(`./generated_programs/${program_name}`, program, "utf-8");
+  }
+  else {
+    let cnt = 0;
+    let pre_program = "";
+    for (let storage_location_solutions of storage_location_dag.solutions_collection) {
+      if (storage_location_solutions.size === 0) continue;
+      for (let [key, value] of storage_location_solutions) {
+        //! key may be ghost and is not in irnodes
+        if (!irnodes.has(key)) continue;
+        if (irnodes.get(key)!.typeName !== "IRVariableDeclaration") {
+          continue;
+        }
+        if ((irnodes.get(key)! as decl.IRVariableDeclaration).loc === undefined)
+          (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
+      }
+      let program = writer.write(source_unit_gen.irnode!.lower());
+      if (program === pre_program) continue;
+      pre_program = program;
+      if (!fs.existsSync("./generated_programs")) {
+        fs.mkdirSync("./generated_programs");
+      }
+      let date = new Date();
+      let year = date.getFullYear();
+      let month = date.getMonth() + 1;
+      let day = date.getDate();
+      let hour = date.getHours();
+      let minute = date.getMinutes();
+      let second = date.getSeconds();
+      let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_${cnt}.sol`;
+      cnt++;
+      fs.writeFileSync(`./generated_programs/${program_name}`, program, "utf-8");
+    }
   }
 }
 
