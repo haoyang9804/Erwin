@@ -1,7 +1,11 @@
 import { DataLocation } from "solc-typed-ast";
 import { DominanceNode } from "./dominance";
 
-export abstract class StorageLocation extends DominanceNode<DataLocation> { }
+export abstract class StorageLocation extends DominanceNode<DataLocation> {
+  equals() : StorageLocation[] {
+    throw new Error("Method not implemented.");
+  }
+}
 
 export class StoragePointer extends StorageLocation {
   constructor() {
@@ -40,6 +44,9 @@ export class StoragePointer extends StorageLocation {
   }
   issuperof(t : StorageLocation) : boolean {
     return this.subs().some(g => g.same(t));
+  }
+  equals() : StorageLocation[] {
+    return [StorageLocationProvider.storage_pointer(), StorageLocationProvider.storage_ref()];
   }
 }
 
@@ -83,6 +90,9 @@ export class StorageRef extends StorageLocation {
   issuperof(t : StorageLocation) : boolean {
     return this.subs().some(g => g.same(t));
   }
+  equals() : StorageLocation[] {
+    return [StorageLocationProvider.storage_pointer(), StorageLocationProvider.storage_ref()];
+  }
 }
 
 export class Memory extends StorageLocation {
@@ -124,6 +134,9 @@ export class Memory extends StorageLocation {
   issuperof(t : StorageLocation) : boolean {
     return this.subs().some(g => g.same(t));
   }
+  equals() : StorageLocation[] {
+    return [StorageLocationProvider.memory()];
+  }
 }
 
 export class Calldata extends StorageLocation {
@@ -160,6 +173,9 @@ export class Calldata extends StorageLocation {
   }
   issuperof(t : StorageLocation) : boolean {
     return this.subs().some(g => g.same(t));
+  }
+  equals() : StorageLocation[] {
+    return [StorageLocationProvider.calldata()];
   }
 }
 
@@ -227,4 +243,22 @@ export class StorageLocationProvider {
   static memory_default() : MemoryDefault {
     return this.m_memory_default_lcoation;
   }
+}
+
+export const all_storage_locations = [
+  StorageLocationProvider.storage_pointer(),
+  StorageLocationProvider.storage_ref(),
+  StorageLocationProvider.memory(),
+  StorageLocationProvider.calldata(),
+  StorageLocationProvider.memory_default()
+];
+
+export function range_of_locs(loc : StorageLocation[], how_is_loc_dominated : "sub" | "super" | "equal") : StorageLocation[] {
+  if (how_is_loc_dominated === "sub") {
+    return [...new Set(loc.flatMap(l => l.supers()))] as StorageLocation[];
+  }
+  if (how_is_loc_dominated === "super") {
+    return [...new Set(loc.flatMap(l => l.subs()))] as StorageLocation[];
+  }
+  return [...new Set(loc.flatMap(l => l.equals()))] as StorageLocation[];
 }

@@ -17,7 +17,7 @@ import { toFile } from "@ts-graphviz/adapter";
 import { color } from "console-log-colors"
 import { DominanceNode, is_equal_range, is_super_range } from "./dominance";
 import { DataLocation } from "solc-typed-ast";
-import { StorageLocation } from "./memory";
+import { StorageLocation } from "./loc";
 import { VisMut, VisMutKind } from "./vismut";
 import { LinkedListNode } from "./dataStructor";
 import { decl_db, expr_db } from "./db";
@@ -132,7 +132,10 @@ export class ConstraintDAG<T, Node extends DominanceNode<T>> {
     assert(this.dag_nodes.has(nodeid), `ConstraintDAG: node ${nodeid} is not in the graph`);
     assert(this.solution_range.has(nodeid), `ConstraintDAG: node ${nodeid} is not in the solution_range`);
     const intersected_range = [...intersection(new Set<Node>(this.solution_range.get(nodeid)), new Set<Node>(range))];
-    assert(intersected_range.length > 0, `ConstraintDAG: node ${nodeid} has empty solution range`);
+    assert(intersected_range.length > 0,
+      `ConstraintDAG: node ${nodeid} has empty solution range.
+       solution_range of ${nodeid} is ${this.solution_range.get(nodeid)!.map(t => t.str())}
+       new solution range is ${range.map(t => t.str())}`);
     this.solution_range.set(nodeid, intersected_range);
     if (!is_equal_range(this.solution_range.get(nodeid)!, intersected_range)) {
       this.tighten_solution_range_middle_out(nodeid);

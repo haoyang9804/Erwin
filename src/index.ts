@@ -28,7 +28,7 @@ const writer = new ASTWriter(
   LatestCompilerVersion
 );
 import * as figlet from "figlet"
-import { StorageLocation, StorageLocationProvider } from "./memory";
+import { StorageLocation, StorageLocationProvider } from "./loc";
 import { FuncVis, FuncVisProvider, VarVis, VarVisProvider } from "./visibility";
 import { FuncVisMutKind, VarVisKind } from "./vismut";
 import { FuncStat, FuncStatProvider } from "./funcstat";
