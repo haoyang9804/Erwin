@@ -1,5 +1,5 @@
 {
-  "name": "erwin",
+  "name": "@__haoyang__/erwin",
   "version": "0.7.1",
   "author": "Haoyang Ma <haoyanghkust@gmail.com>",
   "files": [
@@ -10,6 +10,17 @@
   "bin": {
     "erwin": "dist/index.js"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/haoyang9804/Erwin.git"
+  },
+  "keywords": [
+    "Random Program Generation",
+    "Solidity",
+    "Smart Contract",
+    "Bug Detection",
+    "Compiler Verifier"
+  ],
   "prepublish": "tsc",
   "dependencies": {
     "@ts-graphviz/adapter": "^2.0.3",
