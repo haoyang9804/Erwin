@@ -36,19 +36,18 @@ export const config = {
   array_length_upperlimit: 10,
 
   // Complexity
-  expression_complex_level: 1,
-  statement_complex_level: 1,
-  type_complex_level: 1,
+  expression_complexity_level: 1,
+  statement_complexity__level: 1,
+  type_complexity_level: 1,
 
   // Probability
-  nonstructured_statement_prob: 0.05,
+  nonstructured_statement_prob: 0.5,
+  expression_complexity_prob: 0.8,
   literal_prob: 0.05,
   tuple_prob: 0.3,
   vardecl_prob: 0.0,
-  // The probability of "new"ing a contract or a struct instance
   new_prob: 0.1,
-  else_prob: 0.1,
-  terminal_prob: 0.05,
+  else_prob: 0.3,
   init_state_var_in_constructor_prob: 0.3,
   struct_prob: 0.5,
   contract_instance_prob: 0.1,

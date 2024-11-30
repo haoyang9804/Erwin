@@ -87,17 +87,17 @@ program
   .option("--if_body_stmt_cnt_upper_limit <number>", "The upper limit of the number of statements in the body of an if statement.", `${config.if_body_stmt_cnt_upper_limit}`)
   .option("--if_body_stmt_cnt_lower_limit <number>", "The lower limit of the number of statements in the body of an if statement.", `${config.if_body_stmt_cnt_lower_limit}`)
   // Complexity
-  .option("--expression_complex_level <number>", "The complex level of the expression Erwin will generate.\nThe suggedted range is [1,2,3]. The bigger, the more complex.", `${config.expression_complex_level}`)
-  .option("--statement_complex_level <number>", "The complex level of the statement Erwin will generate.\nThe suggedted range is [1,2]. The bigger, the more complex.", `${config.statement_complex_level}`)
-  .option("--type_complex_level <number>", "The complex level of the type Erwin will generate.\nThe suggedted range is [1,2]. The bigger, the more complex.", `${config.type_complex_level}`)
+  .option("--expression_complexity_level <number>", "The complexity level of the expression Erwin will generate.\nThe suggedted range is [1,2,3]. The bigger, the more complex.", `${config.expression_complexity_level}`)
+  .option("--statement_complexity__level <number>", "The complexity level of the statement Erwin will generate.\nThe suggedted range is [1,2]. The bigger, the more complex.", `${config.statement_complexity__level}`)
+  .option("--type_complexity_level <number>", "The complexity level of the type Erwin will generate.\nThe suggedted range is [1,2]. The bigger, the more complex.", `${config.type_complexity_level}`)
   // Probability
   .option("--nonstructured_statement_prob <float>", "The probability of generating a nonstructured statement, such as AssignmentStatment or FunctionCallAssignment.", `${config.nonstructured_statement_prob}`)
+  .option("--expression_complexity_prob <float>", "The probability of generating a complex expression.", `${config.expression_complexity_prob}`)
   .option("--literal_prob <float>", "The probability of generating a literal.", `${config.literal_prob}`)
   .option("--tuple_prob <float>", "The probability of generating a tuple surrounding an expression.", `${config.tuple_prob}`)
   .option("--vardecl_prob <float>", "The probability of generating a variable declaration.", `${config.vardecl_prob}`)
   .option("--new_prob <float>", "The probability of generating a variable declaration in place.", `${config.new_prob}`)
   .option("--else_prob <float>", "The probability of generating an else statement.", `${config.else_prob}`)
-  .option("--terminal_prob <float>", "The probability of generating a terminal statement.", `${config.terminal_prob}`)
   .option("--init_state_var_in_constructor_prob <float>", "The probability of initializing a state variable in the constructor.", `${config.init_state_var_in_constructor_prob}`)
   .option("--struct_prob <float>", "The probability of generating a struct.", `${config.struct_prob}`)
   .option("--contract_instance_prob <float>", "The probability of generating a contract instance.", `${config.contract_instance_prob}`)
@@ -131,7 +131,7 @@ else if (program.args[0] === "generate") {
   config.maximum_solution_count = parseInt(program.commands[1].opts().maximum_solution_count);
   config.tuple_prob = parseFloat(program.commands[1].opts().tuple_prob);
   config.array_length_upperlimit = parseInt(program.commands[1].opts().array_length_upperlimit);
-  config.expression_complex_level = parseInt(program.commands[1].opts().expression_complex_level);
+  config.expression_complexity_level = parseInt(program.commands[1].opts().expression_complexity_level);
   config.state_variable_count_upperlimit = parseInt(program.commands[1].opts().state_variable_count_upperlimit);
   config.state_variable_count_lowerlimit = parseInt(program.commands[1].opts().state_variable_count_lowerlimit);
   config.state_variable_count_lowerlimit = parseInt(program.commands[1].opts().state_variable_count_lowerlimit);
@@ -141,9 +141,9 @@ else if (program.args[0] === "generate") {
   config.vardecl_prob = parseFloat(program.commands[1].opts().vardecl_prob);
   config.new_prob = parseFloat(program.commands[1].opts().new_prob);
   config.else_prob = parseFloat(program.commands[1].opts().else_prob);
-  config.terminal_prob = parseFloat(program.commands[1].opts().terminal_prob);
   config.init_state_var_in_constructor_prob = parseFloat(program.commands[1].opts().init_state_var_in_constructor_prob);
   config.nonstructured_statement_prob = parseFloat(program.commands[1].opts().nonstructured_statement_prob);
+  config.expression_complexity_prob = parseFloat(program.commands[1].opts().expression_complexity_prob);
   config.struct_prob = parseFloat(program.commands[1].opts().struct_prob);
   config.contract_instance_prob = parseFloat(program.commands[1].opts().contract_instance_prob);
   config.struct_instance_prob = parseFloat(program.commands[1].opts().struct_instance_prob);
@@ -156,8 +156,8 @@ else if (program.args[0] === "generate") {
   config.dynamic_array_prob = parseFloat(program.commands[1].opts().dynamic_array_prob);
   config.for_init_cnt_upper_limit = parseInt(program.commands[1].opts().for_init_cnt_upper_limit);
   config.for_init_cnt_lower_limit = parseInt(program.commands[1].opts().for_init_cnt_lower_limit);
-  config.statement_complex_level = parseInt(program.commands[1].opts().statement_complex_level);
-  config.type_complex_level = parseInt(program.commands[1].opts().type_complex_level);
+  config.statement_complexity__level = parseInt(program.commands[1].opts().statement_complexity__level);
+  config.type_complexity_level = parseInt(program.commands[1].opts().type_complexity_level);
   config.for_body_stmt_cnt_lower_limit = parseInt(program.commands[1].opts().for_body_stmt_cnt_lower_limit);
   config.for_body_stmt_cnt_upper_limit = parseInt(program.commands[1].opts().for_body_stmt_cnt_upper_limit);
   config.while_body_stmt_cnt_lower_limit = parseInt(program.commands[1].opts().while_body_stmt_cnt_lower_limit);
@@ -193,7 +193,7 @@ else if (program.args[0] === "generate") {
   assert(config.maximum_solution_count >= 0, "The maximum number of solutions must be not less than 0.");
   assert(config.tuple_prob >= 0 && config.tuple_prob <= 1, "The probability of generating a tuple surrounding an expression must be in the range [0,1].");
   assert(config.init_state_var_in_constructor_prob >= 0 && config.init_state_var_in_constructor_prob <= 1, "The probability of initializing a state variable in the constructor must be in the range [0,1].");
-  assert(config.expression_complex_level >= 1, "The complex level of the expression must be not less than 1.");
+  assert(config.expression_complexity_level >= 1, "The complex level of the expression must be not less than 1.");
   assert(config.state_variable_count_upperlimit >= 0, "state_variable_count_upperlimit must be not less than 0.");
   assert(config.state_variable_count_lowerlimit >= 0, "state_variable_count_lowerlimit must be not less than 0.");
   assert(config.contract_count >= 0, "contract_count must be not less than 0.");
@@ -206,7 +206,6 @@ else if (program.args[0] === "generate") {
   assert(config.vardecl_prob >= 0 && config.vardecl_prob <= 1.0, "The probability of generating a variable declaration must be in the range [0,1].");
   assert(config.new_prob >= 0 && config.new_prob <= 1.0, "The probability of generating a variable declaration in place must be in the range [0,1].");
   assert(config.else_prob >= 0.0 && config.else_prob <= 1.0, "The probability of generating an else statement must be in the range [0,1].");
-  assert(config.terminal_prob >= 0.0 && config.terminal_prob <= 1.0, "The probability of generating a terminal statement must be in the range [0,1].");
   assert(config.mapping_prob > 0.0 && config.mapping_prob <= 1.0, "The probability of generating a mapping must be in the range (0,1].");
   assert(config.array_prob > 0.0 && config.array_prob <= 1.0, "The probability of generating an array must be in the range (0,1].");
   assert(config.contract_instance_prob >= 0.0 && config.contract_instance_prob <= 1.0, "The probability of generating a contract instance must be in the range [0,1].");
@@ -217,10 +216,11 @@ else if (program.args[0] === "generate") {
   assert(config.param_count_of_function_lowerlimit <= config.param_count_of_function_upperlimit, "The lower limit of the number of parameters of a function must be less than or equal to the upper limit.");
   assert(config.state_variable_count_lowerlimit <= config.state_variable_count_upperlimit, "state_variable_count_lowerlimit must be less than or equal to state_variable_count_upperlimit.");
   assert(config.nonstructured_statement_prob >= 0.0 && config.nonstructured_statement_prob <= 1.0, "The probability of generating a nonstructured statement must be in the range [0,1].");
+  assert(config.expression_complexity_prob >= 0.0 && config.expression_complexity_prob <= 1.0, "The probability of generating a complex expression must be in the range [0,1].");
   assert(config.function_body_stmt_cnt_lower_limit <= config.function_body_stmt_cnt_upper_limit, "The lower limit of the number of statements of a function must be less than or equal to the upper limit.");
   assert(config.function_body_stmt_cnt_lower_limit >= 0, "The lower limit of the number of statements of a function must be not less than 1.");
-  assert(config.statement_complex_level >= 0, "The complex level of the statement must be not less than 0.");
-  assert(config.type_complex_level >= 0, "The complex level of the type must be not less than 0.");
+  assert(config.statement_complexity__level >= 0, "The complex level of the statement must be not less than 0.");
+  assert(config.type_complexity_level >= 0, "The complex level of the type must be not less than 0.");
   assert(config.for_init_cnt_lower_limit <= config.for_init_cnt_upper_limit, "The lower limit of the number of initialization in a for loop must be less than or equal to the upper limit.");
   assert(config.for_init_cnt_lower_limit >= 0, "The upper limit of the number of initialization in a for loop must be not less than 0.");
   assert(config.function_body_stmt_cnt_lower_limit <= config.function_body_stmt_cnt_upper_limit, "The lower limit of the number of statements of a function must be less than or equal to the upper limit.");

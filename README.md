@@ -51,11 +51,11 @@ Enjoy tuning the search space and generate diverse Solidity programs.
   --do_while_body_stmt_cnt_lower_limit <number>       The lower limit of the number of statements in the body of a do while loop. (default: "0")
   --if_body_stmt_cnt_upper_limit <number>             The upper limit of the number of statements in the body of an if statement. (default: "1")
   --if_body_stmt_cnt_lower_limit <number>             The lower limit of the number of statements in the body of an if statement. (default: "0")
-  --expression_complex_level <number>                 The complex level of the expression Erwin will generate.
+  --expression_complexity_level <number>                 The complex level of the expression Erwin will generate.
                                                       The suggedted range is [1,2,3]. The bigger, the more complex. (default: "1")
-  --statement_complex_level <number>                  The complex level of the statement Erwin will generate.
+  --statement_complexity__level <number>                  The complex level of the statement Erwin will generate.
                                                       The suggedted range is [1,2]. The bigger, the more complex. (default: "1")
-  --type_complex_level <number>                       The complex level of the type Erwin will generate.
+  --type_complexity_level <number>                       The complex level of the type Erwin will generate.
                                                       The suggedted range is [1,2]. The bigger, the more complex. (default: "1")
   --nonstructured_statement_prob <float>              The probability of generating a nonstructured statement, such as AssignmentStatment or
                                                       FunctionCallAssignment. (default: "0.05")
@@ -64,7 +64,6 @@ Enjoy tuning the search space and generate diverse Solidity programs.
   --vardecl_prob <float>                              The probability of generating a variable declaration. (default: "0")
   --new_prob <float>                                  The probability of generating a variable declaration in place. (default: "0.1")
   --else_prob <float>                                 The probability of generating an else statement. (default: "0.1")
-  --terminal_prob <float>                             The probability of generating a terminal statement. (default: "0.05")
   --init_state_var_in_constructor_prob <float>        The probability of initializing a state variable in the constructor. (default: "0.3")
   --struct_prob <float>                               The probability of generating a struct. (default: "0.5")
   --contract_instance_prob <float>                    The probability of generating a contract instance. (default: "0.1")

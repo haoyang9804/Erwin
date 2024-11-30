@@ -446,14 +446,18 @@ function cannot_choose_functioncallgenerator(type_range : type.Type[]) : boolean
 }
 
 function get_exprgenerator(type_range : type.Type[],
-  cur_expression_complex_level : number = 0,
+  cur_expression_complexity_level : number = 0,
   forbidden_generators : any[] = [],
   storage_loc_range : loc.StorageLocation[] = []) : any {
   let arg_gen_prototype;
   let generator_candidates = new Set<any>();
+  let not_complex = () : boolean => {
+    return cur_expression_complexity_level < config.expression_complexity_level
+      && Math.random() < config.expression_complexity_prob;
+  }
   if (type_range.some(t => t.typeName === "ContractType")) {
     generator_candidates.add(IdentifierGenerator);
-    if (cur_expression_complex_level < config.expression_complex_level) {
+    if (not_complex()) {
       generator_candidates.add(NewContractGenerator);
       generator_candidates.add(AssignmentGenerator);
       generator_candidates.add(FunctionCallGenerator);
@@ -462,7 +466,7 @@ function get_exprgenerator(type_range : type.Type[],
   }
   if (type_range.some(t => t.typeName === "StructType")) {
     generator_candidates.add(IdentifierGenerator);
-    if (cur_expression_complex_level < config.expression_complex_level) {
+    if (not_complex()) {
       if ((storage_loc_range.length === 0 ||
         storage_loc_range.some(s => s.same(loc.StorageLocationProvider.memory()))) &&
         type_range.some(t => t.typeName === "StructType" && !type.contain_mapping_type(t))) {
@@ -476,14 +480,14 @@ function get_exprgenerator(type_range : type.Type[],
   }
   if (type_range.some(t => t.typeName === "MappingType")) {
     generator_candidates.add(IdentifierGenerator);
-    if (cur_expression_complex_level < config.expression_complex_level) {
+    if (not_complex()) {
       generator_candidates.add(FunctionCallGenerator);
       generator_candidates.add(ConditionalGenerator);
     }
   }
   if (type_range.some(t => t.typeName === "ArrayType")) {
     generator_candidates.add(IdentifierGenerator);
-    if (cur_expression_complex_level < config.expression_complex_level) {
+    if (not_complex()) {
       generator_candidates.add(AssignmentGenerator);
       generator_candidates.add(FunctionCallGenerator);
       generator_candidates.add(ConditionalGenerator);
@@ -491,7 +495,7 @@ function get_exprgenerator(type_range : type.Type[],
   }
   const contain_element_types = type_range.some(t => t.typeName === "ElementaryType");
   if (contain_element_types) {
-    if (cur_expression_complex_level >= config.expression_complex_level || Math.random() < config.terminal_prob) {
+    if (!not_complex()) {
       generator_candidates = merge_set(generator_candidates, new Set<any>([...terminal_expression_generators]));
     }
     else {
@@ -520,7 +524,7 @@ function get_exprgenerator(type_range : type.Type[],
 
 function get_stmtgenerator(cur_stmt_complex_level : number = -1) : any {
   let complex = () : boolean => {
-    return cur_stmt_complex_level >= config.statement_complex_level || Math.random() < config.nonstructured_statement_prob;
+    return cur_stmt_complex_level >= config.statement_complexity__level || Math.random() < config.nonstructured_statement_prob;
   }
   let generator_candidates = cur_stmt_complex_level === -1 ?
     new Set<any>(statement_generators) :
@@ -700,11 +704,11 @@ class MappingDeclarationGenerator extends DeclarationGenerator {
 
   type_range : type.Type[];
   must_be_in_contract_scope : boolean;
-  cur_type_complex_level : number;
+  cur_type_complexity_level : number;
 
-  constructor(cur_type_complex_level : number, type_range : type.Type[], must_be_in_contract_scope : boolean = false) {
+  constructor(cur_type_complexity_level : number, type_range : type.Type[], must_be_in_contract_scope : boolean = false) {
     super();
-    this.cur_type_complex_level = cur_type_complex_level;
+    this.cur_type_complexity_level = cur_type_complexity_level;
     this.type_range = type_range;
     this.must_be_in_contract_scope = must_be_in_contract_scope;
   }
@@ -737,10 +741,10 @@ class MappingDeclarationGenerator extends DeclarationGenerator {
       value_type_range = type_db.types();
     }
     cur_scope = cur_scope.new(scopeKind.MAPPING);
-    const key_var_gen = new VariableDeclarationGenerator(this.cur_type_complex_level + 1, key_type_range, true)
+    const key_var_gen = new VariableDeclarationGenerator(this.cur_type_complexity_level + 1, key_type_range, true)
     key_var_gen.generate();
     (key_var_gen.irnode! as decl.IRVariableDeclaration).loc = DataLocation.Default;
-    const value_var_gen = new VariableDeclarationGenerator(this.cur_type_complex_level + 1, value_type_range, true)
+    const value_var_gen = new VariableDeclarationGenerator(this.cur_type_complexity_level + 1, value_type_range, true)
     value_var_gen.generate();
     (value_var_gen.irnode! as decl.IRVariableDeclaration).loc = DataLocation.Default;
     key_type_range = type_dag.solution_range_of(key_var_gen.irnode!.id)!;
@@ -860,14 +864,14 @@ class MappingDeclarationGenerator extends DeclarationGenerator {
 class ArrayDeclarationGenerator extends DeclarationGenerator {
   type_range : type.Type[];
   no_initializer : boolean;
-  cur_type_complex_level : number;
+  cur_type_complexity_level : number;
   base : IRNode | undefined;
   length : number | undefined;
-  constructor(cur_type_complex_level : number, type_range : type.Type[], no_initializer : boolean = true) {
+  constructor(cur_type_complexity_level : number, type_range : type.Type[], no_initializer : boolean = true) {
     super();
     this.type_range = type_range;
     this.no_initializer = no_initializer;
-    this.cur_type_complex_level = cur_type_complex_level;
+    this.cur_type_complexity_level = cur_type_complexity_level;
   }
 
   private distill_type_range() {
@@ -910,7 +914,7 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
       base_type_range = this.type_range.map((t) => (t as type.ArrayType).base);
     }
     cur_scope = cur_scope.new(scopeKind.ARRAY);
-    const base_gen = new VariableDeclarationGenerator(this.cur_type_complex_level + 1, base_type_range, true);
+    const base_gen = new VariableDeclarationGenerator(this.cur_type_complexity_level + 1, base_type_range, true);
     base_gen.generate();
     cur_scope = cur_scope.rollback();
     this.base = base_gen.irnode!;
@@ -1432,11 +1436,11 @@ class VariableDeclarationGenerator extends DeclarationGenerator {
   no_initializer : boolean;
   must_be_in_contract_scope_if_mapping : boolean;
   type_range : type.Type[];
-  cur_type_complex_level : number;
-  constructor(cur_type_complex_level : number, type_range : type.Type[], no_initializer : boolean = true,
+  cur_type_complexity_level : number;
+  constructor(cur_type_complexity_level : number, type_range : type.Type[], no_initializer : boolean = true,
     must_be_in_contract_scope_if_mapping : boolean = false) {
     super();
-    this.cur_type_complex_level = cur_type_complex_level;
+    this.cur_type_complexity_level = cur_type_complexity_level;
     this.no_initializer = no_initializer;
     this.type_range = type_range;
     this.must_be_in_contract_scope_if_mapping = must_be_in_contract_scope_if_mapping
@@ -1457,9 +1461,9 @@ class VariableDeclarationGenerator extends DeclarationGenerator {
     const contain_contract_types = this.type_range.some((t) => t.typeName === 'ContractType');
     const contain_struct_types = this.type_range.some((t) => t.typeName === 'StructType' &&
       (!inside_constructor_parameter_scope(cur_scope) || !type.contain_mapping_type(t)));
-    const contain_mapping_types = this.cur_type_complex_level <= config.type_complex_level &&
+    const contain_mapping_types = this.cur_type_complexity_level <= config.type_complexity_level &&
       this.type_range.some((t) => t.typeName === 'MappingType') && !inside_constructor_parameter_scope(cur_scope);
-    const contain_array_types = this.cur_type_complex_level <= config.type_complex_level &&
+    const contain_array_types = this.cur_type_complexity_level <= config.type_complexity_level &&
       this.type_range.some((t) => t.typeName === 'ArrayType' &&
         (!inside_constructor_parameter_scope(cur_scope) || !type.contain_mapping_type(t)));
     assert(contain_element_types || contain_contract_types || contain_struct_types || contain_mapping_types || contain_array_types,
@@ -1494,13 +1498,13 @@ class VariableDeclarationGenerator extends DeclarationGenerator {
     }
     //! Generate a mapping-type variable
     else if (contain_mapping_types && Math.random() < contract_type_prob + struct_type_prob + mapping_type_prob) {
-      const mapping_gen = new MappingDeclarationGenerator(this.cur_type_complex_level, this.type_range, this.must_be_in_contract_scope_if_mapping);
+      const mapping_gen = new MappingDeclarationGenerator(this.cur_type_complexity_level, this.type_range, this.must_be_in_contract_scope_if_mapping);
       mapping_gen.generate();
       this.irnode = mapping_gen.irnode;
     }
     //! Generate a array-type variable
     else if (contain_array_types && Math.random() < contract_type_prob + struct_type_prob + mapping_type_prob + array_type_prob) {
-      const array_gen = new ArrayDeclarationGenerator(this.cur_type_complex_level, this.type_range, this.no_initializer);
+      const array_gen = new ArrayDeclarationGenerator(this.cur_type_complexity_level, this.type_range, this.no_initializer);
       array_gen.generate();
       this.irnode = array_gen.irnode;
     }
@@ -2640,8 +2644,8 @@ abstract class ExpressionGenerator extends Generator {
     this.storage_range = storage_location_dag.has_solution_range(id) ? storage_location_dag.solution_range_of(id)! : [];
   }
 
-  protected wrap_in_a_tuple() {
-    if (Math.random() < config.tuple_prob) {
+  protected wrap_in_a_tuple(must_wrap : boolean = false) {
+    if (must_wrap || Math.random() < config.tuple_prob) {
       this.irnode = new expr.IRTuple(new_global_id(), cur_scope.id(), [this.irnode as expr.IRExpression]);
       if (config.debug) {
         console.log(`${" ".repeat(indent)}${this.irnode.id}: Tuple: ${this.irnode.id} scope: ${cur_scope.kind()}`);
@@ -2649,7 +2653,7 @@ abstract class ExpressionGenerator extends Generator {
     }
   }
 
-  abstract generate(cur_expression_complex_level : number) : void;
+  abstract generate(cur_expression_complexity_level : number) : void;
 }
 
 abstract class CallExpressionGenerator extends ExpressionGenerator {
@@ -2657,7 +2661,7 @@ abstract class CallExpressionGenerator extends ExpressionGenerator {
     super(id);
   }
 
-  protected generate_argument_from_parameters(cur_expression_complex_level : number,
+  protected generate_argument_from_parameters(cur_expression_complexity_level : number,
     parameters : decl.IRVariableDeclaration[]) {
     const args_ids : number[] = [];
     parameters.forEach((parameter) => {
@@ -2671,11 +2675,11 @@ abstract class CallExpressionGenerator extends ExpressionGenerator {
       const storage_loc_range = storage_location_dag.has_solution_range(parameter.id) ?
         storage_location_dag.solution_range_of(parameter.id)!.flatMap((s) => s.subs())
         : [];
-      let arg_gen_prototype = get_exprgenerator(type_range, cur_expression_complex_level + 1);
+      let arg_gen_prototype = get_exprgenerator(type_range, cur_expression_complexity_level + 1);
       const arg_gen = new arg_gen_prototype(argid);
       const ghost_id = connect_arguments_to_parameters(argid, parameter.id, arg_gen.generator_name,
         type_range, storage_loc_range as loc.StorageLocation[]);
-      arg_gen.generate(cur_expression_complex_level + 1);
+      arg_gen.generate(cur_expression_complexity_level + 1);
       align_solution_ranges_of_arguments_and_parameters(argid, parameter.id, ghost_id);
     });
     return args_ids;
@@ -2705,7 +2709,7 @@ class IdentifierGenerator extends ExpressionGenerator {
   left : boolean;
   variable_decl : decl.IRVariableDeclaration | undefined;
   available_vardecl : decl.IRVariableDeclaration[] = [];
-  cur_expression_complex_level : number = 0;
+  cur_expression_complexity_level : number = 0;
   //! Since the selected variable may be a struct member, we need to store the instance id of the struct.
   //! In this situation, the identifier is actually a member access from the struct instance.
   //! The instantiation can be a struct instance or a temporary struct expression.
@@ -2782,7 +2786,7 @@ class IdentifierGenerator extends ExpressionGenerator {
 
   private generate_a_temporary_contract_instance_expr() : expr.IRExpression {
     const new_contract_gen = new NewContractGenerator(this.id);
-    new_contract_gen.generate(this.cur_expression_complex_level + 1);
+    new_contract_gen.generate(this.cur_expression_complexity_level + 1);
     const contract_instance_expr = new_contract_gen.irnode as expr.IRExpression;
     const extracted_contract_instance_expr = expr.tuple_extraction(contract_instance_expr);
     expr_db.transfer_read_variables(this.id, extracted_contract_instance_expr.id);
@@ -2828,7 +2832,7 @@ class IdentifierGenerator extends ExpressionGenerator {
 
   private generate_a_temporary_struct_instantiation_expr(id : number) : expr.IRExpression {
     const new_struct_gen = new NewStructGenerator(id);
-    new_struct_gen.generate(this.cur_expression_complex_level + 1);
+    new_struct_gen.generate(this.cur_expression_complexity_level + 1);
     const struct_instance_expr = new_struct_gen.irnode as expr.IRExpression;
     const extracted_struct_instance_expr = expr.tuple_extraction(struct_instance_expr);
     expr_db.transfer_read_variables(id, extracted_struct_instance_expr.id);
@@ -2892,7 +2896,7 @@ class IdentifierGenerator extends ExpressionGenerator {
       //* Generate an expr to be the key of the mapping.
       const key_id = decl_db.key_of_mapping(mapping_decl_id)!;
       const type_range = type_dag.solution_range_of(key_id)!
-      const expr_gen_prototype = get_exprgenerator(type_range, this.cur_expression_complex_level + 1);
+      const expr_gen_prototype = get_exprgenerator(type_range, this.cur_expression_complexity_level + 1);
       const expr_id = new_global_id();
       type_dag.insert(expr_id, type_range);
       let ghost_id;
@@ -2910,7 +2914,7 @@ class IdentifierGenerator extends ExpressionGenerator {
       else {
         type_dag.connect(expr_id, key_id, "super_dominance");
       }
-      expr_gen.generate(this.cur_expression_complex_level + 1);
+      expr_gen.generate(this.cur_expression_complexity_level + 1);
       expr_db.transfer_read_variables(this.id, expr_id);
       if (ghost_id === undefined) {
         type_dag.solution_range_alignment(expr_id, key_id);
@@ -2995,12 +2999,12 @@ class IdentifierGenerator extends ExpressionGenerator {
       const expr_type_range = type.uinteger_types.filter(t => type_db.types().some(g => g.same(t)));
       const expr_gen_prototype = get_exprgenerator(
         expr_type_range,
-        this.cur_expression_complex_level + 1
+        this.cur_expression_complexity_level + 1
       );
       const expr_id = new_global_id();
       type_dag.insert(expr_id, expr_type_range);
       const expr_gen = new expr_gen_prototype(expr_id);
-      expr_gen.generate(this.cur_expression_complex_level + 1);
+      expr_gen.generate(this.cur_expression_complexity_level + 1);
       expr_db.transfer_read_variables(this.id, expr_id);
       if (expr_gen.generator_name === "LiteralGenerator") {
         const literal_expr = expr.tuple_extraction(expr_gen.irnode) as expr.IRLiteral;
@@ -3105,7 +3109,7 @@ class IdentifierGenerator extends ExpressionGenerator {
     const nsid = new_global_id();
     type_dag.insert(nsid, type_db.get_struct_type(struct_decl_id));
     const struct_instance_gen = new NewStructGenerator(nsid);
-    struct_instance_gen.generate(this.cur_expression_complex_level + 1);
+    struct_instance_gen.generate(this.cur_expression_complexity_level + 1);
     const struct_instance_expr = struct_instance_gen.irnode as expr.IRExpression;
     this.struct_instantiation_id = nsid;
     expr_db.transfer_read_variables(this.id, nsid);
@@ -3266,8 +3270,8 @@ class IdentifierGenerator extends ExpressionGenerator {
     }
   }
 
-  generate(cur_expression_complex_level : number) : void {
-    this.cur_expression_complex_level = cur_expression_complex_level;
+  generate(cur_expression_complexity_level : number) : void {
+    this.cur_expression_complexity_level = cur_expression_complexity_level;
     this.start_flag();
     this.get_available_vardecls();
     if (this.should_generate_a_new_var_decl()) {
@@ -3376,15 +3380,15 @@ class AssignmentGenerator extends ExpressionGenerator {
     return [leftid, rightid];
   }
 
-  private generate_right(rightid : number, cur_expression_complex_level : number) : expr.IRExpression {
+  private generate_right(rightid : number, cur_expression_complexity_level : number) : expr.IRExpression {
     let right_expression_gen_prototype = get_exprgenerator(
       type_dag.solution_range_of(rightid)!,
-      cur_expression_complex_level + 1,
+      cur_expression_complexity_level + 1,
       [],
       storage_location_dag.has_solution_range(rightid) ? storage_location_dag.solution_range_of(rightid)! : []
     );
     const right_expression_gen = new right_expression_gen_prototype(rightid);
-    right_expression_gen.generate(cur_expression_complex_level + 1);
+    right_expression_gen.generate(cur_expression_complexity_level + 1);
     if (this.this_dominate_right()) {
       type_dag.solution_range_alignment(this.id, rightid);
     }
@@ -3411,7 +3415,7 @@ class AssignmentGenerator extends ExpressionGenerator {
     }
   }
 
-  private generate_left(leftid : number, rightid : number, cur_expression_complex_level : number) : expr.IRExpression {
+  private generate_left(leftid : number, rightid : number, cur_expression_complexity_level : number) : expr.IRExpression {
     const right_type_range = type_dag.solution_range_of(rightid)!;
     if (this.op === "=" &&
       (type.all_mapping(right_type_range) || type.all_array(right_type_range)) &&
@@ -3431,26 +3435,26 @@ class AssignmentGenerator extends ExpressionGenerator {
       }
     }
     const identifier_gen = new IdentifierGenerator(leftid, true);
-    identifier_gen.generate(cur_expression_complex_level + 1);
+    identifier_gen.generate(cur_expression_complexity_level + 1);
     type_dag.solution_range_alignment(this.id, leftid);
     assert(identifier_gen.variable_decl !== undefined, "AssignmentGenerator: identifier_gen.vardecl is undefined");
     this.update_storage_loc_range(leftid, rightid);
     return identifier_gen.irnode as expr.IRExpression;
   }
 
-  generate(cur_expression_complex_level : number) : void {
+  generate(cur_expression_complexity_level : number) : void {
     this.start_flag();
     this.distill_type_range();
     const [leftid, rightid] = this.init_left_and_right();
-    const right_expression = this.generate_right(rightid, cur_expression_complex_level);
-    const left_expression = this.generate_left(leftid, rightid, cur_expression_complex_level);
+    const right_expression = this.generate_right(rightid, cur_expression_complexity_level);
+    const left_expression = this.generate_left(leftid, rightid, cur_expression_complexity_level);
     expr_db.transfer_read_variables(this.id, leftid);
     expr_db.transfer_write_variables(this.id, leftid);
     expr_db.transfer_read_variables(this.id, rightid);
     expr_db.transfer_write_variables(this.id, rightid);
     this.irnode = new expr.IRAssignment(this.id, cur_scope.id(), left_expression, right_expression, this.op!);
     this.end_flag();
-    this.wrap_in_a_tuple();
+    this.wrap_in_a_tuple(true);
   }
 }
 
@@ -3560,7 +3564,7 @@ class BinaryOpGenerator extends ExpressionGenerator {
   }
 
   private generate_left_and_right(leftid : number, rightid : number, ghostid : number | undefined,
-    cur_expression_complex_level : number) : [expr.IRExpression, expr.IRExpression] {
+    cur_expression_complexity_level : number) : [expr.IRExpression, expr.IRExpression] {
     let left_expression_gen_prototype, right_expression_gen_prototype;
     let left_expression_gen, right_expression_gen;
     /* RULES
@@ -3577,20 +3581,20 @@ class BinaryOpGenerator extends ExpressionGenerator {
     */
     if (this.op === "<<" || this.op === ">>") {
       left_expression_gen_prototype = get_exprgenerator(type_dag.solution_range_of(leftid)!,
-        cur_expression_complex_level + 1, [LiteralGenerator]);
+        cur_expression_complexity_level + 1, [LiteralGenerator]);
     }
     else {
       left_expression_gen_prototype = get_exprgenerator(type_dag.solution_range_of(leftid)!,
-        cur_expression_complex_level + 1);
+        cur_expression_complexity_level + 1);
     }
     /*
     Two literals may induce some wield issues, such as 912 > int8(73).
     So in the current version, Erwin bans it.
     */
     right_expression_gen_prototype = get_exprgenerator(type_dag.solution_range_of(rightid)!,
-      cur_expression_complex_level + 1, [LiteralGenerator]);
+      cur_expression_complexity_level + 1, [LiteralGenerator]);
     right_expression_gen = new right_expression_gen_prototype(rightid);
-    right_expression_gen.generate(cur_expression_complex_level + 1);
+    right_expression_gen.generate(cur_expression_complexity_level + 1);
     //! Generate left-hand-side expression
     if (this.this_dominate_right()) {
       type_dag.solution_range_alignment(this.id, rightid);
@@ -3599,7 +3603,7 @@ class BinaryOpGenerator extends ExpressionGenerator {
       type_dag.solution_range_alignment(ghostid, rightid);
     }
     left_expression_gen = new left_expression_gen_prototype(leftid);
-    left_expression_gen.generate(cur_expression_complex_level + 1);
+    left_expression_gen.generate(cur_expression_complexity_level + 1);
     if (this.this_dominates_left()) {
       type_dag.solution_range_alignment(this.id, leftid);
     }
@@ -3612,12 +3616,12 @@ class BinaryOpGenerator extends ExpressionGenerator {
     ];
   }
 
-  generate(cur_expression_complex_level : number) : void {
+  generate(cur_expression_complexity_level : number) : void {
     this.start_flag();
     this.distill_type_range();
     const [leftid, rightid, ghostid] = this.init_left_and_right();
     //! Select generators for the left-hand-side and right-hand-side expressions
-    const [left_expression, right_expression] = this.generate_left_and_right(leftid, rightid, ghostid, cur_expression_complex_level);
+    const [left_expression, right_expression] = this.generate_left_and_right(leftid, rightid, ghostid, cur_expression_complexity_level);
     const left_extracted_expression = expr.tuple_extraction(left_expression);
     const right_extracted_expression = expr.tuple_extraction(right_expression);
     expr_db.transfer_read_variables(this.id, left_extracted_expression.id);
@@ -3693,17 +3697,17 @@ class BinaryCompareOpGenerator extends ExpressionGenerator {
   }
 
   private generate_left_and_right(leftid : number, rightid : number, ghostid : number | undefined,
-    cur_expression_complex_level : number) : [expr.IRExpression, expr.IRExpression] {
-    let right_expression_gen_prototype = get_exprgenerator(type_dag.solution_range_of(rightid)!, cur_expression_complex_level + 1);
-    let left_expression_gen_prototype = get_exprgenerator(type_dag.solution_range_of(rightid)!, cur_expression_complex_level + 1, [LiteralGenerator]);
+    cur_expression_complexity_level : number) : [expr.IRExpression, expr.IRExpression] {
+    let right_expression_gen_prototype = get_exprgenerator(type_dag.solution_range_of(rightid)!, cur_expression_complexity_level + 1);
+    let left_expression_gen_prototype = get_exprgenerator(type_dag.solution_range_of(rightid)!, cur_expression_complexity_level + 1, [LiteralGenerator]);
     const right_expression_gen = new right_expression_gen_prototype(rightid);
-    right_expression_gen.generate(cur_expression_complex_level + 1);
+    right_expression_gen.generate(cur_expression_complexity_level + 1);
     if (ghostid !== undefined) {
       type_dag.solution_range_alignment(ghostid, rightid);
     }
     //! Generate left-hand-side expression
     const left_expression_gen = new left_expression_gen_prototype(leftid);
-    left_expression_gen.generate(cur_expression_complex_level + 1);
+    left_expression_gen.generate(cur_expression_complexity_level + 1);
     if (ghostid !== undefined) {
       type_dag.solution_range_alignment(ghostid, leftid);
     }
@@ -3713,11 +3717,11 @@ class BinaryCompareOpGenerator extends ExpressionGenerator {
     ]
   }
 
-  generate(cur_expression_complex_level : number) : void {
+  generate(cur_expression_complexity_level : number) : void {
     this.distill_type_range();
     this.start_flag();
     const [leftid, rightid, ghostid] = this.init_left_and_right();
-    const [left_expression, right_expression] = this.generate_left_and_right(leftid, rightid, ghostid, cur_expression_complex_level);
+    const [left_expression, right_expression] = this.generate_left_and_right(leftid, rightid, ghostid, cur_expression_complexity_level);
     let left_extracted_expression = expr.tuple_extraction(left_expression);
     let right_extracted_expression = expr.tuple_extraction(right_expression);
     expr_db.transfer_read_variables(this.id, left_extracted_expression.id);
@@ -3789,21 +3793,21 @@ class UnaryOpGenerator extends ExpressionGenerator {
     type_dag.update(this.id, this.type_range);
   }
 
-  private generate_identifier(cur_expression_complex_level : number) : expr.IRExpression {
+  private generate_identifier(cur_expression_complexity_level : number) : expr.IRExpression {
     const identifier_id = new_global_id();
     type_dag.insert(identifier_id, this.type_range);
     type_dag.connect(this.id, identifier_id);
     const is_left = this.op === "++" || this.op === "--";
     const identifier_gen = new IdentifierGenerator(identifier_id, is_left);
-    identifier_gen.generate(cur_expression_complex_level + 1);
+    identifier_gen.generate(cur_expression_complexity_level + 1);
     type_dag.solution_range_alignment(this.id, identifier_id);
     return identifier_gen.irnode! as expr.IRExpression;
   }
 
-  generate(cur_expression_complex_level : number) : void {
+  generate(cur_expression_complexity_level : number) : void {
     this.start_flag();
     this.distill_type_range();
-    const expression : expr.IRExpression = this.generate_identifier(cur_expression_complex_level);
+    const expression : expr.IRExpression = this.generate_identifier(cur_expression_complexity_level);
     this.irnode = new expr.IRUnaryOp(this.id, cur_scope.id(), pick_random_element([true, false])!, expression, this.op)!;
     const extracted_expression = expr.tuple_extraction(expression);
     expr_db.transfer_read_variables(this.id, extracted_expression.id);
@@ -3855,13 +3859,13 @@ class ConditionalGenerator extends ExpressionGenerator {
   }
 
   private generate_e1_e2_e3(e1id : number, e2id : number, e3id : number,
-    cur_expression_complex_level : number) : [expr.IRExpression, expr.IRExpression, expr.IRExpression] {
-    let e1_gen_prototype = get_exprgenerator(type.bool_types, cur_expression_complex_level + 1);
+    cur_expression_complexity_level : number) : [expr.IRExpression, expr.IRExpression, expr.IRExpression] {
+    let e1_gen_prototype = get_exprgenerator(type.bool_types, cur_expression_complexity_level + 1);
     const e1_gen = new e1_gen_prototype(e1id);
-    e1_gen.generate(cur_expression_complex_level + 1);
-    const e3_gen_prototype = get_exprgenerator(this.type_range, cur_expression_complex_level + 1, [LiteralGenerator]);
+    e1_gen.generate(cur_expression_complexity_level + 1);
+    const e3_gen_prototype = get_exprgenerator(this.type_range, cur_expression_complexity_level + 1, [LiteralGenerator]);
     const e3_gen = new e3_gen_prototype!(e3id);
-    e3_gen.generate(cur_expression_complex_level + 1);
+    e3_gen.generate(cur_expression_complexity_level + 1);
     if ((type.all_array(type_dag.solution_range_of(e3id)!) ||
       type.all_mapping(type_dag.solution_range_of(e3id)!)) &&
       (type.contains_trivial_array(type_dag.solution_range_of(this.id)!) ||
@@ -3885,9 +3889,9 @@ class ConditionalGenerator extends ExpressionGenerator {
         storage_location_dag.insert(e2id, loc.range_of_locs(e3_storage_range, "sub"));
       }
     }
-    const e2_gen_prototype = get_exprgenerator(type_dag.solution_range_of(e3id)!, cur_expression_complex_level + 1);
+    const e2_gen_prototype = get_exprgenerator(type_dag.solution_range_of(e3id)!, cur_expression_complexity_level + 1);
     const e2_gen = new e2_gen_prototype(e2id);
-    e2_gen.generate(cur_expression_complex_level + 1);
+    e2_gen.generate(cur_expression_complexity_level + 1);
     type_dag.solution_range_alignment(this.id, e2id);
     return [e1_gen.irnode! as expr.IRExpression, e2_gen.irnode! as expr.IRExpression, e3_gen.irnode! as expr.IRExpression];
   }
@@ -3910,11 +3914,11 @@ class ConditionalGenerator extends ExpressionGenerator {
     }
   }
 
-  generate(cur_expression_complex_level : number) : void {
+  generate(cur_expression_complexity_level : number) : void {
     this.start_flag();
     type_dag.insert(this.id, this.type_range);
     const [e1id, e2id, e3id] = this.init_e1_e2_e3();
-    const [e1, e2, e3] = this.generate_e1_e2_e3(e1id, e2id, e3id, cur_expression_complex_level);
+    const [e1, e2, e3] = this.generate_e1_e2_e3(e1id, e2id, e3id, cur_expression_complexity_level);
     expr_db.transfer_read_variables(this.id, e1id);
     expr_db.transfer_read_variables(this.id, e2id);
     expr_db.transfer_read_variables(this.id, e3id);
@@ -4077,7 +4081,7 @@ class FunctionCallGenerator extends CallExpressionGenerator {
 
   private generate_arguments(selected_ret_decl : decl.IRVariableDeclaration | null,
     funcdecl : decl.IRFunctionDefinition,
-    cur_expression_complex_level : number
+    cur_expression_complexity_level : number
   ) : number[] {
     if (config.debug) {
       console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating FunctionCall Arguments`));
@@ -4094,7 +4098,7 @@ class FunctionCallGenerator extends CallExpressionGenerator {
     cur_scope = cur_scope.new(scopeKind.FUNC_ARGUMENTS)
     const original_allowed_empty_return = sig.allow_empty_return;
     sig.allow_empty_return = false;
-    const args_ids = super.generate_argument_from_parameters(cur_expression_complex_level, funcdecl.parameters);
+    const args_ids = super.generate_argument_from_parameters(cur_expression_complexity_level, funcdecl.parameters);
     sig.allow_empty_return = original_allowed_empty_return;
     cur_scope = cur_scope.rollback();
     for (const arg_id of args_ids) {
@@ -4114,7 +4118,7 @@ class FunctionCallGenerator extends CallExpressionGenerator {
     selected_ret_decls_index : number,
     func_identifier : expr.IRIdentifier,
     args_ids : number[],
-    cur_expression_complex_level : number) {
+    cur_expression_complexity_level : number) {
     //! If the function has more than one returns, we need to first generate a tuple of identifiers to
     //! relay the returned variables. And the irnode of this generation is the same as the one of the generated
     //! IRIdentifiers
@@ -4150,7 +4154,7 @@ class FunctionCallGenerator extends CallExpressionGenerator {
           const idid = new_global_id();
           type_dag.insert(idid, type_range);
           const identifier_gen = new IdentifierGenerator(idid);
-          identifier_gen.generate(cur_expression_complex_level + 1);
+          identifier_gen.generate(cur_expression_complexity_level + 1);
           contract_instance_expr = identifier_gen.irnode as expr.IRExpression;
           func_call_node = new expr.IRFunctionCall(
             this.fid,
@@ -4179,7 +4183,7 @@ class FunctionCallGenerator extends CallExpressionGenerator {
           type_dag.force_update(this.id, return_type_range);
         }
         const identifier_gen = new IdentifierGenerator(this.id, true);
-        identifier_gen.generate(cur_expression_complex_level + 1);
+        identifier_gen.generate(cur_expression_complexity_level + 1);
         this.irnode = identifier_gen.irnode;
         const identifier_expr = expr.tuple_extraction(identifier_gen.irnode! as expr.IRExpression);
         assert(identifier_gen.variable_decl !== undefined, `FunctionCallGenerator: identifier_gen.variable_decl is undefined`);
@@ -4226,7 +4230,7 @@ class FunctionCallGenerator extends CallExpressionGenerator {
           const idid = new_global_id();
           type_dag.insert(idid, type_range);
           const identifier_gen = new IdentifierGenerator(idid);
-          identifier_gen.generate(cur_expression_complex_level + 1);
+          identifier_gen.generate(cur_expression_complexity_level + 1);
           contract_instance_expr = identifier_gen.irnode as expr.IRExpression;
           this.irnode = new expr.IRFunctionCall(
             this.id,
@@ -4246,7 +4250,7 @@ class FunctionCallGenerator extends CallExpressionGenerator {
     }
   }
 
-  generate(cur_expression_complex_level : number) : void {
+  generate(cur_expression_complexity_level : number) : void {
     const [contractdecl_id, funcdecl_id] = this.pick_function_call();
     this.start_flag(contractdecl_id, funcdecl_id);
     this.update_vismut_range(contractdecl_id, funcdecl_id);
@@ -4255,10 +4259,10 @@ class FunctionCallGenerator extends CallExpressionGenerator {
     const funcdecl = irnodes.get(funcdecl_id)! as decl.IRFunctionDefinition;
     const func_identifier = new expr.IRIdentifier(new_global_id(), cur_scope.id(), funcdecl.name, funcdecl_id);
     const [selected_ret_decls_index, selected_ret_decl] = this.extract_ret_decl(funcdecl);
-    const args_ids = this.generate_arguments(selected_ret_decl, funcdecl, cur_expression_complex_level);
+    const args_ids = this.generate_arguments(selected_ret_decl, funcdecl, cur_expression_complexity_level);
     this.generate_function_call_node(contractdecl_id, funcdecl, selected_ret_decl,
       selected_ret_decls_index, func_identifier, args_ids,
-      cur_expression_complex_level);
+      cur_expression_complexity_level);
     this.update_storage_range(contractdecl_id, funcdecl_id, selected_ret_decl);
     if (selected_ret_decl !== null) {
       this.wrap_in_a_tuple();
@@ -4303,8 +4307,8 @@ class NewStructGenerator extends CallExpressionGenerator {
   }
 
   private generate_arguments(struct_decl : decl.IRStructDefinition,
-    cur_expression_complex_level : number) : expr.IRExpression[] {
-    const args_ids : number[] = super.generate_argument_from_parameters(cur_expression_complex_level, struct_decl.members);
+    cur_expression_complexity_level : number) : expr.IRExpression[] {
+    const args_ids : number[] = super.generate_argument_from_parameters(cur_expression_complexity_level, struct_decl.members);
     const args = args_ids.map(i => irnodes.get(i)! as expr.IRExpression);
     return args;
   }
@@ -4323,12 +4327,12 @@ class NewStructGenerator extends CallExpressionGenerator {
     update_storage_loc_range_for_compound_type(this.id);
   }
 
-  generate(cur_expression_complex_level : number) : void {
+  generate(cur_expression_complexity_level : number) : void {
     this.start_flag();
     const [struct_type, struct_decl] = this.distill_type_range();
     expr_db.add_new_struct_expr(this.id);
     expr_db.pair_new_struct_expr_with_struct_decl(this.id, struct_decl.id);
-    const args = this.generate_arguments(struct_decl, cur_expression_complex_level);
+    const args = this.generate_arguments(struct_decl, cur_expression_complexity_level);
     args.forEach(arg => {
       expr_db.transfer_read_variables(this.id, arg.id);
       expr_db.transfer_write_variables(this.id, arg.id);
@@ -4374,8 +4378,8 @@ class NewContractGenerator extends CallExpressionGenerator {
   }
 
   private generate_arguments(contract_decl : decl.IRContractDefinition,
-    cur_expression_complex_level : number) : expr.IRExpression[] {
-    const args_ids : number[] = super.generate_argument_from_parameters(cur_expression_complex_level, contract_decl.constructor_parameters);
+    cur_expression_complexity_level : number) : expr.IRExpression[] {
+    const args_ids : number[] = super.generate_argument_from_parameters(cur_expression_complexity_level, contract_decl.constructor_parameters);
     const args = args_ids.map(i => irnodes.get(i)! as expr.IRExpression);
     return args;
   }
@@ -4386,12 +4390,12 @@ class NewContractGenerator extends CallExpressionGenerator {
     }
   }
 
-  generate(cur_expression_complex_level : number) : void {
+  generate(cur_expression_complexity_level : number) : void {
     this.start_flag();
     const contract_type = this.distill_type_range();
     const contract_decl = irnodes.get(contract_type.referece_id) as decl.IRContractDefinition;
     const new_expr = new expr.IRNew(new_global_id(), cur_scope.id(), contract_decl.name);
-    const args = this.generate_arguments(contract_decl, cur_expression_complex_level);
+    const args = this.generate_arguments(contract_decl, cur_expression_complexity_level);
     this.update_owner_function_features()
     const new_function_expr = new expr.IRFunctionCall(this.id, cur_scope.id(), FunctionCallKind.FunctionCall, new_expr, args);
     this.irnode = new_function_expr;
@@ -4541,9 +4545,6 @@ abstract class NonExpressionStatementGenerator extends StatementGenerator {
     super();
     this.exprs = [];
   }
-  complex(cur_stmt_complex_level : number) : boolean {
-    return cur_stmt_complex_level >= config.statement_complex_level || Math.random() < config.nonstructured_statement_prob;
-  }
   abstract generate(cur_stmt_complex_level : number) : void;
 };
 
@@ -4560,12 +4561,7 @@ class SingleVariableDeclareStatementGenerator extends NonExpressionStatementGene
   private generate_expr() {
     if (this.expr === undefined) {
       let expression_gen_prototype;
-      if (get_vardecls(type_db.types(), loc.all_storage_locations).length > 0 && Math.random() > config.terminal_prob) {
-        expression_gen_prototype = get_exprgenerator(type_db.types());
-      }
-      else {
-        expression_gen_prototype = LiteralGenerator;
-      }
+      expression_gen_prototype = get_exprgenerator(type_db.types());
       const expr_id = new_global_id();
       type_dag.insert(expr_id, type_db.types());
       const expression_gen = new expression_gen_prototype(expr_id);
@@ -4617,12 +4613,7 @@ class MultipleVariableDeclareStatementGenerator extends NonExpressionStatementGe
     const ir_exps : expr.IRExpression[] = [];
     for (let i = 0; i < this.var_count; i++) {
       let expression_gen_prototype;
-      if (get_vardecls(type_db.types(), loc.all_storage_locations).length > 0 && Math.random() > config.terminal_prob) {
-        expression_gen_prototype = get_exprgenerator(type_db.types());
-      }
-      else {
-        expression_gen_prototype = LiteralGenerator;
-      }
+      expression_gen_prototype = get_exprgenerator(type_db.types());
       const expr_id = new_global_id();
       type_dag.insert(expr_id, type_db.types());
       const expression_gen = new expression_gen_prototype(expr_id);

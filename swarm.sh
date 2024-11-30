@@ -32,10 +32,45 @@ test_validity() {
     return 0
 }
 
+trivial_command() {
+    rm -rf generated_programs && NODE_OPTIONS="--max-old-space-size=8192" npx erwin generate -d > log.txt
+}
+
+# Generate complicated program, full of structs, arrays, mappings
+command1() {
+    # Check if an argument is provided
+    if [ -z "$1" ]; then
+        echo "Error: Missing argument. Please provide a value (loc, type, or scope)."
+        return 1
+    fi
+
+    # Validate the argument
+    if [[ "$1" != "loc" && "$1" != "type" && "$1" != "scope" ]]; then
+        echo "Error: Invalid argument '$1'. Accepted values are loc, type, or scope."
+        return 1
+    fi
+    rm -rf generated_programs && NODE_OPTIONS="--max-old-space-size=8192" npx erwin generate -d -m "$1" --maximum_solution_count 100 --type_complexity_level 2 --statement_complexity__level 2 --expression_complexity_level 2 > log.txt
+}
+
+# Generate complicated program without compound types such as arrays and mappings
+command2() {
+    # Check if an argument is provided
+    if [ -z "$1" ]; then
+        echo "Error: Missing argument. Please provide a value (loc, type, or scope)."
+        return 1
+    fi
+
+    # Validate the argument
+    if [[ "$1" != "loc" && "$1" != "type" && "$1" != "scope" ]]; then
+        echo "Error: Invalid argument '$1'. Accepted values are loc, type, or scope."
+        return 1
+    fi
+    rm -rf generated_programs && NODE_OPTIONS="--max-old-space-size=8192" npx erwin generate -d -m "$1" --maximum_solution_count 100 --type_complexity_level 0 --statement_complexity__level 2 --expression_complexity_level 2 > log.txt
+}
+
 cnt=0
 while true; do
-    # Run the command
-    rm -rf generated_programs && NODE_OPTIONS="--max-old-space-size=8192" npx erwin generate -d -m loc --maximum_solution_count 100 --type_complex_level 2 > log.txt
+    command2 type
     exit_status=$?
     # Check if the command crashed (non-zero exit status)
     if [ $exit_status -ne 0 ]; then
