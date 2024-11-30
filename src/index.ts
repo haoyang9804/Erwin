@@ -45,13 +45,14 @@ program
   .command("mutate")
   .description("Mutate the given Solidity code.")
   .option("-f, --file <string>", "The file to be mutated.", `${config.file}`)
-  .option("--out_dir <string>", "The file to output the mutated code.", `${config.out_dir}`);
+  .option("-o --out_dir <string>", "The file to output the mutated code.", `${config.out_dir}`);
 program
   .command("generate")
   .description("Generate random Solidity code.")
   .option("-e --exprimental", "Enable the exprimental mode.", `${config.experimental}`)
   .option("-m --mode <string>", "The mode of Erwin. The value can be 'type', 'scope', or 'loc'.", `${config.mode}`)
   .option("-d --debug", "Enable the debug mode.", `${config.debug}`)
+  .option("-o --out_dir <string>", "The output directory for the generated program. The default is 'generated_programs'", `${config.out_dir}`)
   // Dominance Constraint Solution
   .option("-max --maximum_solution_count <number>", "The maximum number of solutions Erwin will consider.", `${config.maximum_solution_count}`)
   // Type
@@ -117,6 +118,7 @@ if (program.args[0] === "mutate") {
 }
 else if (program.args[0] === "generate") {
   if (program.commands[1].opts().experimental === true) config.experimental = true;
+  config.out_dir = program.commands[1].opts().out_dir;
   config.int_num = parseInt(program.commands[1].opts().int_types_num);
   config.uint_num = parseInt(program.commands[1].opts().uint_types_num);
   config.function_body_stmt_cnt_upper_limit = parseInt(program.commands[1].opts().function_body_stmt_cnt_upper_limit);
@@ -413,8 +415,8 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
   //! Traverse type solutions
   if (type_dag.solutions_collection.length === 0) {
     const program = writer.write(source_unit_gen.irnode!.lower());
-    if (!fs.existsSync("./generated_programs")) {
-      fs.mkdirSync("./generated_programs");
+    if (!fs.existsSync(`${config.out_dir}`)) {
+      fs.mkdirSync(`${config.out_dir}`);
     }
     let date = new Date();
     let year = date.getFullYear();
@@ -424,7 +426,7 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
     let minute = date.getMinutes();
     let second = date.getSeconds();
     let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_0.sol`;
-    fs.writeFileSync(`./generated_programs/${program_name}`, program, "utf-8");
+    fs.writeFileSync(`${config.out_dir}/${program_name}`, program, "utf-8");
   }
   else {
     let cnt = 0;
@@ -444,8 +446,8 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
       const program = writer.write(source_unit_gen.irnode!.lower());
       if (program === pre_program) continue;
       pre_program = program;
-      if (!fs.existsSync("./generated_programs")) {
-        fs.mkdirSync("./generated_programs");
+      if (!fs.existsSync(`${config.out_dir}`)) {
+        fs.mkdirSync(`${config.out_dir}`);
       }
       let date = new Date();
       let year = date.getFullYear();
@@ -456,7 +458,7 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
       let second = date.getSeconds();
       let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_${cnt}.sol`;
       cnt++;
-      fs.writeFileSync(`./generated_programs/${program_name}`, program, "utf-8");
+      fs.writeFileSync(`${config.out_dir}/${program_name}`, program, "utf-8");
     }
   }
 }
@@ -493,8 +495,8 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
   //! Traverse vismut solutions
   if (vismut_dag.solutions_collection.length === 0) {
     const program = writer.write(source_unit_gen.irnode!.lower());
-    if (!fs.existsSync("./generated_programs")) {
-      fs.mkdirSync("./generated_programs");
+    if (!fs.existsSync(`${config.out_dir}`)) {
+      fs.mkdirSync(`${config.out_dir}`);
     }
     let date = new Date();
     let year = date.getFullYear();
@@ -504,7 +506,7 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
     let minute = date.getMinutes();
     let second = date.getSeconds();
     let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_0.sol`;
-    fs.writeFileSync(`./generated_programs/${program_name}`, program, "utf-8");
+    fs.writeFileSync(`${config.out_dir}/${program_name}`, program, "utf-8");
   }
   else {
     let cnt = 0;
@@ -525,8 +527,8 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
       const program = writer.write(source_unit_gen.irnode!.lower());
       if (program === pre_program) continue;
       pre_program = program;
-      if (!fs.existsSync("./generated_programs")) {
-        fs.mkdirSync("./generated_programs");
+      if (!fs.existsSync(`${config.out_dir}`)) {
+        fs.mkdirSync(`${config.out_dir}`);
       }
       let date = new Date();
       let year = date.getFullYear();
@@ -537,7 +539,7 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
       let second = date.getSeconds();
       let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_${cnt}.sol`;
       cnt++;
-      fs.writeFileSync(`./generated_programs/${program_name}`, program, "utf-8");
+      fs.writeFileSync(`${config.out_dir}/${program_name}`, program, "utf-8");
     }
   }
 }
@@ -576,8 +578,8 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
   //! Traverse storage location solutions
   if (storage_location_dag.solutions_collection.length === 0) {
     let program = writer.write(source_unit_gen.irnode!.lower());
-    if (!fs.existsSync("./generated_programs")) {
-      fs.mkdirSync("./generated_programs");
+    if (!fs.existsSync(`${config.out_dir}`)) {
+      fs.mkdirSync(`${config.out_dir}`);
     }
     let date = new Date();
     let year = date.getFullYear();
@@ -587,7 +589,7 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
     let minute = date.getMinutes();
     let second = date.getSeconds();
     let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_0.sol`;
-    fs.writeFileSync(`./generated_programs/${program_name}`, program, "utf-8");
+    fs.writeFileSync(`${config.out_dir}/${program_name}`, program, "utf-8");
   }
   else {
     let cnt = 0;
@@ -606,8 +608,8 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
       let program = writer.write(source_unit_gen.irnode!.lower());
       if (program === pre_program) continue;
       pre_program = program;
-      if (!fs.existsSync("./generated_programs")) {
-        fs.mkdirSync("./generated_programs");
+      if (!fs.existsSync(`${config.out_dir}`)) {
+        fs.mkdirSync(`${config.out_dir}`);
       }
       let date = new Date();
       let year = date.getFullYear();
@@ -618,7 +620,7 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
       let second = date.getSeconds();
       let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_${cnt}.sol`;
       cnt++;
-      fs.writeFileSync(`./generated_programs/${program_name}`, program, "utf-8");
+      fs.writeFileSync(`${config.out_dir}/${program_name}`, program, "utf-8");
     }
   }
 }

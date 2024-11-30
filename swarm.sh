@@ -32,63 +32,103 @@ test_validity() {
     return 0
 }
 
-trivial_command() {
-    rm -rf generated_programs && NODE_OPTIONS="--max-old-space-size=8192" npx erwin generate -d > log.txt
+init() {
+    rm -rf generated_programs
 }
 
 # Generate complicated program, full of structs, arrays, mappings
 command1() {
-    # Check if an argument is provided
-    if [ -z "$1" ]; then
-        echo "Error: Missing argument. Please provide a value (loc, type, or scope)."
+    # Check if both arguments are provided
+    if [ -z "$1" ] || [ -z "$2" ]; then
+        echo "Error: Missing arguments. Usage: command1 <loc|type|scope> <number>"
         return 1
     fi
 
-    # Validate the argument
+    # Validate the first argument
     if [[ "$1" != "loc" && "$1" != "type" && "$1" != "scope" ]]; then
-        echo "Error: Invalid argument '$1'. Accepted values are loc, type, or scope."
+        echo "Error: Invalid first argument '$1'. Accepted values are loc, type, or scope."
         return 1
     fi
-    rm -rf generated_programs && NODE_OPTIONS="--max-old-space-size=8192" npx erwin generate -d -m "$1" --maximum_solution_count 100 --type_complexity_level 2 --statement_complexity__level 2 --expression_complexity_level 2 > log.txt
+
+    # Validate the second argument (check if it's a number)
+    if ! [[ "$2" =~ ^[0-9]+$ ]]; then
+        echo "Error: Invalid second argument '$2'. It must be a number."
+        return 1
+    fi
+    output_dir="${3:-generated_programs}"
+    NODE_OPTIONS="--max-old-space-size=8192" npx erwin generate -d -m "$1" --maximum_solution_count "$2" --type_complexity_level 2 --statement_complexity__level 2 --expression_complexity_level 2 -o "$output_dir" > log.txt
 }
 
 # Generate complicated program without compound types such as arrays and mappings
 command2() {
-    # Check if an argument is provided
-    if [ -z "$1" ]; then
-        echo "Error: Missing argument. Please provide a value (loc, type, or scope)."
+    # Check if both arguments are provided
+    if [ -z "$1" ] || [ -z "$2" ]; then
+        echo "Error: Missing arguments. Usage: command1 <loc|type|scope> <number>"
         return 1
     fi
 
-    # Validate the argument
+    # Validate the first argument
     if [[ "$1" != "loc" && "$1" != "type" && "$1" != "scope" ]]; then
-        echo "Error: Invalid argument '$1'. Accepted values are loc, type, or scope."
+        echo "Error: Invalid first argument '$1'. Accepted values are loc, type, or scope."
         return 1
     fi
-    rm -rf generated_programs && NODE_OPTIONS="--max-old-space-size=8192" npx erwin generate -d -m "$1" --maximum_solution_count 100 --type_complexity_level 0 --statement_complexity__level 2 --expression_complexity_level 2 > log.txt
+
+    # Validate the second argument (check if it's a number)
+    if ! [[ "$2" =~ ^[0-9]+$ ]]; then
+        echo "Error: Invalid second argument '$2'. It must be a number."
+        return 1
+    fi
+    output_dir="${3:-generated_programs}"
+    NODE_OPTIONS="--max-old-space-size=8192" npx erwin generate -d -m "$1" --maximum_solution_count "$2" --type_complexity_level 0 --statement_complexity__level 2 --expression_complexity_level 2 -o "$output_dir" > log.txt
 }
 
-cnt=0
-while true; do
-    command2 type
-    exit_status=$?
-    # Check if the command crashed (non-zero exit status)
-    if [ $exit_status -ne 0 ]; then
-        echo "> Command crashed with exit status: $exit_status"
-        break
+test() {
+    cnt=0
+    while true; do
+        init
+        command2 type 1
+        exit_status=$?
+        # Check if the command crashed (non-zero exit status)
+        if [ $exit_status -ne 0 ]; then
+            echo "> Command crashed with exit status: $exit_status"
+            break
+        fi
+        test_validity
+        return_code=$?
+        if [ $return_code -eq 0 ]; then
+            echo "All files are valid."
+        elif [ $return_code -eq 1 ]; then
+            echo "There exist invalid files."
+            break
+        else
+            echo "No file is generated."
+            break
+        fi
+        cnt=$((cnt+1))
+        echo "Round $cnt is done."
+    done
+    echo "In total, successfully passed $cnt rounds."
+}
+
+generate() {
+    if [ -z "$1" ]; then
+        echo "Error: Missing argument. Usage: generate <number>"
+        return 1
     fi
-    test_validity
-    return_code=$?
-    if [ $return_code -eq 0 ]; then
-        echo "All files are valid."
-    elif [ $return_code -eq 1 ]; then
-        echo "There exist invalid files."
-        break
-    else
-        echo "No file is generated."
-        break
+    # Validate the argument (check if it's a number)
+    if ! [[ "$1" =~ ^[0-9]+$ ]]; then
+        echo "Error: Invalid argument '$1'. It must be a number."
+        return 1
     fi
-    cnt=$((cnt+1))
-    echo "Round $cnt is done."
-done
-echo "In total, successfully passed $cnt rounds."
+    cnt=0
+    while true; do
+        command1 type 1 $cnt
+        cnt=$((cnt+1))
+        if [ $cnt -eq $1 ]; then
+            break
+        fi
+    done
+    
+}
+
+generate 1

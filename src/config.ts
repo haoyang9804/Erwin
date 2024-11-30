@@ -1,6 +1,6 @@
 export const config = {
   file: "",
-  out_dir: "",
+  out_dir: "./generated_programs",
 
   experimental: false,
   mode: "",
