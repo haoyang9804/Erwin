@@ -87,6 +87,10 @@ program
   .option("--do_while_body_stmt_cnt_lower_limit <number>", "The lower limit of the number of statements in the body of a do while loop.", `${config.do_while_body_stmt_cnt_lower_limit}`)
   .option("--if_body_stmt_cnt_upper_limit <number>", "The upper limit of the number of statements in the body of an if statement.", `${config.if_body_stmt_cnt_upper_limit}`)
   .option("--if_body_stmt_cnt_lower_limit <number>", "The lower limit of the number of statements in the body of an if statement.", `${config.if_body_stmt_cnt_lower_limit}`)
+  .option("--struct_decl_per_contract_upperlimit <number>", "The upper limit of the number of struct declarations in a contract.", `${config.struct_decl_per_contract_upperlimit}`)
+  .option("--struct_decl_per_contract_lowerlimit <number>", "The lower limit of the number of struct declarations in a contract.", `${config.struct_decl_per_contract_lowerlimit}`)
+  .option("--event_decl_per_contract_upperlimit <number>", "The upper limit of the number of events in a contract.", `${config.event_decl_per_contract_upperlimit}`)
+  .option("--event_count_per_contract_lowerlimit <number>", "The lower limit of the number of events in a contract.", `${config.event_count_per_contract_lowerlimit}`)
   // Complexity
   .option("--expression_complexity_level <number>", "The complexity level of the expression Erwin will generate.\nThe suggedted range is [1,2,3]. The bigger, the more complex.", `${config.expression_complexity_level}`)
   .option("--statement_complexity__level <number>", "The complexity level of the statement Erwin will generate.\nThe suggedted range is [1,2]. The bigger, the more complex.", `${config.statement_complexity__level}`)
@@ -110,6 +114,7 @@ program
   .option("--mapping_prob <float>", "The probability of generating a mapping.", `${config.mapping_prob}`)
   .option("--array_prob <float>", "The probability of generating an array.", `${config.array_prob}`)
   .option("--dynamic_array_prob <float>", "The probability of generating a dynamic array.", `${config.dynamic_array_prob}`)
+  .option("--event_prob <float>", "The probability of generating an event.", `${config.event_prob}`)
 program.parse(process.argv);
 // Set the configuration
 if (program.args[0] === "mutate") {
@@ -156,6 +161,7 @@ else if (program.args[0] === "generate") {
   config.mapping_prob = parseFloat(program.commands[1].opts().mapping_prob);
   config.array_prob = parseFloat(program.commands[1].opts().array_prob);
   config.dynamic_array_prob = parseFloat(program.commands[1].opts().dynamic_array_prob);
+  config.event_prob = parseFloat(program.commands[1].opts().event_prob);
   config.for_init_cnt_upper_limit = parseInt(program.commands[1].opts().for_init_cnt_upper_limit);
   config.for_init_cnt_lower_limit = parseInt(program.commands[1].opts().for_init_cnt_lower_limit);
   config.statement_complexity__level = parseInt(program.commands[1].opts().statement_complexity__level);
@@ -168,6 +174,10 @@ else if (program.args[0] === "generate") {
   config.do_while_body_stmt_cnt_upper_limit = parseInt(program.commands[1].opts().do_while_body_stmt_cnt_upper_limit);
   config.if_body_stmt_cnt_lower_limit = parseInt(program.commands[1].opts().if_body_stmt_cnt_lower_limit);
   config.if_body_stmt_cnt_upper_limit = parseInt(program.commands[1].opts().if_body_stmt_cnt_upper_limit);
+  config.struct_decl_per_contract_upperlimit = parseInt(program.commands[1].opts().struct_decl_per_contract_upperlimit);
+  config.struct_decl_per_contract_lowerlimit = parseInt(program.commands[1].opts().struct_decl_per_contract_lowerlimit);
+  config.event_decl_per_contract_upperlimit = parseInt(program.commands[1].opts().event_decl_per_contract_upperlimit);
+  config.event_count_per_contract_lowerlimit = parseInt(program.commands[1].opts().event_count_per_contract_lowerlimit);
   if (program.commands[1].opts().debug === true) config.debug = true;
   if (config.mode == "scope") {
     config.int_num = 1;
@@ -214,6 +224,7 @@ else if (program.args[0] === "generate") {
   assert(config.struct_instance_prob >= 0.0 && config.struct_instance_prob <= 1.0, "The probability of generating a struct instance must be in the range [0,1].");
   assert(config.array_prob + config.mapping_prob + config.contract_instance_prob + config.struct_instance_prob < 1, "The sum of the probabilities of generating a contract/struct instance, a mapping declaration, or an array declaration must be less than 1.");
   assert(config.dynamic_array_prob >= 0.0 && config.dynamic_array_prob <= 1.0, "The probability of generating a dynamic array must be in the range [0,1].");
+  assert(config.event_prob >= 0.0 && config.event_prob <= 1.0, "The probability of generating an event must be in the range [0,1].");
   assert(config.return_count_of_function_lowerlimit <= config.return_count_of_function_upperlimit, "The lower limit of the number of return values of a function must be less than or equal to the upper limit.");
   assert(config.param_count_of_function_lowerlimit <= config.param_count_of_function_upperlimit, "The lower limit of the number of parameters of a function must be less than or equal to the upper limit.");
   assert(config.state_variable_count_lowerlimit <= config.state_variable_count_upperlimit, "state_variable_count_lowerlimit must be less than or equal to state_variable_count_upperlimit.");
@@ -236,6 +247,10 @@ else if (program.args[0] === "generate") {
   assert(config.if_body_stmt_cnt_lower_limit <= config.if_body_stmt_cnt_upper_limit, "The lower limit of the number of statements in the body of an if statement must be less than or equal to the upper limit.");
   assert(config.struct_member_variable_count_lowerlimit <= config.struct_member_variable_count_upperlimit, "The lower limit of the number of member variables in a struct must be less than or equal to the upper limit.");
   assert(config.struct_member_variable_count_lowerlimit >= 1, "The lower limit of the number of member variables in a struct must be not less than 1.");
+  assert(config.struct_decl_per_contract_lowerlimit <= config.struct_decl_per_contract_upperlimit, "The lower limit of the number of struct declarations in a contract must be less than or equal to the upper limit.");
+  assert(config.struct_decl_per_contract_lowerlimit >= 1, "The lower limit of the number of struct declarations in a contract must be not less than 1.");
+  assert(config.event_count_per_contract_lowerlimit <= config.event_decl_per_contract_upperlimit, "The lower limit of the number of events in a contract must be less than or equal to the upper limit.");
+  assert(config.event_count_per_contract_lowerlimit >= 1, "The lower limit of the number of events in a contract must be not less than 1.");
   assert(config.struct_prob >= 0 && config.struct_prob <= 1, "The probability of generating a struct must be in the range [0,1].");
   assert(config.initialization_prob >= 0 && config.initialization_prob <= 1, "The probability of generating an initialization statement must be in the range [0,1].");
   assert(config.constructor_prob >= 0 && config.constructor_prob <= 1, "The probability of generating a constructor must be in the range [0,1].");

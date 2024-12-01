@@ -26,6 +26,12 @@ export const config = {
   // Struct
   struct_member_variable_count_lowerlimit: 1,
   struct_member_variable_count_upperlimit: 2,
+  struct_decl_per_contract_upperlimit: 2,
+  struct_decl_per_contract_lowerlimit: 1,
+
+  // Event
+  event_decl_per_contract_upperlimit: 2,
+  event_count_per_contract_lowerlimit: 1,
 
   // Contract
   contract_count: 2,
@@ -59,6 +65,7 @@ export const config = {
   return_prob: 0.5,
   reuse_name_prob: 0.0,
   dynamic_array_prob: 0.5,
+  event_prob: 0.5,
 
   // Structured Statements
   for_init_cnt_upper_limit: 1,

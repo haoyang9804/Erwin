@@ -52,21 +52,20 @@ export class DeprecatedDB {
 
 class DeclDB {
 
-  //! Scope-Related
   private scope_tree : Tree<number> = new Tree();
   private scope2irnode : Map<number, number[]> = new Map<number, number[]>();
   private irnode2scope : Map<number, number> = new Map<number, number>();
   private contractdecl_id_to_scope : Map<number, number> = new Map<number, number>();
   private scope_id_to_contractdecl_id : Map<number, number> = new Map<number, number>();
 
-  //! Decl-Related
   private vardecls : Set<number> = new Set<number>();
   private structdecls : Set<number> = new Set<number>();
   private funcdecls : Set<number> = new Set<number>();
   private struct_instance_decls : Set<number> = new Set<number>();
   private contractdecls : Set<number> = new Set<number>();
-  private state_variables : Set<number> = new Set<number>();
+  private state_decls : Set<number> = new Set<number>();
   private getter_funcdecls : Set<number> = new Set<number>();
+  private eventdecls : Set<number> = new Set<number>();
 
   /*
   ! For any struct declaration, different struct instances may have different storage location ranges.
@@ -130,11 +129,9 @@ class DeclDB {
   //* vardecl
   add_vardecl_with_scope(vardecl_id : number, scope : ScopeList) : void {
     if (scope.kind() === scopeKind.CONTRACT) {
-      this.add_state_variable(vardecl_id);
+      this.add_state_decl(vardecl_id);
     }
-    else {
-      this.add_vardecl(vardecl_id);
-    }
+    this.add_vardecl(vardecl_id);
     this.insert(vardecl_id, scope.id());
   }
 
@@ -168,6 +165,23 @@ class DeclDB {
 
   is_locked_vardecl(vardecl_id : number) : boolean {
     return this.forbidden_vardecls.has(vardecl_id);
+  }
+
+  //* eventdecl
+  add_eventdecl(eventdecl_id : number) : void {
+    this.eventdecls.add(eventdecl_id);
+  }
+
+  remove_eventdecl(eventdecl_id : number) : void {
+    this.eventdecls.delete(eventdecl_id);
+  }
+
+  is_eventdecl(eventdecl_id : number) : boolean {
+    return this.eventdecls.has(eventdecl_id);
+  }
+
+  eventdecls_ids() : number[] {
+    return Array.from(this.eventdecls);
   }
 
   //* structdecl
@@ -355,25 +369,25 @@ class DeclDB {
     return this.contractdecls.size;
   }
 
-  //* state_variable
-  add_state_variable(vardecl_id : number) : void {
-    this.state_variables.add(vardecl_id);
+  //* state_decl
+  add_state_decl(vardecl_id : number) : void {
+    this.state_decls.add(vardecl_id);
   }
 
-  remove_state_variable(vardecl_id : number) : void {
-    this.state_variables.delete(vardecl_id);
+  remove_state_decl(vardecl_id : number) : void {
+    this.state_decls.delete(vardecl_id);
   }
 
-  is_state_variable(vardecl_id : number) : boolean {
-    return this.state_variables.has(vardecl_id);
+  is_state_decl(vardecl_id : number) : boolean {
+    return this.state_decls.has(vardecl_id);
   }
 
-  state_variables_ids() : number[] {
-    return Array.from(this.state_variables);
+  state_decls_ids() : number[] {
+    return Array.from(this.state_decls);
   }
 
-  state_variable_size() : number {
-    return this.state_variables.size;
+  state_decl_size() : number {
+    return this.state_decls.size;
   }
 
   //* struct decl
@@ -665,6 +679,11 @@ class DeclDB {
     return irnodes_ids.filter(x => this.structdecls.has(x));
   }
 
+  get_eventdecls_ids_recursively_from_a_scope(scope_id : number) : number[] {
+    let irnodes_ids = this.get_irnodes_ids_recursively_from_a_scope(scope_id);
+    return irnodes_ids.filter(x => this.eventdecls.has(x));
+  }
+
   get_funcdecls_ids_recursively_from_a_contract(contract_id : number) : number[] {
     let scope_id = this.contractdecl_id_to_scope.get(contract_id);
     return this.get_funcdecls_ids_recursively_from_a_scope(scope_id!);
@@ -673,6 +692,11 @@ class DeclDB {
   get_structdecls_ids_recursively_from_a_contract(contract_id : number) : number[] {
     let scope_id = this.contractdecl_id_to_scope.get(contract_id);
     return this.get_structdecls_ids_recursively_from_a_scope(scope_id!);
+  }
+
+  get_eventdecls_ids_recursively_from_a_contract(contract_id : number) : number[] {
+    let scope_id = this.contractdecl_id_to_scope.get(contract_id);
+    return this.get_eventdecls_ids_recursively_from_a_scope(scope_id!);
   }
 }
 
@@ -929,7 +953,8 @@ export enum IDENTIFIER {
   CONTRACT_INSTANCE,
   STRUCT_INSTANCE,
   MAPPING,
-  ARRAY
+  ARRAY,
+  EVENT
 };
 
 class NameDB {
@@ -954,6 +979,8 @@ class NameDB {
         return `struct${this.name_id++}`;
       case IDENTIFIER.FUNC:
         return `func${this.name_id++}`;
+      case IDENTIFIER.EVENT:
+        return `event${this.name_id++}`;
       default:
         throw new Error(`generate_name: identifier ${identifier} is not supported`);
     }

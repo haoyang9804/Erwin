@@ -90,6 +90,7 @@ export class IRReturnStatement extends IRStatement {
   }
 }
 
+//! Deprecated
 export class IREmitStatement extends IRStatement {
   event_call : IRExpression;
   arguments : IRExpression[];
@@ -101,6 +102,17 @@ export class IREmitStatement extends IRStatement {
   lower() : Statement {
     const event_call = factory.makeFunctionCall("", FunctionCallKind.FunctionCall, this.event_call.lower(), this.arguments.map(a => a.lower() as Expression));
     return factory.makeEmitStatement(event_call);
+  }
+}
+
+export class IREmitStatementV2 extends IRStatement {
+  event_call : IRFunctionCall;
+  constructor(id : number, scope : number, event_call : IRFunctionCall) {
+    super(id, scope);
+    this.event_call = event_call;
+  }
+  lower() : Statement {
+    return factory.makeEmitStatement(this.event_call.lower() as FunctionCall);
   }
 }
 

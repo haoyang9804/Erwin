@@ -122,7 +122,7 @@ generate() {
     fi
     cnt=0
     while true; do
-        command1 type 1 $cnt
+        command1 type 1
         cnt=$((cnt+1))
         if [ $cnt -eq $1 ]; then
             break
@@ -131,4 +131,5 @@ generate() {
     
 }
 
-generate 1
+# generate 1
+test
