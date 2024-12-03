@@ -1,4 +1,4 @@
-import { IRUserDefinedTypeDefinition, IREnumDefinition } from "../src/declare";
+import { IRUserDefinedTypeDefinition, IREnumDefinition } from "../src/declaration";
 import {
   PrettyFormatter,
   ASTWriter,

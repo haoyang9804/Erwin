@@ -1,5 +1,5 @@
 import { TypeProvider } from "../src/type"
-import { IRVariableDeclaration, IRFunctionDefinition, IRContractDefinition } from "../src/declare";
+import { IRVariableDeclaration, IRFunctionDefinition, IRContractDefinition } from "../src/declaration";
 import { IRIdentifier, IRLiteral, IRTuple, IRFunctionCall, IRNew } from "../src/expression";
 import { IRVariableDeclarationStatement } from "../src/statement";
 import {

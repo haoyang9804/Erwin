@@ -1,5 +1,5 @@
 import { TypeProvider } from "../src/type"
-import { IRStructDefinition, IRVariableDeclaration } from "../src/declare";
+import { IRStructDefinition, IRVariableDeclaration } from "../src/declaration";
 import {
   PrettyFormatter,
   ASTWriter,

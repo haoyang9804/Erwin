@@ -31,7 +31,11 @@ export const config = {
 
   // Event
   event_decl_per_contract_upperlimit: 2,
-  event_count_per_contract_lowerlimit: 1,
+  event_decl_per_contract_lowerlimit: 1,
+
+  // Error
+  error_decl_per_contract_upperlimit: 2,
+  error_decl_per_contract_lowerlimit: 1,
 
   // Contract
   contract_count: 2,
@@ -67,6 +71,7 @@ export const config = {
   reuse_name_prob: 0.0,
   dynamic_array_prob: 0.5,
   event_prob: 0.5,
+  error_prob: 0.5,
 
   // Structured Statements
   for_init_cnt_upper_limit: 1,

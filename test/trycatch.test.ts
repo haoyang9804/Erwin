@@ -1,5 +1,5 @@
 import { TypeProvider } from "../src/type"
-import { IREventDefinition, IRVariableDeclaration } from "../src/declare";
+import { IREventDefinition, IRVariableDeclaration } from "../src/declaration";
 import { IRIdentifier, IRFunctionCall } from "../src/expression";
 import { IRTryCatchClause, IRTry, IREmitStatement } from "../src/statement";
 import {

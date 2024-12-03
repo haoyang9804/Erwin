@@ -11,7 +11,7 @@ import { irnodes } from "./node";
 import { color } from "console-log-colors"
 import { is_super_range, is_equal_range, intersection_range } from "./dominance";
 import { ContractKind, DataLocation, FunctionCallKind, FunctionKind, FunctionStateMutability, FunctionVisibility, StateVariableVisibility } from "solc-typed-ast";
-import { ScopeList, scopeKind, initScope, inside_function_body, inside_struct_decl_scope, get_scope_from_scope_id, unexpected_extra_stmt_belong_to_the_parent_scope, inside_constructor_scope, inside_constructor_parameter_scope, inside_event_scope } from "./scope";
+import { ScopeList, scopeKind, initScope, inside_function_body, inside_struct_decl_scope, get_scope_from_scope_id, unexpected_extra_stmt_belong_to_the_parent_scope, inside_constructor_scope, inside_constructor_parameter_scope, inside_event_scope, inside_error_scope } from "./scope";
 import { FuncStat, FuncStatProvider } from "./funcstat";
 import { FuncVis, FuncVisProvider } from "./visibility";
 import * as loc from "./loc";
@@ -439,6 +439,17 @@ function get_eventdecls() : [number, number][] {
   return contractdecl_id_plus_eventdecl_id;
 }
 
+function get_errordecls() : [number, number][] {
+  let contractdecl_id_plus_errordecl_id : [number, number][] = [];
+  for (let contract_id of decl_db.contractdecls_ids()) {
+    const errordecl_ids = decl_db.get_errordecls_ids_recursively_from_a_contract(contract_id);
+    for (let irnode_id of errordecl_ids) {
+      contractdecl_id_plus_errordecl_id.push([contract_id, irnode_id]);
+    }
+  }
+  return contractdecl_id_plus_errordecl_id;
+}
+
 function cannot_choose_functioncallgenerator(type_range : type.Type[], storage_loc_range : loc.StorageLocation[]) : boolean {
   return !contains_available_funcdecls(get_funcdecls(type_range, storage_loc_range));
 }
@@ -546,6 +557,9 @@ function get_stmtgenerator(cur_stmt_complex_level : number = -1) : any {
   }
   if (get_eventdecls().length === 0) {
     generator_candidates.delete(EmitStatementGenerator);
+  }
+  if (get_errordecls().length === 0) {
+    generator_candidates.delete(RevertStatementGenerator);
   }
   let generator_candidates_array = Array.from(generator_candidates);
   return pick_random_element(generator_candidates_array);
@@ -1014,7 +1028,8 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
     }
     else if (cur_scope.kind() === scopeKind.STRUCT) {
     }
-    else if (cur_scope.kind() === scopeKind.EVENT) {
+    else if (cur_scope.kind() === scopeKind.EVENT ||
+      cur_scope.kind() === scopeKind.ERROR) {
       storage_location_dag.insert(this.irnode.id, [
         loc.StorageLocationProvider.memory(),
         loc.StorageLocationProvider.storage_pointer(),
@@ -1200,7 +1215,8 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
     }
     else if (cur_scope.kind() === scopeKind.STRUCT) {
     }
-    else if (cur_scope.kind() === scopeKind.EVENT) {
+    else if (cur_scope.kind() === scopeKind.EVENT ||
+      cur_scope.kind() === scopeKind.ERROR) {
       storage_location_dag.insert(this.irnode.id, [
         loc.StorageLocationProvider.memory(),
         loc.StorageLocationProvider.storage_pointer(),
@@ -1425,7 +1441,8 @@ class StringDeclarationGenerator extends DeclarationGenerator {
     }
     else if (cur_scope.kind() === scopeKind.STRUCT) {
     }
-    else if (cur_scope.kind() === scopeKind.EVENT) {
+    else if (cur_scope.kind() === scopeKind.EVENT ||
+      cur_scope.kind() === scopeKind.ERROR) {
       storage_location_dag.insert(this.irnode.id, [
         loc.StorageLocationProvider.memory(),
         loc.StorageLocationProvider.storage_pointer(),
@@ -1523,6 +1540,52 @@ class EventDeclarationGenerator extends DeclarationGenerator {
     decl_db.add_eventdecl(eventid);
     if (cur_scope.kind() === scopeKind.CONTRACT) {
       decl_db.add_state_decl(eventid);
+    }
+    this.end_flag();
+  }
+}
+
+class ErrorDeclarationGenerator extends DeclarationGenerator {
+  constructor() {
+    super();
+  }
+
+  private start_flag() {
+    if (config.debug) {
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Error Declaration, scope: ${cur_scope.kind()}`));
+      indent += 2;
+    }
+  }
+
+  private end_flag() {
+    if (config.debug) {
+      indent -= 2;
+      console.log(color.yellowBG(`${" ".repeat(indent)}Error Declaration, scope: ${cur_scope.kind()}, id: ${this.irnode!.id}, name: ${(this.irnode as decl.IRErrorDefinition).name}`));
+    }
+  }
+
+  private generate_parameters() {
+    cur_scope = cur_scope.new(scopeKind.ERROR);
+    const parameter_count = random_int(config.param_count_of_function_lowerlimit, config.param_count_of_function_upperlimit);
+    const parameters : decl.IRVariableDeclaration[] = [];
+    Array.from({ length: parameter_count }).forEach(() => {
+      const parameter_gen = new VariableDeclarationGenerator(0, type_db.types());
+      parameter_gen.generate();
+      parameters.push(parameter_gen.irnode! as decl.IRVariableDeclaration);
+    });
+    cur_scope = cur_scope.rollback();
+    return parameters;
+  }
+
+  generate() : void {
+    this.start_flag();
+    const errorid = new_global_id();
+    const error_name = name_db.generate_name(IDENTIFIER.ERROR);
+    this.irnode = new decl.IRErrorDefinition(errorid, cur_scope.id(), error_name, this.generate_parameters());
+    decl_db.insert(errorid, cur_scope.id());
+    decl_db.add_errordecl(errorid);
+    if (cur_scope.kind() === scopeKind.CONTRACT) {
+      decl_db.add_state_decl(errorid);
     }
     this.end_flag();
   }
@@ -1710,7 +1773,7 @@ class VariableDeclarationGenerator extends DeclarationGenerator {
 
   private distill_type_range() {
     //! Types containing (nested) mappings can only be parameters or return variables of internal or library functions.
-    if (inside_constructor_parameter_scope(cur_scope) || inside_event_scope(cur_scope)) {
+    if (inside_constructor_parameter_scope(cur_scope) || inside_event_scope(cur_scope) || inside_error_scope(cur_scope)) {
       this.type_range = this.type_range.filter(t => {
         return !type.contain_mapping_type(t);
       })
@@ -2819,12 +2882,23 @@ class ContractDeclarationGenerator extends DeclarationGenerator {
   }
 
   private generate_event_decls() {
-    const event_count = random_int(config.event_count_per_contract_lowerlimit, config.event_decl_per_contract_upperlimit);
+    const event_count = random_int(config.event_decl_per_contract_lowerlimit, config.event_decl_per_contract_upperlimit);
     for (let i = 0; i < event_count; i++) {
       if (Math.random() < config.event_prob) {
         const event_gen = new EventDeclarationGenerator();
         event_gen.generate();
         this.body.push(event_gen.irnode!);
+      }
+    }
+  }
+
+  private generate_error_decls() {
+    const error_count = random_int(config.error_decl_per_contract_lowerlimit, config.error_decl_per_contract_upperlimit);
+    for (let i = 0; i < error_count; i++) {
+      if (Math.random() < config.event_prob) {
+        const error_gen = new ErrorDeclarationGenerator();
+        error_gen.generate();
+        this.body.push(error_gen.irnode!);
       }
     }
   }
@@ -2922,6 +2996,7 @@ class ContractDeclarationGenerator extends DeclarationGenerator {
     this.irnode = new decl.IRContractDefinition(thisid, cur_scope.id(), contract_name,
       ContractKind.Contract, false, false, [], [], [], [], []);
     this.generate_event_decls();
+    this.generate_error_decls();
     this.generate_struct_decls();
     this.generate_state_variables();
     decl_db.insert_yin_contract(cur_scope.id(), thisid);
@@ -4847,6 +4922,51 @@ class EmitExpressionGenerator extends CallExpressionGenerator {
   }
 }
 
+class RevertExpressionGenerator extends CallExpressionGenerator {
+  constructor(id : number) {
+    super(id);
+  }
+
+  start_flag() {
+    if (config.debug) {
+      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating RevertExpressionGenerator ${this.id}: scope: ${cur_scope.kind()}`));
+      indent += 2;
+    }
+  }
+
+  end_flag() {
+    if (config.debug) {
+      indent -= 2;
+      console.log(color.yellowBG(`${" ".repeat(indent)}${this.id}: RevertExpressionGenerator, scope: ${cur_scope.kind()}`));
+    }
+  }
+
+  generate(cur_expression_complexity_level : number) : void {
+    this.start_flag();
+    const contractdecl_id_plus_errordecl_id = get_errordecls();
+    let [contractdecl_id, errordecl_id] = pick_random_element(contractdecl_id_plus_errordecl_id)!;
+    if (contractdecl_id < 0) {
+      contractdecl_id = -contractdecl_id;
+    }
+    const cur_contract_id = decl_db.get_current_contractdecl_id(cur_scope);
+    const error_decl = irnodes.get(errordecl_id)! as decl.IRErrorDefinition;
+    const contract_decl = irnodes.get(contractdecl_id)! as decl.IRContractDefinition;
+    const name = cur_contract_id === contractdecl_id ?
+      Math.random() < 0.5 ? error_decl.name : contract_decl.name + "." + error_decl.name :
+      contract_decl.name + "." + error_decl.name;
+    const args_ids = super.generate_argument_from_parameters(cur_expression_complexity_level + 1, error_decl.parameters);
+    const args = args_ids.map(i => irnodes.get(i)! as expr.IRExpression);
+    const error_identifier = new expr.IRIdentifier(new_global_id(), cur_scope.id(), name, errordecl_id);
+    expr_db.expr_reads_variable(this.id, errordecl_id);
+    expr_db.expr_writes_variable(this.id, errordecl_id);
+    args_ids.forEach(arg_id => {
+      expr_db.transfer_read_variables(this.id, arg_id);
+    });
+    this.irnode = new expr.IRFunctionCall(this.id, cur_scope.id(), FunctionCallKind.FunctionCall, error_identifier, args);
+    this.end_flag();
+  }
+}
+
 const terminal_expression_generators = [
   LiteralGenerator,
   IdentifierGenerator
@@ -4986,7 +5106,6 @@ class EmitStatementGenerator extends ExpressionStatementGenerator {
   constructor() {
     super();
   }
-
   generate(_ : number) : void {
     this.start_flag();
     const emit_expr_id = new_global_id();
@@ -4995,6 +5114,23 @@ class EmitStatementGenerator extends ExpressionStatementGenerator {
     emit_expr_gen.generate(0);
     this.expr = emit_expr_gen.irnode! as expr.IRExpression;
     this.irnode = new stmt.IREmitStatementV2(new_global_id(), cur_scope.id(), this.expr as expr.IRFunctionCall);
+    (this.irnode as stmt.IRStatement).exprs = [this.expr];
+    this.end_flag();
+  }
+}
+
+class RevertStatementGenerator extends ExpressionStatementGenerator {
+  constructor() {
+    super();
+  }
+  generate(_ : number) : void {
+    this.start_flag();
+    const revert_expr_id = new_global_id();
+    type_dag.insert(revert_expr_id, type_db.types());
+    const revert_expr_gen = new RevertExpressionGenerator(revert_expr_id);
+    revert_expr_gen.generate(0);
+    this.expr = revert_expr_gen.irnode! as expr.IRExpression;
+    this.irnode = new stmt.IRRevertStatementV2(new_global_id(), cur_scope.id(), this.expr as expr.IRFunctionCall);
     (this.irnode as stmt.IRStatement).exprs = [this.expr];
     this.end_flag();
   }
@@ -5522,7 +5658,8 @@ const non_structured_statement_generators = [
   UnaryOpStatementGenerator,
   ConditionalStatementGenerator,
   FunctionCallStatementGenerator,
-  EmitStatementGenerator
+  EmitStatementGenerator,
+  RevertStatementGenerator
 ];
 
 const statement_generators = [
@@ -5532,6 +5669,7 @@ const statement_generators = [
   ConditionalStatementGenerator,
   FunctionCallStatementGenerator,
   EmitStatementGenerator,
+  RevertStatementGenerator,
   IfStatementGenerator,
   ForStatementGenerator,
   WhileStatementGenerator,

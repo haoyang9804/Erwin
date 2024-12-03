@@ -1,5 +1,5 @@
 import { TypeProvider } from "../src/type"
-import { IRVariableDeclaration } from "../src/declare";
+import { IRVariableDeclaration } from "../src/declaration";
 import { IRIdentifier, IRUnaryOp, IRBinaryOp, IRLiteral } from "../src/expression";
 import { IRFor, IRVariableDeclarationStatement, IRBreakStatement } from "../src/statement";
 import {

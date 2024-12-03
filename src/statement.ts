@@ -201,10 +201,22 @@ export class IRRevertStatement extends IRStatement {
     this.arguments = arguments_;
   }
   lower() : Statement {
-    const event_call = factory.makeFunctionCall("", FunctionCallKind.FunctionCall, this.error_call.lower(), this.arguments.map(a => a.lower() as Expression));
-    return factory.makeRevertStatement(event_call);
+    const error_call = factory.makeFunctionCall("", FunctionCallKind.FunctionCall, this.error_call.lower(), this.arguments.map(a => a.lower() as Expression));
+    return factory.makeRevertStatement(error_call);
   }
 }
+
+export class IRRevertStatementV2 extends IRStatement {
+  error_call : IRFunctionCall;
+  constructor(id : number, scope : number, error_call : IRFunctionCall) {
+    super(id, scope);
+    this.error_call = error_call;
+  }
+  lower() : Statement {
+    return factory.makeRevertStatement(this.error_call.lower() as FunctionCall);
+  }
+}
+
 
 export class IRTryCatchClause extends IRStatement {
   error_name : string;

@@ -66,6 +66,7 @@ class DeclDB {
   private state_decls : Set<number> = new Set<number>();
   private getter_funcdecls : Set<number> = new Set<number>();
   private eventdecls : Set<number> = new Set<number>();
+  private errordecls : Set<number> = new Set<number>();
   private stringdecls : Set<number> = new Set<number>();
 
   /*
@@ -183,6 +184,23 @@ class DeclDB {
 
   eventdecls_ids() : number[] {
     return Array.from(this.eventdecls);
+  }
+
+  //* errordecl
+  add_errordecl(errordecl_id : number) : void {
+    this.errordecls.add(errordecl_id);
+  }
+
+  remove_errordecl(errordecl_id : number) : void {
+    this.errordecls.delete(errordecl_id);
+  }
+
+  is_errordecl(errordecl_id : number) : boolean {
+    return this.errordecls.has(errordecl_id);
+  }
+
+  errordecls_ids() : number[] {
+    return Array.from(this.errordecls);
   }
 
   //* stringdecl
@@ -704,6 +722,11 @@ class DeclDB {
     return irnodes_ids.filter(x => this.eventdecls.has(x));
   }
 
+  get_errordecls_ids_recursively_from_a_scope(scope_id : number) : number[] {
+    let irnodes_ids = this.get_irnodes_ids_recursively_from_a_scope(scope_id);
+    return irnodes_ids.filter(x => this.errordecls.has(x));
+  }
+
   get_funcdecls_ids_recursively_from_a_contract(contract_id : number) : number[] {
     let scope_id = this.contractdecl_id_to_scope.get(contract_id);
     return this.get_funcdecls_ids_recursively_from_a_scope(scope_id!);
@@ -718,6 +741,12 @@ class DeclDB {
     let scope_id = this.contractdecl_id_to_scope.get(contract_id);
     return this.get_eventdecls_ids_recursively_from_a_scope(scope_id!);
   }
+
+  get_errordecls_ids_recursively_from_a_contract(contract_id : number) : number[] {
+    let scope_id = this.contractdecl_id_to_scope.get(contract_id);
+    return this.get_errordecls_ids_recursively_from_a_scope(scope_id!);
+  }
+
 }
 
 class ExprDB {
@@ -1014,7 +1043,8 @@ export enum IDENTIFIER {
   STRUCT_INSTANCE,
   MAPPING,
   ARRAY,
-  EVENT
+  EVENT,
+  ERROR
 };
 
 class NameDB {
@@ -1041,6 +1071,8 @@ class NameDB {
         return `func${this.name_id++}`;
       case IDENTIFIER.EVENT:
         return `event${this.name_id++}`;
+      case IDENTIFIER.ERROR:
+        return `error${this.name_id++}`;
       default:
         throw new Error(`generate_name: identifier ${identifier} is not supported`);
     }

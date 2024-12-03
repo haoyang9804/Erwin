@@ -1,5 +1,5 @@
 import { ElementaryType, ArrayType } from "../src/type"
-import { IRVariableDeclaration } from "../src/declare";
+import { IRVariableDeclaration } from "../src/declaration";
 import { IRIndexedAccess, IRIdentifier, IRLiteral } from "../src/expression";
 import {
   PrettyFormatter,

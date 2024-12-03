@@ -1,5 +1,5 @@
 import { TypeProvider, StructType } from "../src/type"
-import { IRModifier, IRVariableDeclaration, IRFunctionDefinition } from "../src/declare";
+import { IRModifier, IRVariableDeclaration, IRFunctionDefinition } from "../src/declaration";
 import { IRIdentifier, IRBinaryOp, IRLiteral, IRTuple, IRFunctionCall } from "../src/expression";
 import { IRPlaceholderStatement, IRVariableDeclarationStatement, IRExpressionStatement } from "../src/statement";
 import {

@@ -23,6 +23,7 @@ export enum scopeKind {
   MAPPING = "scopeKind::MAPPING",
   ARRAY = "scopeKind::ARRAY",
   EVENT = "scopeKind::EVENT",
+  ERROR = "scopeKind::ERROR"
 }
 
 export function inside_function_body(scope : ScopeList) : boolean {
@@ -163,6 +164,16 @@ export function inside_function_parameter_scope(cur_scope : ScopeList) : boolean
 export function inside_event_scope(cur_scope : ScopeList) : boolean {
   while (cur_scope.kind() !== scopeKind.GLOBAL) {
     if (cur_scope.kind() === scopeKind.EVENT) {
+      return true;
+    }
+    cur_scope = cur_scope.pre();
+  }
+  return false;
+}
+
+export function inside_error_scope(cur_scope : ScopeList) : boolean {
+  while (cur_scope.kind() !== scopeKind.GLOBAL) {
+    if (cur_scope.kind() === scopeKind.ERROR) {
       return true;
     }
     cur_scope = cur_scope.pre();
