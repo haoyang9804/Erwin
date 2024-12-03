@@ -235,9 +235,14 @@ export abstract class FuncVisMut extends VisMut {
   }
   subs() : VisMut[] {
     const local_kind = this.kind as FuncVisMutKind;
+    //@ts-ignore
     const vis_sub = local_kind.visibility.subs();
+    const all_visibility = [FuncVisProvider.internal(),
+    FuncVisProvider.external(),
+    FuncVisProvider.public(),
+    FuncVisProvider.private()];
     const stat_sub = local_kind.state_mutability.subs();
-    return cartesian_product([vis_sub, stat_sub])
+    return cartesian_product([all_visibility, stat_sub])
       .filter(([vis, stat]) => !(vis === FuncVisProvider.internal() && stat === FuncStatProvider.payable())
         && !(vis === FuncVisProvider.private() && stat === FuncStatProvider.payable()))
       .map(([vis, stat]) =>
@@ -250,9 +255,14 @@ export abstract class FuncVisMut extends VisMut {
   }
   supers() : VisMut[] {
     const local_kind = this.kind as FuncVisMutKind;
+    //@ts-ignore
     const vis_super = local_kind.visibility.supers();
+    const all_visibility = [FuncVisProvider.internal(),
+    FuncVisProvider.external(),
+    FuncVisProvider.public(),
+    FuncVisProvider.private()];
     const stat_super = local_kind.state_mutability.supers();
-    return cartesian_product([vis_super, stat_super])
+    return cartesian_product([all_visibility, stat_super])
       .filter(([vis, stat]) => !(vis === FuncVisProvider.internal() && stat === FuncStatProvider.payable())
         && !(vis === FuncVisProvider.private() && stat === FuncStatProvider.payable()))
       .map(([vis, stat]) =>

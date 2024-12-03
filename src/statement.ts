@@ -10,7 +10,7 @@ import {
 
 import { assert, } from "./utility";
 import { IRNode, factory } from "./node";
-import { IRVariableDeclaration } from "./declare";
+import { IRVariableDeclaration } from "./declaration";
 import { IRExpression, IRFunctionCall, IRTuple } from "./expression";
 
 export abstract class IRStatement extends IRNode {

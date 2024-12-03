@@ -3,7 +3,7 @@ import * as sqlite3 from 'sqlite3';
 import { Tree } from './dataStructor';
 import { inside_contract, scopeKind, ScopeList } from './scope';
 import { assert } from 'console';
-import { IRContractDefinition, IRStructDefinition } from './declare';
+import { IRContractDefinition, IRStructDefinition } from './declaration';
 import { irnodes } from './node';
 import * as type from './type';
 import { type_dag } from './constraint';
@@ -66,6 +66,7 @@ class DeclDB {
   private state_decls : Set<number> = new Set<number>();
   private getter_funcdecls : Set<number> = new Set<number>();
   private eventdecls : Set<number> = new Set<number>();
+  private stringdecls : Set<number> = new Set<number>();
 
   /*
   ! For any struct declaration, different struct instances may have different storage location ranges.
@@ -182,6 +183,23 @@ class DeclDB {
 
   eventdecls_ids() : number[] {
     return Array.from(this.eventdecls);
+  }
+
+  //* stringdecl
+  add_stringdecl(stringdecl_id : number) : void {
+    this.stringdecls.add(stringdecl_id);
+  }
+
+  remove_stringdecl(stringdecl_id : number) : void {
+    this.stringdecls.delete(stringdecl_id);
+  }
+
+  is_stringdecl(stringdecl_id : number) : boolean {
+    return this.stringdecls.has(stringdecl_id);
+  }
+
+  stringdecls_ids() : number[] {
+    return Array.from(this.stringdecls);
   }
 
   //* structdecl
@@ -592,7 +610,9 @@ class DeclDB {
     return this.is_mapping_decl(id) ||
       this.is_array_decl(id) ||
       this.is_struct_instance_decl(id) ||
-      expr_db.is_new_struct_expr(id);
+      expr_db.is_new_struct_expr(id) ||
+      this.is_stringdecl(id) ||
+      expr_db.is_string_expr(id);
   }
 
   contains_mapping_decl(id : number) : boolean {
@@ -701,8 +721,10 @@ class DeclDB {
 }
 
 class ExprDB {
-  public expr2read_variables : Map<number, Set<number>> = new Map<number, Set<number>>();
-  public expr2write_variables : Map<number, Set<number>> = new Map<number, Set<number>>();
+  private expr2read_variables : Map<number, Set<number>> = new Map<number, Set<number>>();
+  private expr2write_variables : Map<number, Set<number>> = new Map<number, Set<number>>();
+
+  private literals : Set<number> = new Set<number>();
 
   private mapping_type_exprs : Set<number> = new Set<number>();
   private mapping_type_expr_to_key_value_pair : Map<number, [number, number]> = new Map<number, [number, number]>();
@@ -717,6 +739,8 @@ class ExprDB {
   private new_struct_to_struct_decl : Map<number, number> = new Map<number, number>();
   private ghost_members_of_new_struct_expr : Map<number, number[]> = new Map<number, number[]>();
   private ghost_member_to_member : Map<number, number> = new Map<number, number>();
+
+  private string_exprs : Set<number> = new Set<number>();
 
   //! Read-Write-Related
 
@@ -943,6 +967,42 @@ class ExprDB {
     throw new Error(`The member ${member_id} does not have a ghost member in new struct expr ${newstruct_id}.
                      ghost_members: ${ghost_members}`);
   }
+
+  //! String-Related
+
+  add_string_expr(expr_id : number) : void {
+    this.string_exprs.add(expr_id);
+  }
+
+  is_string_expr(expr_id : number) : boolean {
+    return this.string_exprs.has(expr_id);
+  }
+
+  remove_string_expr(expr_id : number) : void {
+    this.string_exprs.delete(expr_id);
+  }
+
+  string_exprs_ids() : number[] {
+    return Array.from(this.string_exprs);
+  }
+
+  //! Literal-Related
+
+  add_literal(expr_id : number) : void {
+    this.literals.add(expr_id);
+  }
+
+  is_literal(expr_id : number) : boolean {
+    return this.literals.has(expr_id);
+  }
+
+  literals_ids() : number[] {
+    return Array.from(this.literals);
+  }
+
+  remove_literal(expr_id : number) : void {
+    this.literals.delete(expr_id);
+  }
 }
 
 export enum IDENTIFIER {
@@ -1038,6 +1098,7 @@ class TypeDB {
     this.all_types = [...type.elementary_types,
     type.TypeProvider.trivial_mapping(),
     type.TypeProvider.trivial_array(),
+    type.TypeProvider.string()
     ];
   }
 
@@ -1116,6 +1177,10 @@ class TypeDB {
       this.add_type(external_struct_type);
       this.add_user_defined_type(external_struct_type);
     }
+  }
+
+  has_type(t : type.Type) : boolean {
+    return this.all_types.some(x => x.same(t));
   }
 }
 

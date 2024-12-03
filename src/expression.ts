@@ -7,7 +7,7 @@ import {
 import { assert, generate_random_string, str2hex, random_bigInt } from "./utility";
 import { TypeKind, Type, ElementaryType } from "./type";
 import { IRNode, factory } from "./node";
-import { IRVariableDeclaration } from "./declare";
+import { IRVariableDeclaration } from "./declaration";
 import { config } from "./config";
 
 export abstract class IRExpression extends IRNode {
@@ -143,7 +143,8 @@ export class IRLiteral extends IRExpression {
   lower() : Expression {
     if (config.debug) {
       assert(this.type !== undefined, `IRLiteral ${this.id}: type is not generated`);
-      assert(this.type.kind === TypeKind.ElementaryType, `IRLiteral ${this.id}: type is not ElementaryType, but ${this.type.kind}`);
+      assert(this.type.kind === TypeKind.ElementaryType || this.type.kind === TypeKind.StringType,
+        `IRLiteral ${this.id}: type is not ElementaryType or StringType, but ${this.type.kind}`);
     }
     this.generateKind();
     if (this.value === undefined) this.generateVal();
@@ -163,10 +164,18 @@ export class IRLiteral extends IRExpression {
         factory.makeElementaryTypeNameExpression("", factory.makeElementaryTypeName("", "address", "payable")),
         [factory.makeLiteral("", kind!, str2hex(value!), value!)]);
     }
-    if (mustHaveIntTypeConversion || (!config.unit_test_mode && Math.random() > 0.5))
-      return factory.makeFunctionCall("", FunctionCallKind.TypeConversion,
-        factory.makeElementaryTypeNameExpression("", factory.makeElementaryTypeName("", (this.type as ElementaryType).name, "nonpayable")),
-        [factory.makeLiteral("", kind!, str2hex(value!), value!)]);
+    if (mustHaveIntTypeConversion || (!config.unit_test_mode && Math.random() > 0.5)) {
+      if (this.type!.kind === TypeKind.ElementaryType) {
+        return factory.makeFunctionCall("", FunctionCallKind.TypeConversion,
+          factory.makeElementaryTypeNameExpression("", factory.makeElementaryTypeName("", (this.type as ElementaryType).name, "nonpayable")),
+          [factory.makeLiteral("", kind!, str2hex(value!), value!)]);
+      }
+      else if (this.type!.kind === TypeKind.StringType) {
+        return factory.makeFunctionCall("", FunctionCallKind.TypeConversion,
+          factory.makeElementaryTypeNameExpression("", factory.makeElementaryTypeName("", "string", "nonpayable")),
+          [factory.makeLiteral("", kind!, str2hex(value!), value!)]);
+      }
+    }
     return factory.makeLiteral("", kind!, str2hex(value!), value!);
   }
 }

@@ -81,6 +81,9 @@ export class IRVariableDeclaration extends IRDeclare {
       const type = this.type as ArrayType;
       return factory.makeElementaryTypeName(type.str(), type.str());
     }
+    if (type.kind === TypeKind.StringType) {
+      return factory.makeElementaryTypeName(type.str(), type.str());
+    }
     else {
       throw new Error(`IRVariableDeclaration: type ${type.kind} is not supported`);
     }
@@ -99,6 +102,7 @@ export class IRVariableDeclaration extends IRDeclare {
       else if (this.type.kind === TypeKind.StructType
         || this.type.kind === TypeKind.ArrayType
         || this.type.kind === TypeKind.MappingType
+        || this.type.kind === TypeKind.StringType
       ) {
       }
       else {

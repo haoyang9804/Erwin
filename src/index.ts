@@ -4,7 +4,7 @@ import * as gen from "./generator"
 import { vismut_dag, storage_location_dag, type_dag } from "./constraint";
 import { irnodes } from "./node";
 import * as expr from "./expression";
-import * as decl from "./declare";
+import * as decl from "./declaration";
 import * as mut from "./mutators";
 import { config } from "./config";
 import * as fs from "fs";
@@ -105,14 +105,15 @@ program
   .option("--else_prob <float>", "The probability of generating an else statement.", `${config.else_prob}`)
   .option("--init_state_var_in_constructor_prob <float>", "The probability of initializing a state variable in the constructor.", `${config.init_state_var_in_constructor_prob}`)
   .option("--struct_prob <float>", "The probability of generating a struct.", `${config.struct_prob}`)
-  .option("--contract_instance_prob <float>", "The probability of generating a contract instance.", `${config.contract_instance_prob}`)
-  .option("--struct_instance_prob <float>", "The probability of generating a struct instance.", `${config.struct_instance_prob}`)
+  .option("--contract_type_prob <float>", "The probability of generating a contract-type variable.", `${config.contract_type_prob}`)
+  .option("--struct_type_prob <float>", "The probability of generating a struct-type variable.", `${config.struct_type_prob}`)
   .option("--initialization_prob <float>", "The probability of generating an initialization statement.", `${config.initialization_prob}`)
   .option("--constructor_prob <float>", "The probability of generating a constructor.", `${config.constructor_prob}`)
   .option("--return_prob <float>", "The probability of generating a return statement.", `${config.return_prob}`)
   .option("--reuse_name_prob <float>", "The probability of reusing a name.", `${config.reuse_name_prob}`)
-  .option("--mapping_prob <float>", "The probability of generating a mapping.", `${config.mapping_prob}`)
-  .option("--array_prob <float>", "The probability of generating an array.", `${config.array_prob}`)
+  .option("--mapping_type_prob <float>", "The probability of generating a mapping-type variable.", `${config.mapping_type_prob}`)
+  .option("--array_type_prob <float>", "The probability of generating an array-type variab;e.", `${config.array_type_prob}`)
+  .option("--string_type_prob <float>", "The probability of generating a string-type variable.", `${config.string_type_prob}`)
   .option("--dynamic_array_prob <float>", "The probability of generating a dynamic array.", `${config.dynamic_array_prob}`)
   .option("--event_prob <float>", "The probability of generating an event.", `${config.event_prob}`)
 program.parse(process.argv);
@@ -152,14 +153,15 @@ else if (program.args[0] === "generate") {
   config.nonstructured_statement_prob = parseFloat(program.commands[1].opts().nonstructured_statement_prob);
   config.expression_complexity_prob = parseFloat(program.commands[1].opts().expression_complexity_prob);
   config.struct_prob = parseFloat(program.commands[1].opts().struct_prob);
-  config.contract_instance_prob = parseFloat(program.commands[1].opts().contract_instance_prob);
-  config.struct_instance_prob = parseFloat(program.commands[1].opts().struct_instance_prob);
+  config.contract_type_prob = parseFloat(program.commands[1].opts().contract_type_prob);
+  config.struct_type_prob = parseFloat(program.commands[1].opts().struct_type_prob);
   config.initialization_prob = parseFloat(program.commands[1].opts().initialization_prob);
   config.constructor_prob = parseFloat(program.commands[1].opts().constructor_prob);
   config.return_prob = parseFloat(program.commands[1].opts().return_prob);
   config.reuse_name_prob = parseFloat(program.commands[1].opts().reuse_name_prob);
-  config.mapping_prob = parseFloat(program.commands[1].opts().mapping_prob);
-  config.array_prob = parseFloat(program.commands[1].opts().array_prob);
+  config.mapping_type_prob = parseFloat(program.commands[1].opts().mapping_type_prob);
+  config.array_type_prob = parseFloat(program.commands[1].opts().array_type_prob);
+  config.string_type_prob = parseFloat(program.commands[1].opts().string_type_prob);
   config.dynamic_array_prob = parseFloat(program.commands[1].opts().dynamic_array_prob);
   config.event_prob = parseFloat(program.commands[1].opts().event_prob);
   config.for_init_cnt_upper_limit = parseInt(program.commands[1].opts().for_init_cnt_upper_limit);
@@ -218,11 +220,12 @@ else if (program.args[0] === "generate") {
   assert(config.vardecl_prob >= 0 && config.vardecl_prob <= 1.0, "The probability of generating a variable declaration must be in the range [0,1].");
   assert(config.new_prob >= 0 && config.new_prob <= 1.0, "The probability of generating a variable declaration in place must be in the range [0,1].");
   assert(config.else_prob >= 0.0 && config.else_prob <= 1.0, "The probability of generating an else statement must be in the range [0,1].");
-  assert(config.mapping_prob > 0.0 && config.mapping_prob <= 1.0, "The probability of generating a mapping must be in the range (0,1].");
-  assert(config.array_prob > 0.0 && config.array_prob <= 1.0, "The probability of generating an array must be in the range (0,1].");
-  assert(config.contract_instance_prob >= 0.0 && config.contract_instance_prob <= 1.0, "The probability of generating a contract instance must be in the range [0,1].");
-  assert(config.struct_instance_prob >= 0.0 && config.struct_instance_prob <= 1.0, "The probability of generating a struct instance must be in the range [0,1].");
-  assert(config.array_prob + config.mapping_prob + config.contract_instance_prob + config.struct_instance_prob < 1, "The sum of the probabilities of generating a contract/struct instance, a mapping declaration, or an array declaration must be less than 1.");
+  assert(config.mapping_type_prob > 0.0 && config.mapping_type_prob <= 1.0, "The probability of generating a mapping must be in the range (0,1].");
+  assert(config.array_type_prob > 0.0 && config.array_type_prob <= 1.0, "The probability of generating an array must be in the range (0,1].");
+  assert(config.string_type_prob >= 0.0 && config.string_type_prob <= 1.0, "The probability of generating a string must be in the range [0,1].");
+  assert(config.contract_type_prob >= 0.0 && config.contract_type_prob <= 1.0, "The probability of generating a contract instance must be in the range [0,1].");
+  assert(config.struct_type_prob >= 0.0 && config.struct_type_prob <= 1.0, "The probability of generating a struct instance must be in the range [0,1].");
+  assert(config.array_type_prob + config.mapping_type_prob + config.contract_type_prob + config.struct_type_prob + config.string_type_prob < 1, "A variable can be of elementary type, contract type, contract type, struct type, mapping type, array type, or string type. Therefore, the sum of the probabilities of generating non-elementary types must be less than 1 to ensure the generation of elementary-type variables.");
   assert(config.dynamic_array_prob >= 0.0 && config.dynamic_array_prob <= 1.0, "The probability of generating a dynamic array must be in the range [0,1].");
   assert(config.event_prob >= 0.0 && config.event_prob <= 1.0, "The probability of generating an event must be in the range [0,1].");
   assert(config.return_count_of_function_lowerlimit <= config.return_count_of_function_upperlimit, "The lower limit of the number of return values of a function must be less than or equal to the upper limit.");

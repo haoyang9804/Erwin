@@ -794,6 +794,39 @@ export class MappingType extends Type {
   }
 }
 
+export class StringType extends Type {
+  constructor() {
+    super(TypeKind.StringType);
+  }
+  str() : string {
+    return "string";
+  }
+  copy() : Type {
+    return new StringType();
+  }
+  same(t : Type) : boolean {
+    return t === TypeProvider.string();
+  }
+  subs() : Type[] {
+    return [this];
+  }
+  sub_with_lowerbound(_ : Type) : Type[] {
+    return [this];
+  }
+  supers() : Type[] {
+    return [this];
+  }
+  super_with_upperbound(_ : Type) : Type[] {
+    return [this];
+  }
+  issubof(t : Type) : boolean {
+    return this.same(t);
+  }
+  issuperof(t : Type) : boolean {
+    return this.same(t);
+  }
+}
+
 export class TypeProvider {
   static int256() : ElementaryType { return this.m_int256; }
   static int128() : ElementaryType { return this.m_int128; }
@@ -813,6 +846,8 @@ export class TypeProvider {
   static placeholder() : PlaceholderType { return this.m_placeholder; }
   static trivial_mapping() : MappingType { return this.m_mapping; }
   static trivial_array() : ArrayType { return this.m_array; }
+  static string() : StringType { return this.m_string; }
+  private static m_string : StringType = new StringType();
   private static m_placeholder : PlaceholderType = new PlaceholderType();
   private static m_mapping : MappingType = new MappingType(this.m_placeholder, this.m_placeholder);
   private static m_array : ArrayType = new ArrayType(this.m_placeholder, undefined);
@@ -891,6 +926,9 @@ export function contain_mapping_type(type : Type) : boolean {
     return false;
   }
   if (type.kind === TypeKind.PlaceholderType) {
+    return false;
+  }
+  if (type.kind === TypeKind.StringType) {
     return false;
   }
   throw new Error(`contain_mapping_type: unrecognized type kind: ${type.kind}`);

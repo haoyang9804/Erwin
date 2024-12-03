@@ -34,3 +34,13 @@ test("test literal 2",
   expect(writer.write(lowered_value)).toBe(`int8(${l1.value})`);
 }
 )
+
+test("test literal 3",
+() => {
+  const l1 = new IRLiteral(0, 0, undefined, false);
+  l1.type = TypeProvider.string();
+  const lowered_value = l1.lower();
+  expect(l1.value).toBeDefined();
+  expect(writer.write(lowered_value)).toBe(`"${l1.value}"`);
+}
+)

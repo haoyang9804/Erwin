@@ -1616,7 +1616,8 @@ export class TypeDominanceDAG extends ConstraintDAG<TypeKind, Type> {
 
   protected remove_irrelevant_leaves() : void {
     this.leaves.forEach(leaf => {
-      if (decl_db.is_mapping_decl(leaf) || decl_db.is_array_decl(leaf)) {
+      if (decl_db.is_mapping_decl(leaf) || decl_db.is_array_decl(leaf) ||
+        !decl_db.is_vardecl(leaf) && !expr_db.is_literal(leaf)) {
         this.leaves.delete(leaf);
         for (const edge of this.leavesequal) {
           const [leaf1, leaf2] = edge.split(" ");

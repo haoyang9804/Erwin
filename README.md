@@ -10,14 +10,14 @@
 
 ## How to play it?
 
-The simplest way is `npm install` it and `npx erwin generate` with different generation flags. `npx erwin generate` is the trivial generation, in which Erwin will not explore the search space of the IR, but instead randomly pick one valid program from the space and finish one generation round.
+The simplest way is `npm install` it and `npx erwin generate` with different generation flags. `npx erwin generate` is the trivial generation, in which Erwin will not explore the search space of the IR, but instead randomly pick one valid program from the space and finish the generation round.
 
-Erwin support exploring type spaces, storage location spaces, state mutability spaces, and visibility spaces. To invoke them, you need to use the flag `-m` to activate nontrivial modes. Please refer the general flags to learn how to use flags.
+Erwin supports exploring type spaces, storage location spaces, state mutability spaces, and visibility spaces. To invoke them, you need to use the flag `-m` to activate nontrivial modes. Please refer the general flags to learn how to use flags.
 
 ## General Flags
 
-As planned, Erwin can both generate and mutate. Until now, all efforts have been made on generation. Below are flags supported by `erwin generate`.
-Enjoy tuning the search space and generate diverse Solidity programs.
+As planned, Erwin can both generate and mutate. But up to now, all efforts have been made on generation. Below are flags supported by `erwin generate`.
+Enjoy tuning the search space and generate diverse and valid Solidity programs.
 
 ```
   -e --exprimental                                    Enable the exprimental mode.
@@ -69,14 +69,14 @@ Enjoy tuning the search space and generate diverse Solidity programs.
   --else_prob <float>                                 The probability of generating an else statement. (default: "0.3")
   --init_state_var_in_constructor_prob <float>        The probability of initializing a state variable in the constructor. (default: "0.3")
   --struct_prob <float>                               The probability of generating a struct. (default: "0.5")
-  --contract_instance_prob <float>                    The probability of generating a contract instance. (default: "0.1")
-  --struct_instance_prob <float>                      The probability of generating a struct instance. (default: "0.1")
+  --contract_type_prob <float>                    The probability of generating a contract instance. (default: "0.1")
+  --struct_type_prob <float>                      The probability of generating a struct instance. (default: "0.1")
   --initialization_prob <float>                       The probability of generating an initialization statement. (default: "0.3")
   --constructor_prob <float>                          The probability of generating a constructor. (default: "0.5")
   --return_prob <float>                               The probability of generating a return statement. (default: "0.5")
   --reuse_name_prob <float>                           The probability of reusing a name. (default: "0")
-  --mapping_prob <float>                              The probability of generating a mapping. (default: "0.1")
-  --array_prob <float>                                The probability of generating an array. (default: "0.1")
+  --mapping_type_prob <float>                              The probability of generating a mapping. (default: "0.1")
+  --array_type_prob <float>                                The probability of generating an array. (default: "0.1")
   --dynamic_array_prob <float>                        The probability of generating a dynamic array. (default: "0.5")
 ```
 
