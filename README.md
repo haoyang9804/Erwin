@@ -20,16 +20,15 @@ As planned, Erwin can both generate and mutate. But up to now, all efforts have 
 Enjoy tuning the search space and generate diverse and valid Solidity programs.
 
 ```
-  -e --exprimental                                    Enable the exprimental mode.
   -m --mode <string>                                  The mode of Erwin. The value can be 'type', 'scope', or 'loc'. (default: "")
   -d --debug                                          Enable the debug mode.
   -o --out_dir <string>                               The output directory for the generated program. The default is 'generated_programs' (default:
                                                       "./generated_programs")
   -max --maximum_solution_count <number>              The maximum number of solutions Erwin will consider. (default: "500")
-  --int_types_num <number>                            The number of int types Erwin will consider in resolving type dominance. (default: "2")
-  --uint_types_num <number>                           The number of uint types Erwin will consider in resolving type dominance. (default: "2")
-  --function_body_stmt_cnt_upper_limit <number>       The upper limit of the number of non-declaration statements of a function. This value is suggested to be
-                                                      bigger than tha value of var_count (default: "1")
+  --int_types_num <number>                            The number of int types Erwin will consider in resolving type constraints. (default: "2")
+  --uint_types_num <number>                           The number of uint types Erwin will consider in resolving type constraints. (default: "2")
+  --function_body_stmt_cnt_upper_limit <number>       The upper limit of the number of non-declaration statements of a function. This value is suggested to
+                                                      be bigger than tha value of var_count (default: "1")
   --function_body_stmt_cnt_lower_limit <number>       The lower limit of the number of non-declaration statements of a function. (default: "1")
   --return_count_of_function_upperlimit <number>      The upper limit of the number of return values of a function. (default: "2")
   --return_count_of_function_lowerlimit <number>      The lower limit of the number of return values of a function. (default: "0")
@@ -53,6 +52,12 @@ Enjoy tuning the search space and generate diverse and valid Solidity programs.
   --do_while_body_stmt_cnt_lower_limit <number>       The lower limit of the number of statements in the body of a do while loop. (default: "0")
   --if_body_stmt_cnt_upper_limit <number>             The upper limit of the number of statements in the body of an if statement. (default: "1")
   --if_body_stmt_cnt_lower_limit <number>             The lower limit of the number of statements in the body of an if statement. (default: "0")
+  --struct_decl_per_contract_upperlimit <number>      The upper limit of the number of struct declarations in a contract. (default: "2")
+  --struct_decl_per_contract_lowerlimit <number>      The lower limit of the number of struct declarations in a contract. (default: "1")
+  --event_decl_per_contract_upperlimit <number>       The upper limit of the number of events in a contract. (default: "2")
+  --event_decl_per_contract_lowerlimit <number>       The lower limit of the number of events in a contract. (default: "1")
+  --error_decl_per_contract_upperlimit <number>       The upper limit of the number of errors in a contract. (default: "2")
+  --error_decl_per_contract_lowerlimit <number>       The lower limit of the number of errors in a contract. (default: "1")
   --expression_complexity_level <number>              The complexity level of the expression Erwin will generate.
                                                       The suggedted range is [1,2,3]. The bigger, the more complex. (default: "1")
   --statement_complexity__level <number>              The complexity level of the statement Erwin will generate.
@@ -69,15 +74,18 @@ Enjoy tuning the search space and generate diverse and valid Solidity programs.
   --else_prob <float>                                 The probability of generating an else statement. (default: "0.3")
   --init_state_var_in_constructor_prob <float>        The probability of initializing a state variable in the constructor. (default: "0.3")
   --struct_prob <float>                               The probability of generating a struct. (default: "0.5")
-  --contract_type_prob <float>                    The probability of generating a contract instance. (default: "0.1")
-  --struct_type_prob <float>                      The probability of generating a struct instance. (default: "0.1")
+  --contract_type_prob <float>                        The probability of generating a contract-type variable. (default: "0.1")
+  --struct_type_prob <float>                          The probability of generating a struct-type variable. (default: "0.1")
   --initialization_prob <float>                       The probability of generating an initialization statement. (default: "0.3")
   --constructor_prob <float>                          The probability of generating a constructor. (default: "0.5")
   --return_prob <float>                               The probability of generating a return statement. (default: "0.5")
   --reuse_name_prob <float>                           The probability of reusing a name. (default: "0")
-  --mapping_type_prob <float>                              The probability of generating a mapping. (default: "0.1")
-  --array_type_prob <float>                                The probability of generating an array. (default: "0.1")
+  --mapping_type_prob <float>                         The probability of generating a mapping-type variable. (default: "0.1")
+  --array_type_prob <float>                           The probability of generating an array-type variab;e. (default: "0.1")
+  --string_type_prob <float>                          The probability of generating a string-type variable. (default: "0.1")
   --dynamic_array_prob <float>                        The probability of generating a dynamic array. (default: "0.5")
+  --event_prob <float>                                The probability of generating an event. (default: "0.5")
+  --error_prob <float>                                The probability of generating an error. (default: "0.5")
 ```
 
 

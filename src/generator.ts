@@ -5,13 +5,12 @@ import * as decl from "./declaration";
 import * as stmt from "./statement";
 import * as type from "./type";
 import { IDENTIFIER, decl_db, expr_db, ghost_member_of_member_inside_struct_instantiation, name_db, stmt_db, type_db, update_ghost_members_of_struct_instantiation } from "./db";
-import { type_dag, storage_location_dag, vismut_dag } from "./constraint";
+import { type_dag, storage_location_dag, vismut_dag, is_super_range, is_equal_range, intersection_range } from "./constraint";
 import { config } from './config';
 import { irnodes } from "./node";
 import { color } from "console-log-colors"
-import { is_super_range, is_equal_range, intersection_range } from "./dominance";
 import { ContractKind, DataLocation, FunctionCallKind, FunctionKind, FunctionStateMutability, FunctionVisibility, StateVariableVisibility } from "solc-typed-ast";
-import { ScopeList, scopeKind, initScope, inside_function_body, inside_struct_decl_scope, get_scope_from_scope_id, unexpected_extra_stmt_belong_to_the_parent_scope, inside_constructor_scope, inside_constructor_parameter_scope, inside_event_scope, inside_error_scope } from "./scope";
+import { ScopeList, scopeKind, initScope, inside_function_body, inside_struct_decl_scope, get_scope_from_scope_id, unexpected_extra_stmt_belong_to_the_parent_scope, inside_constructor_scope, inside_constructor_parameter_scope, inside_event_scope, inside_error_scope, inside_mapping_scope, inside_array_scope } from "./scope";
 import { FuncStat, FuncStatProvider } from "./funcstat";
 import { FuncVis, FuncVisProvider } from "./visibility";
 import * as loc from "./loc";
@@ -105,15 +104,15 @@ function update_storage_loc_range_for_compound_type(id : number, struct_instanti
           `update_storage_loc_range_for_compound_type: ghost_id is -1 but struct_instantiation_id (${struct_instantiation_id}) is not -1`);
         if (storage_location_dag.has_solution_range(baseid)) {
           storage_location_dag.update(baseid,
-            loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'equal'));
+            loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'same'));
         }
         else {
           storage_location_dag.insert(baseid,
-            loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'equal'));
+            loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'same'));
         }
         const bridge_id = new_global_id();
         storage_location_dag.insert(bridge_id,
-          loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'equal'));
+          loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'same'));
         storage_location_dag.connect(bridge_id, id);
         storage_location_dag.connect(bridge_id, baseid);
         storage_location_dag.solution_range_alignment(bridge_id, baseid);
@@ -129,9 +128,9 @@ function update_storage_loc_range_for_compound_type(id : number, struct_instanti
         const base_ghost_id = new_global_id();
         const bridge_id = new_global_id();
         storage_location_dag.insert(base_ghost_id,
-          loc.range_of_locs(storage_location_dag.solution_range_of(ghost_id)!, 'equal'));
+          loc.range_of_locs(storage_location_dag.solution_range_of(ghost_id)!, 'same'));
         storage_location_dag.insert(bridge_id,
-          loc.range_of_locs(storage_location_dag.solution_range_of(ghost_id)!, 'equal'));
+          loc.range_of_locs(storage_location_dag.solution_range_of(ghost_id)!, 'same'));
         storage_location_dag.connect(bridge_id, ghost_id);
         storage_location_dag.connect(bridge_id, base_ghost_id);
         update_ghost_members_of_struct_instantiation(struct_instantiation_id, baseid, base_ghost_id);
@@ -149,10 +148,10 @@ function update_storage_loc_range_for_compound_type(id : number, struct_instanti
         if (ghost_id === -1) {
           const member_ghost_id = new_global_id();
           storage_location_dag.insert(member_ghost_id,
-            loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'equal'));
+            loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'same'));
           const bridge_id = new_global_id();
           storage_location_dag.insert(bridge_id,
-            loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'equal'));
+            loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'same'));
           storage_location_dag.connect(bridge_id, id);
           storage_location_dag.connect(bridge_id, member_ghost_id);
           update_ghost_members_of_struct_instantiation(id, member, member_ghost_id);
@@ -169,9 +168,9 @@ function update_storage_loc_range_for_compound_type(id : number, struct_instanti
           const member_ghost_id = new_global_id();
           const bridge_id = new_global_id();
           storage_location_dag.insert(member_ghost_id,
-            loc.range_of_locs(storage_location_dag.solution_range_of(ghost_id)!, 'equal'));
+            loc.range_of_locs(storage_location_dag.solution_range_of(ghost_id)!, 'same'));
           storage_location_dag.insert(bridge_id,
-            loc.range_of_locs(storage_location_dag.solution_range_of(ghost_id)!, 'equal'));
+            loc.range_of_locs(storage_location_dag.solution_range_of(ghost_id)!, 'same'));
           storage_location_dag.connect(bridge_id, ghost_id);
           storage_location_dag.connect(bridge_id, member_ghost_id);
           update_ghost_members_of_struct_instantiation(struct_instantiation_id, member, member_ghost_id);
@@ -189,7 +188,7 @@ function update_storage_loc_range_for_compound_type(id : number, struct_instanti
       if (decl_db.qualifed_by_storage_qualifier(member)) {
         const member_ghost_id = new_global_id();
         storage_location_dag.insert(member_ghost_id,
-          loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'equal'));
+          loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'same'));
         storage_location_dag.connect(id, member_ghost_id);
         update_ghost_members_of_struct_instantiation(id, member, member_ghost_id);
         if (config.debug) {
@@ -205,15 +204,15 @@ function update_storage_loc_range_for_compound_type(id : number, struct_instanti
       if (ghost_id === -1) {
         if (storage_location_dag.has_solution_range(value)) {
           storage_location_dag.update(value,
-            loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'equal'));
+            loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'same'));
         }
         else {
           storage_location_dag.insert(value,
-            loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'equal'));
+            loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'same'));
         }
         const bridge_id = new_global_id();
         storage_location_dag.insert(bridge_id,
-          loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'equal'));
+          loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'same'));
         storage_location_dag.connect(bridge_id, id);
         storage_location_dag.connect(bridge_id, value);
         storage_location_dag.solution_range_alignment(bridge_id, value);
@@ -229,9 +228,9 @@ function update_storage_loc_range_for_compound_type(id : number, struct_instanti
         const value_ghost_id = new_global_id();
         const bridge_id = new_global_id();
         storage_location_dag.insert(value_ghost_id,
-          loc.range_of_locs(storage_location_dag.solution_range_of(ghost_id)!, 'equal'));
+          loc.range_of_locs(storage_location_dag.solution_range_of(ghost_id)!, 'same'));
         storage_location_dag.insert(bridge_id,
-          loc.range_of_locs(storage_location_dag.solution_range_of(ghost_id)!, 'equal'));
+          loc.range_of_locs(storage_location_dag.solution_range_of(ghost_id)!, 'same'));
         storage_location_dag.connect(bridge_id, value_ghost_id);
         storage_location_dag.connect(bridge_id, ghost_id);
         update_ghost_members_of_struct_instantiation(struct_instantiation_id, value, value_ghost_id);
@@ -251,19 +250,18 @@ to the solution ranges of the corresponding parameters (including function param
 function connect_arguments_to_parameters(arg_id : number, param_id : number) : number | undefined {
   let ghost_id;
   ghost_id = new_global_id();
-  const type_range = type_dag.solution_range_of(arg_id)!;
+  const type_range = type_dag.solution_range_of(param_id)!;
   type_dag.insert(ghost_id, type_range);
+  type_dag.connect(ghost_id, param_id, "super");
   type_dag.connect(ghost_id, arg_id);
   type_dag.solution_range_alignment(ghost_id, arg_id);
-  type_dag.connect(ghost_id, param_id, "super_dominance");
-  type_dag.solution_range_alignment(ghost_id, param_id);
   if (config.debug) {
     console.log(`${" ".repeat(indent)}connect_arguments_to_parameters: ghost id: ${ghost_id}, arg id: ${arg_id}, param id: ${param_id}`);
   }
   if (storage_location_dag.has_solution_range(param_id)) {
     assert(storage_location_dag.has_solution_range(arg_id),
       `storage_location_dag.solution_range should have ${arg_id}`);
-    storage_location_dag.connect(arg_id, param_id);
+    storage_location_dag.connect(arg_id, param_id, "super");
   }
   return ghost_id;
 }
@@ -857,8 +855,8 @@ class MappingDeclarationGenerator extends DeclarationGenerator {
     }
     if (inside_struct_decl_scope(cur_scope)) return;
     if (cur_scope.kind() === scopeKind.CONTRACT ||
-      cur_scope.kind() === scopeKind.MAPPING ||
-      cur_scope.kind() === scopeKind.ARRAY) {
+      inside_mapping_scope(cur_scope) ||
+      inside_array_scope(cur_scope)) {
       storage_location_dag.insert(mappingid, [
         loc.StorageLocationProvider.storage_ref()
       ]);
@@ -973,7 +971,7 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
       const nid = new_global_id();
       assert(this.irnode !== undefined, `ArrayDeclarationGenerator: this.irnode is undefined`);
       type_dag.insert(nid, type_dag.solution_range_of(this.irnode.id)!);
-      type_dag.connect(nid, this.irnode.id, "super_dominance");
+      type_dag.connect(nid, this.irnode.id, "super");
       const new_struct_gen = new IdentifierGenerator(nid);
       new_struct_gen.generate(0);
       initializer = new_struct_gen.irnode as expr.IRExpression;
@@ -997,7 +995,7 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
         loc.StorageLocationProvider.storage_ref()
       ]);
     }
-    else if (cur_scope.kind() === scopeKind.MAPPING) {
+    else if (inside_mapping_scope(cur_scope)) {
       storage_location_dag.insert(this.irnode.id, [
         loc.StorageLocationProvider.storage_ref()
       ]);
@@ -1049,6 +1047,12 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
         loc.StorageLocationProvider.storage_pointer()
       ]);
     }
+    if (decl_db.contains_mapping_decl(this.irnode.id)) {
+      storage_location_dag.update(this.irnode.id, [
+        loc.StorageLocationProvider.storage_ref(),
+        loc.StorageLocationProvider.storage_pointer()
+      ]);
+    }
   }
 
   private update_storage_location_range() {
@@ -1065,7 +1069,7 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
       assert(storage_location_dag.has_solution_range(this.irnode.id),
         `ArrayDeclarationGenerator: storage_location_dag.has_solution_range(${this.irnode.id}) is false`);
       const initializer_id = expr.tuple_extraction(value).id;
-      storage_location_dag.connect(initializer_id, this.irnode.id, "super_dominance");
+      storage_location_dag.connect(initializer_id, this.irnode.id, "super");
       storage_location_dag.solution_range_alignment(initializer_id, this.irnode.id);
     }
     update_storage_loc_range_for_compound_type(this.irnode.id);
@@ -1101,17 +1105,16 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
     const arrayid = new_global_id();
     const array_name = name_db.generate_name(IDENTIFIER.ARRAY);
     this.irnode = new decl.IRVariableDeclaration(arrayid, cur_scope.id(), array_name);
-    this.init_storage_location_range();
     this.generate_length();
     this.generate_base();
+    this.init_storage_location_range();
     decl_db.add_array_decl(arrayid, this.base!.id);
     this.update_type_range();
     type_dag.insert(arrayid, this.type_range);
-    decl_db.if_array_decl_contain_mapping_decl(arrayid);
-    if (decl_db.is_array_decl_that_contains_mapping_decl(arrayid)) {
-      decl_db.set_vardecl_as_nonassignable(arrayid);
-    }
     this.generate_initializer();
+    if (decl_db.contains_mapping_decl(this.irnode.id)) {
+      decl_db.set_vardecl_as_nonassignable(this.irnode.id);
+    }
     this.initialize_array_length();
     decl_db.add_vardecl_with_scope(arrayid, cur_scope);
     this.update_storage_location_range();
@@ -1159,7 +1162,7 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
     if (this.initializable() && !decl_db.contains_mapping_decl(this.struct_id)) {
       const nid = new_global_id();
       type_dag.insert(nid, type_dag.solution_range_of(this.irnode.id)!);
-      type_dag.connect(nid, this.irnode.id, "super_dominance");
+      type_dag.connect(nid, this.irnode.id, "super");
       const new_struct_gen = new NewStructGenerator(nid);
       new_struct_gen.generate(0);
       initializer = new_struct_gen.irnode as expr.IRExpression;
@@ -1186,7 +1189,7 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
         loc.StorageLocationProvider.storage_ref()
       ]);
     }
-    else if (cur_scope.kind() === scopeKind.MAPPING) {
+    else if (inside_mapping_scope(cur_scope)) {
       storage_location_dag.insert(this.irnode.id, [
         loc.StorageLocationProvider.storage_ref()
       ]);
@@ -1272,7 +1275,7 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
       assert(storage_location_dag.non_empty_solution_range_of(this.irnode.id),
         `StructInstanceDeclarationGenerator: storage_location_dag.non_empty_solution_range_of(${this.irnode.id}) is empty`);
       const initializer_id = expr.tuple_extraction(value).id;
-      storage_location_dag.connect(initializer_id, this.irnode.id, "super_dominance");
+      storage_location_dag.connect(initializer_id, this.irnode.id, "super");
       storage_location_dag.solution_range_alignment(initializer_id, this.irnode.id);
     }
   }
@@ -1345,7 +1348,7 @@ class StringDeclarationGenerator extends DeclarationGenerator {
         const literal_gen = new LiteralGenerator(literal_id);
         const ghost_id = new_global_id();
         type_dag.insert(ghost_id, type_dag.solution_range_of(this.irnode!.id)!);
-        type_dag.connect(ghost_id, this.irnode!.id, "super_dominance");
+        type_dag.connect(ghost_id, this.irnode!.id, "super");
         type_dag.connect(ghost_id, literal_id);
         type_dag.solution_range_alignment(ghost_id, literal_id);
         if (config.debug) {
@@ -1366,18 +1369,18 @@ class StringDeclarationGenerator extends DeclarationGenerator {
           const ghost_id = new_global_id();
           type_dag.insert(ghost_id, type_dag.solution_range_of(expr_id)!);
           type_dag.connect(ghost_id, expr_id);
-          type_dag.connect(ghost_id, this.irnode!.id, "super_dominance");
+          type_dag.connect(ghost_id, this.irnode!.id, "super");
           type_dag.solution_range_alignment(ghost_id, this.irnode!.id);
           if (config.debug) {
             console.log(`${" ".repeat(indent)}StringDeclarationGenerator::generate_initializer: ghost_id: ${ghost_id}, expr_id: ${expr_id}, id: ${this.irnode!.id}`);
           }
         }
         else {
-          type_dag.connect(expr_id, this.irnode!.id, "super_dominance");
+          type_dag.connect(expr_id, this.irnode!.id, "super");
           type_dag.solution_range_alignment(expr_id, this.irnode!.id);
           assert(storage_location_dag.has_solution_range(expr_id),
             `StringDeclarationGenerator::generate_initializer: storage_location_dag's solution range of ${expr_id} is empty`);
-          storage_location_dag.connect(expr_id, this.irnode!.id, "super_dominance");
+          storage_location_dag.connect(expr_id, this.irnode!.id, "super");
         }
         (this.irnode as decl.IRVariableDeclaration).value = expr_gen.irnode! as expr.IRExpression;
       }
@@ -1390,10 +1393,10 @@ class StringDeclarationGenerator extends DeclarationGenerator {
     }
   }
 
-  private end_flag() {
+  private end_flag(name : string) {
     if (config.debug) {
       indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode!.id}: String Declaration, scope: ${cur_scope.kind()}, type: ${type_dag.solution_range_of(this.irnode!.id)!.map(t => t.str())}, storage loc range: ${storage_location_dag.has_solution_range(this.irnode!.id) ? storage_location_dag.solution_range_of(this.irnode!.id).map(s => s.str()) : ""}`));
+      console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode!.id}: String Declaration, name: ${name}, scope: ${cur_scope.kind()}, type: ${type_dag.solution_range_of(this.irnode!.id)!.map(t => t.str())}, storage loc range: ${storage_location_dag.has_solution_range(this.irnode!.id) ? storage_location_dag.solution_range_of(this.irnode!.id).map(s => s.str()) : ""}`));
     }
   }
 
@@ -1408,7 +1411,7 @@ class StringDeclarationGenerator extends DeclarationGenerator {
         loc.StorageLocationProvider.storage_ref()
       ]);
     }
-    else if (cur_scope.kind() === scopeKind.MAPPING) {
+    else if (inside_mapping_scope(cur_scope)) {
       storage_location_dag.insert(this.irnode.id, [
         loc.StorageLocationProvider.storage_ref()
       ]);
@@ -1492,7 +1495,7 @@ class StringDeclarationGenerator extends DeclarationGenerator {
     this.generate_initializer();
     this.update_vismut_dag();
     this.stringdecl_must_be_initialized_if_in_function_return_scope_or_funcbody();
-    this.end_flag();
+    this.end_flag(string_name);
   }
 }
 
@@ -1617,7 +1620,7 @@ class ContractInstanceDeclarationGenerator extends DeclarationGenerator {
     if (this.initializable()) {
       const nid = new_global_id();
       type_dag.insert(nid, this.type_range);
-      type_dag.connect(nid, this.irnode.id, "super_dominance");
+      type_dag.connect(nid, this.irnode.id, "super");
       const new_contract_gen = new NewContractGenerator(nid);
       new_contract_gen.generate(0);
       initializer = new_contract_gen.irnode as expr.IRExpression;
@@ -1692,7 +1695,7 @@ class ElementaryTypeVariableDeclarationGenerator extends DeclarationGenerator {
         const literal_gen = new LiteralGenerator(literal_id);
         const ghost_id = new_global_id();
         type_dag.insert(ghost_id, type_dag.solution_range_of(this.irnode!.id)!);
-        type_dag.connect(ghost_id, this.irnode!.id, "super_dominance");
+        type_dag.connect(ghost_id, this.irnode!.id, "super");
         type_dag.connect(ghost_id, literal_id);
         type_dag.solution_range_alignment(ghost_id, literal_id);
         if (config.debug) {
@@ -1712,14 +1715,14 @@ class ElementaryTypeVariableDeclarationGenerator extends DeclarationGenerator {
           const ghost_id = new_global_id();
           type_dag.insert(ghost_id, type_dag.solution_range_of(expr_id)!);
           type_dag.connect(ghost_id, expr_id);
-          type_dag.connect(ghost_id, this.irnode!.id, "super_dominance");
+          type_dag.connect(ghost_id, this.irnode!.id, "super");
           type_dag.solution_range_alignment(ghost_id, this.irnode!.id);
           if (config.debug) {
             console.log(`${" ".repeat(indent)}ElementaryTypeVariableDeclarationGenerator::generate_initializer: ghost_id: ${ghost_id}, expr_id: ${expr_id}, id: ${this.irnode!.id}`);
           }
         }
         else {
-          type_dag.connect(expr_id, this.irnode!.id, "super_dominance");
+          type_dag.connect(expr_id, this.irnode!.id, "super");
           type_dag.solution_range_alignment(expr_id, this.irnode!.id);
         }
         (this.irnode as decl.IRVariableDeclaration).value = expr_gen.irnode! as expr.IRExpression;
@@ -1896,7 +1899,7 @@ class ConstructorDeclarationGenerator extends DeclarationGenerator {
       if (expr_gen.generator_name === "LiteralGenerator") {
         ghost_id = new_global_id();
         type_dag.insert(ghost_id, type_dag.solution_range_of(vardecl.id)!);
-        type_dag.connect(ghost_id, vardecl.id, "super_dominance");
+        type_dag.connect(ghost_id, vardecl.id, "super");
         type_dag.connect(ghost_id, expr_id);
         type_dag.solution_range_alignment(ghost_id, expr_id);
         if (config.debug) {
@@ -1904,7 +1907,7 @@ class ConstructorDeclarationGenerator extends DeclarationGenerator {
         }
       }
       else {
-        type_dag.connect(expr_id, vardecl.id, "super_dominance");
+        type_dag.connect(expr_id, vardecl.id, "super");
         type_dag.solution_range_alignment(expr_id, vardecl.id);
       }
       expr_gen.generate(0);
@@ -2160,7 +2163,7 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
       if (called_function_decl_ID === thisid) continue;
       const ghost_id = new_global_id();
       vismut_dag.insert(ghost_id, vismut_dag.solution_range_of(thisid)!);
-      vismut_dag.connect(ghost_id, thisid, "super_dominance");
+      vismut_dag.connect(ghost_id, thisid, "super");
       vismut_dag.connect(ghost_id, called_function_decl_ID);
       vismut_dag.solution_range_alignment(ghost_id, called_function_decl_ID);
       if (config.debug) {
@@ -2233,7 +2236,7 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
         const storage_loc_range = storage_location_dag.has_solution_range(return_decl.id) ?
           storage_location_dag.solution_range_of(return_decl.id)! : [];
         if (storage_loc_range.length > 0) {
-          storage_location_dag.insert(expr_id, loc.range_of_locs(storage_loc_range as loc.StorageLocation[], "equal"));
+          storage_location_dag.insert(expr_id, loc.range_of_locs(storage_loc_range as loc.StorageLocation[], "super"));
         }
         const ghost_id = connect_arguments_to_parameters(expr_id, return_decl.id);
         let expr_gen_prototype = get_exprgenerator(type_range, 0, [], storage_loc_range as loc.StorageLocation[]);
@@ -2354,8 +2357,6 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
         assert(vismut_solution.some((v) => closed_func_vismut.includes(v)),
           `FunctionDeclarationGenerator: vismut_dag.solution_range[${this.fid}] should contain ${closed_func_vismut.map(f => f.str())}, but is ${vismut_solution.map(f => f.str())}`);
         vismut_dag.update(this.fid, closed_func_vismut);
-        // haoyang
-        console.log(1);
       }
       else if (this.removing_storage_from_parameters_or_returns_leads_to_broken_storage_location_constraint()) {
         // If removing the storage possibility from a storage parameter or return decl leads
@@ -2363,8 +2364,6 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
         assert(vismut_solution.some((v) => closed_func_vismut.includes(v)),
           `FunctionDeclarationGenerator: vismut_dag.solution_range[${this.fid}] should contain ${closed_func_vismut.map(f => f.str())}, but is ${vismut_solution.map(f => f.str())}`);
         vismut_dag.update(this.fid, closed_func_vismut);
-        // haoyang
-        console.log(2);
       }
       else if (vismut_solution.some((v) => closed_func_vismut.includes(v)) && Math.random() < 0.5) {
         // If this function can be internal or private, then with 50% probability,
@@ -2372,8 +2371,6 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
         assert(vismut_solution.some((v) => closed_func_vismut.includes(v)),
           `FunctionDeclarationGenerator: vismut_dag.solution_range[${this.fid}] should contain ${closed_func_vismut.map(f => f.str())}, but is ${vismut_solution.map(f => f.str())}`);
         vismut_dag.update(this.fid, closed_func_vismut);
-        // haoyang
-        console.log(3);
       }
       else {
         // Otherwise, we force the storage parameters and return decls to be in memory or calldata.
@@ -2395,8 +2392,6 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
             loc.StorageLocationProvider.calldata()
           ]);
         });
-        // haoyang
-        console.log(4);
       }
     }
 
@@ -3128,7 +3123,7 @@ class IdentifierGenerator extends ExpressionGenerator {
   }
 
   private get_available_vardecls() {
-    const storage_loc_range = loc.range_of_locs(this.storage_range, 'equal');
+    const storage_loc_range = loc.range_of_locs(this.storage_range, 'same');
     this.available_vardecl = get_vardecls(this.type_range, storage_loc_range);
     if (this.left) {
       this.available_vardecl = this.available_vardecl.filter(irdecl => !decl_db.is_vardecl_nonassignable(irdecl.id));
@@ -3269,14 +3264,14 @@ class IdentifierGenerator extends ExpressionGenerator {
       if (expr_gen.generator_name === "LiteralGenerator") {
         ghost_id = new_global_id();
         type_dag.insert(ghost_id, type_range);
-        type_dag.connect(ghost_id, key_id, "super_dominance");
+        type_dag.connect(ghost_id, key_id, "super");
         type_dag.connect(ghost_id, expr_id);
         if (config.debug) {
           console.log(`${" ".repeat(indent)}IdentifierGenerator::generate_expr_when_selected_vardecl_is_a_mapping_value: ghost_id: ${ghost_id}, expr_id: ${expr_id}, key_id: ${key_id}`);
         }
       }
       else {
-        type_dag.connect(expr_id, key_id, "super_dominance");
+        type_dag.connect(expr_id, key_id, "super");
       }
       expr_gen.generate(this.cur_expression_complexity_level + 1);
       expr_db.transfer_read_variables(this.id, expr_id);
@@ -3548,11 +3543,11 @@ class IdentifierGenerator extends ExpressionGenerator {
         this.variable_decl!.id, this.struct_instantiation_id);
       if (storage_location_dag.has_solution_range(this.id)) {
         storage_location_dag.update(this.id,
-          loc.range_of_locs(storage_location_dag.solution_range.get(ghost_member_id)!, 'equal'));
+          loc.range_of_locs(storage_location_dag.solution_range.get(ghost_member_id)!, 'same'));
       }
       else {
         storage_location_dag.insert(this.id,
-          loc.range_of_locs(storage_location_dag.solution_range.get(ghost_member_id)!, 'equal')
+          loc.range_of_locs(storage_location_dag.solution_range.get(ghost_member_id)!, 'same')
         );
       }
       storage_location_dag.connect(this.id, ghost_member_id);
@@ -3560,12 +3555,12 @@ class IdentifierGenerator extends ExpressionGenerator {
     else if (storage_location_dag.has_solution_range(this.variable_decl!.id)) {
       if (storage_location_dag.has_solution_range(this.id)) {
         storage_location_dag.update(this.id,
-          loc.range_of_locs(storage_location_dag.solution_range.get(this.variable_decl!.id)!, 'equal')
+          loc.range_of_locs(storage_location_dag.solution_range.get(this.variable_decl!.id)!, 'same')
         );
       }
       else {
         storage_location_dag.insert(this.id,
-          loc.range_of_locs(storage_location_dag.solution_range.get(this.variable_decl!.id)!, 'equal')
+          loc.range_of_locs(storage_location_dag.solution_range.get(this.variable_decl!.id)!, 'same')
         );
       }
       storage_location_dag.connect(this.id, this.variable_decl!.id);
@@ -3748,14 +3743,14 @@ class AssignmentGenerator extends ExpressionGenerator {
     }
     type_dag.insert(leftid, this.type_range);
     if (this.this_dominate_right()) {
-      type_dag.connect(this.id, rightid, "sub_dominance");
+      type_dag.connect(this.id, rightid, "sub");
     }
     type_dag.connect(this.id, leftid);
     if (this.op === "=" && this.storage_range.length > 0) {
-      storage_location_dag.insert(leftid, loc.range_of_locs(this.storage_range, 'equal'));
+      storage_location_dag.insert(leftid, loc.range_of_locs(this.storage_range, 'same'));
       storage_location_dag.connect(this.id, leftid);
       storage_location_dag.insert(rightid, loc.range_of_locs(this.storage_range, 'sub'));
-      storage_location_dag.connect(this.id, rightid, "sub_dominance");
+      storage_location_dag.connect(this.id, rightid, "sub");
     }
     return [leftid, rightid];
   }
@@ -3782,15 +3777,15 @@ class AssignmentGenerator extends ExpressionGenerator {
         `AssignmentGenerator: right_extracted_expression.id ${rightid} is not in storage_location_dag.solution_range`);
       if (storage_location_dag.has_solution_range(this.id)) {
         storage_location_dag.update(this.id,
-          loc.range_of_locs(storage_location_dag.solution_range_of(leftid)!, "equal"));
+          loc.range_of_locs(storage_location_dag.solution_range_of(leftid)!, 'same'));
       }
       else {
         storage_location_dag.insert(this.id,
-          loc.range_of_locs(storage_location_dag.solution_range_of(leftid)!, 'equal'));
+          loc.range_of_locs(storage_location_dag.solution_range_of(leftid)!, 'same'));
       }
       storage_location_dag.connect(this.id, leftid);
       storage_location_dag.solution_range_alignment(this.id, leftid);
-      storage_location_dag.connect(this.id, rightid, "sub_dominance");
+      storage_location_dag.connect(this.id, rightid, "sub");
       storage_location_dag.solution_range_alignment(this.id, rightid);
     }
   }
@@ -3808,8 +3803,8 @@ class AssignmentGenerator extends ExpressionGenerator {
     if (right_storage_range.length > 0) {
       assert(this.op === "=", `AssignmentGenerator: op is not =, but is ${this.op}`);
       storage_location_dag.insert(this.id, loc.range_of_locs(right_storage_range, "sub"));
-      storage_location_dag.connect(this.id, rightid, "sub_dominance");
-      storage_location_dag.insert(leftid, loc.range_of_locs(storage_location_dag.solution_range_of(this.id), "equal"));
+      storage_location_dag.connect(this.id, rightid, "sub");
+      storage_location_dag.insert(leftid, loc.range_of_locs(storage_location_dag.solution_range_of(this.id), 'same'));
       storage_location_dag.connect(this.id, leftid);
       storage_location_dag.update(leftid, loc.range_of_locs(right_storage_range, "sub"));
       storage_location_dag.solution_range_alignment(this.id, rightid);
@@ -3928,7 +3923,7 @@ class BinaryOpGenerator extends ExpressionGenerator {
       type_dag.connect(this.id, leftid);
     }
     if (this.this_dominate_right()) {
-      type_dag.connect(this.id, rightid, "sub_dominance");
+      type_dag.connect(this.id, rightid, "sub");
     }
     let ghostid;
     if (["<", ">", "<=", ">=", "==", "!="].includes(this.op)) {
@@ -3936,7 +3931,7 @@ class BinaryOpGenerator extends ExpressionGenerator {
       type_dag.insert(ghostid, type.all_integer_types);
       type_dag.connect(ghostid, leftid);
       type_dag.solution_range_alignment(ghostid, leftid);
-      type_dag.connect(ghostid, rightid, "sub_dominance");
+      type_dag.connect(ghostid, rightid, "sub");
       type_dag.solution_range_alignment(ghostid, rightid);
     }
     return [leftid, rightid, ghostid];
@@ -4068,7 +4063,7 @@ class BinaryCompareOpGenerator extends ExpressionGenerator {
       type_dag.insert(ghostid, type.all_integer_types);
       type_dag.connect(ghostid, leftid);
       type_dag.solution_range_alignment(ghostid, leftid);
-      type_dag.connect(ghostid, rightid, "sub_dominance");
+      type_dag.connect(ghostid, rightid, "sub");
       type_dag.solution_range_alignment(ghostid, rightid);
     }
     return [leftid, rightid, ghostid];
@@ -4219,10 +4214,10 @@ class ConditionalGenerator extends ExpressionGenerator {
 
   private init_storage_loc_range(e2id : number, e3id : number) {
     if (this.storage_range.length > 0) {
-      storage_location_dag.insert(e2id, loc.range_of_locs(this.storage_range, "equal"));
+      storage_location_dag.insert(e2id, loc.range_of_locs(this.storage_range, 'same'));
       storage_location_dag.connect(this.id, e2id);
       storage_location_dag.insert(e3id, loc.range_of_locs(this.storage_range, 'super'));
-      storage_location_dag.connect(this.id, e3id, "sub_dominance");
+      storage_location_dag.connect(this.id, e3id, "sub");
     }
   }
 
@@ -4235,7 +4230,7 @@ class ConditionalGenerator extends ExpressionGenerator {
     const e3id = new_global_id();
     type_dag.insert(e3id, this.type_range);
     type_dag.connect(this.id, e2id);
-    type_dag.connect(this.id, e3id, "sub_dominance");
+    type_dag.connect(this.id, e3id, "sub");
     this.init_storage_loc_range(e2id, e3id);
     return [e1id, e2id, e3id];
   }
@@ -4267,8 +4262,8 @@ class ConditionalGenerator extends ExpressionGenerator {
       storage_location_dag.solution_range_of(e3id)! : [];
     if (e3_storage_range.length > 0) {
       storage_location_dag.insert(this.id, loc.range_of_locs(e3_storage_range, "sub"));
-      storage_location_dag.connect(this.id, e3id, "sub_dominance");
-      storage_location_dag.insert(e2id, loc.range_of_locs(storage_location_dag.solution_range_of(this.id), "equal"));
+      storage_location_dag.connect(this.id, e3id, "sub");
+      storage_location_dag.insert(e2id, loc.range_of_locs(storage_location_dag.solution_range_of(this.id), 'same'));
       storage_location_dag.connect(this.id, e2id);
       storage_location_dag.update(e2id, loc.range_of_locs(e3_storage_range, "sub"));
       storage_location_dag.solution_range_alignment(this.id, e3id);
@@ -4287,15 +4282,15 @@ class ConditionalGenerator extends ExpressionGenerator {
       assert(storage_location_dag.has_solution_range(e3id),
         `ConditionalGenerator: e3id ${e3id} is not in storage_location_dag.solution_range`);
       if (storage_location_dag.has_solution_range(this.id)) {
-        storage_location_dag.update(this.id, loc.range_of_locs(storage_location_dag.solution_range_of(e2id)!, "equal"));
+        storage_location_dag.update(this.id, loc.range_of_locs(storage_location_dag.solution_range_of(e2id)!, 'same'));
       }
       else {
         storage_location_dag.insert(this.id,
-          loc.range_of_locs(storage_location_dag.solution_range_of(e2id)!, 'equal')
+          loc.range_of_locs(storage_location_dag.solution_range_of(e2id)!, 'same')
         );
       }
       storage_location_dag.connect(this.id, e2id);
-      storage_location_dag.connect(this.id, e3id, "sub_dominance");
+      storage_location_dag.connect(this.id, e3id, "sub");
       storage_location_dag.solution_range_alignment(this.id, e3id);
     }
   }
@@ -4342,7 +4337,7 @@ abstract class CallExpressionGenerator extends ExpressionGenerator {
       const storage_loc_range = storage_location_dag.has_solution_range(parameter.id) ?
         storage_location_dag.solution_range_of(parameter.id)! : [];
       if (storage_loc_range.length > 0) {
-        storage_location_dag.insert(argid, loc.range_of_locs(storage_loc_range as loc.StorageLocation[], "equal"));
+        storage_location_dag.insert(argid, loc.range_of_locs(storage_loc_range as loc.StorageLocation[], "super"));
       }
       const ghost_id = connect_arguments_to_parameters(argid, parameter.id);
       let arg_gen_prototype = get_exprgenerator(type_range, cur_expression_complexity_level + 1,
@@ -4459,35 +4454,10 @@ class FunctionCallGenerator extends CallExpressionGenerator {
         }
       }
     }
-    if (selected_ret_decl === null) {
-      return;
-    }
-    const return_type_range = type_dag.solution_range_of(selected_ret_decl.id)!;
-    if ((type.all_array(return_type_range) || type.all_mapping(return_type_range)) &&
-      (type.contains_trivial_array(this.type_range) || type.contains_trivial_mapping(this.type_range))) {
-      type_dag.force_update(this.id, return_type_range);
-    }
-    let return_storage_range : loc.StorageLocation[];
-    if (storage_location_dag.has_solution_range(selected_ret_decl.id)) {
-      return_storage_range = storage_location_dag.solution_range_of(selected_ret_decl.id)!;
-    }
-    else if (decl_db.is_member_of_struct_decl(selected_ret_decl.id)) {
-      if (type_dag.solution_range_of(selected_ret_decl.id).every(t => t.typeName === "StringType")) {
-        return_storage_range = [loc.StorageLocationProvider.memory()];
-      }
-      else {
-        return_storage_range = [];
-      }
-    }
-    else {
-      return_storage_range = [];
-    }
-    if (return_storage_range.length > 0) {
-      if (storage_location_dag.has_solution_range(this.id)) {
-        storage_location_dag.update(this.id, loc.range_of_locs(return_storage_range, 'super'));
-      }
-      else {
-        storage_location_dag.insert(this.id, loc.range_of_locs(return_storage_range, 'super'));
+    if (selected_ret_decl !== null) {
+      type_dag.solution_range_alignment(this.id, selected_ret_decl.id);
+      if (storage_location_dag.has_solution_range(selected_ret_decl.id)) {
+        storage_location_dag.solution_range_alignment(this.id, selected_ret_decl.id);
       }
     }
   }
@@ -4507,6 +4477,65 @@ class FunctionCallGenerator extends CallExpressionGenerator {
     }
   }
 
+  private init_solution_ranges(selected_ret_decl : decl.IRVariableDeclaration | null) {
+    if (selected_ret_decl !== null) {
+      //* Init/Update type range
+      if ((type.all_array(type_dag.solution_range_of(selected_ret_decl.id)!) ||
+        type.all_mapping(type_dag.solution_range_of(selected_ret_decl.id)!)) &&
+        (type.contains_trivial_array(type_dag.solution_range_of(this.id)!) ||
+          type.contains_trivial_mapping(type_dag.solution_range_of(this.id)!))) {
+        type_dag.force_update(this.id, type_dag.solution_range_of(selected_ret_decl.id)!);
+      }
+      type_dag.connect(this.id, selected_ret_decl.id);
+      type_dag.solution_range_alignment(this.id, selected_ret_decl.id);
+      //* Init/Update storage location range
+      let return_storage_range : loc.StorageLocation[];
+      if (storage_location_dag.has_solution_range(selected_ret_decl.id)) {
+        return_storage_range = storage_location_dag.solution_range_of(selected_ret_decl.id)!;
+      }
+      else if (decl_db.is_member_of_struct_decl(selected_ret_decl.id)) {
+        if (type_dag.solution_range_of(selected_ret_decl.id).every(t => t.typeName === "StringType")) {
+          return_storage_range = [loc.StorageLocationProvider.memory()];
+        }
+        else {
+          return_storage_range = [];
+        }
+      }
+      else {
+        return_storage_range = [];
+      }
+      if (return_storage_range.length > 0) {
+        if (storage_location_dag.has_solution_range(this.id)) {
+          storage_location_dag.update(this.id, loc.range_of_locs(return_storage_range, 'same'));
+        }
+        else {
+          storage_location_dag.insert(this.id, loc.range_of_locs(return_storage_range, 'same'));
+        }
+        if (storage_location_dag.has_solution_range(selected_ret_decl.id)) {
+          if (storage_location_dag.check_connection(this.id, selected_ret_decl.id)) {
+            //! This function call is the return expr for the selected_ret_decl.
+            //! This scenario happens sometimes
+            /*
+              funnction f() returns (int[] memory x) {
+                return f();
+              }
+            */
+            //! In the above example, the return expr, which is the current function call,
+            //! has been connected to the selected_ret_decl with a super constraint in function
+            //! connect_arguments_to_parameters.
+            //! Therefore, we need to update the connection
+            storage_location_dag.remove_connection(this.id, selected_ret_decl.id);
+          }
+          storage_location_dag.connect(this.id, selected_ret_decl.id);
+          storage_location_dag.solution_range_alignment(this.id, selected_ret_decl.id);
+        }
+      }
+    }
+    if (config.debug && selected_ret_decl !== null) {
+      console.log(color.redBG(`${" ".repeat(indent)}>>  The type range of the selected ret decl (ID: ${selected_ret_decl.id}) is: ${type_dag.solution_range_of(selected_ret_decl.id)!.map(t => t.str())}. The storage location range is ${storage_location_dag.has_solution_range(selected_ret_decl.id) ? storage_location_dag.solution_range_of(selected_ret_decl.id)!.map(t => t.str()) : ''}`));
+    }
+  }
+
   private extract_ret_decl(funcdecl : decl.IRFunctionDefinition) : [number, decl.IRVariableDeclaration | null] {
     const available_ret_decls_index : number[] = [];
     for (let i = 0; i < funcdecl.returns.length; i++) {
@@ -4520,30 +4549,6 @@ class FunctionCallGenerator extends CallExpressionGenerator {
       -1 : pick_random_element(available_ret_decls_index)!;
     let selected_ret_decl : null | decl.IRVariableDeclaration = null;
     if (selected_ret_decls_index !== -1) selected_ret_decl = funcdecl.returns[selected_ret_decls_index];
-    if (selected_ret_decl !== null) {
-      if ((type.all_array(type_dag.solution_range_of(selected_ret_decl.id)!) ||
-        type.all_mapping(type_dag.solution_range_of(selected_ret_decl.id)!)) &&
-        (type.contains_trivial_array(type_dag.solution_range_of(this.id)!) ||
-          type.contains_trivial_mapping(type_dag.solution_range_of(this.id)!))) {
-        type_dag.force_update(this.id, type_dag.solution_range_of(selected_ret_decl.id)!);
-      }
-      type_dag.connect(this.id, selected_ret_decl.id);
-      type_dag.solution_range_alignment(this.id, selected_ret_decl.id);
-      if (storage_location_dag.has_solution_range(selected_ret_decl!.id)) {
-        if (!storage_location_dag.has_solution_range(this.id)) {
-          storage_location_dag.insert(this.id,
-            loc.range_of_locs(storage_location_dag.solution_range_of(selected_ret_decl.id)!, 'equal'));
-        }
-        else {
-          storage_location_dag.update(this.id,
-            loc.range_of_locs(storage_location_dag.solution_range_of(selected_ret_decl.id)!, 'equal'));
-        }
-        storage_location_dag.connect(this.id, selected_ret_decl.id);
-      }
-    }
-    if (config.debug && selected_ret_decl !== null) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  The type range of the selected ret decl (ID: ${selected_ret_decl.id}) is ${selected_ret_decls_index}: ${type_dag.solution_range_of(selected_ret_decl.id)!.map(t => t.str())}`));
-    }
     return [selected_ret_decls_index, selected_ret_decl];
   }
 
@@ -4722,11 +4727,12 @@ class FunctionCallGenerator extends CallExpressionGenerator {
     const funcdecl = irnodes.get(funcdecl_id)! as decl.IRFunctionDefinition;
     const func_identifier = new expr.IRIdentifier(new_global_id(), cur_scope.id(), funcdecl.name, funcdecl_id);
     const [selected_ret_decls_index, selected_ret_decl] = this.extract_ret_decl(funcdecl);
-    this.update_solution_ranges(contractdecl_id, funcdecl_id, selected_ret_decl);
+    this.init_solution_ranges(selected_ret_decl);
     const args_ids = this.generate_arguments(selected_ret_decl, funcdecl, cur_expression_complexity_level);
     this.generate_function_call_node(contractdecl_id, funcdecl, selected_ret_decl,
       selected_ret_decls_index, func_identifier, args_ids,
       cur_expression_complexity_level);
+    this.update_solution_ranges(contractdecl_id, funcdecl_id, selected_ret_decl);
     if (selected_ret_decl !== null) {
       this.wrap_in_a_tuple();
     }
@@ -5176,14 +5182,14 @@ class SingleVariableDeclareStatementGenerator extends NonExpressionStatementGene
       const ghost_id = new_global_id();
       type_dag.insert(ghost_id, type_dag.solution_range_of(extracted_ir.id)!);
       type_dag.connect(ghost_id, extracted_ir.id);
-      type_dag.connect(ghost_id, this.vardecl!.id, "super_dominance");
+      type_dag.connect(ghost_id, this.vardecl!.id, "super");
       type_dag.solution_range_alignment(ghost_id, this.vardecl!.id);
       if (config.debug) {
         console.log(`${" ".repeat(indent)}SingleVariableDeclareStatementGenerator: ghost_id: ${ghost_id}, extracted_ir: ${extracted_ir}, this.vardecl.id: ${this.vardecl!.id}`);
       }
     }
     else {
-      type_dag.connect(extracted_ir.id, this.vardecl!.id, "super_dominance");
+      type_dag.connect(extracted_ir.id, this.vardecl!.id, "super");
       type_dag.solution_range_alignment(extracted_ir.id, this.vardecl!.id);
     }
     this.end_flag();
@@ -5229,14 +5235,14 @@ class MultipleVariableDeclareStatementGenerator extends NonExpressionStatementGe
         const ghost_id = new_global_id();
         type_dag.insert(ghost_id, type_dag.solution_range_of(extracted_ir.id)!);
         type_dag.connect(ghost_id, extracted_ir.id);
-        type_dag.connect(ghost_id, this.vardecls[i].id, "super_dominance");
+        type_dag.connect(ghost_id, this.vardecls[i].id, "super");
         type_dag.solution_range_alignment(ghost_id, this.vardecls[i].id);
         if (config.debug) {
           console.log(`${" ".repeat(indent)}MultipleVariableDeclareStatementGenerator: ghost_id: ${ghost_id}, extracted_ir: ${extracted_ir}, this.vardecl.id: ${this.vardecls[i].id}`);
         }
       }
       else {
-        type_dag.connect(extracted_ir.id, this.vardecls[i].id, "super_dominance");
+        type_dag.connect(extracted_ir.id, this.vardecls[i].id, "super");
         type_dag.solution_range_alignment(extracted_ir.id, this.vardecls[i].id);
       }
     }

@@ -56,8 +56,8 @@ program
   // Dominance Constraint Solution
   .option("-max --maximum_solution_count <number>", "The maximum number of solutions Erwin will consider.", `${config.maximum_solution_count}`)
   // Type
-  .option("--int_types_num <number>", "The number of int types Erwin will consider in resolving type dominance.", `${config.int_num}`)
-  .option("--uint_types_num <number>", "The number of uint types Erwin will consider in resolving type dominance.", `${config.uint_num}`)
+  .option("--int_types_num <number>", "The number of int types Erwin will consider in resolving type constraints.", `${config.int_num}`)
+  .option("--uint_types_num <number>", "The number of uint types Erwin will consider in resolving type constraints.", `${config.uint_num}`)
   // Function
   .option("--function_body_stmt_cnt_upper_limit <number>", "The upper limit of the number of non-declaration statements of a function. This value is suggested to be bigger than tha value of var_count", `${config.function_body_stmt_cnt_upper_limit}`)
   .option("--function_body_stmt_cnt_lower_limit <number>", "The lower limit of the number of non-declaration statements of a function.", `${config.function_body_stmt_cnt_lower_limit}`)

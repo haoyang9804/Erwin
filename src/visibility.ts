@@ -1,16 +1,9 @@
 import { FunctionVisibility, StateVariableVisibility } from "solc-typed-ast";
-import { DominanceNode } from "./dominance";
+import { ConstraintNode } from "./constraint";
 
 //! Visibility does not have super/sub relations
 
-export abstract class FuncVis extends DominanceNode<FunctionVisibility> {
-  issubof(t : FuncVis) : boolean {
-    return this.supers().includes(t);
-  }
-  issuperof(t : FuncVis) : boolean {
-    return this.subs().includes(t);
-  }
-}
+export abstract class FuncVis extends ConstraintNode<FunctionVisibility> { }
 
 class FuncInternal extends FuncVis {
   constructor() {
@@ -27,23 +20,7 @@ class FuncInternal extends FuncVis {
       FuncVisProvider.private()
     ];
   }
-  sub_with_lowerbound(lower_bound : FuncVis) : FuncVis[] {
-    return [
-      FuncVisProvider.internal(),
-      FuncVisProvider.external(),
-      FuncVisProvider.public(),
-      FuncVisProvider.private()
-    ];
-  }
   supers() : FuncVis[] {
-    return [
-      FuncVisProvider.internal(),
-      FuncVisProvider.external(),
-      FuncVisProvider.public(),
-      FuncVisProvider.private()
-    ];
-  }
-  super_with_upperbound(upper_bound : FuncVis) : FuncVis[] {
     return [
       FuncVisProvider.internal(),
       FuncVisProvider.external(),
@@ -74,23 +51,7 @@ class FuncExternal extends FuncVis {
       FuncVisProvider.private()
     ];
   }
-  sub_with_lowerbound(lower_bound : FuncVis) : FuncVis[] {
-    return [
-      FuncVisProvider.internal(),
-      FuncVisProvider.external(),
-      FuncVisProvider.public(),
-      FuncVisProvider.private()
-    ];
-  }
   supers() : FuncVis[] {
-    return [
-      FuncVisProvider.internal(),
-      FuncVisProvider.external(),
-      FuncVisProvider.public(),
-      FuncVisProvider.private()
-    ];
-  }
-  super_with_upperbound(upper_bound : FuncVis) : FuncVis[] {
     return [
       FuncVisProvider.internal(),
       FuncVisProvider.external(),
@@ -121,23 +82,7 @@ class FuncPublic extends FuncVis {
       FuncVisProvider.private()
     ];
   }
-  sub_with_lowerbound(lower_bound : FuncVis) : FuncVis[] {
-    return [
-      FuncVisProvider.internal(),
-      FuncVisProvider.external(),
-      FuncVisProvider.public(),
-      FuncVisProvider.private()
-    ];
-  }
   supers() : FuncVis[] {
-    return [
-      FuncVisProvider.internal(),
-      FuncVisProvider.external(),
-      FuncVisProvider.public(),
-      FuncVisProvider.private()
-    ];
-  }
-  super_with_upperbound(upper_bound : FuncVis) : FuncVis[] {
     return [
       FuncVisProvider.internal(),
       FuncVisProvider.external(),
@@ -168,23 +113,7 @@ class FuncPrivate extends FuncVis {
       FuncVisProvider.private()
     ];
   }
-  sub_with_lowerbound(lower_bound : FuncVis) : FuncVis[] {
-    return [
-      FuncVisProvider.internal(),
-      FuncVisProvider.external(),
-      FuncVisProvider.public(),
-      FuncVisProvider.private()
-    ];
-  }
   supers() : FuncVis[] {
-    return [
-      FuncVisProvider.internal(),
-      FuncVisProvider.external(),
-      FuncVisProvider.public(),
-      FuncVisProvider.private()
-    ];
-  }
-  super_with_upperbound(upper_bound : FuncVis) : FuncVis[] {
     return [
       FuncVisProvider.internal(),
       FuncVisProvider.external(),
@@ -211,13 +140,7 @@ class FuncDefault extends FuncVis {
   subs() : FuncVis[] {
     return [];
   }
-  sub_with_lowerbound(lower_bound : FuncVis) : FuncVis[] {
-    return [];
-  }
   supers() : FuncVis[] {
-    return [];
-  }
-  super_with_upperbound(upper_bound : FuncVis) : FuncVis[] {
     return [];
   }
   same(t : FuncVis) : boolean {
@@ -251,14 +174,7 @@ export class FuncVisProvider {
   }
 }
 
-export abstract class VarVis extends DominanceNode<StateVariableVisibility> {
-  issubof(t : VarVis) : boolean {
-    return this.supers().includes(t);
-  }
-  issuperof(t : VarVis) : boolean {
-    return this.subs().includes(t);
-  }
-}
+export abstract class VarVis extends ConstraintNode<StateVariableVisibility> { }
 
 class VarInternal extends VarVis {
   constructor() {
@@ -274,21 +190,7 @@ class VarInternal extends VarVis {
       VarVisProvider.private()
     ];
   }
-  sub_with_lowerbound(lower_bound : VarVis) : VarVis[] {
-    return [
-      VarVisProvider.internal(),
-      VarVisProvider.public(),
-      VarVisProvider.private()
-    ];
-  }
   supers() : VarVis[] {
-    return [
-      VarVisProvider.internal(),
-      VarVisProvider.public(),
-      VarVisProvider.private()
-    ];
-  }
-  super_with_upperbound(upper_bound : VarVis) : VarVis[] {
     return [
       VarVisProvider.internal(),
       VarVisProvider.public(),
@@ -317,21 +219,7 @@ class VarPublic extends VarVis {
       VarVisProvider.private()
     ];
   }
-  sub_with_lowerbound(lower_bound : VarVis) : VarVis[] {
-    return [
-      VarVisProvider.internal(),
-      VarVisProvider.public(),
-      VarVisProvider.private()
-    ];
-  }
   supers() : VarVis[] {
-    return [
-      VarVisProvider.internal(),
-      VarVisProvider.public(),
-      VarVisProvider.private()
-    ];
-  }
-  super_with_upperbound(upper_bound : VarVis) : VarVis[] {
     return [
       VarVisProvider.internal(),
       VarVisProvider.public(),
@@ -360,21 +248,7 @@ class VarPrivate extends VarVis {
       VarVisProvider.private()
     ];
   }
-  sub_with_lowerbound(lower_bound : VarVis) : VarVis[] {
-    return [
-      VarVisProvider.internal(),
-      VarVisProvider.public(),
-      VarVisProvider.private()
-    ];
-  }
   supers() : VarVis[] {
-    return [
-      VarVisProvider.internal(),
-      VarVisProvider.public(),
-      VarVisProvider.private()
-    ];
-  }
-  super_with_upperbound(upper_bound : VarVis) : VarVis[] {
     return [
       VarVisProvider.internal(),
       VarVisProvider.public(),
@@ -403,21 +277,7 @@ class VarDefault extends VarVis {
       VarVisProvider.private()
     ];
   }
-  sub_with_lowerbound(lower_bound : VarVis) : VarVis[] {
-    return [
-      VarVisProvider.internal(),
-      VarVisProvider.public(),
-      VarVisProvider.private()
-    ];
-  }
   supers() : VarVis[] {
-    return [
-      VarVisProvider.internal(),
-      VarVisProvider.public(),
-      VarVisProvider.private()
-    ];
-  }
-  super_with_upperbound(upper_bound : VarVis) : VarVis[] {
     return [
       VarVisProvider.internal(),
       VarVisProvider.public(),

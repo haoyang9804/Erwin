@@ -1,12 +1,12 @@
-import { type_dag, storage_location_dag, TypeDominanceDAG } from "../src/constraint";
+import { type_dag, storage_location_dag, TypeConstraintDAG } from "../src/constraint";
 import { MappingType, Type, uinteger_types } from "../src/type";
 import { config } from "../src/config";
-import { StorageLocationProvider } from "../src/memory";
+import { StorageLocationProvider } from "../src/loc";
 import { TypeProvider } from "../src/type";
 config.unit_test_mode = true;
-test("test dominance dag 1",
+test("test constraint dag 1",
 async () => {
-  console.log('========== test dominance dag 1 ==========');
+  console.log('========== test constraint dag 1 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -23,9 +23,9 @@ async () => {
 }
 )
 
-test("test dominance dag 2",
+test("test constraint dag 2",
 async () => {
-  console.log('========== test dominance dag 2 ==========');
+  console.log('========== test constraint dag 2 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -46,9 +46,9 @@ async () => {
 }
 )
 
-test("test dominance dag 3",
+test("test constraint dag 3",
 async () => {
-  console.log('========== test dominance dag 3 ==========');
+  console.log('========== test constraint dag 3 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -78,9 +78,9 @@ async () => {
 }
 )
 
-test("test dominance dag 4",
+test("test constraint dag 4",
 async () => {
-  console.log('========== test dominance dag 4 ==========');
+  console.log('========== test constraint dag 4 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -113,10 +113,10 @@ async () => {
 )
 
 
-test("test dominance pyramids 1",
+test("test constraint pyramids 1",
 // graph: constraintDAGs/constraint2
 async () => {
-  console.log('========== test dominance pyramids 1 ==========');
+  console.log('========== test constraint pyramids 1 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -135,10 +135,10 @@ async () => {
 }
 )
 
-test("test dominance pyramids 2",
+test("test constraint pyramids 2",
   // graph: constraintDAGs/constraint3
 async () => {
-  console.log('========== test dominance pyramids 2 ==========');
+  console.log('========== test constraint pyramids 2 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -159,10 +159,10 @@ async () => {
 }
 )
 
-test("test dominance pyramids 3",
-  // mutation of test dominance pyramids 2
+test("test constraint pyramids 3",
+  // mutation of test constraint pyramids 2
 async () => {
-  console.log('========== test dominance pyramids 3 ==========');
+  console.log('========== test constraint pyramids 3 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -183,10 +183,10 @@ async () => {
 }
 )
    
-test("test dominance multi-dominance",
+test("test constraint multi-constraint",
   // graph: constraintDAGs/constraint1
 async () => {
-  console.log('========== test dominance multi-dominance ==========');
+  console.log('========== test constraint multi-constraint ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -452,7 +452,7 @@ async() => {
 }
 )
 
-class TestStorageLocationDominanceDAG extends TypeDominanceDAG {
+class TestStorageLocationDominanceDAG extends TypeConstraintDAG {
   dominatee_solution_range_should_be_shrinked(dominator_id : number, dominatee_id : number) : Type[] | undefined {
     return super.dominatee_solution_range_should_be_shrinked(dominator_id, dominatee_id);
   }
