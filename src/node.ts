@@ -29,13 +29,3 @@ export class IRSourceUnit extends IRNode {
     return factory.makeSourceUnit("", -1, "", new Map<string, number>(), this.children.map(x => x.lower()));
   }
 }
-
-// Ghost node is to make non-leaf nodes leaf nodes
-export class IRGhost extends IRNode {
-  constructor(id : number, scope : number) {
-    super(id, scope);
-  }
-  lower() : ASTNode {
-    throw new Error("IRGhost cannot be lowered");
-  }
-}

@@ -1,11 +1,7 @@
 import { DataLocation } from "solc-typed-ast";
 import { DominanceNode } from "./dominance";
 
-export abstract class StorageLocation extends DominanceNode<DataLocation> {
-  equals() : StorageLocation[] {
-    throw new Error("Method not implemented.");
-  }
-}
+export abstract class StorageLocation extends DominanceNode<DataLocation> {}
 
 export class StoragePointer extends StorageLocation {
   constructor() {
@@ -44,9 +40,6 @@ export class StoragePointer extends StorageLocation {
   }
   issuperof(t : StorageLocation) : boolean {
     return this.subs().some(g => g.same(t));
-  }
-  equals() : StorageLocation[] {
-    return [StorageLocationProvider.storage_pointer(), StorageLocationProvider.storage_ref()];
   }
 }
 
@@ -90,9 +83,6 @@ export class StorageRef extends StorageLocation {
   issuperof(t : StorageLocation) : boolean {
     return this.subs().some(g => g.same(t));
   }
-  equals() : StorageLocation[] {
-    return [StorageLocationProvider.storage_pointer(), StorageLocationProvider.storage_ref()];
-  }
 }
 
 export class Memory extends StorageLocation {
@@ -134,9 +124,6 @@ export class Memory extends StorageLocation {
   issuperof(t : StorageLocation) : boolean {
     return this.subs().some(g => g.same(t));
   }
-  equals() : StorageLocation[] {
-    return [StorageLocationProvider.memory()];
-  }
 }
 
 export class Calldata extends StorageLocation {
@@ -173,9 +160,6 @@ export class Calldata extends StorageLocation {
   }
   issuperof(t : StorageLocation) : boolean {
     return this.subs().some(g => g.same(t));
-  }
-  equals() : StorageLocation[] {
-    return [StorageLocationProvider.calldata()];
   }
 }
 
@@ -260,5 +244,5 @@ export function range_of_locs(loc : StorageLocation[], how_is_loc_dominated : "s
   if (how_is_loc_dominated === "super") {
     return [...new Set(loc.flatMap(l => l.subs()))] as StorageLocation[];
   }
-  return [...new Set(loc.flatMap(l => l.equals()))] as StorageLocation[];
+  return [...new Set(loc.flatMap(l => l.equivalents() as StorageLocation[]))] as StorageLocation[];
 }

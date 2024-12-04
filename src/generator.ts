@@ -1,5 +1,5 @@
 import { assert, pick_random_element, random_int, merge_set, intersection, cartesian_product } from "./utility";
-import { IRGhost, IRNode, IRSourceUnit } from "./node";
+import { IRNode, IRSourceUnit } from "./node";
 import * as expr from "./expression";
 import * as decl from "./declaration";
 import * as stmt from "./statement";
@@ -252,7 +252,6 @@ function connect_arguments_to_parameters(arg_id : number, param_id : number) : n
   let ghost_id;
   ghost_id = new_global_id();
   const type_range = type_dag.solution_range_of(arg_id)!;
-  new IRGhost(ghost_id, cur_scope.id());
   type_dag.insert(ghost_id, type_range);
   type_dag.connect(ghost_id, arg_id);
   type_dag.solution_range_alignment(ghost_id, arg_id);
@@ -1345,7 +1344,6 @@ class StringDeclarationGenerator extends DeclarationGenerator {
         type_dag.insert(literal_id, type_dag.solution_range_of(this.irnode!.id)!);
         const literal_gen = new LiteralGenerator(literal_id);
         const ghost_id = new_global_id();
-        new IRGhost(ghost_id, cur_scope.id());
         type_dag.insert(ghost_id, type_dag.solution_range_of(this.irnode!.id)!);
         type_dag.connect(ghost_id, this.irnode!.id, "super_dominance");
         type_dag.connect(ghost_id, literal_id);
@@ -1366,7 +1364,6 @@ class StringDeclarationGenerator extends DeclarationGenerator {
         const extracted_expr = expr.tuple_extraction(expr_gen.irnode! as expr.IRExpression);
         if (extracted_expr!.typeName === "IRLiteral") {
           const ghost_id = new_global_id();
-          new IRGhost(ghost_id, cur_scope.id());
           type_dag.insert(ghost_id, type_dag.solution_range_of(expr_id)!);
           type_dag.connect(ghost_id, expr_id);
           type_dag.connect(ghost_id, this.irnode!.id, "super_dominance");
@@ -1694,7 +1691,6 @@ class ElementaryTypeVariableDeclarationGenerator extends DeclarationGenerator {
         type_dag.insert(literal_id, type_dag.solution_range_of(this.irnode!.id)!);
         const literal_gen = new LiteralGenerator(literal_id);
         const ghost_id = new_global_id();
-        new IRGhost(ghost_id, cur_scope.id());
         type_dag.insert(ghost_id, type_dag.solution_range_of(this.irnode!.id)!);
         type_dag.connect(ghost_id, this.irnode!.id, "super_dominance");
         type_dag.connect(ghost_id, literal_id);
@@ -1714,7 +1710,6 @@ class ElementaryTypeVariableDeclarationGenerator extends DeclarationGenerator {
         const extracted_expr = expr.tuple_extraction(expr_gen.irnode! as expr.IRExpression);
         if (extracted_expr!.typeName === "IRLiteral") {
           const ghost_id = new_global_id();
-          new IRGhost(ghost_id, cur_scope.id());
           type_dag.insert(ghost_id, type_dag.solution_range_of(expr_id)!);
           type_dag.connect(ghost_id, expr_id);
           type_dag.connect(ghost_id, this.irnode!.id, "super_dominance");
@@ -1900,7 +1895,6 @@ class ConstructorDeclarationGenerator extends DeclarationGenerator {
       let ghost_id;
       if (expr_gen.generator_name === "LiteralGenerator") {
         ghost_id = new_global_id();
-        new IRGhost(ghost_id, cur_scope.id());
         type_dag.insert(ghost_id, type_dag.solution_range_of(vardecl.id)!);
         type_dag.connect(ghost_id, vardecl.id, "super_dominance");
         type_dag.connect(ghost_id, expr_id);
@@ -2165,7 +2159,6 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
       if (decl_db.is_getter_function(called_function_decl_ID)) continue;
       if (called_function_decl_ID === thisid) continue;
       const ghost_id = new_global_id();
-      new IRGhost(ghost_id, cur_scope.id());
       vismut_dag.insert(ghost_id, vismut_dag.solution_range_of(thisid)!);
       vismut_dag.connect(ghost_id, thisid, "super_dominance");
       vismut_dag.connect(ghost_id, called_function_decl_ID);
@@ -3275,7 +3268,6 @@ class IdentifierGenerator extends ExpressionGenerator {
       const expr_gen = new expr_gen_prototype(expr_id);
       if (expr_gen.generator_name === "LiteralGenerator") {
         ghost_id = new_global_id();
-        new IRGhost(ghost_id, cur_scope.id());
         type_dag.insert(ghost_id, type_range);
         type_dag.connect(ghost_id, key_id, "super_dominance");
         type_dag.connect(ghost_id, expr_id);
@@ -3941,7 +3933,6 @@ class BinaryOpGenerator extends ExpressionGenerator {
     let ghostid;
     if (["<", ">", "<=", ">=", "==", "!="].includes(this.op)) {
       ghostid = new_global_id();
-      new IRGhost(ghostid, cur_scope.id());
       type_dag.insert(ghostid, type.all_integer_types);
       type_dag.connect(ghostid, leftid);
       type_dag.solution_range_alignment(ghostid, leftid);
@@ -4074,7 +4065,6 @@ class BinaryCompareOpGenerator extends ExpressionGenerator {
     let ghostid;
     if (["<", ">", "<=", ">=", "==", "!="].includes(this.op)) {
       ghostid = new_global_id();
-      new IRGhost(ghostid, cur_scope.id());
       type_dag.insert(ghostid, type.all_integer_types);
       type_dag.connect(ghostid, leftid);
       type_dag.solution_range_alignment(ghostid, leftid);

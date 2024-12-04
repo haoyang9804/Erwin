@@ -7,13 +7,23 @@ export abstract class DominanceNode<T> {
   }
   abstract str() : string;
   abstract subs() : DominanceNode<T>[];
-  abstract sub_with_lowerbound(lower_bound : DominanceNode<T>) : DominanceNode<T>[];
+  sub_with_lowerbound(lower_bound : DominanceNode<T>) : DominanceNode<T>[] {
+    return this.subs().filter(x => x.issuperof(lower_bound));
+  }
   abstract supers() : DominanceNode<T>[];
-  abstract super_with_upperbound(upper_bound : DominanceNode<T>) : DominanceNode<T>[];
+  super_with_upperbound(upper_bound : DominanceNode<T>) : DominanceNode<T>[] {
+    return this.supers().filter(x => x.issubof(upper_bound));
+  }
   abstract same(t : DominanceNode<T>) : boolean;
   abstract copy() : DominanceNode<T>;
   abstract issubof(t : DominanceNode<T>) : boolean;
   abstract issuperof(t : DominanceNode<T>) : boolean;
+  equivalents() : DominanceNode<T>[] {
+    return this.subs().filter(t => this.supers().some(g => g.same(t)));
+  }
+  equal(t : DominanceNode<T>) : boolean {
+    return this.equivalents().some(g => g.same(t));
+  }
 }
 
 export function includes<T>(arr : DominanceNode<T>[], item : DominanceNode<T>) : boolean {
