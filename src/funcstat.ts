@@ -1,15 +1,7 @@
 import { FunctionStateMutability } from "solc-typed-ast";
-import { DominanceNode } from "./dominance";
-import { assert } from "./utility";
+import { ConstraintNode } from "./constraint";
 
-export abstract class FuncStat extends DominanceNode<FunctionStateMutability> {
-  issubof(t : FuncStat) : boolean {
-    return this.supers().includes(t);
-  }
-  issuperof(t : FuncStat) : boolean {
-    return this.subs().includes(t);
-  }
-}
+export abstract class FuncStat extends ConstraintNode<FunctionStateMutability> { }
 
 class Pure extends FuncStat {
   constructor() {
@@ -21,26 +13,8 @@ class Pure extends FuncStat {
   subs() : FuncStat[] {
     return [FuncStatProvider.pure()];
   }
-  sub_with_lowerbound(lower_bound : FuncStat) : FuncStat[] {
-    assert(lower_bound.kind === FunctionStateMutability.Pure);
-    return [FuncStatProvider.pure()];
-  }
   supers() : FuncStat[] {
     return [FuncStatProvider.pure(), FuncStatProvider.view(), FuncStatProvider.empty()];
-  }
-  super_with_upperbound(upper_bound : FuncStat) : FuncStat[] {
-    if (upper_bound instanceof Pure) {
-      return [FuncStatProvider.pure()];
-    }
-    else if (upper_bound instanceof View) {
-      return [FuncStatProvider.pure(), FuncStatProvider.view()];
-    }
-    else if (upper_bound instanceof Empty) {
-      return [FuncStatProvider.pure(), FuncStatProvider.view(), FuncStatProvider.empty()];
-    }
-    else {
-      throw new Error(`Pure::super_with_upperbound: Impropoer upperbound type ${upper_bound.str()}`);
-    }
   }
   same(t : FuncStat) : boolean {
     return t instanceof Pure;
@@ -60,30 +34,8 @@ class View extends FuncStat {
   subs() : FuncStat[] {
     return [FuncStatProvider.view(), FuncStatProvider.pure()];
   }
-  sub_with_lowerbound(lower_bound : FuncStat) : FuncStat[] {
-    if (lower_bound instanceof Pure) {
-      return [FuncStatProvider.view(), FuncStatProvider.pure()];
-    }
-    else if (lower_bound instanceof View) {
-      return [FuncStatProvider.view()];
-    }
-    else {
-      throw new Error(`View::sub_with_lowerbound: Improper lowerbound type ${lower_bound.str()}`);
-    }
-  }
   supers() : FuncStat[] {
     return [FuncStatProvider.view(), FuncStatProvider.empty()];
-  }
-  super_with_upperbound(upper_bound : FuncStat) : FuncStat[] {
-    if (upper_bound instanceof View) {
-      return [FuncStatProvider.view()];
-    }
-    else if (upper_bound instanceof Empty) {
-      return [FuncStatProvider.view(), FuncStatProvider.empty()];
-    }
-    else {
-      throw new Error(`View::super_with_upperbound: Improper upperbound type ${upper_bound.str()}`);
-    }
   }
   same(t : FuncStat) : boolean {
     return t instanceof View;
@@ -103,15 +55,7 @@ class Payable extends FuncStat {
   subs() : FuncStat[] {
     return [FuncStatProvider.payable(), FuncStatProvider.empty()];
   }
-  sub_with_lowerbound(lower_bound : FuncStat) : FuncStat[] {
-    assert(lower_bound.kind === FunctionStateMutability.Payable || lower_bound.kind === FunctionStateMutability.NonPayable);
-    return [FuncStatProvider.payable(), FuncStatProvider.empty()];
-  }
   supers() : FuncStat[] {
-    return [FuncStatProvider.payable(), FuncStatProvider.empty()];
-  }
-  super_with_upperbound(upper_bound : FuncStat) : FuncStat[] {
-    assert(upper_bound.kind === FunctionStateMutability.Payable || upper_bound.kind === FunctionStateMutability.NonPayable);
     return [FuncStatProvider.payable(), FuncStatProvider.empty()];
   }
   same(t : FuncStat) : boolean {
@@ -132,33 +76,8 @@ class Empty extends FuncStat {
   subs() : FuncStat[] {
     return [FuncStatProvider.empty(), FuncStatProvider.payable(), FuncStatProvider.view(), FuncStatProvider.pure()];
   }
-  sub_with_lowerbound(lower_bound : FuncStat) : FuncStat[] {
-    if (lower_bound instanceof Pure) {
-      return [FuncStatProvider.pure(), FuncStatProvider.view(), FuncStatProvider.empty()];
-    }
-    else if (lower_bound instanceof View) {
-      return [FuncStatProvider.view(), FuncStatProvider.empty()];
-    }
-    else if (lower_bound instanceof Payable) {
-      return [FuncStatProvider.payable(), FuncStatProvider.empty()];
-    }
-    else if (lower_bound instanceof Empty) {
-      return [FuncStatProvider.empty()];
-    }
-    else {
-      throw new Error(`Empty::sub_with_lowerbound: Improper lowerbound type ${lower_bound.str()}`);
-    }
-  }
   supers() : FuncStat[] {
     return [FuncStatProvider.empty(), FuncStatProvider.payable()];
-  }
-  super_with_upperbound(upper_bound : FuncStat) : FuncStat[] {
-    if (upper_bound.kind === FunctionStateMutability.NonPayable || upper_bound.kind === FunctionStateMutability.Payable) {
-      return [FuncStatProvider.empty(), FuncStatProvider.payable()];
-    }
-    else {
-      throw new Error(`Empty::super_with_upperbound: Improper upperbound type ${upper_bound.str()}`);
-    }
   }
   same(t : FuncStat) : boolean {
     return t instanceof Empty;

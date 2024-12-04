@@ -180,3 +180,23 @@ export function inside_error_scope(cur_scope : ScopeList) : boolean {
   }
   return false;
 }
+
+export function inside_mapping_scope(cur_scope : ScopeList) : boolean {
+  while (cur_scope.kind() !== scopeKind.GLOBAL) {
+    if (cur_scope.kind() === scopeKind.MAPPING) {
+      return true;
+    }
+    cur_scope = cur_scope.pre();
+  }
+  return false;
+}
+
+export function inside_array_scope(cur_scope : ScopeList) : boolean {
+  while (cur_scope.kind() !== scopeKind.GLOBAL) {
+    if (cur_scope.kind() === scopeKind.ARRAY) {
+      return true;
+    }
+    cur_scope = cur_scope.pre();
+  }
+  return false;
+}

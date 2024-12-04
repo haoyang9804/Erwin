@@ -1,7 +1,7 @@
 import { DataLocation } from "solc-typed-ast";
-import { DominanceNode } from "./dominance";
+import { ConstraintNode } from "./constraint";
 
-export abstract class StorageLocation extends DominanceNode<DataLocation> {}
+export abstract class StorageLocation extends ConstraintNode<DataLocation> { }
 
 export class StoragePointer extends StorageLocation {
   constructor() {
@@ -16,9 +16,6 @@ export class StoragePointer extends StorageLocation {
       StorageLocationProvider.storage_ref(),
     ];
   }
-  sub_with_lowerbound(lower_bound : StorageLocation) : StorageLocation[] {
-    throw new Error("Method not implemented.");
-  }
   supers() : StorageLocation[] {
     return [
       StorageLocationProvider.storage_pointer(),
@@ -26,20 +23,11 @@ export class StoragePointer extends StorageLocation {
       StorageLocationProvider.memory()
     ];
   }
-  super_with_upperbound(upper_bound : StorageLocation) : StorageLocation[] {
-    throw new Error("Method not implemented.");
-  }
   same(t : StorageLocation) : boolean {
     return t instanceof StoragePointer || t instanceof StorageRef;
   }
   copy() : StorageLocation {
     return new StoragePointer();
-  }
-  issubof(t : StorageLocation) : boolean {
-    return this.supers().some(g => g.same(t));
-  }
-  issuperof(t : StorageLocation) : boolean {
-    return this.subs().some(g => g.same(t));
   }
 }
 
@@ -58,9 +46,6 @@ export class StorageRef extends StorageLocation {
       StorageLocationProvider.calldata()
     ];
   }
-  sub_with_lowerbound(lower_bound : StorageLocation) : StorageLocation[] {
-    throw new Error("Method not implemented.");
-  }
   supers() : StorageLocation[] {
     return [
       StorageLocationProvider.storage_pointer(),
@@ -68,20 +53,11 @@ export class StorageRef extends StorageLocation {
       StorageLocationProvider.memory(),
     ];
   }
-  super_with_upperbound(upper_bound : StorageLocation) : StorageLocation[] {
-    throw new Error("Method not implemented.");
-  }
   same(t : StorageLocation) : boolean {
     return t instanceof StorageRef || t instanceof StoragePointer;
   }
   copy() : StorageLocation {
     return new StorageRef();
-  }
-  issubof(t : StorageLocation) : boolean {
-    return this.supers().some(g => g.same(t));
-  }
-  issuperof(t : StorageLocation) : boolean {
-    return this.subs().some(g => g.same(t));
   }
 }
 
@@ -100,29 +76,17 @@ export class Memory extends StorageLocation {
       StorageLocationProvider.storage_pointer()
     ];
   }
-  sub_with_lowerbound(lower_bound : StorageLocation) : StorageLocation[] {
-    throw new Error("Method not implemented.");
-  }
   supers() : StorageLocation[] {
     return [
       StorageLocationProvider.memory(),
       StorageLocationProvider.storage_ref(),
     ];
   }
-  super_with_upperbound(upper_bound : StorageLocation) : StorageLocation[] {
-    throw new Error("Method not implemented.");
-  }
   same(t : StorageLocation) : boolean {
     return t instanceof Memory;
   }
   copy() : StorageLocation {
     return new Memory();
-  }
-  issubof(t : StorageLocation) : boolean {
-    return this.supers().some(g => g.same(t));
-  }
-  issuperof(t : StorageLocation) : boolean {
-    return this.subs().some(g => g.same(t));
   }
 }
 
@@ -136,9 +100,6 @@ export class Calldata extends StorageLocation {
   subs() : StorageLocation[] {
     return [StorageLocationProvider.calldata()];
   }
-  sub_with_lowerbound(lower_bound : StorageLocation) : StorageLocation[] {
-    throw new Error("Method not implemented.");
-  }
   supers() : StorageLocation[] {
     return [
       StorageLocationProvider.calldata(),
@@ -146,20 +107,11 @@ export class Calldata extends StorageLocation {
       StorageLocationProvider.storage_ref(),
     ];
   }
-  super_with_upperbound(upper_bound : StorageLocation) : StorageLocation[] {
-    throw new Error("Method not implemented.");
-  }
   same(t : StorageLocation) : boolean {
     return t instanceof Calldata;
   }
   copy() : StorageLocation {
     return new Calldata();
-  }
-  issubof(t : StorageLocation) : boolean {
-    return this.supers().some(g => g.same(t));
-  }
-  issuperof(t : StorageLocation) : boolean {
-    return this.subs().some(g => g.same(t));
   }
 }
 
@@ -180,29 +132,17 @@ export class MemoryDefault extends StorageLocation {
       StorageLocationProvider.storage_pointer()
     ];
   }
-  sub_with_lowerbound(lower_bound : StorageLocation) : StorageLocation[] {
-    throw new Error("Method not implemented.");
-  }
   supers() : StorageLocation[] {
     return [
       StorageLocationProvider.memory(),
       StorageLocationProvider.storage_ref(),
     ];
   }
-  super_with_upperbound(upper_bound : StorageLocation) : StorageLocation[] {
-    throw new Error("Method not implemented.");
-  }
   same(t : StorageLocation) : boolean {
     return t instanceof MemoryDefault;
   }
   copy() : StorageLocation {
     return new MemoryDefault();
-  }
-  issubof(t : StorageLocation) : boolean {
-    return this.supers().some(g => g.same(t));
-  }
-  issuperof(t : StorageLocation) : boolean {
-    return this.subs().some(g => g.same(t));
   }
 }
 
@@ -237,12 +177,21 @@ export const all_storage_locations = [
   StorageLocationProvider.memory_default()
 ];
 
-export function range_of_locs(loc : StorageLocation[], how_is_loc_dominated : "sub" | "super" | "equal") : StorageLocation[] {
+export function range_of_locs(loc : StorageLocation[], how_is_loc_dominated : "sub" | "super" | "equal" | "same") : StorageLocation[] {
   if (how_is_loc_dominated === "sub") {
     return [...new Set(loc.flatMap(l => l.supers()))] as StorageLocation[];
   }
   if (how_is_loc_dominated === "super") {
     return [...new Set(loc.flatMap(l => l.subs()))] as StorageLocation[];
   }
-  return [...new Set(loc.flatMap(l => l.equivalents() as StorageLocation[]))] as StorageLocation[];
+  if (how_is_loc_dominated === "equal") {
+    return [...new Set(loc.flatMap(l => l.equivalents()))] as StorageLocation[];
+  }
+  return [...new Set(loc.flatMap(l =>
+    l === StorageLocationProvider.storage_pointer() ||
+      l === StorageLocationProvider.storage_ref() ? [
+      StorageLocationProvider.storage_pointer(),
+      StorageLocationProvider.storage_ref()
+    ] : [l]
+  ))];
 }

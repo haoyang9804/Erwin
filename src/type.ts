@@ -1,9 +1,8 @@
 import { assert, cartesian_product, pick_random_subarray, merge_set } from "./utility";
 import { sizeof } from "sizeof";
-import { DominanceNode } from "./dominance";
 import { config } from './config';
 import { decl_db } from "./db";
-import { type_dag } from "./constraint";
+import { type_dag, ConstraintNode } from "./constraint";
 
 export enum TypeKind {
   ElementaryType = "TypeKind::ElementaryType",
@@ -17,7 +16,7 @@ export enum TypeKind {
   PlaceholderType = "TypeKind::PlaceholderType"
 }
 
-export abstract class Type extends DominanceNode<TypeKind> { }
+export abstract class Type extends ConstraintNode<TypeKind> { }
 
 export class PlaceholderType extends Type {
   constructor() {
@@ -32,23 +31,11 @@ export class PlaceholderType extends Type {
   subs() : Type[] {
     return [TypeProvider.placeholder()];
   }
-  sub_with_lowerbound(lower_bound : Type) : Type[] {
-    return [TypeProvider.placeholder()];
-  }
   supers() : Type[] {
-    return [TypeProvider.placeholder()];
-  }
-  super_with_upperbound(upper_bound : Type) : Type[] {
     return [TypeProvider.placeholder()];
   }
   same(t : Type) : boolean {
     return t === TypeProvider.placeholder();
-  }
-  issubof(t : Type) : boolean {
-    return this.same(t);
-  }
-  issuperof(t : Type) : boolean {
-    return this.same(t);
   }
 }
 
@@ -93,32 +80,14 @@ export class StructType extends UserDefinedType {
   subs() : Type[] {
     return this._subs;
   }
-  sub_with_lowerbound(lower_bound : Type) : Type[] {
-    return this.subs().filter(x => x.issuperof(lower_bound));
-  }
   supers() : Type[] {
     return this._supers;
-  }
-  super_with_upperbound(upper_bound : Type) : Type[] {
-    return this.supers().filter(x => x.issubof(upper_bound));
   }
   copy() : Type {
     return new StructType(this.referece_id, this.name, this.type_str);
   }
   same(t : Type) : boolean {
     return t.kind === TypeKind.StructType && (t as StructType).name === this.name;
-  }
-  issubof(t : Type) : boolean {
-    for (let i = 0; i < this._subs.length; i++) {
-      if (this._supers[i].same(t)) return true;
-    }
-    return false;
-  }
-  issuperof(t : Type) : boolean {
-    for (let i = 0; i < this._supers.length; i++) {
-      if (this._subs[i].same(t)) return true;
-    }
-    return false;
   }
 }
 
@@ -134,32 +103,14 @@ export class ContractType extends UserDefinedType {
   subs() : Type[] {
     return this._subs;
   }
-  sub_with_lowerbound(lower_bound : Type) : Type[] {
-    return this.subs().filter(x => x.issuperof(lower_bound));
-  }
   supers() : Type[] {
     return this._supers;
-  }
-  super_with_upperbound(upper_bound : Type) : Type[] {
-    return this.supers().filter(x => x.issubof(upper_bound));
   }
   copy() : Type {
     return new ContractType(this.referece_id, this.name);
   }
   same(t : Type) : boolean {
     return t.kind === TypeKind.ContractType && (t as ContractType).name === this.name;
-  }
-  issubof(t : Type) : boolean {
-    for (let i = 0; i < this._subs.length; i++) {
-      if (this._supers[i].same(t)) return true;
-    }
-    return false;
-  }
-  issuperof(t : Type) : boolean {
-    for (let i = 0; i < this._supers.length; i++) {
-      if (this._subs[i].same(t)) return true;
-    }
-    return false;
   }
 }
 
@@ -284,10 +235,6 @@ export class ElementaryType extends Type {
     }
   }
 
-  sub_with_lowerbound(lower_bound : Type) : Type[] {
-    return this.subs().filter(x => x.issuperof(lower_bound));
-  }
-
   supers() : Type[] {
     switch (this.name) {
       case "uint256":
@@ -383,10 +330,6 @@ export class ElementaryType extends Type {
     }
   }
 
-  super_with_upperbound(upper_bound : Type) : Type[] {
-    return this.supers().filter(x => x.issubof(upper_bound));
-  }
-
   same(t : Type) : boolean {
     if (t.kind !== TypeKind.ElementaryType) return false;
     if ((t as ElementaryType).name === "address" && this.name === "address") {
@@ -399,116 +342,6 @@ export class ElementaryType extends Type {
       return true;
     }
     return false;
-  }
-
-  issuperof(t : Type) : boolean {
-    if (t.kind !== TypeKind.ElementaryType) return false;
-    const et : ElementaryType = t as ElementaryType;
-    switch (et.name) {
-      case "uint256":
-        if (this.name === "uint256") return true;
-        return false;
-      case "uint128":
-        if (this.name === "uint256" || this.name === "uint128") return true;
-        return false;
-      case "uint64":
-        if (this.name.startsWith('u') && !this.name.endsWith('t8') && !this.name.endsWith('16') && !this.name.endsWith('2')) return true;
-        return false;
-      case "uint32":
-        if (this.name.startsWith('u') && !this.name.endsWith('t8') && !this.name.endsWith('16')) return true;
-        return false;
-      case "uint16":
-        if (this.name.startsWith('u') && !this.name.endsWith('t8')) return true;
-        return false;
-      case "uint8":
-        if (this.name.startsWith('u')) return true;
-        return false;
-      case "int256":
-        if (this.name === "int256") return true;
-        return false;
-      case "int128":
-        if (this.name === "int256" || this.name === "int128") return true;
-        return false;
-      case "int64":
-        if (this.name.startsWith('i') && !this.name.endsWith('t8') && !this.name.endsWith('16') && !this.name.endsWith('2')) return true;
-        return false;
-      case "int32":
-        if (this.name.startsWith('i') && !this.name.endsWith('t8') && !this.name.endsWith('16')) return true;
-        return false;
-      case "int16":
-        if (this.name.startsWith('i') && !this.name.endsWith('t8')) return true;
-        return false;
-      case "int8":
-        if (this.name.startsWith('i')) return true;
-        return false;
-      case "address":
-        if (this.name !== "address") return false;
-        if (this.stateMutability === "nonpayable") {
-          return true;
-        }
-        else if (this.stateMutability === "payable") {
-          if (et.stateMutability === "payable") return true;
-          return false;
-        }
-      case "bool":
-        if (this.name === "bool") return true;
-        return false;
-    }
-  }
-
-  issubof(t : Type) : boolean {
-    if (t.kind !== TypeKind.ElementaryType) return false;
-    const et : ElementaryType = t as ElementaryType;
-    switch (et.name) {
-      case "uint256":
-        if (this.name.startsWith('u')) return true;
-        return false;
-      case "uint128":
-        if (this.name.startsWith('u') && !this.name.endsWith('56')) return true;
-        return false;
-      case "uint64":
-        if (this.name.startsWith('u') && !this.name.endsWith('56') && !this.name.endsWith('28')) return true;
-        return false;
-      case "uint32":
-        if (this.name.startsWith('u') && !this.name.endsWith('56') && !this.name.endsWith('28') && !this.name.endsWith('4')) return true;
-        return false;
-      case "uint16":
-        if (this.name === "uint16" || this.name === "uint8") return true;
-        return false;
-      case "uint8":
-        if (this.name === "uint8") return true;
-        return false;
-      case "int256":
-        if (this.name.startsWith('i')) return true;
-        return false;
-      case "int128":
-        if (this.name.startsWith('i') && !this.name.endsWith('56')) return true;
-        return false;
-      case "int64":
-        if (this.name.startsWith('i') && !this.name.endsWith('56') && !this.name.endsWith('28')) return true;
-        return false;
-      case "int32":
-        if (this.name.startsWith('i') && !this.name.endsWith('56') && !this.name.endsWith('28') && !this.name.endsWith('4')) return true;
-        return false;
-      case "int16":
-        if (this.name === "int16" || this.name === "int8") return true;
-        return false;
-      case "int8":
-        if (this.name === "int8") return true;
-        return false;
-      case "address":
-        if (this.name !== "address") return false;
-        if (this.stateMutability === "nonpayable") {
-          if (et.stateMutability === "nonpayable") return true;
-          return false;
-        }
-        else if (this.stateMutability === "payable") {
-          return true;
-        }
-      case "bool":
-        if (this.name === "bool") return true;
-        return false;
-    }
   }
 }
 
@@ -527,36 +360,14 @@ export class UnionType extends Type {
   subs() : Type[] {
     return cartesian_product(this.types.map(x => x.subs())).map(x => new UnionType(x));
   }
-  sub_with_lowerbound(lower_bound : Type) : Type[] {
-    return this.subs().filter(x => x.issuperof(lower_bound));
-  }
   supers() : Type[] {
     return cartesian_product(this.types.map(x => x.supers())).map(x => new UnionType(x));
-  }
-  super_with_upperbound(upper_bound : Type) : Type[] {
-    return this.supers().filter(x => x.issubof(upper_bound));
   }
   same(t : Type) : boolean {
     if (t.kind !== TypeKind.UnionType) return false;
     if ((t as UnionType).types.length !== this.types.length) return false;
     for (let i = 0; i < this.types.length; i++) {
       if (!this.types[i].same((t as UnionType).types[i])) return false;
-    }
-    return true;
-  }
-  issubof(t : Type) : boolean {
-    if (t.kind !== TypeKind.UnionType) return false;
-    if (this.types.length !== (t as UnionType).types.length) return false;
-    for (let i = 0; i < this.types.length; i++) {
-      if (!this.types[i].issubof((t as UnionType).types[i])) return false;
-    }
-    return true;
-  }
-  issuperof(t : Type) : boolean {
-    if (t.kind !== TypeKind.UnionType) return false;
-    if (this.types.length !== (t as UnionType).types.length) return false;
-    for (let i = 0; i < this.types.length; i++) {
-      if (!this.types[i].issuperof((t as UnionType).types[i])) return false;
     }
     return true;
   }
@@ -605,9 +416,6 @@ export class FunctionType extends Type {
         new FunctionType(this.visibility, "view", this.parameterTypes, this.returnTypes)]
     }
   }
-  sub_with_lowerbound(lower_bound : Type) : Type[] {
-    return this.subs().filter(x => x.issuperof(lower_bound));
-  }
   supers() : Type[] {
     switch (this.stateMutability) {
       case "pure":
@@ -624,9 +432,6 @@ export class FunctionType extends Type {
         return [new FunctionType(this.visibility, "nonpayable", this.parameterTypes, this.returnTypes)]
     }
   }
-  super_with_upperbound(upper_bound : Type) : Type[] {
-    return this.supers().filter(x => x.issubof(upper_bound));
-  }
   same(t : Type) : boolean {
     if (t.kind !== TypeKind.FunctionType) return false;
     if ((t as FunctionType).stateMutability === this.stateMutability
@@ -638,50 +443,6 @@ export class FunctionType extends Type {
       return true;
     }
     return false;
-  }
-
-  issubof(t : Type) : boolean {
-    if (t.kind !== TypeKind.FunctionType) return false;
-    const ft : FunctionType = t as FunctionType;
-    if (this.visibility !== ft.visibility) return false;
-    if (!this.parameterTypes.same(ft.parameterTypes)) return false;
-    if (!this.returnTypes.same(ft.returnTypes)) return false;
-    switch (ft.stateMutability) {
-      case "pure":
-        if (this.stateMutability === "pure") return true;
-        return false;
-      case "view":
-        if (this.stateMutability === "view" || this.stateMutability === "pure") return true;
-        return false;
-      case "payable":
-        if (this.stateMutability === "payable") return true;
-        return false;
-      case "nonpayable":
-        if (this.stateMutability === "nonpayable" || this.stateMutability === "payable" || this.stateMutability === "view" || this.stateMutability === "pure") return true;
-        return false;
-    }
-  }
-
-  issuperof(t : Type) : boolean {
-    if (t.kind !== TypeKind.FunctionType) return false;
-    const ft : FunctionType = t as FunctionType;
-    if (this.visibility !== ft.visibility) return false;
-    if (!this.parameterTypes.same(ft.parameterTypes)) return false;
-    if (!this.returnTypes.same(ft.returnTypes)) return false;
-    switch (ft.stateMutability) {
-      case "pure":
-        if (this.stateMutability === "pure" || this.stateMutability === "view" || this.stateMutability === "nonpayable") return true;
-        return false;
-      case "view":
-        if (this.stateMutability === "nonpayable" || this.stateMutability === "view") return true;
-        return false;
-      case "payable":
-        if (this.stateMutability === "nonpayable" || this.stateMutability === "payable") return true;
-        return false;
-      case "nonpayable":
-        if (this.stateMutability === "nonpayable") return true;
-        return false;
-    }
   }
 }
 
@@ -702,16 +463,10 @@ export class ArrayType extends Type {
   copy() : Type {
     throw new Error("ArrayType::copy() not implemented.");
   }
-  super_with_upperbound(upper_bound : Type) : Type[] {
-    return this.supers().filter(x => x.issubof(upper_bound));
-  }
   supers() : Type[] {
     if (this === TypeProvider.trivial_array()) return [this];
     const base_supers = this.base.supers();
     return base_supers.map(x => new ArrayType(x, this.length));
-  }
-  sub_with_lowerbound(lower_bound : Type) : Type[] {
-    return this.subs().filter(x => x.issuperof(lower_bound));
   }
   subs() : Type[] {
     if (this === TypeProvider.trivial_array()) return [this];
@@ -726,28 +481,6 @@ export class ArrayType extends Type {
     }
     if (this === TypeProvider.trivial_array() && t.kind === TypeKind.ArrayType) return true;
     return false;
-  }
-  issubof(t : Type) : boolean {
-    const supers = this.supers();
-    let flag = false;
-    supers.forEach(x => {
-      if (x.same(t)) {
-        flag = true;
-        return;
-      }
-    });
-    return flag;
-  }
-  issuperof(t : Type) : boolean {
-    const subs = this.subs();
-    let flag = false;
-    subs.forEach(x => {
-      if (x.same(t)) {
-        flag = true;
-        return;
-      }
-    });
-    return flag;
   }
 }
 
@@ -777,20 +510,8 @@ export class MappingType extends Type {
   subs() : Type[] {
     return [this];
   }
-  sub_with_lowerbound(_ : Type) : Type[] {
-    return [this];
-  }
   supers() : Type[] {
     return [this];
-  }
-  super_with_upperbound(_ : Type) : Type[] {
-    return [this];
-  }
-  issubof(t : Type) : boolean {
-    return this.same(t);
-  }
-  issuperof(t : Type) : boolean {
-    return this.same(t);
   }
 }
 
@@ -810,20 +531,8 @@ export class StringType extends Type {
   subs() : Type[] {
     return [this];
   }
-  sub_with_lowerbound(_ : Type) : Type[] {
-    return [this];
-  }
   supers() : Type[] {
     return [this];
-  }
-  super_with_upperbound(_ : Type) : Type[] {
-    return [this];
-  }
-  issubof(t : Type) : boolean {
-    return this.same(t);
-  }
-  issuperof(t : Type) : boolean {
-    return this.same(t);
   }
 }
 

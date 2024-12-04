@@ -1,6 +1,6 @@
 import { FuncStatProvider, FuncStat } from "./funcstat";
 import { FuncVis, FuncVisProvider, VarVis, VarVisProvider } from "./visibility";
-import { DominanceNode } from "./dominance";
+import { ConstraintNode } from "./constraint";
 import { cartesian_product } from "./utility";
 
 export class FuncVisMutKind {
@@ -227,7 +227,7 @@ export class VisMutKindProvider {
   }
 }
 
-export abstract class VisMut extends DominanceNode<VisMutKind> { }
+export abstract class VisMut extends ConstraintNode<VisMutKind> { }
 
 export abstract class FuncVisMut extends VisMut {
   str() : string {
@@ -248,10 +248,6 @@ export abstract class FuncVisMut extends VisMut {
       .map(([vis, stat]) =>
         VisMutProvider.from_kind(
           VisMutKindProvider.combine_vis_mut(vis, stat)));
-
-  }
-  sub_with_lowerbound(lower_bound : VisMut) : VisMut[] {
-    return this.subs().filter(x => x.issuperof(lower_bound));
   }
   supers() : VisMut[] {
     const local_kind = this.kind as FuncVisMutKind;
@@ -269,13 +265,10 @@ export abstract class FuncVisMut extends VisMut {
         VisMutProvider.from_kind(
           VisMutKindProvider.combine_vis_mut(vis, stat)));
   }
-  super_with_upperbound(upper_bound : VisMut) : VisMut[] {
-    return this.supers().filter(x => x.issubof(upper_bound));
-  }
-  issubof(t : VisMut) : boolean {
+  is_sub_of(t : VisMut) : boolean {
     return this.supers().includes(t);
   }
-  issuperof(t : VisMut) : boolean {
+  is_super_of(t : VisMut) : boolean {
     return this.subs().includes(t);
   }
 }
@@ -458,21 +451,15 @@ export abstract class VarVisMut extends VisMut {
     return vis_sub.map(t => VisMutProvider.from_kind(VisMutKindProvider.from_varvis(t)));
 
   }
-  sub_with_lowerbound(lower_bound : VisMut) : VisMut[] {
-    return this.subs().filter(x => x.issuperof(lower_bound));
-  }
   supers() : VisMut[] {
     const local_kind = this.kind as VarVisKind;
     const vis_sub = local_kind.visibility.supers() as VarVis[];
     return vis_sub.map(t => VisMutProvider.from_kind(VisMutKindProvider.from_varvis(t)));
   }
-  super_with_upperbound(upper_bound : VisMut) : VisMut[] {
-    return this.supers().filter(x => x.issubof(upper_bound));
-  }
-  issubof(t : VisMut) : boolean {
+  is_sub_of(t : VisMut) : boolean {
     return this.supers().includes(t);
   }
-  issuperof(t : VisMut) : boolean {
+  is_super_of(t : VisMut) : boolean {
     return this.subs().includes(t);
   }
 }

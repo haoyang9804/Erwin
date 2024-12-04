@@ -6,7 +6,6 @@ import { assert } from 'console';
 import { IRContractDefinition, IRStructDefinition } from './declaration';
 import { irnodes } from './node';
 import * as type from './type';
-import { type_dag } from './constraint';
 import { merge_set } from './utility';
 import { IRStatement } from './statement';
 import { initialize_variable } from './generator';
@@ -114,7 +113,6 @@ class DeclDB {
   private array_decl_id : Set<number> = new Set<number>();
   private array_decl_id_to_base_id : Map<number, number> = new Map<number, number>();
   private base_id_to_array_decl_id : Map<number, number> = new Map<number, number>();
-  private array_decl_that_contains_mapping_decl : Set<number> = new Set<number>();
 
   private member2structdecl : Map<number, number> = new Map<number, number>();
   private structdecl2members : Map<number, number[]> = new Map<number, number[]>();
@@ -510,19 +508,6 @@ class DeclDB {
 
   base_of_array(array_decl_id : number) : number {
     return this.array_decl_id_to_base_id.get(array_decl_id)!;
-  }
-
-  if_array_decl_contain_mapping_decl(array_decl_id : number) : void {
-    for (const t of type_dag.solution_range.get(array_decl_id)!) {
-      if (type.contain_mapping_type(t)) {
-        this.array_decl_that_contains_mapping_decl.add(array_decl_id);
-        break;
-      }
-    }
-  }
-
-  is_array_decl_that_contains_mapping_decl(array_decl_id : number) : boolean {
-    return this.array_decl_that_contains_mapping_decl.has(array_decl_id);
   }
 
   array_decls_ids() : number[] {
