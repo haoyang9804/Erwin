@@ -18,7 +18,7 @@ import { sig } from "./signal";
 import { Log } from "./log";
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Global Variables
 const global_id_start = 1;
-export let global_id = global_id_start;
+let global_id : number;
 export function init_global_id() {
   global_id = global_id_start;
 }
@@ -37,11 +37,14 @@ export function change_node_id(node : IRNode, new_id : number) {
   }
   irnodes.set(new_id, node);
 }
-let cur_scope : ScopeList = initScope();
+let cur_scope : ScopeList;
 export function init_scope() {
   cur_scope = initScope();
 }
-let indent = 0;
+let indent : number;
+export function init_indent() {
+  indent = 0;
+}
 
 export function initialize_variable(vardecl_id : number) {
   assert(irnodes.has(vardecl_id), `initialize_variable: id ${vardecl_id} is not in irnodes`);
