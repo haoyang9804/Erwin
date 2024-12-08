@@ -85,6 +85,19 @@ export const config = {
   if_body_stmt_cnt_upper_limit: 1,
   if_body_stmt_cnt_lower_limit: 0,
 
-  // Test
+  // Test Erwin
   unit_test_mode: false,
+
+  // The number of generation rounds
+  generation_rounds: 1,
+
+  // Log file path
+  log_file_path: "./log.txt",
+
+  // Test Solidity
+  compiler_path: "",
+  enable_test: false,
+
+  // Refresh the folder of the generated programs before generating new programs
+  refresh_folder: true,
 }

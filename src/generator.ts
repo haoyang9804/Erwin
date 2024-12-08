@@ -8,7 +8,6 @@ import { IDENTIFIER, decl_db, expr_db, ghost_member_of_member_inside_struct_inst
 import { type_dag, storage_location_dag, vismut_dag, is_super_range, is_equal_range, intersection_range } from "./constraint";
 import { config } from './config';
 import { irnodes } from "./node";
-import { color } from "console-log-colors"
 import { ContractKind, DataLocation, FunctionCallKind, FunctionKind, FunctionStateMutability, FunctionVisibility, StateVariableVisibility } from "solc-typed-ast";
 import { ScopeList, scopeKind, initScope, inside_function_body, inside_struct_decl_scope, get_scope_from_scope_id, unexpected_extra_stmt_belong_to_the_parent_scope, inside_constructor_scope, inside_constructor_parameter_scope, inside_event_scope, inside_error_scope, inside_mapping_scope, inside_array_scope } from "./scope";
 import { FuncStat, FuncStatProvider } from "./funcstat";
@@ -16,9 +15,13 @@ import { FuncVis, FuncVisProvider } from "./visibility";
 import * as loc from "./loc";
 import { all_func_vismut, all_var_vismut, closed_func_vismut, FuncVisMut, nonpayable_func_vismut, nonpure_func_vismut, nonpure_nonview_func_vismut, open_func_vismut, pure_func_vismut, view_func_vismut, VisMut, VisMutKindProvider, VisMutProvider } from "./vismut";
 import { sig } from "./signal";
+import { Log } from "./log";
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Global Variables
 const global_id_start = 1;
 export let global_id = global_id_start;
+export function init_global_id() {
+  global_id = global_id_start;
+}
 export function new_global_id() {
   return global_id++;
 }
@@ -35,6 +38,9 @@ export function change_node_id(node : IRNode, new_id : number) {
   irnodes.set(new_id, node);
 }
 let cur_scope : ScopeList = initScope();
+export function init_scope() {
+  cur_scope = initScope();
+}
 let indent = 0;
 
 export function initialize_variable(vardecl_id : number) {
@@ -116,9 +122,7 @@ function update_storage_loc_range_for_compound_type(id : number, struct_instanti
         storage_location_dag.connect(bridge_id, id);
         storage_location_dag.connect(bridge_id, baseid);
         storage_location_dag.solution_range_alignment(bridge_id, baseid);
-        if (config.debug) {
-          console.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: bridge id: ${bridge_id}, base id: ${baseid}, array id: ${id}`);
-        }
+        Log.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: bridge id: ${bridge_id}, base id: ${baseid}, array id: ${id}`);
       }
       else {
         assert(!storage_location_dag.has_solution_range(baseid),
@@ -134,9 +138,7 @@ function update_storage_loc_range_for_compound_type(id : number, struct_instanti
         storage_location_dag.connect(bridge_id, ghost_id);
         storage_location_dag.connect(bridge_id, base_ghost_id);
         update_ghost_members_of_struct_instantiation(struct_instantiation_id, baseid, base_ghost_id);
-        if (config.debug) {
-          console.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: bridge id: ${bridge_id}, base ghost id: ${base_ghost_id}, base id: ${baseid}, ghost array id: ${ghost_id}, array id: ${id}`);
-        }
+        Log.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: bridge id: ${bridge_id}, base ghost id: ${base_ghost_id}, base id: ${baseid}, ghost array id: ${ghost_id}, array id: ${id}`);
         update_storage_loc_range_for_compound_type(baseid, struct_instantiation_id, base_ghost_id);
       }
     }
@@ -155,9 +157,7 @@ function update_storage_loc_range_for_compound_type(id : number, struct_instanti
           storage_location_dag.connect(bridge_id, id);
           storage_location_dag.connect(bridge_id, member_ghost_id);
           update_ghost_members_of_struct_instantiation(id, member, member_ghost_id);
-          if (config.debug) {
-            console.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: bridge id: ${bridge_id}, member id: ${member}, struct instance id: ${id}, member ghost id: ${member_ghost_id}`);
-          }
+          Log.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: bridge id: ${bridge_id}, member id: ${member}, struct instance id: ${id}, member ghost id: ${member_ghost_id}`);
           update_storage_loc_range_for_compound_type(member, id, member_ghost_id);
         }
         else {
@@ -174,9 +174,7 @@ function update_storage_loc_range_for_compound_type(id : number, struct_instanti
           storage_location_dag.connect(bridge_id, ghost_id);
           storage_location_dag.connect(bridge_id, member_ghost_id);
           update_ghost_members_of_struct_instantiation(struct_instantiation_id, member, member_ghost_id);
-          if (config.debug) {
-            console.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: bridge id: ${bridge_id}, member id: ${member}, struct instance id: ${id}, member ghost id: ${member_ghost_id}, stuct instance ghost id: ${ghost_id}, struct instantiation id: ${struct_instantiation_id}`);
-          }
+          Log.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: bridge id: ${bridge_id}, member id: ${member}, struct instance id: ${id}, member ghost id: ${member_ghost_id}, stuct instance ghost id: ${ghost_id}, struct instantiation id: ${struct_instantiation_id}`);
           update_storage_loc_range_for_compound_type(member, struct_instantiation_id, member_ghost_id);
         }
       }
@@ -191,9 +189,7 @@ function update_storage_loc_range_for_compound_type(id : number, struct_instanti
           loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'same'));
         storage_location_dag.connect(id, member_ghost_id);
         update_ghost_members_of_struct_instantiation(id, member, member_ghost_id);
-        if (config.debug) {
-          console.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: member id: ${member}, struct expr id: ${id}, member ghost id: ${member_ghost_id}`);
-        }
+        Log.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: member id: ${member}, struct expr id: ${id}, member ghost id: ${member_ghost_id}`);
         update_storage_loc_range_for_compound_type(member, id, member_ghost_id);
       }
     });
@@ -216,9 +212,7 @@ function update_storage_loc_range_for_compound_type(id : number, struct_instanti
         storage_location_dag.connect(bridge_id, id);
         storage_location_dag.connect(bridge_id, value);
         storage_location_dag.solution_range_alignment(bridge_id, value);
-        if (config.debug) {
-          console.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: bridge id: ${bridge_id}, value id: ${value}, mapping id: ${id}`);
-        }
+        Log.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: bridge id: ${bridge_id}, value id: ${value}, mapping id: ${id}`);
       }
       else {
         assert(!storage_location_dag.has_solution_range(value),
@@ -234,9 +228,7 @@ function update_storage_loc_range_for_compound_type(id : number, struct_instanti
         storage_location_dag.connect(bridge_id, value_ghost_id);
         storage_location_dag.connect(bridge_id, ghost_id);
         update_ghost_members_of_struct_instantiation(struct_instantiation_id, value, value_ghost_id);
-        if (config.debug) {
-          console.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: bridge id: ${bridge_id}, value ghost id: ${value_ghost_id}, ghost mapping id: ${ghost_id}, mapping id: ${id}`);
-        }
+        Log.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: bridge id: ${bridge_id}, value ghost id: ${value_ghost_id}, ghost mapping id: ${ghost_id}, mapping id: ${id}`);
         update_storage_loc_range_for_compound_type(value, struct_instantiation_id, value_ghost_id);
       }
     }
@@ -255,9 +247,7 @@ function connect_arguments_to_parameters(arg_id : number, param_id : number) : n
   type_dag.connect(ghost_id, param_id, "super");
   type_dag.connect(ghost_id, arg_id);
   type_dag.solution_range_alignment(ghost_id, arg_id);
-  if (config.debug) {
-    console.log(`${" ".repeat(indent)}connect_arguments_to_parameters: ghost id: ${ghost_id}, arg id: ${arg_id}, param id: ${param_id}`);
-  }
+  Log.log(`${" ".repeat(indent)}connect_arguments_to_parameters: ghost id: ${ghost_id}, arg id: ${arg_id}, param id: ${param_id}`);
   if (storage_location_dag.has_solution_range(param_id)) {
     assert(storage_location_dag.has_solution_range(arg_id),
       `storage_location_dag.solution_range should have ${arg_id}`);
@@ -686,21 +676,17 @@ abstract class Generator {
 export class SourceUnitGenerator extends Generator {
   constructor() {
     super();
-    type_db.init_types();
+    type_db.init();
   }
 
   private start_flag() {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating SourceUnit, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating SourceUnit, scope: ${cur_scope.kind()}`)
+    indent += 2;
   }
 
   private end_flag() {
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}SourceUnit, scope: ${cur_scope.kind()}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}SourceUnit, scope: ${cur_scope.kind()}`)
   }
 
   private generate_children() : IRNode[] {
@@ -812,18 +798,14 @@ class MappingDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag(mappingid : number) {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Mapping Declaration, scope: ${cur_scope.kind()}, id: ${mappingid}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating Mapping Declaration, scope: ${cur_scope.kind()}, id: ${mappingid}`)
+    indent += 2;
   }
 
   private end_flag(mappingid : number, mapping_name : string) {
-    if (config.debug) {
-      indent -= 2;
-      const type_range_str = generate_type_range_str(this.type_range);
-      console.log(color.yellowBG(`${" ".repeat(indent)}Mapping Declaration, name: ${mapping_name} scope: ${cur_scope.kind()}, id: ${mappingid}, type range: ${type_range_str}, storage loc range: ${storage_location_dag.has_solution_range(mappingid) ? storage_location_dag.solution_range_of(mappingid).map(s => s.str()) : ''}`));
-    }
+    indent -= 2;
+    const type_range_str = generate_type_range_str(this.type_range);
+    Log.log(`${" ".repeat(indent)}Mapping Declaration, name: ${mapping_name} scope: ${cur_scope.kind()}, id: ${mappingid}, type range: ${type_range_str}, storage loc range: ${storage_location_dag.has_solution_range(mappingid) ? storage_location_dag.solution_range_of(mappingid).map(s => s.str()) : ''}`)
   }
 
   private go_back_to_contract_scope_if_required() : [boolean, ScopeList] {
@@ -920,17 +902,13 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag() {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Array Declaration, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating Array Declaration, scope: ${cur_scope.kind()}`)
+    indent += 2;
   }
 
   private end_flag(array_name : string, arrayid : number) {
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}Array Declaration, scope: ${cur_scope.kind()}, name: ${array_name}, id: ${arrayid}, storage loc range: ${storage_location_dag.has_solution_range(arrayid) ? storage_location_dag.solution_range_of(arrayid).map(s => s.str()) : ''}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}Array Declaration, scope: ${cur_scope.kind()}, name: ${array_name}, id: ${arrayid}, storage loc range: ${storage_location_dag.has_solution_range(arrayid) ? storage_location_dag.solution_range_of(arrayid).map(s => s.str()) : ''}`)
   }
 
   private generate_length() {
@@ -1149,10 +1127,8 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag(id : number) {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Struct Instance Declaration ${id}, type_range: ${this.type_range.map(t => t.str())}, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating Struct Instance Declaration ${id}, type_range: ${this.type_range.map(t => t.str())}, scope: ${cur_scope.kind()}`)
+    indent += 2;
   }
 
   private generate_initializer() {
@@ -1172,10 +1148,8 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
 
   private end_flag(struct_instance_name : string) {
     assert(this.irnode !== undefined, `StructInstanceDeclarationGenerator: this.irnode is undefined`);
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode.id}: Struct Instance Declaration, name: ${struct_instance_name} scope: ${cur_scope.kind()}, type: ${type_dag.solution_range_of(this.irnode.id)!.map(t => t.str())}, storage loc range: ${storage_location_dag.has_solution_range(this.irnode.id) ? storage_location_dag.solution_range_of(this.irnode.id).map(s => s.str()) : ""}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}${this.irnode.id}: Struct Instance Declaration, name: ${struct_instance_name} scope: ${cur_scope.kind()}, type: ${type_dag.solution_range_of(this.irnode.id)!.map(t => t.str())}, storage loc range: ${storage_location_dag.has_solution_range(this.irnode.id) ? storage_location_dag.solution_range_of(this.irnode.id).map(s => s.str()) : ""}`)
   }
 
   private init_storage_location_range() {
@@ -1334,10 +1308,8 @@ class StringDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag() {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating String Declaration, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating String Declaration, scope: ${cur_scope.kind()}`)
+    indent += 2;
   }
 
   private generate_initializer() {
@@ -1351,9 +1323,7 @@ class StringDeclarationGenerator extends DeclarationGenerator {
         type_dag.connect(ghost_id, this.irnode!.id, "super");
         type_dag.connect(ghost_id, literal_id);
         type_dag.solution_range_alignment(ghost_id, literal_id);
-        if (config.debug) {
-          console.log(`${" ".repeat(indent)}StringDeclarationGenerator::generate_initializer: ghost_id: ${ghost_id}, literal_id: ${literal_id}, id: ${this.irnode!.id}`);
-        }
+        Log.log(`${" ".repeat(indent)}StringDeclarationGenerator::generate_initializer: ghost_id: ${ghost_id}, literal_id: ${literal_id}, id: ${this.irnode!.id}`);
         literal_gen.generate(0);
         (this.irnode as decl.IRVariableDeclaration).value = literal_gen.irnode! as expr.IRExpression;
       }
@@ -1371,9 +1341,7 @@ class StringDeclarationGenerator extends DeclarationGenerator {
           type_dag.connect(ghost_id, expr_id);
           type_dag.connect(ghost_id, this.irnode!.id, "super");
           type_dag.solution_range_alignment(ghost_id, this.irnode!.id);
-          if (config.debug) {
-            console.log(`${" ".repeat(indent)}StringDeclarationGenerator::generate_initializer: ghost_id: ${ghost_id}, expr_id: ${expr_id}, id: ${this.irnode!.id}`);
-          }
+          Log.log(`${" ".repeat(indent)}StringDeclarationGenerator::generate_initializer: ghost_id: ${ghost_id}, expr_id: ${expr_id}, id: ${this.irnode!.id}`);
         }
         else {
           type_dag.connect(expr_id, this.irnode!.id, "super");
@@ -1394,10 +1362,8 @@ class StringDeclarationGenerator extends DeclarationGenerator {
   }
 
   private end_flag(name : string) {
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode!.id}: String Declaration, name: ${name}, scope: ${cur_scope.kind()}, type: ${type_dag.solution_range_of(this.irnode!.id)!.map(t => t.str())}, storage loc range: ${storage_location_dag.has_solution_range(this.irnode!.id) ? storage_location_dag.solution_range_of(this.irnode!.id).map(s => s.str()) : ""}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}${this.irnode!.id}: String Declaration, name: ${name}, scope: ${cur_scope.kind()}, type: ${type_dag.solution_range_of(this.irnode!.id)!.map(t => t.str())}, storage loc range: ${storage_location_dag.has_solution_range(this.irnode!.id) ? storage_location_dag.solution_range_of(this.irnode!.id).map(s => s.str()) : ""}`)
   }
 
   private init_storage_location_range() {
@@ -1505,17 +1471,13 @@ class EventDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag() {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Event Declaration, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating Event Declaration, scope: ${cur_scope.kind()}`)
+    indent += 2;
   }
 
   private end_flag() {
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}Event Declaration, scope: ${cur_scope.kind()}, id: ${this.irnode!.id}, name: ${(this.irnode as decl.IREventDefinition).name}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}Event Declaration, scope: ${cur_scope.kind()}, id: ${this.irnode!.id}, name: ${(this.irnode as decl.IREventDefinition).name}`)
   }
 
   private generate_parameters() {
@@ -1551,17 +1513,13 @@ class ErrorDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag() {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Error Declaration, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating Error Declaration, scope: ${cur_scope.kind()}`)
+    indent += 2;
   }
 
   private end_flag() {
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}Error Declaration, scope: ${cur_scope.kind()}, id: ${this.irnode!.id}, name: ${(this.irnode as decl.IRErrorDefinition).name}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}Error Declaration, scope: ${cur_scope.kind()}, id: ${this.irnode!.id}, name: ${(this.irnode as decl.IRErrorDefinition).name}`)
   }
 
   private generate_parameters() {
@@ -1608,10 +1566,8 @@ class ContractInstanceDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag() {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Contract Instance Declaration, type_range: ${this.type_range.map(t => t.str())}, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating Contract Instance Declaration, type_range: ${this.type_range.map(t => t.str())}, scope: ${cur_scope.kind()}`)
+    indent += 2;
   }
 
   private generate_initializer() {
@@ -1637,10 +1593,8 @@ class ContractInstanceDeclarationGenerator extends DeclarationGenerator {
   }
 
   private end_flag() {
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode!.id}: Contract Instance Declaration, scope: ${cur_scope.id()}, type: ${type_dag.solution_range_of(this.irnode!.id)!.map(t => t.str())}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}${this.irnode!.id}: Contract Instance Declaration, scope: ${cur_scope.id()}, type: ${type_dag.solution_range_of(this.irnode!.id)!.map(t => t.str())}`)
   }
 
   generate() : void {
@@ -1675,10 +1629,8 @@ class ElementaryTypeVariableDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag() {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Elementary Type Variable Decl, name is ${this.name}, type_range: ${this.type_range.map(t => t.str())}, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating Elementary Type Variable Decl, name is ${this.name}, type_range: ${this.type_range.map(t => t.str())}, scope: ${cur_scope.kind()}`)
+    indent += 2;
   }
 
   private update_vismut_dag() {
@@ -1698,9 +1650,7 @@ class ElementaryTypeVariableDeclarationGenerator extends DeclarationGenerator {
         type_dag.connect(ghost_id, this.irnode!.id, "super");
         type_dag.connect(ghost_id, literal_id);
         type_dag.solution_range_alignment(ghost_id, literal_id);
-        if (config.debug) {
-          console.log(`${" ".repeat(indent)}ElementaryTypeVariableDeclarationGenerator::generate_initializer: ghost_id: ${ghost_id}, literal_id: ${literal_id}, id: ${this.irnode!.id}`);
-        }
+        Log.log(`${" ".repeat(indent)}ElementaryTypeVariableDeclarationGenerator::generate_initializer: ghost_id: ${ghost_id}, literal_id: ${literal_id}, id: ${this.irnode!.id}`);
         literal_gen.generate(0);
         (this.irnode as decl.IRVariableDeclaration).value = literal_gen.irnode! as expr.IRExpression;
       }
@@ -1717,9 +1667,7 @@ class ElementaryTypeVariableDeclarationGenerator extends DeclarationGenerator {
           type_dag.connect(ghost_id, expr_id);
           type_dag.connect(ghost_id, this.irnode!.id, "super");
           type_dag.solution_range_alignment(ghost_id, this.irnode!.id);
-          if (config.debug) {
-            console.log(`${" ".repeat(indent)}ElementaryTypeVariableDeclarationGenerator::generate_initializer: ghost_id: ${ghost_id}, expr_id: ${expr_id}, id: ${this.irnode!.id}`);
-          }
+          Log.log(`${" ".repeat(indent)}ElementaryTypeVariableDeclarationGenerator::generate_initializer: ghost_id: ${ghost_id}, expr_id: ${expr_id}, id: ${this.irnode!.id}`);
         }
         else {
           type_dag.connect(expr_id, this.irnode!.id, "super");
@@ -1731,10 +1679,8 @@ class ElementaryTypeVariableDeclarationGenerator extends DeclarationGenerator {
   }
 
   private end_flag() {
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode!.id}: Elementary Type Variable Decl, name: ${this.name}, scope: ${cur_scope.kind()}, type: ${type_dag.solution_range_of(this.irnode!.id)!.map(t => t.str())}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}${this.irnode!.id}: Elementary Type Variable Decl, name: ${this.name}, scope: ${cur_scope.kind()}, type: ${type_dag.solution_range_of(this.irnode!.id)!.map(t => t.str())}`)
   }
 
   generate() : void {
@@ -1873,17 +1819,13 @@ class ConstructorDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag_of_constructor_body() {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Constructor Body`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating Constructor Body`)
+    indent += 2;
   }
 
   private end_flag_of_constructor_body() {
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}Constructor Body`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}Constructor Body`)
   }
 
   private initiaize_state_variables_in_cur_contract_scope() : boolean {
@@ -1902,9 +1844,7 @@ class ConstructorDeclarationGenerator extends DeclarationGenerator {
         type_dag.connect(ghost_id, vardecl.id, "super");
         type_dag.connect(ghost_id, expr_id);
         type_dag.solution_range_alignment(ghost_id, expr_id);
-        if (config.debug) {
-          console.log(`${" ".repeat(indent)}ConstructorDeclarationGenerator::initiaize_state_variables_in_cur_contract_scope: ghost_id: ${ghost_id}, expr_id: ${expr_id}, id: ${vardecl.id}`);
-        }
+        Log.log(`${" ".repeat(indent)}ConstructorDeclarationGenerator::initiaize_state_variables_in_cur_contract_scope: ghost_id: ${ghost_id}, expr_id: ${expr_id}, id: ${vardecl.id}`);
       }
       else {
         type_dag.connect(expr_id, vardecl.id, "super");
@@ -1954,17 +1894,13 @@ class ConstructorDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag_of_constructor_decl() {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Constructor Declaration: ${this.fid}, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating Constructor Declaration: ${this.fid}, scope: ${cur_scope.kind()}`)
+    indent += 2;
   }
 
   private end_flag_of_constructor_decl() {
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode!.id}: Constructor Declaration, scope: ${cur_scope.kind()}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}${this.irnode!.id}: Constructor Declaration, scope: ${cur_scope.kind()}`)
   }
 
   //TODO: support modifiers
@@ -1973,10 +1909,8 @@ class ConstructorDeclarationGenerator extends DeclarationGenerator {
   }
 
   private generate_parameters() : void {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Constructor Parameters, ${this.parameter_count} in total`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating Constructor Parameters, ${this.parameter_count} in total`)
+    indent += 2;
     cur_scope = cur_scope.new(scopeKind.CONSTRUCTOR_PARAMETERS);
     Array.from({ length: this.parameter_count }, () => {
       const variable_gen = new VariableDeclarationGenerator(0, type_db.types().filter((t) => t.typeName !== 'MappingType'));
@@ -1984,10 +1918,8 @@ class ConstructorDeclarationGenerator extends DeclarationGenerator {
       this.parameters.push(variable_gen.irnode! as decl.IRVariableDeclaration);
     });
     cur_scope = cur_scope.rollback();
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}Constructor Parameters`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}Constructor Parameters`)
   }
 
   generate() : void {
@@ -2015,17 +1947,13 @@ class StructGenerator extends DeclarationGenerator {
   }
 
   private start_flag(id : number) {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Struct Definition: ${id}, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating Struct Definition: ${id}, scope: ${cur_scope.kind()}`)
+    indent += 2;
   }
 
   private end_flag(id : number, struct_name : string) {
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}${id}: Struct Definition, scope: ${cur_scope.kind()}, name: ${struct_name}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}${id}: Struct Definition, scope: ${cur_scope.kind()}, name: ${struct_name}`)
   }
 
   private generate_member_variables(struct_id : number) {
@@ -2166,9 +2094,7 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
       vismut_dag.connect(ghost_id, thisid, "super");
       vismut_dag.connect(ghost_id, called_function_decl_ID);
       vismut_dag.solution_range_alignment(ghost_id, called_function_decl_ID);
-      if (config.debug) {
-        console.log(`${" ".repeat(indent)}FunctionDeclarationGenerator::build_connection_between_caller_and_callee: ghost_id: ${ghost_id}, id: ${thisid}, called_function_decl_ID: ${called_function_decl_ID}`);
-      }
+      Log.log(`${" ".repeat(indent)}FunctionDeclarationGenerator::build_connection_between_caller_and_callee: ghost_id: ${ghost_id}, id: ${thisid}, called_function_decl_ID: ${called_function_decl_ID}`);
     }
     decl_db.clear_called_function_decls();
   }
@@ -2187,17 +2113,13 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag_of_func_body() {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Body for ${this.fid}. vismut range is ${vismut_dag.solution_range_of(this.irnode!.id)!.map(f => f.str())}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating Function Body for ${this.fid}. vismut range is ${vismut_dag.solution_range_of(this.irnode!.id)!.map(f => f.str())}`)
+    indent += 2;
   }
 
   private end_flag_of_func_body() {
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}Function Body for ${this.fid}. vismut range is ${vismut_dag.solution_range_of(this.irnode!.id)!.map(f => f.str())}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}Function Body for ${this.fid}. vismut range is ${vismut_dag.solution_range_of(this.irnode!.id)!.map(f => f.str())}`)
   }
 
   private initialize_the_vardecls_that_must_be_initialized() {
@@ -2504,31 +2426,23 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag_of_func_decl(func_name : string) {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Definition ${this.fid} ${func_name}, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating Function Definition ${this.fid} ${func_name}, scope: ${cur_scope.kind()}`)
+    indent += 2;
   }
 
   private end_flag_of_func_decl(func_name : string) {
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}${this.fid}: Function ${func_name}, vismut range is ${vismut_dag.solution_range_of(this.fid)!.map(f => f.str())}, scope: ${cur_scope.kind()}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}${this.fid}: Function ${func_name}, vismut range is ${vismut_dag.solution_range_of(this.fid)!.map(f => f.str())}, scope: ${cur_scope.kind()}`)
   }
 
   private start_flag_of_func_params() {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Parameters, ${this.parameter_count} in total`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating Function Parameters, ${this.parameter_count} in total`)
+    indent += 2;
   }
 
   private end_flag_of_func_params() {
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}Function Parameters`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}Function Parameters`)
   }
 
   private generate_func_params() {
@@ -2544,17 +2458,13 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag_of_func_return_decls() {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Function Return Decls, ${this.return_count} in total`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating Function Return Decls, ${this.return_count} in total`)
+    indent += 2;
   }
 
   private end_flag_of_func_return_decls() {
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}Function Return Decls`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}Function Return Decls`)
   }
 
   private generate_func_return_decls() {
@@ -2612,17 +2522,13 @@ class ContractDeclarationGenerator extends DeclarationGenerator {
   constructor() { super(); }
 
   private start_flag_of_getter_function(fid : number, var_name : string) {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating getter function ${fid} for state variable ${var_name}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating getter function ${fid} for state variable ${var_name}`)
+    indent += 2;
   }
 
   private end_flag_of_getter_function(fid : number, var_name : string) {
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)} Getter function ${fid} for state variable ${var_name}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)} Getter function ${fid} for state variable ${var_name}`)
   }
 
   private generate_getter_function_for_contract_type_state_variable(variable_decl : decl.IRVariableDeclaration) {
@@ -2845,17 +2751,13 @@ class ContractDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag_of_contract_decl(id : number) {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Contract Definition: ${id}, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating Contract Definition: ${id}, scope: ${cur_scope.kind()}`)
+    indent += 2;
   }
 
   private end_flag_of_contract_decl(id : number) {
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}${id}: Contract, scope: ${cur_scope.kind()}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}${id}: Contract, scope: ${cur_scope.kind()}`)
   }
 
   private generate_struct_decls() {
@@ -2893,10 +2795,8 @@ class ContractDeclarationGenerator extends DeclarationGenerator {
 
   private generate_state_variables() {
     let state_variable_count = random_int(config.state_variable_count_lowerlimit, config.state_variable_count_upperlimit);
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating State Variables: ${state_variable_count} in total as planned`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating State Variables: ${state_variable_count} in total as planned`)
+    indent += 2;
     //* Generate state variables and randomly assigns values to these variables
     const local_state_variables : decl.IRVariableDeclaration[] = [];
     for (let i = 0; i < state_variable_count; i++) {
@@ -2922,10 +2822,8 @@ class ContractDeclarationGenerator extends DeclarationGenerator {
       stmt_db.remove_unexpected_extra_stmt_from_scope(cur_scope.id());
       this.body.push(variable_decl);
     }
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}State Variables, ${local_state_variables.length} in total practically`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}State Variables, ${local_state_variables.length} in total practically`)
     //* For each state variable, generate a external view function with the same identifier name as the state variable.
     for (let variable_decl of local_state_variables) {
       this.generate_getter_function(variable_decl);
@@ -3020,9 +2918,7 @@ abstract class ExpressionGenerator extends Generator {
   protected wrap_in_a_tuple(must_wrap : boolean = false) {
     if (must_wrap || Math.random() < config.tuple_prob) {
       this.irnode = new expr.IRTuple(new_global_id(), cur_scope.id(), [this.irnode as expr.IRExpression]);
-      if (config.debug) {
-        console.log(`${" ".repeat(indent)}${this.irnode.id}: Tuple: ${this.irnode.id} scope: ${cur_scope.kind()}`);
-      }
+      Log.log(`${" ".repeat(indent)}${this.irnode.id}: Tuple: ${this.irnode.id} scope: ${cur_scope.kind()}`);
     }
   }
 
@@ -3037,9 +2933,7 @@ class LiteralGenerator extends ExpressionGenerator {
   generate(_ : number) : void {
     this.type_range = this.type_range.filter(t => t.kind === type.TypeKind.ElementaryType || t.kind === type.TypeKind.StringType);
     assert(this.type_range.length > 0, `LiteralGenerator: type_range ${this.type_range.map(t => t.str())} is invalid`);
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Literal ${this.id}: ${this.type_range.map(t => t.str())}, scope: ${cur_scope.kind()}`));
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating Literal ${this.id}: ${this.type_range.map(t => t.str())}, scope: ${cur_scope.kind()}`)
     if (this.type_range.some(t => t.kind === type.TypeKind.StringType)) {
       expr_db.add_string_expr(this.id);
       storage_location_dag.insert(this.id, [
@@ -3050,7 +2944,7 @@ class LiteralGenerator extends ExpressionGenerator {
     type_dag.update(this.id, this.type_range);
     this.irnode = new expr.IRLiteral(this.id, cur_scope.id());
     if (config.debug)
-      console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode.id}: Literal, scope: ${cur_scope.kind()}, type: ${type_dag.solution_range_of(this.irnode.id)!.map(t => t.str())}`));
+      Log.log(`${" ".repeat(indent)}${this.irnode.id}: Literal, scope: ${cur_scope.kind()}, type: ${type_dag.solution_range_of(this.irnode.id)!.map(t => t.str())}`)
     this.wrap_in_a_tuple();
   }
 }
@@ -3070,19 +2964,15 @@ class IdentifierGenerator extends ExpressionGenerator {
   }
 
   private start_flag() {
-    if (config.debug) {
-      const type_range_str = generate_type_range_str(this.type_range);
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Identifier ${this.id}: type: ${type_range_str}, loc: ${this.storage_range.map(t => t.str())}, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    const type_range_str = generate_type_range_str(this.type_range);
+    Log.log(`${" ".repeat(indent)}>>  Start generating Identifier ${this.id}: type: ${type_range_str}, loc: ${this.storage_range.map(t => t.str())}, scope: ${cur_scope.kind()}`)
+    indent += 2;
   }
 
   private end_flag() {
-    if (config.debug) {
-      indent -= 2;
-      const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
-      console.log(color.yellowBG(`${" ".repeat(indent)}${this.id}: Identifier ${this.variable_decl === undefined ? '' : `--> ${this.variable_decl.id}`}, scope: ${cur_scope.kind()}, type: ${type_range_str}, loc: ${storage_location_dag.has_solution_range(this.id) ? storage_location_dag.solution_range_of(this.id)!.map(t => t.str()) : ''}`));
-    }
+    indent -= 2;
+    const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
+    Log.log(`${" ".repeat(indent)}${this.id}: Identifier ${this.variable_decl === undefined ? '' : `--> ${this.variable_decl.id}`}, scope: ${cur_scope.kind()}, type: ${type_range_str}, loc: ${storage_location_dag.has_solution_range(this.id) ? storage_location_dag.solution_range_of(this.id)!.map(t => t.str()) : ''}`)
   }
 
   private generate_var_decl() : void {
@@ -3266,9 +3156,7 @@ class IdentifierGenerator extends ExpressionGenerator {
         type_dag.insert(ghost_id, type_range);
         type_dag.connect(ghost_id, key_id, "super");
         type_dag.connect(ghost_id, expr_id);
-        if (config.debug) {
-          console.log(`${" ".repeat(indent)}IdentifierGenerator::generate_expr_when_selected_vardecl_is_a_mapping_value: ghost_id: ${ghost_id}, expr_id: ${expr_id}, key_id: ${key_id}`);
-        }
+        Log.log(`${" ".repeat(indent)}IdentifierGenerator::generate_expr_when_selected_vardecl_is_a_mapping_value: ghost_id: ${ghost_id}, expr_id: ${expr_id}, key_id: ${key_id}`);
       }
       else {
         type_dag.connect(expr_id, key_id, "super");
@@ -3655,9 +3543,7 @@ class IdentifierGenerator extends ExpressionGenerator {
       this.variable_decl = pick_random_element(this.available_vardecl)!;
     }
     if (this.variable_decl !== undefined) {
-      if (config.debug) {
-        console.log(`${" ".repeat(indent)}IdentifierGenerator::generate: this.variable_decl: ${this.variable_decl.id}`);
-      }
+      Log.log(`${" ".repeat(indent)}IdentifierGenerator::generate: this.variable_decl: ${this.variable_decl.id}`);
       decl_db.lock_vardecl(this.variable_decl!.id);
     }
     this.generate_identifier();
@@ -3701,19 +3587,15 @@ class AssignmentGenerator extends ExpressionGenerator {
   }
 
   private start_flag() {
-    if (config.debug) {
-      const type_range_str = generate_type_range_str(this.type_range);
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Assignment ${this.op}: ${this.id}: type: ${type_range_str}, loc: ${this.storage_range.map(t => t.str())}, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    const type_range_str = generate_type_range_str(this.type_range);
+    Log.log(`${" ".repeat(indent)}>>  Start generating Assignment ${this.op}: ${this.id}: type: ${type_range_str}, loc: ${this.storage_range.map(t => t.str())}, scope: ${cur_scope.kind()}`)
+    indent += 2;
   }
 
   private end_flag() {
-    if (config.debug) {
-      indent -= 2;
-      const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
-      console.log(color.yellowBG(`${" ".repeat(indent)}${this.id}: Assignment ${this.op}, scope: ${cur_scope.kind()}, type: ${type_range_str}, loc: ${storage_location_dag.has_solution_range(this.id) ? storage_location_dag.solution_range_of(this.id)!.map(t => t.str()) : ''}, scope: ${cur_scope.kind()}`));
-    }
+    indent -= 2;
+    const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
+    Log.log(`${" ".repeat(indent)}${this.id}: Assignment ${this.op}, scope: ${cur_scope.kind()}, type: ${type_range_str}, loc: ${storage_location_dag.has_solution_range(this.id) ? storage_location_dag.solution_range_of(this.id)!.map(t => t.str()) : ''}, scope: ${cur_scope.kind()}`)
   }
 
   private distill_type_range() {
@@ -3864,19 +3746,15 @@ class BinaryOpGenerator extends ExpressionGenerator {
   }
 
   private start_flag() {
-    if (config.debug) {
-      const type_range_str = generate_type_range_str(this.type_range);
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating BinaryOp ${this.op}: ${this.id}: ${type_range_str}, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    const type_range_str = generate_type_range_str(this.type_range);
+    Log.log(`${" ".repeat(indent)}>>  Start generating BinaryOp ${this.op}: ${this.id}: ${type_range_str}, scope: ${cur_scope.kind()}`)
+    indent += 2;
   }
 
   private end_flag() {
-    if (config.debug) {
-      indent -= 2;
-      const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
-      console.log(color.yellowBG(`${" ".repeat(indent)}${this.id}: BinaryOp ${this.op}, scope: ${cur_scope.kind()}, type: ${type_range_str}`));
-    }
+    indent -= 2;
+    const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
+    Log.log(`${" ".repeat(indent)}${this.id}: BinaryOp ${this.op}, scope: ${cur_scope.kind()}, type: ${type_range_str}`)
   }
 
   private distill_type_range() {
@@ -4028,19 +3906,15 @@ class BinaryCompareOpGenerator extends ExpressionGenerator {
   }
 
   private start_flag() {
-    if (config.debug) {
-      const type_range_str = generate_type_range_str(this.type_range);
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating BinaryCompareOp ${this.op}: ${this.id}: ${type_range_str}, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    const type_range_str = generate_type_range_str(this.type_range);
+    Log.log(`${" ".repeat(indent)}>>  Start generating BinaryCompareOp ${this.op}: ${this.id}: ${type_range_str}, scope: ${cur_scope.kind()}`)
+    indent += 2;
   }
 
   private end_flag() {
-    if (config.debug) {
-      indent -= 2;
-      const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
-      console.log(color.yellowBG(`${" ".repeat(indent)}${this.id}: BinaryCompareOp ${this.op}, scope: ${cur_scope.kind()}, type: ${type_range_str}`));
-    }
+    indent -= 2;
+    const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
+    Log.log(`${" ".repeat(indent)}${this.id}: BinaryCompareOp ${this.op}, scope: ${cur_scope.kind()}, type: ${type_range_str}`)
   }
 
   private distill_type_range() {
@@ -4132,19 +4006,15 @@ class UnaryOpGenerator extends ExpressionGenerator {
   }
 
   private start_flag() {
-    if (config.debug) {
-      const type_range_str = generate_type_range_str(this.type_range);
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating UnaryOp ${this.op}: ${this.id}: ${type_range_str}, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    const type_range_str = generate_type_range_str(this.type_range);
+    Log.log(`${" ".repeat(indent)}>>  Start generating UnaryOp ${this.op}: ${this.id}: ${type_range_str}, scope: ${cur_scope.kind()}`)
+    indent += 2;
   }
 
   private end_flag() {
-    if (config.debug) {
-      indent -= 2;
-      const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
-      console.log(color.yellowBG(`${" ".repeat(indent)}${this.id}: UnaryOp ${this.op}, scope: ${cur_scope.kind()}, type: ${type_range_str}`));
-    }
+    indent -= 2;
+    const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
+    Log.log(`${" ".repeat(indent)}${this.id}: UnaryOp ${this.op}, scope: ${cur_scope.kind()}, type: ${type_range_str}`)
   }
 
   private distill_type_range() {
@@ -4197,19 +4067,15 @@ class ConditionalGenerator extends ExpressionGenerator {
   }
 
   private start_flag() {
-    if (config.debug) {
-      const type_range_str = generate_type_range_str(this.type_range);
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating Conditional: ${this.id}: type: ${type_range_str}, loc: ${this.storage_range.map(t => t.str())}, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    const type_range_str = generate_type_range_str(this.type_range);
+    Log.log(`${" ".repeat(indent)}>>  Start generating Conditional: ${this.id}: type: ${type_range_str}, loc: ${this.storage_range.map(t => t.str())}, scope: ${cur_scope.kind()}`)
+    indent += 2;
   }
 
   private end_flag() {
-    if (config.debug) {
-      indent -= 2;
-      const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
-      console.log(color.yellowBG(`${" ".repeat(indent)}${this.id}: Conditional, scope: ${cur_scope.kind()}, type: ${type_range_str}, loc: ${storage_location_dag.has_solution_range(this.id) ? storage_location_dag.solution_range_of(this.id)!.map(t => t.str()) : ''}`));
-    }
+    indent -= 2;
+    const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
+    Log.log(`${" ".repeat(indent)}${this.id}: Conditional, scope: ${cur_scope.kind()}, type: ${type_range_str}, loc: ${storage_location_dag.has_solution_range(this.id) ? storage_location_dag.solution_range_of(this.id)!.map(t => t.str()) : ''}`)
   }
 
   private init_storage_loc_range(e2id : number, e3id : number) {
@@ -4371,19 +4237,15 @@ class FunctionCallGenerator extends CallExpressionGenerator {
   }
 
   private start_flag(contractdecl_id : number, funcdecl_id : number) {
-    if (config.debug) {
-      const type_range_str = generate_type_range_str(this.type_range);
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating FunctionCall: ${this.id}: type: ${type_range_str}, loc: ${this.storage_range.map(t => t.str())}, contractdecl_id: ${contractdecl_id} funcdecl_id: ${funcdecl_id}, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    const type_range_str = generate_type_range_str(this.type_range);
+    Log.log(`${" ".repeat(indent)}>>  Start generating FunctionCall: ${this.id}: type: ${type_range_str}, loc: ${this.storage_range.map(t => t.str())}, contractdecl_id: ${contractdecl_id} funcdecl_id: ${funcdecl_id}, scope: ${cur_scope.kind()}`)
+    indent += 2;
   }
 
   private end_flag() {
-    if (config.debug) {
-      indent -= 2;
-      const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
-      console.log(color.yellowBG(`${" ".repeat(indent)}${this.id}: FunctionCall, id: ${this.id} scope: ${cur_scope.kind()}, type: ${type_range_str}, loc: ${storage_location_dag.has_solution_range(this.id) ? storage_location_dag.solution_range_of(this.id)!.map(t => t.str()) : ''}, scope: ${cur_scope.kind()}`));
-    }
+    indent -= 2;
+    const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
+    Log.log(`${" ".repeat(indent)}${this.id}: FunctionCall, id: ${this.id} scope: ${cur_scope.kind()}, type: ${type_range_str}, loc: ${storage_location_dag.has_solution_range(this.id) ? storage_location_dag.solution_range_of(this.id)!.map(t => t.str()) : ''}, scope: ${cur_scope.kind()}`)
   }
 
   private internal_function_call(contractdecl_id : number) : boolean {
@@ -4532,7 +4394,7 @@ class FunctionCallGenerator extends CallExpressionGenerator {
       }
     }
     if (config.debug && selected_ret_decl !== null) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  The type range of the selected ret decl (ID: ${selected_ret_decl.id}) is: ${type_dag.solution_range_of(selected_ret_decl.id)!.map(t => t.str())}. The storage location range is ${storage_location_dag.has_solution_range(selected_ret_decl.id) ? storage_location_dag.solution_range_of(selected_ret_decl.id)!.map(t => t.str()) : ''}`));
+      Log.log(`${" ".repeat(indent)}>>  The type range of the selected ret decl (ID: ${selected_ret_decl.id}) is: ${type_dag.solution_range_of(selected_ret_decl.id)!.map(t => t.str())}. The storage location range is ${storage_location_dag.has_solution_range(selected_ret_decl.id) ? storage_location_dag.solution_range_of(selected_ret_decl.id)!.map(t => t.str()) : ''}`)
     }
   }
 
@@ -4556,10 +4418,8 @@ class FunctionCallGenerator extends CallExpressionGenerator {
     funcdecl : decl.IRFunctionDefinition,
     cur_expression_complexity_level : number
   ) : number[] {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating FunctionCall Arguments`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating FunctionCall Arguments`)
+    indent += 2;
     if (selected_ret_decl !== null) {
       if (decl_db.is_getter_function(funcdecl.id)) {
         expr_db.expr_reads_variable(this.id, decl_db.state_var_of_getter_function(funcdecl.id)!);
@@ -4578,10 +4438,8 @@ class FunctionCallGenerator extends CallExpressionGenerator {
       expr_db.transfer_read_variables(this.id, arg_id);
       expr_db.transfer_write_variables(this.id, arg_id);
     }
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}FunctionCall Arguments`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}FunctionCall Arguments`)
     return args_ids;
   }
 
@@ -4749,18 +4607,15 @@ class NewStructGenerator extends CallExpressionGenerator {
   private start_flag() {
     if (config.debug) {
       const type_range_str = generate_type_range_str(this.type_range);
-      console.log(color.redBG(
-        `${" ".repeat(indent)}>>  Start generating NewStructGenerator ${this.id}: ${type_range_str}, scope: ${cur_scope.kind()}`));
+      Log.log(`${" ".repeat(indent)}>>  Start generating NewStructGenerator ${this.id}: ${type_range_str}, scope: ${cur_scope.kind()}`);
       indent += 2;
     }
   }
 
   private end_flag() {
-    if (config.debug) {
-      indent -= 2;
-      const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
-      console.log(color.yellowBG(`${" ".repeat(indent)}${this.id}: NewStructGenerator, scope: ${cur_scope.kind()} type: ${type_range_str}, loc: ${storage_location_dag.has_solution_range(this.id) ? storage_location_dag.solution_range_of(this.id)!.map(t => t.str()) : ''}`));
-    }
+    indent -= 2;
+    const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
+    Log.log(`${" ".repeat(indent)}${this.id}: NewStructGenerator, scope: ${cur_scope.kind()} type: ${type_range_str}, loc: ${storage_location_dag.has_solution_range(this.id) ? storage_location_dag.solution_range_of(this.id)!.map(t => t.str()) : ''}`)
   }
 
   private distill_type_range() : [type.StructType, decl.IRStructDefinition] {
@@ -4822,19 +4677,15 @@ class NewContractGenerator extends CallExpressionGenerator {
   }
 
   private start_flag() {
-    if (config.debug) {
-      const type_range_str = generate_type_range_str(this.type_range);
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating NewContractGenerator ${this.id}: ${type_range_str}, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    const type_range_str = generate_type_range_str(this.type_range);
+    Log.log(`${" ".repeat(indent)}>>  Start generating NewContractGenerator ${this.id}: ${type_range_str}, scope: ${cur_scope.kind()}`)
+    indent += 2;
   }
 
   private end_flag() {
-    if (config.debug) {
-      indent -= 2;
-      const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
-      console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode!.id}: NewContractGenerator, scope: ${cur_scope.kind()}, type_range: ${type_range_str}`));
-    }
+    indent -= 2;
+    const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
+    Log.log(`${" ".repeat(indent)}${this.irnode!.id}: NewContractGenerator, scope: ${cur_scope.kind()}, type_range: ${type_range_str}`)
   }
 
   private distill_type_range() : type.ContractType {
@@ -4879,17 +4730,13 @@ class EmitExpressionGenerator extends CallExpressionGenerator {
   }
 
   start_flag() {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating EmitExpressionGenerator ${this.id}: scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating EmitExpressionGenerator ${this.id}: scope: ${cur_scope.kind()}`)
+    indent += 2;
   }
 
   end_flag() {
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}${this.id}: EmitExpressionGenerator, scope: ${cur_scope.kind()}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}${this.id}: EmitExpressionGenerator, scope: ${cur_scope.kind()}`)
   }
 
   generate(cur_expression_complexity_level : number) : void {
@@ -4924,17 +4771,13 @@ class RevertExpressionGenerator extends CallExpressionGenerator {
   }
 
   start_flag() {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating RevertExpressionGenerator ${this.id}: scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating RevertExpressionGenerator ${this.id}: scope: ${cur_scope.kind()}`)
+    indent += 2;
   }
 
   end_flag() {
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}${this.id}: RevertExpressionGenerator, scope: ${cur_scope.kind()}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}${this.id}: RevertExpressionGenerator, scope: ${cur_scope.kind()}`)
   }
 
   generate(cur_expression_complexity_level : number) : void {
@@ -4998,16 +4841,12 @@ abstract class StatementGenerator extends Generator {
   constructor() { super(); }
   abstract generate(cur_stmt_complex_level : number) : void;
   protected start_flag() {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating ${this.generator_name}, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating ${this.generator_name}, scope: ${cur_scope.kind()}`)
+    indent += 2;
   }
   protected end_flag() {
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}${this.irnode!.id}: ${this.generator_name}, scope: ${cur_scope.kind()}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}${this.irnode!.id}: ${this.generator_name}, scope: ${cur_scope.kind()}`)
   }
 }
 
@@ -5184,9 +5023,7 @@ class SingleVariableDeclareStatementGenerator extends NonExpressionStatementGene
       type_dag.connect(ghost_id, extracted_ir.id);
       type_dag.connect(ghost_id, this.vardecl!.id, "super");
       type_dag.solution_range_alignment(ghost_id, this.vardecl!.id);
-      if (config.debug) {
-        console.log(`${" ".repeat(indent)}SingleVariableDeclareStatementGenerator: ghost_id: ${ghost_id}, extracted_ir: ${extracted_ir}, this.vardecl.id: ${this.vardecl!.id}`);
-      }
+      Log.log(`${" ".repeat(indent)}SingleVariableDeclareStatementGenerator: ghost_id: ${ghost_id}, extracted_ir: ${extracted_ir}, this.vardecl.id: ${this.vardecl!.id}`);
     }
     else {
       type_dag.connect(extracted_ir.id, this.vardecl!.id, "super");
@@ -5237,9 +5074,7 @@ class MultipleVariableDeclareStatementGenerator extends NonExpressionStatementGe
         type_dag.connect(ghost_id, extracted_ir.id);
         type_dag.connect(ghost_id, this.vardecls[i].id, "super");
         type_dag.solution_range_alignment(ghost_id, this.vardecls[i].id);
-        if (config.debug) {
-          console.log(`${" ".repeat(indent)}MultipleVariableDeclareStatementGenerator: ghost_id: ${ghost_id}, extracted_ir: ${extracted_ir}, this.vardecl.id: ${this.vardecls[i].id}`);
-        }
+        Log.log(`${" ".repeat(indent)}MultipleVariableDeclareStatementGenerator: ghost_id: ${ghost_id}, extracted_ir: ${extracted_ir}, this.vardecl.id: ${this.vardecls[i].id}`);
       }
       else {
         type_dag.connect(extracted_ir.id, this.vardecls[i].id, "super");
@@ -5300,28 +5135,22 @@ class IfStatementGenerator extends NonExpressionStatementGenerator {
   }
 
   private generate_condition() : expr.IRExpression {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating If condition, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating If condition, scope: ${cur_scope.kind()}`)
+    indent += 2;
     const cid = new_global_id();
     type_dag.insert(cid, type.bool_types);
     const condition_gen = new BinaryCompareOpGenerator(cid);
     condition_gen.generate(0);
     this.exprs.push(expr.tuple_extraction(condition_gen.irnode as expr.IRExpression));
     cur_scope = cur_scope.rollback();
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}IfStatement Condition, scope: ${cur_scope.kind()}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}IfStatement Condition, scope: ${cur_scope.kind()}`)
     return condition_gen.irnode as expr.IRExpression;
   }
 
   private generate_true_body(cur_stmt_complex_level : number) {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating If true body, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating If true body, scope: ${cur_scope.kind()}`)
+    indent += 2;
     cur_scope = cur_scope.new(scopeKind.IF_BODY);
     let true_body : stmt.IRStatement[] = [];
     const true_stmt_cnt = random_int(config.if_body_stmt_cnt_lower_limit, config.if_body_stmt_cnt_upper_limit);
@@ -5339,19 +5168,15 @@ class IfStatementGenerator extends NonExpressionStatementGenerator {
           then_stmt_gen.exprs
       );
     }
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}IfStatement True Body, scope: ${cur_scope.kind()}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}IfStatement True Body, scope: ${cur_scope.kind()}`)
     cur_scope = cur_scope.rollback();
     return true_body;
   }
 
   private generate_false_body(cur_stmt_complex_level : number) {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating If false body, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating If false body, scope: ${cur_scope.kind()}`)
+    indent += 2;
     cur_scope = cur_scope.new(scopeKind.IF_BODY);
     let false_body : stmt.IRStatement[] = [];
     const false_stmt_cnt = random_int(config.if_body_stmt_cnt_lower_limit, config.if_body_stmt_cnt_upper_limit);
@@ -5369,10 +5194,8 @@ class IfStatementGenerator extends NonExpressionStatementGenerator {
           else_stmt_gen.exprs
       );
     }
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}IfStatement False Body, scope: ${cur_scope.kind()}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}IfStatement False Body, scope: ${cur_scope.kind()}`)
     return false_body;
   }
 
@@ -5400,10 +5223,8 @@ class ForStatementGenerator extends NonExpressionStatementGenerator {
   }
 
   private generate_init() {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating intialization, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating intialization, scope: ${cur_scope.kind()}`)
+    indent += 2;
     let init_stmt_expr : stmt.IRVariableDeclarationStatement | expr.IRExpression | undefined;
     const init_cnt = random_int(config.for_init_cnt_lower_limit, config.for_init_cnt_upper_limit);
     if (init_cnt > 0 && Math.random() < config.vardecl_prob) {
@@ -5431,31 +5252,23 @@ class ForStatementGenerator extends NonExpressionStatementGenerator {
         this.exprs = [];
       }
     }
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}ForStatement Initialization, scope: ${cur_scope.kind()}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}ForStatement Initialization, scope: ${cur_scope.kind()}`)
     return init_stmt_expr;
   }
 
   private generate_condition() {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating conditional, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating conditional, scope: ${cur_scope.kind()}`)
+    indent += 2;
     const cid = new_global_id();
     type_dag.insert(cid, type.bool_types);
     const conditional_gen = new BinaryCompareOpGenerator(cid);
     conditional_gen.generate(0);
     this.exprs = this.exprs.concat([expr.tuple_extraction(conditional_gen.irnode as expr.IRExpression)]);
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}ForStatement Conditional, scope: ${cur_scope.kind()}`));
-    }
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating loop generation, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}ForStatement Conditional, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating loop generation, scope: ${cur_scope.kind()}`)
+    indent += 2;
     return conditional_gen.irnode! as expr.IRExpression;
   }
 
@@ -5466,14 +5279,10 @@ class ForStatementGenerator extends NonExpressionStatementGenerator {
     const loop_gen = new loop_gen_prototype(lid);
     loop_gen.generate(0);
     this.exprs = this.exprs.concat([expr.tuple_extraction(loop_gen.irnode as expr.IRExpression)]);
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}ForStatement Loop Generation, scope: ${cur_scope.kind()}`));
-    }
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating body, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}ForStatement Loop Generation, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating body, scope: ${cur_scope.kind()}`)
+    indent += 2;
     return loop_gen.irnode! as expr.IRExpression;
   }
 
@@ -5495,10 +5304,8 @@ class ForStatementGenerator extends NonExpressionStatementGenerator {
           body_stmt_gen.exprs
       );
     }
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}ForStatement, scope: ${cur_scope.kind()}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}ForStatement, scope: ${cur_scope.kind()}`)
     cur_scope = cur_scope.rollback();
     return body;
   }
@@ -5524,10 +5331,8 @@ class WhileStatementGenerator extends NonExpressionStatementGenerator {
   }
 
   private generate_condition() {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating condition, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating condition, scope: ${cur_scope.kind()}`)
+    indent += 2;
     const cond_gen_prototype = get_exprgenerator(type.bool_types);
     const cid = new_global_id();
     type_dag.insert(cid, type.bool_types);
@@ -5536,18 +5341,14 @@ class WhileStatementGenerator extends NonExpressionStatementGenerator {
     cond_gen.generate(0);
     this.exprs = this.exprs.concat([expr.tuple_extraction(cond_gen.irnode as expr.IRExpression)]);
     cur_scope = cur_scope.rollback();
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}WhileStatement Condition, scope: ${cur_scope.kind()}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}WhileStatement Condition, scope: ${cur_scope.kind()}`)
     return cond_gen.irnode! as expr.IRExpression;
   }
 
   private generate_body(cur_stmt_complex_level : number) {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating body, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating body, scope: ${cur_scope.kind()}`)
+    indent += 2;
     cur_scope = cur_scope.new(scopeKind.WHILE_BODY);
     const stmt_cnt = random_int(config.while_body_stmt_cnt_lower_limit, config.while_body_stmt_cnt_upper_limit);
     let body : stmt.IRStatement[] = [];
@@ -5565,10 +5366,8 @@ class WhileStatementGenerator extends NonExpressionStatementGenerator {
       stmt_db.remove_unexpected_extra_stmt_from_scope(cur_scope.id());
       body.push(body_stmt_gen.irnode! as stmt.IRStatement);
     }
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}WhileStatement body, scope: ${cur_scope.kind()}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}WhileStatement body, scope: ${cur_scope.kind()}`)
     cur_scope = cur_scope.rollback();
     return body;
   }
@@ -5589,10 +5388,8 @@ class DoWhileStatementGenerator extends NonExpressionStatementGenerator {
   }
 
   private generate_condition() {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating DoWhileStatement condition, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating DoWhileStatement condition, scope: ${cur_scope.kind()}`)
+    indent += 2;
     const cond_gen_prototype = get_exprgenerator(type.bool_types);
     const cid = new_global_id();
     type_dag.insert(cid, type.bool_types);
@@ -5601,18 +5398,14 @@ class DoWhileStatementGenerator extends NonExpressionStatementGenerator {
     cond_gen.generate(0);
     cur_scope = cur_scope.rollback();
     this.exprs = this.exprs.concat([expr.tuple_extraction(cond_gen.irnode as expr.IRExpression)]);
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}DoWhileStatement Condition, scope: ${cur_scope.kind()}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}DoWhileStatement Condition, scope: ${cur_scope.kind()}`)
     return cond_gen.irnode! as expr.IRExpression;
   }
 
   private generate_body(cur_stmt_complex_level : number) {
-    if (config.debug) {
-      console.log(color.redBG(`${" ".repeat(indent)}>>  Start generating DoWhileStatement body, scope: ${cur_scope.kind()}`));
-      indent += 2;
-    }
+    Log.log(`${" ".repeat(indent)}>>  Start generating DoWhileStatement body, scope: ${cur_scope.kind()}`)
+    indent += 2;
     cur_scope = cur_scope.new(scopeKind.DOWHILE_BODY);
     const stmt_cnt = random_int(config.do_while_body_stmt_cnt_lower_limit, config.do_while_body_stmt_cnt_upper_limit);
     let body : stmt.IRStatement[] = [];
@@ -5630,10 +5423,8 @@ class DoWhileStatementGenerator extends NonExpressionStatementGenerator {
       stmt_db.remove_unexpected_extra_stmt_from_scope(cur_scope.id());
       body.push(body_stmt_gen.irnode! as stmt.IRStatement);
     }
-    if (config.debug) {
-      indent -= 2;
-      console.log(color.yellowBG(`${" ".repeat(indent)}DoWhileStatement body, scope: ${cur_scope.kind()}`));
-    }
+    indent -= 2;
+    Log.log(`${" ".repeat(indent)}DoWhileStatement body, scope: ${cur_scope.kind()}`)
     cur_scope = cur_scope.rollback();
     return body;
   }

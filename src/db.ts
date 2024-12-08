@@ -96,7 +96,7 @@ class DeclDB {
   ! Then expr is also m[{expr}], possibly causing an infinite recursion under some hyperparemeter settings.
   ! Therefore, Erwin forbides such resorting to itself to fullfil its hole.
   ! */
-  forbidden_vardecls : Set<number> = new Set<number>();
+  private forbidden_vardecls : Set<number> = new Set<number>();
 
   private storage_qualified_struct_members_of_struct_instance : Map<number, number[]> = new Map<number, number[]>();
 
@@ -123,6 +123,54 @@ class DeclDB {
   private has_be_initialized : Set<number> = new Set<number>();
 
   constructor() { }
+
+  init() {
+    this.scope_tree.init();
+    this.scope2irnode.clear();
+    this.irnode2scope.clear();
+    this.contractdecl_id_to_scope.clear();
+    this.scope_id_to_contractdecl_id.clear();
+
+    this.vardecls.clear();
+    this.structdecls.clear();
+    this.funcdecls.clear();
+    this.struct_instance_decls.clear();
+    this.contractdecls.clear();
+    this.state_decls.clear();
+    this.getter_funcdecls.clear();
+    this.eventdecls.clear();
+    this.errordecls.clear();
+    this.stringdecls.clear();
+
+    this.ghost_members_of_struct_instance.clear();
+    this.ghost_member_to_member.clear();
+
+    this.forbidden_vardecls.clear();
+
+    this.storage_qualified_struct_members_of_struct_instance.clear();
+
+    this.getter_function_id_to_state_var_id.clear();
+    this.state_var_id_to_getter_function_id.clear();
+
+    this.mapping_decls.clear();
+    this.mapping_decl_id_to_kv_ids.clear();
+    this.value_id_to_mapping_decl_id.clear();
+    this.key_id_to_mapping_decl_id.clear();
+
+    this.called_function_decls_ids.clear();
+
+    this.array_decl_id.clear();
+    this.array_decl_id_to_base_id.clear();
+    this.base_id_to_array_decl_id.clear();
+
+    this.member2structdecl.clear();
+    this.structdecl2members.clear();
+    this.struct_instance_to_struct_decl.clear();
+
+    this.cannot_be_assigned_to.clear();
+    this.must_be_initialized.clear();
+    this.has_be_initialized.clear();
+  }
 
   //! ================ Decl-Related ================
 
@@ -756,6 +804,29 @@ class ExprDB {
 
   private string_exprs : Set<number> = new Set<number>();
 
+  init() {
+    this.expr2read_variables.clear();
+    this.expr2write_variables.clear();
+
+    this.literals.clear();
+
+    this.mapping_type_exprs.clear();
+    this.mapping_type_expr_to_key_value_pair.clear();
+    this.key_expr_to_mapping_expr.clear();
+    this.value_expr_to_mapping_expr.clear();
+
+    this.array_type_exprs.clear();
+    this.array_type_expr_id_to_base_expr_id.clear();
+    this.base_expr_id_to_array_type_expr_id.clear();
+
+    this.new_struct_exprs.clear();
+    this.new_struct_to_struct_decl.clear();
+    this.ghost_members_of_new_struct_expr.clear();
+    this.ghost_member_to_member.clear();
+
+    this.string_exprs.clear();
+  }
+
   //! Read-Write-Related
 
   expr_reads_variable(expr_id : number, var_id : number | number[] | Set<number>) : void {
@@ -1035,6 +1106,10 @@ export enum IDENTIFIER {
 class NameDB {
   private name_id : number = 0;
 
+  init() {
+    this.name_id = 0;
+  }
+
   //TODO: support name shallowing.
   public generate_name(identifier : IDENTIFIER) : string {
     switch (identifier) {
@@ -1067,6 +1142,10 @@ class NameDB {
 class StmtDB {
   // Record the statements that are not expected to be generated before the current statement.
   private unexpected_extra_stmt : Map<number, IRStatement[]> = new Map<number, IRStatement[]>();
+
+  init() {
+    this.unexpected_extra_stmt.clear();
+  }
 
   public initialize_the_vardecls_that_must_be_initialized(scope_id : number) : void {
     for (const id of decl_db.get_vardecls_that_must_be_initialized(scope_id)!) {
@@ -1111,12 +1190,16 @@ class TypeDB {
   private internal_struct_type_to_external_struct_type = new Map<type.StructType, type.StructType>();
   private user_defined_types : type.UserDefinedType[] = [];
 
-  public init_types() : void {
+  public init() : void {
     this.all_types = [...type.elementary_types,
     type.TypeProvider.trivial_mapping(),
     type.TypeProvider.trivial_array(),
     type.TypeProvider.string()
     ];
+    this.contract_types.clear();
+    this.internal_struct_types.clear();
+    this.internal_struct_type_to_external_struct_type.clear();
+    this.user_defined_types = []
   }
 
   public remove_internal_struct_types() : void {
@@ -1229,4 +1312,12 @@ export function update_ghost_members_of_struct_instantiation(struct_instantiatio
   else {
     throw new Error(`The struct instantiation ${struct_instantiation_id} is not a struct instance declaration or a new struct expression.`);
   }
+}
+
+export function init() {
+  decl_db.init();
+  expr_db.init();
+  stmt_db.init();
+  name_db.init();
+  type_db.init();
 }

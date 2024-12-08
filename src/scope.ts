@@ -90,6 +90,8 @@ export class ScopeList extends LinkedListNode<scopeT> {
 }
 
 export function initScope() {
+  scope_id = global_scope;
+  scope_id_to_scope.clear();
   const scope = new ScopeList({ id: scope_id, kind: scopeKind.GLOBAL })
   scope_id_to_scope.set(scope_id, scope);
   return scope;

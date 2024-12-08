@@ -12,9 +12,8 @@ import { assert, intersection, merge_set } from "./utility";
 import { Type, TypeKind, MappingType, ArrayType } from "./type"
 import * as dot from 'ts-graphviz';
 import { config } from './config'
-// debug
 import { toFile } from "@ts-graphviz/adapter";
-import { color } from "console-log-colors"
+import { Log } from "./log";
 import { DataLocation } from "solc-typed-ast";
 import { StorageLocation } from "./loc";
 import { VisMut, VisMutKind } from "./vismut";
@@ -158,6 +157,7 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
     this.edge2leaf.clear();
     this.leaves_sub.clear();
     this.leaves_same.clear();
+    this.leaves_equal.clear();
     this.leaves_same_range.clear();
   }
 
@@ -196,9 +196,7 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
   }
 
   remove(nodeid : number) : void {
-    if (config.debug) {
-      assert(this.dag_nodes.has(nodeid), `ConstraintDAG: node ${nodeid} is not in the graph`);
-    }
+    assert(this.dag_nodes.has(nodeid), `ConstraintDAG: node ${nodeid} is not in the graph`);
     this.solution_range.delete(nodeid);
     for (const innode of this.dag_nodes.get(nodeid)!.ins) {
       this.dag_nodes.get(innode)!.outs = this.dag_nodes.get(innode)!.outs.filter(t => t !== nodeid);
@@ -237,10 +235,8 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
 
   connect(from : number, to : number, rank ?: string) : void {
     if (this.check_connection(from, to)) return;
-    if (config.debug) {
-      assert(this.dag_nodes.has(from), `ConstraintDAG: node ${from} is not in the graph`);
-      assert(this.dag_nodes.has(to), `ConstraintDAG: node ${to} is not in the graph`);
-    }
+    assert(this.dag_nodes.has(from), `ConstraintDAG: node ${from} is not in the graph`);
+    assert(this.dag_nodes.has(to), `ConstraintDAG: node ${to} is not in the graph`);
     if (from === to) return;
     this.dag_nodes.get(to)!.ins.push(from);
     this.dag_nodes.get(from)!.outs.push(to);
@@ -792,10 +788,8 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
   protected allocate_solutions_for_leaves_in_stream() : Generator<Map<number, Node>> {
     for (let leaf of this.leaves) this.solution_range.set(leaf, this.solution_range.get(leaf)!);
     const leave_array = Array.from(this.leaves);
-    if (config.debug) {
-      console.log(`leave_array: ${leave_array}`);
-      console.log("====== solution_range of leaves before allocating solutions ======\n", Array.from(this.solution_range).filter(t => this.leaves.has(t[0])).map(t => [t[0], t[1].map(g => g.str())]));
-    }
+    Log.log(`leave_array: ${leave_array}`);
+    Log.log(`====== solution_range of leaves before allocating solutions ======\n,${Array.from(this.solution_range).filter(t => this.leaves.has(t[0])).map(t => [t[0], t[1].map(g => g.str())]).join("\n")}`);
     const solution_range_copy = this.solution_range;
     let check_leaf_solution = (leaf_solution : Map<number, Node>) : boolean => {
       const leaf_solution_array = Array.from(leaf_solution);
@@ -1191,8 +1185,7 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
       if (this.solution_range.get(id)!.length === 0) continue;
       mul *= BigInt(this.solution_range.get(id)!.length)
     }
-    if (config.debug || config.unit_test_mode)
-      console.log(color.cyan(`The size of solution candidate of ${this.name} is ${mul}`));
+    Log.log(`The size of solution candidate of ${this.name} is ${mul}`);
     // !Map nodes to their leaves, recording if there exists a path from the node to leaf with leaf_id on which sub/super domination does not holds.
     // If there are multiple paths from node to leaf, then the sub does not hold as long as there exists a path on which sub domination does not hold.
     // leaf_ids are not in this.node2leaf
@@ -1200,29 +1193,27 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
     if (config.debug || config.unit_test_mode) {
       for (let [id, leaf_infos] of this.node2leaf) {
         for (const leaf_info of leaf_infos) {
-          console.log(`node ${id} constraints leaf ${leaf_info.leaf_id}: sub: ${leaf_info.sub}, super: ${leaf_info.super}, same_range: ${leaf_info.same_range}, same: ${leaf_info.same}`);
+          Log.log(`node ${id} constraints leaf ${leaf_info.leaf_id}: sub: ${leaf_info.sub}, super: ${leaf_info.super}, same_range: ${leaf_info.same_range}, same: ${leaf_info.same}`);
         }
       }
     }
     this.build_leaves_relation();
     this.remove_irrelevant_leaves();
-    if (config.debug || config.unit_test_mode) {
-      console.log(color.green(`> leaves_sub: ${this.leaves_sub.size}`));
-      for (const edge of this.leaves_sub) {
-        console.log(edge);
-      }
-      console.log(color.green(`> leaves_same: ${this.leaves_same.size}`));
-      for (const edge of this.leaves_same) {
-        console.log(edge);
-      }
-      console.log(color.green(`> leaves_equal: ${this.leaves_equal.size}`));
-      for (const edge of this.leaves_equal) {
-        console.log(edge);
-      }
-      console.log(color.green(`> leaves_same_range: ${this.leaves_same_range.size}`));
-      for (const edge of this.leaves_same_range) {
-        console.log(edge);
-      }
+    Log.log(`> leaves_sub: ${this.leaves_sub.size}`);
+    for (const edge of this.leaves_sub) {
+      Log.log(edge);
+    }
+    Log.log(`> leaves_same: ${this.leaves_same.size}`);
+    for (const edge of this.leaves_same) {
+      Log.log(edge);
+    }
+    Log.log(`> leaves_equal: ${this.leaves_equal.size}`);
+    for (const edge of this.leaves_equal) {
+      Log.log(edge);
+    }
+    Log.log(`> leaves_same_range: ${this.leaves_same_range.size}`);
+    for (const edge of this.leaves_same_range) {
+      Log.log(edge);
     }
     if (config.debug || config.unit_test_mode) {
       await this.draw_for_debug();
@@ -1239,9 +1230,7 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
         should_stop = true;
         break;
       }
-      if (config.debug) {
-        console.log(`leaf_solution${solution_id++}`, Array.from(leaf_solution).map(t => [t[0], t[1].str()]));
-      }
+      Log.log(`leaf_solution${solution_id++}: ${Array.from(leaf_solution).map(t => [t[0], t[1].str()])}`);
       if (leaf_solution.size === 0) continue;
       this.solutions_collection.push(new Map(leaf_solution));
     }

@@ -71,6 +71,13 @@ export class Tree<T> {
     this.node_set = new Set<T>();
     this.has_ins = new Set<T>();
   }
+  init() {
+    this.root = undefined;
+    this.parent_map.clear();
+    this.children_map.clear();
+    this.node_set.clear();
+    this.has_ins.clear();
+  }
   insert(parent : T, child : T) : void {
     if (this.children_map.has(parent)) {
       this.children_map.set(parent, this.children_map.get(parent)!.concat(child));
@@ -95,15 +102,13 @@ export class Tree<T> {
   }
   get_root() : T {
     if (this.root !== undefined) return this.root;
-    if (config.debug) {
-      let root_count = 0;
-      for (let node of this.node_set) {
-        if (!this.has_ins.has(node)) {
-          root_count++;
-        }
+    let root_count = 0;
+    for (let node of this.node_set) {
+      if (!this.has_ins.has(node)) {
+        root_count++;
       }
-      assert(root_count === 1, "There must be only one root.")
     }
+    assert(root_count === 1, "There must be only one root.")
     for (let node of this.node_set) {
       if (!this.has_ins.has(node)) {
         this.root = node;

@@ -141,11 +141,9 @@ export class IRLiteral extends IRExpression {
     }
   }
   lower() : Expression {
-    if (config.debug) {
-      assert(this.type !== undefined, `IRLiteral ${this.id}: type is not generated`);
-      assert(this.type.kind === TypeKind.ElementaryType || this.type.kind === TypeKind.StringType,
-        `IRLiteral ${this.id}: type is not ElementaryType or StringType, but ${this.type.kind}`);
-    }
+    assert(this.type !== undefined, `IRLiteral ${this.id}: type is not generated`);
+    assert(this.type.kind === TypeKind.ElementaryType || this.type.kind === TypeKind.StringType,
+      `IRLiteral ${this.id}: type is not ElementaryType or StringType, but ${this.type.kind}`);
     this.generateKind();
     if (this.value === undefined) this.generateVal();
     const value = this.value!;
@@ -195,10 +193,8 @@ export class IRIdentifier extends IRExpression {
     return this;
   }
   lower() : Expression {
-    if (config.debug) {
-      assert(this.name !== undefined, "IRIdentifier: name is not generated");
-      assert(this.reference !== undefined, "IRIdentifier: reference is not generated");
-    }
+    assert(this.name !== undefined, "IRIdentifier: name is not generated");
+    assert(this.reference !== undefined, "IRIdentifier: reference is not generated");
     return factory.makeIdentifier("", this.name!, this.reference!);
   }
 }
@@ -226,11 +222,9 @@ export class IRBinaryOp extends IRExpression {
     super(id, scope);
     this.left = left;
     this.right = right;
-    if (config.debug) {
-      if (operator !== undefined) {
-        assert(["+", "-", "*", "/", "%", "<<", ">>", "<", ">", "<=", ">=", "==", "!=", "&", "^", "|", "&&", "||"].includes(operator),
-          `IRBinaryOp: operator ${operator} is not supported`)
-      }
+    if (operator !== undefined) {
+      assert(["+", "-", "*", "/", "%", "<<", ">>", "<", ">", "<=", ">=", "==", "!=", "&", "^", "|", "&&", "||"].includes(operator),
+        `IRBinaryOp: operator ${operator} is not supported`)
     }
     this.operator = operator;
   }
@@ -251,10 +245,8 @@ export class IRUnaryOp extends IRExpression {
     super(id, scope);
     this.prefix = prefix;
     this.expression = expression;
-    if (config.debug) {
-      if (operator !== undefined) {
-        assert(["!", "-", "~", "++", "--", "delete"].includes(operator), `IRUnaryOp: operator ${operator} is not supported`)
-      }
+    if (operator !== undefined) {
+      assert(["!", "-", "~", "++", "--", "delete"].includes(operator), `IRUnaryOp: operator ${operator} is not supported`)
     }
     this.operator = operator;
     this.useFunction = useFunction;
