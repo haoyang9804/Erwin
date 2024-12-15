@@ -64,6 +64,10 @@ async function compile(file_path : string) : Promise<[string, string]> {
     const index = Math.random() < 0.5 ? selected_opt_flags.indexOf('--optimize-yul') : selected_opt_flags.indexOf('--no-optimize-yul');
     selected_opt_flags.splice(index, 1);
   }
+  if (selected_opt_flags.includes('--no-optimize-yul') && selected_opt_flags.includes('--optimize')) {
+    const index = Math.random() < 0.5 ? selected_opt_flags.indexOf('--optimize') : selected_opt_flags.indexOf('--no-optimize-yul');
+    selected_opt_flags.splice(index, 1);
+  }
   if (!selected_opt_flags.includes('--optimize-yul') && selected_opt_flags.includes('--yul-optimizations')) {
     const index = selected_opt_flags.indexOf('--yul-optimizations');
     selected_opt_flags.splice(index, 1);
@@ -148,26 +152,18 @@ export async function test_validity() : Promise<number> {
     } catch (err) {
       return 2;
     }
-
-    // Loop through each file in "generated_programs" directory
     const files = await readdir(dirPath);
     for (const file of files) {
       const filePath = path.join(dirPath, file);
-      try {
-        const stats = await stat(filePath);
-        if (stats.isFile()) {
-          // Run solc on the file and capture the output and error
-          //@ts-ignore
-          const { stdout, stderr } = await compile(filePath);
-          if (stderr) {
-            console.log(`=========Error in file ${filePath}=========`);
-            console.log(stderr);
-            return 1;
-          }
+      const stats = await stat(filePath);
+      if (stats.isFile()) {
+        //@ts-ignore
+        const { stdout, stderr } = await compile(filePath);
+        if (stderr) {
+          console.log(`=========Error in file ${filePath}=========`);
+          console.log(stderr);
+          return 1;
         }
-      } catch (err) {
-        console.error(`Error accessing file: ${filePath}`, err);
-        continue;
       }
     }
     return 0;

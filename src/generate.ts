@@ -437,7 +437,7 @@ export async function generate() {
       process.exit(1);
     }
     if (config.enable_test) {
-      test_validity().then((result) => {
+      await test_validity().then((result) => {
         if (result !== 0) {
           console.error("Some generated programs cause compilation errors.");
           process.exit(1);
