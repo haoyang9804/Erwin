@@ -107,6 +107,7 @@ Enjoy tuning the search space and generate diverse and valid Solidity programs.
 14. https://github.com/ethereum/solidity/issues/15567 (wait for comfirmation, error handling)
 15. https://github.com/ethereum/solidity/pull/15566 (wait for confirmation, documentation error)
 16. https://github.com/ethereum/solidity/issues/15583 (error handling,low effort low impact must have eventually should report better error) ✅
+17. https://github.com/ethereum/solidity/issues/15645 (ICE, wait for confirmation)
 
 ## Weird Language Features
 

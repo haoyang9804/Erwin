@@ -13,7 +13,7 @@ import { FuncVis, FuncVisProvider, VarVis, VarVisProvider } from "./visibility";
 import { FuncVisMutKind, VarVisKind } from "./vismut";
 import { FuncStat, FuncStatProvider } from "./funcstat";
 import { Log } from "./log";
-import { new_factory } from "./node";
+
 import {
   PrettyFormatter,
   ASTWriter,
@@ -33,7 +33,6 @@ const writer = new ASTWriter(
 );
 
 function init_generation() {
-  new_factory();
   db.init();
   type_dag.clear();
   vismut_dag.clear();
@@ -41,7 +40,6 @@ function init_generation() {
   irnodes.clear();
   gen.init_scope();
   gen.init_global_id();
-  gen.init_indent();
 }
 
 function storageLocation2loc(sl : StorageLocation) : DataLocation {

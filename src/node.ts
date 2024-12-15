@@ -3,11 +3,7 @@ import {
   ASTNodeFactory,
 } from "solc-typed-ast"
 
-export let factory : ASTNodeFactory;
-export function new_factory() {
-  factory = new ASTNodeFactory();
-}
-
+export const factory = new ASTNodeFactory();
 export const irnodes = new Map<number, IRNode>();
 
 export abstract class IRNode {

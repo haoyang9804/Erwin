@@ -1,7 +1,6 @@
 node_modules
 *.js
 *.d.ts
-test.ts
 *.sol
 dist
 coverage

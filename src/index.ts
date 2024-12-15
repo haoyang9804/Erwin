@@ -94,9 +94,9 @@ program
   .option("--error_prob <float>", "The probability of generating an error.", `${config.error_prob}`)
   .option("--generation_rounds <number>", "The number of rounds Erwin will generate.", `${config.generation_rounds}`)
   .option("--log_file_path <string>", "The path of the log file.", `${config.log_file_path}`)
-  .option("--enable_test <boolean>", "Enable the test mode.", `${config.enable_test}`)
+  .option("--enable_test", "Enable the test mode.", `${config.enable_test}`)
   .option("--compiler_path <string>", "The path of the Solidity compiler.", `${config.compiler_path}`)
-  .option("--refresh_folder <boolean>", "Refresh the folder before generating the program.", `${config.refresh_folder}`)
+  .option("--refresh_folder", "Refresh the folder before generating the program.", `${config.refresh_folder}`)
 program.parse(process.argv);
 // Set the configuration
 if (program.args[0] === "mutate") {
