@@ -102,12 +102,13 @@ Enjoy tuning the search space and generate diverse and valid Solidity programs.
 9. https://github.com/ethereum/solidity/issues/15483 (not a bug, but a workaround)
 10. https://github.com/ethereum/solidity/issues/15525 (documentation error, workaround) ✅
 11. https://github.com/ethereum/solidity/issues/15483 (documentation error) ✅
-12. https://github.com/ethereum/solidity/issues/15565 (wait for confirmation, error handling)
-13. https://github.com/ethereum/solidity/issues/15564 (wait for confirmation, error handling)
-14. https://github.com/ethereum/solidity/issues/15567 (wait for comfirmation, error handling)
-15. https://github.com/ethereum/solidity/pull/15566 (wait for confirmation, documentation error)
+12. https://github.com/ethereum/solidity/issues/15565 (error handling)
+13. https://github.com/ethereum/solidity/issues/15564 (error handling)
+14. https://github.com/ethereum/solidity/issues/15567 (error handling)
+15. https://github.com/ethereum/solidity/pull/15566 (documentation error)
 16. https://github.com/ethereum/solidity/issues/15583 (error handling,low effort low impact must have eventually should report better error) ✅
-17. https://github.com/ethereum/solidity/issues/15645 (ICE, wait for confirmation)
+17. https://github.com/ethereum/solidity/issues/15645 (ICE)
+18. https://github.com/ethereum/solidity/issues/15646 (error handling)
 
 ## Weird Language Features
 

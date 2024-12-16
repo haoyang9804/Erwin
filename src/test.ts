@@ -135,7 +135,7 @@ async function compile(file_path : string) : Promise<[string, string]> {
     const index = selected_model_checker_flags.indexOf('--model-checker-print-query');
     selected_model_checker_flags.splice(index, 1);
   }
-  const compile_command = `${config.compiler_path} ${file_path} ${pick_random_element(selected_output_flags)} ${selected_opt_flags.join(' ')} ${selected_model_checker_flags.join(' ')}`;
+  const compile_command = `${config.compiler_path} ${file_path} ${pick_random_element(selected_output_flags)} ${selected_opt_flags.join(' ')} ${selected_model_checker_flags.join(' ')}` + ' --via-ir';
   const { stdout, stderr } = await execPromise(compile_command);
   return [stdout, stderr];
 }
