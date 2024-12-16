@@ -75,7 +75,7 @@ async function compile(file_path : string) : Promise<[string, string]> {
   selected_opt_flags.forEach((flag) => {
     if (flag === '--optimize-runs') {
       const index = selected_opt_flags.indexOf(flag);
-      selected_opt_flags[index] = flag + ' ' + random_int(1, 200).toString();
+      selected_opt_flags[index] = flag + ' ' + random_int(1, 10).toString();
     }
     else if (flag === '--yul-optimizations') {
       const index = selected_opt_flags.indexOf(flag);
@@ -118,7 +118,7 @@ async function compile(file_path : string) : Promise<[string, string]> {
     }
     else if (flag === '--model-checker-timeout' || flag === '--model-checker-bmc-loop-iterations') {
       const index = selected_model_checker_flags.indexOf(flag);
-      selected_model_checker_flags[index] = flag + ' ' + random_int(1, 200).toString();
+      selected_model_checker_flags[index] = flag + ' ' + random_int(1, 10).toString();
     }
   });
   if (selected_model_checker_flags.includes('--model-checker-print-query') && selected_model_checker_flags.includes('--model-checker-solvers')) {

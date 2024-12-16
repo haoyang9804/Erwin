@@ -41,7 +41,7 @@ const id2 = new IRIdentifier(3,0).from(v1);
 const op = new IRBinaryOp(4,0,id1,id2,"+");
 const op_stmt = new IRExpressionStatement(5,0,op);
 
-const modifier_error = new IRModifier(0, 0, "M", true, true, "internal", [v1], [op_stmt]);
+const modifier_error = new IRModifier(0, 0, "M", true, true, [v1], [op_stmt]);
 test("test modifier 1",
 () => {
   expect(async() => {
@@ -50,7 +50,7 @@ test("test modifier 1",
 }
 )
 
-const modifier_correct = new IRModifier(0, 0, "M", true, false, "intrnal", [v1], [op_stmt, new IRPlaceholderStatement(5,0)]);
+const modifier_correct = new IRModifier(0, 0, "M", true, false, [v1], [op_stmt, new IRPlaceholderStatement(5,0)]);
 test("test modifier 2",
 () => {
   expect(writer.write(modifier_correct.lower())).toBe("modifier M(uint256 x) virtual {\n  x + x;\n  _;\n}");
@@ -71,7 +71,7 @@ true, true, [v2], [v3], [variable_declare_stmt], [{name: "M", arg_names: ["x"]}]
 
 test("test function 1",
 () => {
-  expect(writer.write(f_correct.lower())).toBe("function F(S y) virtual override private view M(x) returns (uint256 z) {\n  (uint256 x, uint256 y) = (" + literal1.value + ", " + literal2.value + ");\n}")
+  expect(writer.write(f_correct.lower())).toBe("function F(S memory y) virtual override private view M(x) returns (uint256 z) {\n  (uint256 x, uint256 y) = (" + literal1.value + ", " + literal2.value + ");\n}")
 }
 )
 

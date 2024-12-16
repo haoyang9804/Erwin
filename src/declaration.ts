@@ -186,14 +186,12 @@ export class IRStructDefinition extends IRDeclare {
 export class IRModifier extends IRDeclare {
   virtual : boolean;
   override : boolean;
-  visibility : string;
   parameters : IRVariableDeclaration[];
   body : IRStatement[];
-  constructor(id : number, scope : number, name : string, virtual : boolean, override : boolean, visibility : string, parameters : IRVariableDeclaration[], body : IRStatement[]) {
+  constructor(id : number, scope : number, name : string, virtual : boolean, override : boolean, parameters : IRVariableDeclaration[], body : IRStatement[]) {
     super(id, scope, name);
     this.virtual = virtual;
     this.override = override;
-    this.visibility = visibility;
     this.parameters = parameters;
     this.body = body;
   }
@@ -206,7 +204,7 @@ export class IRModifier extends IRDeclare {
       return stmt.lower();
     });
     assert(has_placeholder, "IRModifier: body does not contain placeholder");
-    return factory.makeModifierDefinition(this.name, this.virtual, this.visibility,
+    return factory.makeModifierDefinition(this.name, this.virtual, "",
       factory.makeParameterList(this.parameters.map((parameter) => parameter.lower() as VariableDeclaration)),
       this.override ? factory.makeOverrideSpecifier([]) : undefined,
       factory.makeBlock(lowered_body));
