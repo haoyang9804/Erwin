@@ -20,6 +20,7 @@ As planned, Erwin can both generate and mutate. But up to now, all efforts have 
 Enjoy tuning the search space and generate diverse and valid Solidity programs.
 
 ```
+  -e --exprimental                                    Enable the exprimental mode.
   -m --mode <string>                                  The mode of Erwin. The value can be 'type', 'scope', or 'loc'. (default: "")
   -d --debug                                          Enable the debug mode.
   -o --out_dir <string>                               The output directory for the generated program. The default is 'generated_programs' (default:
@@ -27,8 +28,8 @@ Enjoy tuning the search space and generate diverse and valid Solidity programs.
   -max --maximum_solution_count <number>              The maximum number of solutions Erwin will consider. (default: "500")
   --int_types_num <number>                            The number of int types Erwin will consider in resolving type constraints. (default: "2")
   --uint_types_num <number>                           The number of uint types Erwin will consider in resolving type constraints. (default: "2")
-  --function_body_stmt_cnt_upper_limit <number>       The upper limit of the number of non-declaration statements of a function. This value is suggested to
-                                                      be bigger than tha value of var_count (default: "1")
+  --function_body_stmt_cnt_upper_limit <number>       The upper limit of the number of non-declaration statements of a function. This value is
+                                                      suggested to be bigger than tha value of var_count (default: "1")
   --function_body_stmt_cnt_lower_limit <number>       The lower limit of the number of non-declaration statements of a function. (default: "1")
   --return_count_of_function_upperlimit <number>      The upper limit of the number of return values of a function. (default: "2")
   --return_count_of_function_lowerlimit <number>      The lower limit of the number of return values of a function. (default: "0")
@@ -36,6 +37,10 @@ Enjoy tuning the search space and generate diverse and valid Solidity programs.
   --param_count_of_function_lowerlimit <number>       The lower limit of the number of parameters of a function. (default: "0")
   --function_count_per_contract_upper_limit <number>  The upper limit of the number of functions in a contract. (default: "2")
   --function_count_per_contract_lower_limit <number>  The lower limit of the number of functions in a contract. (default: "1")
+  --modifier_per_function_upper_limit <number>        The upper limit of the number of modifiers in a contract. (default: "2")
+  --modifier_per_function_lower_limit <number>        The lower limit of the number of modifiers in a contract. (default: "0")
+  --modifier_count_per_contract_upper_limit <number>  The upper limit of the number of modifiers in a contract. (default: "2")
+  --modifier_count_per_contract_lower_limit <number>  The lower limit of the number of modifiers in a contract. (default: "1")
   --struct_member_variable_count_upperlimit <number>  The upper limit of the number of member variables in a struct. (default: "2")
   --struct_member_variable_count_lowerlimit <number>  The lower limit of the number of member variables in a struct. (default: "1")
   --contract_count <number>                           The upper limit of the number of contracts Erwin will generate. (default: "2")
@@ -86,6 +91,11 @@ Enjoy tuning the search space and generate diverse and valid Solidity programs.
   --dynamic_array_prob <float>                        The probability of generating a dynamic array. (default: "0.5")
   --event_prob <float>                                The probability of generating an event. (default: "0.5")
   --error_prob <float>                                The probability of generating an error. (default: "0.5")
+  --generation_rounds <number>                        The number of rounds Erwin will generate. (default: "1")
+  --log_file_path <string>                            The path of the log file. (default: "./log.txt")
+  --enable_test                                       Enable the test mode.
+  --compiler_path <string>                            The path of the Solidity compiler. (default: "")
+  --refresh_folder                                    Refresh the folder before generating the program.
 ```
 
 
@@ -110,6 +120,7 @@ Enjoy tuning the search space and generate diverse and valid Solidity programs.
 17. https://github.com/ethereum/solidity/issues/15645 (ICE, duplicate) 🤡
 18. https://github.com/ethereum/solidity/issues/15646 (error handling) ✅
 19. https://github.com/ethereum/solidity/issues/15647 (ICE)
+20. https://github.com/ethereum/solidity/issues/15649 (ICE)
 
 ## Weird Language Features
 
