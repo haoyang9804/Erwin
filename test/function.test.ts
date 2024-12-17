@@ -1,6 +1,6 @@
 import { TypeProvider, StructType } from "../src/type"
 import { IRModifier, IRVariableDeclaration, IRFunctionDefinition } from "../src/declaration";
-import { IRIdentifier, IRBinaryOp, IRLiteral, IRTuple, IRFunctionCall } from "../src/expression";
+import { IRIdentifier, IRBinaryOp, IRLiteral, IRTuple, IRFunctionCall, IRModifierInvoker } from "../src/expression";
 import { IRPlaceholderStatement, IRVariableDeclarationStatement, IRExpressionStatement } from "../src/statement";
 import {
   PrettyFormatter,
@@ -64,10 +64,11 @@ v2.loc= DataLocation.Memory
 const v3 = new IRVariableDeclaration(6, 0, "z");
 v3.type = TypeProvider.uint256()
 
-
+const x = new IRIdentifier(13, 0, "x", -1);
+const modifier_invoker = new IRModifierInvoker(12, 0, modifier_correct, [x]);
 
 const f_correct = new IRFunctionDefinition(7, 0, "F", FunctionKind.Function,
-true, true, [v2], [v3], [variable_declare_stmt], [{name: "M", arg_names: ["x"]}], FunctionVisibility.Private, FunctionStateMutability.View);
+true, true, [v2], [v3], [variable_declare_stmt], [modifier_invoker], FunctionVisibility.Private, FunctionStateMutability.View);
 
 test("test function 1",
 () => {

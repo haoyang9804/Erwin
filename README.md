@@ -92,11 +92,11 @@ Enjoy tuning the search space and generate diverse and valid Solidity programs.
 ## Detected Bugs
 
 1. https://github.com/ethereum/solidity/issues/14719 (medium impact, confirmed, fixed, type) ✅
-2. https://github.com/ethereum/solidity/issues/14720 (duplicate of 14719)
+2. https://github.com/ethereum/solidity/issues/14720 (duplicate of 14719) 🤡
 3. https://github.com/ethereum/solidity/issues/15223 (error handling) ✅
-4. https://github.com/ethereum/solidity/issues/15236 (a probable duplicate, confirmed, fixed, type) ✅❌
+4. https://github.com/ethereum/solidity/issues/15236 (a probable duplicate, confirmed, fixed, type) ✅🤡
 5. https://github.com/ethereum/solidity/issues/15219 (low effort, low impact, confirmed) ✅
-6. https://github.com/ethereum/solidity/issues/15468 (low effort, low impact, confirmed, a probable duplicate) ✅
+6. https://github.com/ethereum/solidity/issues/15468 (low effort, low impact, confirmed, a probable duplicate) ✅🤡
 7. https://github.com/ethereum/solidity/issues/15469 (smt) ✅
 8. https://github.com/ethereum/solidity/issues/15469 (smt, two bugs in a thread) ✅
 9. https://github.com/ethereum/solidity/issues/15483 (not a bug, but a workaround)
@@ -107,8 +107,9 @@ Enjoy tuning the search space and generate diverse and valid Solidity programs.
 14. https://github.com/ethereum/solidity/issues/15567 (error handling)
 15. https://github.com/ethereum/solidity/pull/15566 (documentation error)
 16. https://github.com/ethereum/solidity/issues/15583 (error handling,low effort low impact must have eventually should report better error) ✅
-17. https://github.com/ethereum/solidity/issues/15645 (ICE)
-18. https://github.com/ethereum/solidity/issues/15646 (error handling)
+17. https://github.com/ethereum/solidity/issues/15645 (ICE, duplicate) 🤡
+18. https://github.com/ethereum/solidity/issues/15646 (error handling) ✅
+19. https://github.com/ethereum/solidity/issues/15647 (ICE)
 
 ## Weird Language Features
 

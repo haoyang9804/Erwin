@@ -7,7 +7,7 @@ import {
 import { assert, generate_random_string, str2hex, random_bigInt } from "./utility";
 import { TypeKind, Type, ElementaryType } from "./type";
 import { IRNode, factory } from "./node";
-import { IRVariableDeclaration } from "./declaration";
+import { IRModifier, IRVariableDeclaration } from "./declaration";
 import { config } from "./config";
 
 export abstract class IRExpression extends IRNode {
@@ -359,5 +359,19 @@ export class IRNew extends IRExpression {
   }
   lower() {
     return factory.makeNewExpression("", factory.makeUserDefinedTypeName("", this.type_name, -1));
+  }
+}
+
+export class IRModifierInvoker extends IRNode {
+  modifier_decl : IRModifier;
+  arguments : IRExpression[];
+  constructor(id : number, scope : number, modifier_decl : IRModifier, arguments_ : IRExpression[]) {
+    super(id, scope);
+    this.modifier_decl = modifier_decl;
+    this.arguments = arguments_;
+  }
+  lower() {
+    const modifier_identifier = factory.makeIdentifier("", this.modifier_decl.name, this.modifier_decl.id);
+    return factory.makeModifierInvocation(modifier_identifier, this.arguments.map((arg) => arg.lower() as Expression));
   }
 }

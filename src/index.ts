@@ -40,6 +40,11 @@ program
   .option("--param_count_of_function_lowerlimit <number>", "The lower limit of the number of parameters of a function.", `${config.param_count_of_function_lowerlimit}`)
   .option("--function_count_per_contract_upper_limit <number>", "The upper limit of the number of functions in a contract.", `${config.function_count_per_contract_upper_limit}`)
   .option("--function_count_per_contract_lower_limit <number>", "The lower limit of the number of functions in a contract.", `${config.function_count_per_contract_lower_limit}`)
+  .option("--modifier_per_function_upper_limit <number>", "The upper limit of the number of modifiers in a contract.", `${config.modifier_per_function_upper_limit}`)
+  .option("--modifier_per_function_lower_limit <number>", "The lower limit of the number of modifiers in a contract.", `${config.modifier_per_function_lower_limit}`)
+  // Modifier
+  .option("--modifier_count_per_contract_upper_limit <number>", "The upper limit of the number of modifiers in a contract.", `${config.modifier_count_per_contract_upper_limit}`)
+  .option("--modifier_count_per_contract_lower_limit <number>", "The lower limit of the number of modifiers in a contract.", `${config.modifier_count_per_contract_lower_limit}`)
   // Struct
   .option("--struct_member_variable_count_upperlimit <number>", "The upper limit of the number of member variables in a struct.", `${config.struct_member_variable_count_upperlimit}`)
   .option("--struct_member_variable_count_lowerlimit <number>", "The lower limit of the number of member variables in a struct.", `${config.struct_member_variable_count_lowerlimit}`)
@@ -116,6 +121,10 @@ else if (program.args[0] === "generate") {
   config.param_count_of_function_lowerlimit = parseInt(program.commands[1].opts().param_count_of_function_lowerlimit);
   config.function_count_per_contract_upper_limit = parseInt(program.commands[1].opts().function_count_per_contract_upper_limit);
   config.function_count_per_contract_lower_limit = parseInt(program.commands[1].opts().function_count_per_contract_lower_limit);
+  config.modifier_per_function_lower_limit = parseInt(program.commands[1].opts().modifier_per_function_lower_limit);
+  config.modifier_per_function_upper_limit = parseInt(program.commands[1].opts().modifier_per_function_upper_limit);
+  config.modifier_count_per_contract_upper_limit = parseInt(program.commands[1].opts().modifier_count_per_contract_upper_limit);
+  config.modifier_count_per_contract_lower_limit = parseInt(program.commands[1].opts().modifier_count_per_contract_lower_limit);
   config.literal_prob = parseFloat(program.commands[1].opts().literal_prob);
   config.maximum_solution_count = parseInt(program.commands[1].opts().maximum_solution_count);
   config.tuple_prob = parseFloat(program.commands[1].opts().tuple_prob);
@@ -191,6 +200,10 @@ else if (program.args[0] === "generate") {
   assert(config.param_count_of_function_upperlimit >= 0, "The upper limit of the number of parameters of a function must be not less than 0.");
   assert(config.function_count_per_contract_lower_limit <= config.function_count_per_contract_upper_limit, "The lower limit of the number of functions must be less than or equal to the upper limit.");
   assert(config.function_count_per_contract_lower_limit >= 0, "The number of functions must be not less than 0.");
+  assert(config.modifier_per_function_lower_limit <= config.modifier_per_function_upper_limit, "The lower limit of the number of modifiers must be less than or equal to the upper limit.");
+  assert(config.modifier_per_function_lower_limit >= 0, "The number of modifiers must be not less than 0.");
+  assert(config.modifier_count_per_contract_lower_limit <= config.modifier_count_per_contract_upper_limit, "The lower limit of the number of modifiers must be less than or equal to the upper limit.");
+  assert(config.modifier_count_per_contract_lower_limit >= 0, "The number of modifiers must be not less than 0.");
   assert(config.literal_prob >= 0 && config.literal_prob <= 1, "The probability of generating a literal must be in the range [0,1].");
   assert(config.maximum_solution_count >= 0, "The maximum number of solutions must be not less than 0.");
   assert(config.tuple_prob >= 0 && config.tuple_prob <= 1, "The probability of generating a tuple surrounding an expression must be in the range [0,1].");
