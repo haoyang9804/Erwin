@@ -5,9 +5,12 @@ import { assert } from './utility'
 export enum scopeKind {
   CONSTRUCTOR = "scopeKind::CONSTRUCTOR",
   CONSTRUCTOR_PARAMETERS = "scopeKind::CONSTRUCTOR_PARAMETERS",
+  CONSTRUCTOR_BODY = "scopeKind::CONSTRUCTOR_BODY",
   FUNC = "scopeKind::FUNC",
   FUNC_PARAMETER = "scopeKind::FUNC_PARAMETER",
+  GETTER_FUNC_PARAMETER = "scopeKind::GETTER_FUNC_PARAMETER",
   FUNC_RETURNS = "scopeKind::FUNC_RETURNS",
+  FUNC_BODY = "scopeKind::FUNC_BODY",
   FUNC_ARGUMENTS = "scopeKind::FUNC_ARGUMENTS",
   CONTRACT = "scopeKind::CONTRACT",
   GLOBAL = "scopeKind::GLOBAL",
@@ -23,18 +26,11 @@ export enum scopeKind {
   MAPPING = "scopeKind::MAPPING",
   ARRAY = "scopeKind::ARRAY",
   EVENT = "scopeKind::EVENT",
-  ERROR = "scopeKind::ERROR"
-}
-
-export function inside_function_body(scope : ScopeList) : boolean {
-  let s = scope;
-  while (s.kind() !== scopeKind.FUNC && s.kind() !== scopeKind.GLOBAL) {
-    s = s.pre();
-  }
-  if (s.kind() === scopeKind.FUNC) {
-    return true;
-  }
-  return false;
+  ERROR = "scopeKind::ERROR",
+  MODIFIER_PARAMETER = "scopeKind::MODIFIER_PARAMETER",
+  MODIFIER = "scopeKind::MODIFIER",
+  MODIFIER_BODY = "scopeKind::MODIFIER_BODY",
+  MODIFIER_INVOKER = "scopeKind::MODIFIER_INVOKER",
 }
 
 type scopeT = {
@@ -59,9 +55,9 @@ export class ScopeList extends LinkedListNode<scopeT> {
       kind: kind
     };
     decl_db.new_scope(new_scope.id, this.m_value!.id);
-    this.m_next = new ScopeList(new_scope);
+    this.set_next(new ScopeList(new_scope));
     scope_id_to_scope.set(new_scope.id, this.m_next as ScopeList);
-    this.m_next.set_pre(this);
+    this.m_next!.set_pre(this);
     return this.m_next as ScopeList;
   }
 
@@ -72,7 +68,6 @@ export class ScopeList extends LinkedListNode<scopeT> {
   // Roll back to the previous scope
   rollback() : ScopeList {
     assert(this.m_pre !== undefined, "The previous node must exist.");
-    this.m_pre!.set_next(undefined);
     return this.m_pre! as ScopeList;
   }
 
@@ -86,6 +81,14 @@ export class ScopeList extends LinkedListNode<scopeT> {
 
   pre() : ScopeList {
     return this.m_pre! as ScopeList;
+  }
+
+  next() : ScopeList {
+    return this.m_next! as ScopeList;
+  }
+
+  nexts() : ScopeList[] {
+    return this.m_nexts as ScopeList[];
   }
 }
 
@@ -120,7 +123,10 @@ export function unexpected_extra_stmt_belong_to_the_parent_scope(scope : ScopeLi
     scope.kind() === scopeKind.IF_CONDITION ||
     scope.kind() === scopeKind.MAPPING ||
     scope.kind() === scopeKind.ARRAY ||
-    scope.kind() === scopeKind.FUNC_ARGUMENTS;
+    scope.kind() === scopeKind.FUNC_ARGUMENTS ||
+    scope.kind() === scopeKind.MODIFIER_INVOKER ||
+    scope.kind() === scopeKind.FUNC ||
+    scope.kind() === scopeKind.CONSTRUCTOR;
 }
 
 export function inside_contract(cur_scope : ScopeList) : boolean {
@@ -133,9 +139,19 @@ export function inside_contract(cur_scope : ScopeList) : boolean {
   return false;
 }
 
-export function inside_constructor_scope(cur_scope : ScopeList) : boolean {
+export function inside_function_body(scope : ScopeList) : boolean {
+  while (scope.kind() !== scopeKind.GLOBAL) {
+    if (scope.kind() === scopeKind.FUNC_BODY) {
+      return true;
+    }
+    scope = scope.pre();
+  }
+  return false;
+}
+
+export function inside_constructor_body(cur_scope : ScopeList) : boolean {
   while (cur_scope.kind() !== scopeKind.GLOBAL) {
-    if (cur_scope.kind() === scopeKind.CONSTRUCTOR) {
+    if (cur_scope.kind() === scopeKind.CONSTRUCTOR_BODY) {
       return true;
     }
     cur_scope = cur_scope.pre();

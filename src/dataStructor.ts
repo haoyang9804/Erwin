@@ -123,6 +123,7 @@ export class Tree<T> {
 
 export class LinkedListNode<T> {
   protected m_next : LinkedListNode<T> | undefined;
+  protected m_nexts : LinkedListNode<T>[] = [];
   protected m_pre : LinkedListNode<T> | undefined;
   protected m_value : T | undefined;
   constructor(value : T) {
@@ -134,8 +135,12 @@ export class LinkedListNode<T> {
   next() : LinkedListNode<T> | undefined {
     return this.m_next;
   }
+  nexts() : LinkedListNode<T>[] {
+    return this.m_nexts;
+  }
   set_next(next : LinkedListNode<T> | undefined) : void {
     this.m_next = next;
+    this.m_nexts.push(next!);
   }
   set_pre(pre : LinkedListNode<T> | undefined) : void {
     this.m_pre = pre;

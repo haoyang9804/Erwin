@@ -22,6 +22,12 @@ export const config = {
   param_count_of_function_lowerlimit: 0,
   function_count_per_contract_upper_limit: 2,
   function_count_per_contract_lower_limit: 1,
+  modifier_per_function_upper_limit: 2,
+  modifier_per_function_lower_limit: 0,
+
+  // modifier
+  modifier_count_per_contract_upper_limit: 2,
+  modifier_count_per_contract_lower_limit: 1,
 
   // Struct
   struct_member_variable_count_lowerlimit: 1,

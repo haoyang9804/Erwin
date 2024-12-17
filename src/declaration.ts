@@ -8,7 +8,6 @@ import {
   FunctionKind,
   FunctionVisibility,
   FunctionStateMutability,
-  ModifierInvocation,
   ContractKind,
 } from "solc-typed-ast";
 
@@ -16,19 +15,17 @@ import { assert } from "./utility";
 import { TypeKind, Type, ElementaryType, UnionType, FunctionType, ContractType, StructType, MappingType, ArrayType } from "./type";
 import { IRNode, factory } from "./node";
 import { IRStatement, IRPlaceholderStatement } from "./statement";
-import { IRExpression } from "./expression";
+import { IRExpression, IRModifierInvoker } from "./expression";
 
-export const name2declare = new Map<string, IRDeclare>();
-export abstract class IRDeclare extends IRNode {
+export abstract class IRDeclaration extends IRNode {
   name : string;
   constructor(id : number, scope : number, name : string) {
     super(id, scope);
     this.name = name;
-    name2declare.set(name, this);
   }
 }
 
-export class IRVariableDeclaration extends IRDeclare {
+export class IRVariableDeclaration extends IRDeclaration {
   indexed : boolean = false;
   constant : boolean = false; // duplicated with attribute `mutable`. but required by solc-typed-ast.
   state : boolean = false;
@@ -123,7 +120,7 @@ export class IRVariableDeclaration extends IRDeclare {
   }
 }
 
-export class IREnumDefinition extends IRDeclare {
+export class IREnumDefinition extends IRDeclaration {
   values : string[] = [];
   constructor(id : number, scope : number, name : string, values : string[]) {
     super(id, scope, name);
@@ -135,7 +132,7 @@ export class IREnumDefinition extends IRDeclare {
   }
 }
 
-export class IRUserDefinedTypeDefinition extends IRDeclare {
+export class IRUserDefinedTypeDefinition extends IRDeclaration {
   type_name : string;
   constructor(id : number, scope : number, name : string, type_name : string) {
     super(id, scope, name);
@@ -147,7 +144,7 @@ export class IRUserDefinedTypeDefinition extends IRDeclare {
 }
 
 
-export class IRErrorDefinition extends IRDeclare {
+export class IRErrorDefinition extends IRDeclaration {
   parameters : IRVariableDeclaration[];
   constructor(id : number, scope : number, name : string, parameters : IRVariableDeclaration[]) {
     super(id, scope, name);
@@ -158,7 +155,7 @@ export class IRErrorDefinition extends IRDeclare {
   }
 }
 
-export class IREventDefinition extends IRDeclare {
+export class IREventDefinition extends IRDeclaration {
   anonymous : boolean;
   parameters : IRVariableDeclaration[];
   constructor(id : number, scope : number, name : string, anonymous : boolean, parameters : IRVariableDeclaration[]) {
@@ -171,7 +168,7 @@ export class IREventDefinition extends IRDeclare {
   }
 }
 
-export class IRStructDefinition extends IRDeclare {
+export class IRStructDefinition extends IRDeclaration {
   members : IRVariableDeclaration[];
   constructor(id : number, scope : number, name : string, members : IRVariableDeclaration[]) {
     super(id, scope, name);
@@ -183,7 +180,7 @@ export class IRStructDefinition extends IRDeclare {
   }
 }
 
-export class IRModifier extends IRDeclare {
+export class IRModifier extends IRDeclaration {
   virtual : boolean;
   override : boolean;
   parameters : IRVariableDeclaration[];
@@ -211,12 +208,7 @@ export class IRModifier extends IRDeclare {
   }
 }
 
-export type Modifier = {
-  name : string;
-  arg_names : string[];
-};
-
-export class IRFunctionDefinition extends IRDeclare {
+export class IRFunctionDefinition extends IRDeclaration {
   kind : FunctionKind;
   virtual : boolean;
   override : boolean;
@@ -224,14 +216,14 @@ export class IRFunctionDefinition extends IRDeclare {
   stateMutability : FunctionStateMutability | undefined;
   parameters : IRVariableDeclaration[];
   returns : IRVariableDeclaration[];
-  modifier : Modifier[];
+  modifier_invokers : IRModifierInvoker[];
   body : IRStatement[];
   return_type : UnionType | undefined;
   parameter_type : UnionType | undefined;
   function_type : FunctionType | undefined;
   constructor(id : number, scope : number, name : string, kind : FunctionKind,
     virtual : boolean, override : boolean, parameters : IRVariableDeclaration[], returns : IRVariableDeclaration[],
-    body : IRStatement[], modifier : Modifier[], visibility ?: FunctionVisibility, stateMutability ?: FunctionStateMutability) {
+    body : IRStatement[], modifier_invokers : IRModifierInvoker[], visibility ?: FunctionVisibility, stateMutability ?: FunctionStateMutability) {
     super(id, scope, name);
     this.virtual = virtual;
     this.override = override;
@@ -240,7 +232,7 @@ export class IRFunctionDefinition extends IRDeclare {
     this.stateMutability = stateMutability;
     this.parameters = parameters;
     this.returns = returns;
-    this.modifier = modifier;
+    this.modifier_invokers = modifier_invokers;
     this.body = body;
   }
 
@@ -292,27 +284,18 @@ export class IRFunctionDefinition extends IRDeclare {
     //WARNING: currently, we don't support visibility = default or stateMutability = constant
     assert(this.visibility !== FunctionVisibility.Default, `IRFunctionDefinition ${this.id}: visibility is default`);
     assert(this.stateMutability !== FunctionStateMutability.Constant, `IRFunctionDefinition ${this.id}: stateMutability is constant`);
-    const modifier_invocation : ModifierInvocation[] = [];
-    for (const modifier of this.modifier) {
-      assert(name2declare.has(modifier.name), `IRFunctionDefinition: modifier ${modifier} is not declared`);
-      const modifier_identifier = factory.makeIdentifier("", modifier.name, name2declare.get(modifier.name)!.id);
-      for (const arg_name of modifier.arg_names) {
-        assert(name2declare.has(arg_name), `IRFunctionDefinition: arg_name ${arg_name} is not declared`);
-      }
-      modifier_invocation.push(factory.makeModifierInvocation(modifier_identifier, modifier.arg_names.map((arg_name) => factory.makeIdentifier("", arg_name, name2declare.get(arg_name)!.id))));
-    };
     const parameterList = factory.makeParameterList(this.parameters.map((parameter) => parameter.lower() as VariableDeclaration));
     const returnParameterList = factory.makeParameterList(this.returns.map((ret) => ret.lower() as VariableDeclaration));
     const lowered_body = this.body.map(function(stmt) {
       return stmt.lower();
     });
     return factory.makeFunctionDefinition(this.scope, this.kind, this.name, this.virtual, this.visibility, this.stateMutability,
-      this.kind == FunctionKind.Constructor, parameterList, returnParameterList, modifier_invocation,
+      this.kind == FunctionKind.Constructor, parameterList, returnParameterList, this.modifier_invokers.map((invoker) => invoker.lower()),
       this.override ? factory.makeOverrideSpecifier([]) : undefined, factory.makeBlock(lowered_body));
   }
 }
 
-export class IRContractDefinition extends IRDeclare {
+export class IRContractDefinition extends IRDeclaration {
   kind : ContractKind;
   abstract : boolean;
   fullyImplemented : boolean;

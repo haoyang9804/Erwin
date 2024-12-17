@@ -1,7 +1,7 @@
 import * as sqlite from 'sqlite';
 import * as sqlite3 from 'sqlite3';
 import { Tree } from './dataStructor';
-import { inside_contract, scopeKind, ScopeList } from './scope';
+import { get_scope_from_scope_id, inside_contract, scopeKind, ScopeList } from './scope';
 import { assert } from 'console';
 import { IRContractDefinition, IRStructDefinition } from './declaration';
 import { irnodes } from './node';
@@ -60,6 +60,7 @@ class DeclDB {
   private vardecls : Set<number> = new Set<number>();
   private structdecls : Set<number> = new Set<number>();
   private funcdecls : Set<number> = new Set<number>();
+  private contract_modifierdecls : Map<number, Set<number>> = new Map<number, Set<number>>();
   private struct_instance_decls : Set<number> = new Set<number>();
   private contractdecls : Set<number> = new Set<number>();
   private state_decls : Set<number> = new Set<number>();
@@ -134,6 +135,7 @@ class DeclDB {
     this.vardecls.clear();
     this.structdecls.clear();
     this.funcdecls.clear();
+    this.contract_modifierdecls.clear();
     this.struct_instance_decls.clear();
     this.contractdecls.clear();
     this.state_decls.clear();
@@ -285,6 +287,23 @@ class DeclDB {
 
   structdecl_size() : number {
     return this.structdecls.size;
+  }
+
+  //* modifierdecl
+  add_modifierdecl(modifierdecl_id : number, contract_id : number) : void {
+    if (this.contract_modifierdecls.has(contract_id)) {
+      this.contract_modifierdecls.get(contract_id)!.add(modifierdecl_id);
+    }
+    else {
+      this.contract_modifierdecls.set(contract_id, new Set([modifierdecl_id]));
+    }
+  }
+
+  modifierdecls_ids(contract_id : number) : number[] {
+    if (this.contract_modifierdecls.has(contract_id)) {
+      return Array.from(this.contract_modifierdecls.get(contract_id)!);
+    }
+    return [];
   }
 
   //* funcdecl
@@ -726,10 +745,41 @@ class DeclDB {
   get_irnodes_ids_recursively_from_a_scope(scope_id : number) : number[] {
     let irnodes_ids : number[] = [];
     while (true) {
-      if (this.scope2irnode.has(scope_id))
+      if (this.scope2irnode.has(scope_id)) {
         irnodes_ids = irnodes_ids.concat(
           this.scope2irnode.get(scope_id)!
         );
+      }
+      const scope = get_scope_from_scope_id(scope_id);
+      if (scope.kind() === scopeKind.FUNC) {
+        const function_scope = scope.pre();
+        const function_parameter_scope = function_scope.nexts().find(x => x.kind() === scopeKind.FUNC_PARAMETER);
+        const function_return_scope = function_scope.nexts().find(x => x.kind() === scopeKind.FUNC_RETURNS);
+        if (function_parameter_scope) {
+          irnodes_ids = irnodes_ids.concat(this.get_irnodes_ids_nonrecursively_from_a_scope(function_parameter_scope.id()));
+        }
+        if (function_return_scope) {
+          irnodes_ids = irnodes_ids.concat(this.get_irnodes_ids_nonrecursively_from_a_scope(function_return_scope.id()));
+        }
+      }
+      if (scope.kind() === scopeKind.CONSTRUCTOR) {
+        const constructor_scope = scope.pre();
+        const constructor_parameter_scope = constructor_scope.nexts().find(x => x.kind() === scopeKind.CONSTRUCTOR_PARAMETERS);
+        if (constructor_parameter_scope) {
+          irnodes_ids = irnodes_ids.concat(this.get_irnodes_ids_nonrecursively_from_a_scope(constructor_parameter_scope.id()));
+        }
+      }
+      if (scope.kind() === scopeKind.MODIFIER_INVOKER) {
+        const func_constructor_scope = scope.pre();
+        const parameter_scope = func_constructor_scope.nexts().find(x => x.kind() === scopeKind.FUNC_PARAMETER) || func_constructor_scope.nexts().find(x => x.kind() === scopeKind.CONSTRUCTOR_PARAMETERS);
+        const returns_scope = func_constructor_scope.nexts().find(x => x.kind() === scopeKind.FUNC_RETURNS);
+        if (parameter_scope) {
+          irnodes_ids = irnodes_ids.concat(this.get_irnodes_ids_nonrecursively_from_a_scope(parameter_scope.id()));
+        }
+        if (returns_scope) {
+          irnodes_ids = irnodes_ids.concat(this.get_irnodes_ids_nonrecursively_from_a_scope(returns_scope.id()));
+        }
+      }
       if (this.scope_tree.has_parent(scope_id)) {
         scope_id = this.scope_tree.get_parent(scope_id);
       }
@@ -1100,7 +1150,8 @@ export enum IDENTIFIER {
   MAPPING,
   ARRAY,
   EVENT,
-  ERROR
+  ERROR,
+  MODIFIER,
 };
 
 class NameDB {
@@ -1133,6 +1184,8 @@ class NameDB {
         return `event${this.name_id++}`;
       case IDENTIFIER.ERROR:
         return `error${this.name_id++}`;
+      case IDENTIFIER.MODIFIER:
+        return `modifier${this.name_id++}`;
       default:
         throw new Error(`generate_name: identifier ${identifier} is not supported`);
     }
