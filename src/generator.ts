@@ -42,6 +42,9 @@ export function init_scope() {
   cur_scope = initScope();
 }
 let indent = 0;
+export function init_indent() {
+  indent = 0;
+}
 
 export function initialize_variable(vardecl_id : number) {
   assert(irnodes.has(vardecl_id), `initialize_variable: id ${vardecl_id} is not in irnodes`);

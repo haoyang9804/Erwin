@@ -40,6 +40,7 @@ function init_generation() {
   irnodes.clear();
   gen.init_scope();
   gen.init_global_id();
+  gen.init_indent();
 }
 
 function storageLocation2loc(sl : StorageLocation) : DataLocation {
