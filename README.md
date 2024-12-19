@@ -1,6 +1,12 @@
 <p align="center">
 <img src="https://raw.githubusercontent.com/haoyang9804/haoyang9804.github.io/master/Erwin_icon.png" alt="erwin" width="200"/>
 </p>
+<p align="center">
+  <a href="https://www.npmjs.com/package/@__haoyang__/erwin">
+    <img alt="NPM Version" src="https://img.shields.io/npm/v/%40__haoyang__%2Ferwin">
+  </a>
+  <img alt="NPM License" src="https://img.shields.io/npm/l/%40__haoyang__%2Ferwin">
+</p>
 
 :blush: Erwin is an academic attempt on introducing bounded exhaustive enumeration in random program generator to mitigate opportunism.
 
