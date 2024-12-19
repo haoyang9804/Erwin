@@ -12,8 +12,9 @@ import { new_global_id } from './genContext';
 import { IRAssignment, IRIdentifier } from './expression';
 import { cur_scope } from './genContext';
 
+//@ts-ignore
 // Deprecated Database
-export class DeprecatedDB {
+class DeprecatedDB {
   db : sqlite.Database;
   constructor(filename : string = ":memory:") {
     const config = {
@@ -51,6 +52,9 @@ export class DeprecatedDB {
   }
 }
 
+/**
+ * A class to store the declaration information.
+ */
 class DeclDB {
 
   private scope_tree : Tree<number> = new Tree();
@@ -901,6 +905,9 @@ class DeclDB {
 
 }
 
+/**
+ * A class to store the information of expressions.
+ */
 class ExprDB {
   private expr2read_variables : Map<number, Set<number>> = new Map<number, Set<number>>();
   private expr2write_variables : Map<number, Set<number>> = new Map<number, Set<number>>();
@@ -1249,6 +1256,9 @@ export enum IDENTIFIER {
   MODIFIER,
 };
 
+/**
+ * The class that stores all the names.
+ */
 class NameDB {
   private name_id : number = 0;
 
@@ -1287,6 +1297,9 @@ class NameDB {
   }
 }
 
+/**
+ * The class that stores all the statements.
+ */
 class StmtDB {
   // Record the statements that are not expected to be generated before the current statement.
   private unexpected_extra_stmt : Map<number, IRStatement[]> = new Map<number, IRStatement[]>();
@@ -1346,6 +1359,9 @@ class StmtDB {
   }
 }
 
+/**
+ * The class that stores all the types.
+ */
 class TypeDB {
   private all_types : type.Type[] = [];
   private contract_types : Map<number, type.ContractType> = new Map<number, type.ContractType>();
@@ -1453,6 +1469,19 @@ export const stmt_db = new StmtDB();
 export const name_db = new NameDB();
 export const type_db = new TypeDB();
 
+
+/**
+ * Struct declarations may contain declarations that are qualified by storage locations (e.g., memory, storage, calldata).
+ * When creating a struct instance of this kind, we have to assign a storage location to the instance and vicariously to its members.
+ * Therefore, two identifiers of the same member of a struct declaration may have different storage locations.
+ * In this case, we cannot easily say the identifier's storage location restrains the member's storage location.
+ * We need to create a ghost member of the member inside the struct instance to represent the member's storage location
+ * in this case and let the identifier's storage location restrain the ghost member's storage location.
+ * 
+ * @param member_id The ID of the member of a struct declaration
+ * @param struct_instantiation_id The ID of the struct instantiation, e.g., a new-struct expression, or an identifier of a struct instance declaration
+ * @returns The ghost member ID of the member inside the struct instantiation
+ */
 export function ghost_member_of_member_inside_struct_instantiation(member_id : number, struct_instantiation_id : number) : number {
   if (decl_db.is_struct_instance_decl(struct_instantiation_id)) {
     return decl_db.ghost_member_of_member_inside_struct_instance(member_id, struct_instantiation_id);
@@ -1464,6 +1493,13 @@ export function ghost_member_of_member_inside_struct_instantiation(member_id : n
     throw new Error(`The struct instantiation ${struct_instantiation_id} is not a struct instance declaration or a new struct expression.`);
   }
 }
+
+/**
+ * 
+ * @param struct_instantiation_id The ID of the struct instantiation, e.g., a new-struct expression, or an identifier of a struct instance declaration
+ * @param member_id The ID of the member of a struct declaration
+ * @param ghost_member_id The ghost member ID of the member inside the struct instantiation
+ */
 
 export function update_ghost_members_of_struct_instantiation(struct_instantiation_id : number, member_id : number, ghost_member_id : number) {
   if (decl_db.is_struct_instance_decl(struct_instantiation_id)) {
@@ -1477,6 +1513,9 @@ export function update_ghost_members_of_struct_instantiation(struct_instantiatio
   }
 }
 
+/**
+ * Initialize all databases.
+ */
 export function init() {
   decl_db.init();
   expr_db.init();

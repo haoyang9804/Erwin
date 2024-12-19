@@ -1,9 +1,9 @@
 import { FunctionVisibility, StateVariableVisibility } from "solc-typed-ast";
-import { ConstraintNode } from "./constraintNode";
+import { Value } from "./value";
 
 //! Visibility does not have super/sub relations
 
-export abstract class FuncVis extends ConstraintNode<FunctionVisibility> { }
+export abstract class FuncVis extends Value<FunctionVisibility> { }
 
 class FuncInternal extends FuncVis {
   constructor() {
@@ -174,7 +174,7 @@ export class FuncVisProvider {
   }
 }
 
-export abstract class VarVis extends ConstraintNode<StateVariableVisibility> { }
+export abstract class VarVis extends Value<StateVariableVisibility> { }
 
 class VarInternal extends VarVis {
   constructor() {

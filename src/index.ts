@@ -266,7 +266,7 @@ else if (program.args[0] === "generate") {
   assert(config.generation_rounds >= 1, "The number of generation rounds must be not less than 1.");
   assert(!config.enable_test || config.compiler_path !== "", "The path of the compiler path is not provided while enabling the testing mode.");
 }
-// Execute
+
 if (program.args[0] === "mutate") {
   (async () => {
     await mutate();

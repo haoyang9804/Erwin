@@ -42,6 +42,10 @@ export const global_scope : number = 1;
 let scope_id : number = global_scope;
 const scope_id_to_scope : Map<number, ScopeList> = new Map();
 
+/**
+ * A linked-list-based scope class.
+ * It's used to manage the scope of declarations, statements, and expressions.
+ */
 export class ScopeList extends LinkedListNode<scopeT> {
   constructor(value : scopeT) {
     super(value);

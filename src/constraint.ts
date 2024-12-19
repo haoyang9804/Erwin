@@ -10,9 +10,13 @@ import { StorageLocation } from "./loc";
 import { VisMut, VisMutKind } from "./vismut";
 import { LinkedListNode } from "./dataStructor";
 import { decl_db, expr_db } from "./db";
-import { ConstraintNode, is_equal_range, is_super_range } from "./constraintNode";
+import { Value, is_equal_range, is_super_range } from "./value";
 
+/**
+ * Stores how a non-leaf constraint node restrains a leaf node.
+ */
 interface toLeaf {
+  // leaf's id
   leaf_id : number;
   // leaf's solution is the sub of node's solution
   sub : boolean;
@@ -25,7 +29,11 @@ interface toLeaf {
   // leaf's solution is the equivalent of the node's solution
   equal : boolean;
 };
-class DagNode {
+
+/**
+ * A node in the constraint graph
+ */
+export class ConstraintNode {
   id : number;
   inbound : number = 0;
   outbound : number = 0;
@@ -35,15 +43,17 @@ class DagNode {
     this.id = id;
   }
 }
-export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
-
-  dag_nodes : Map<number, DagNode> = new Map<number, DagNode>();
+/**
+ * A directed acyclic graph that stores the constraints between nodes.
+ */
+export class ConstraintDAG<T, V extends Value<T>> {
+  dag_nodes : Map<number, ConstraintNode> = new Map<number, ConstraintNode>();
   // If 'id1 id2' is installed in sub/super, then the solution of id2 is a sub/super of the solution of id1
   sub : Set<string> = new Set();
   super : Set<string> = new Set();
-  solutions = new Map<number, Node>();
-  solution_range = new Map<number, Node[]>();
-  solutions_collection : Map<number, Node>[] = [];
+  solutions = new Map<number, V>();
+  solution_range = new Map<number, V[]>();
+  solutions_collection : Map<number, V>[] = [];
   // Records the IDs of roots/leaves
   roots : Set<number> = new Set<number>();
   leaves : Set<number> = new Set<number>();
@@ -107,11 +117,11 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
     // No need to check if a node connects to itself because it's forbidden in the connect function
   }
 
-  newNode(id : number) : DagNode {
-    return new DagNode(id);
+  newNode(id : number) : ConstraintNode {
+    return new ConstraintNode(id);
   }
 
-  insert(nodeid : number, range : Node[]) : void {
+  insert(nodeid : number, range : V[]) : void {
     if (this.dag_nodes.has(nodeid)) return;
     const node = this.newNode(nodeid);
     this.dag_nodes.set(node.id, node);
@@ -134,10 +144,10 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
     this.super = new Set([...this.super].filter(t => !t.includes(`${nodeid}`)));
   }
 
-  update(nodeid : number, range : Node[]) : void {
+  update(nodeid : number, range : V[]) : void {
     assert(this.dag_nodes.has(nodeid), `ConstraintDAG: node ${nodeid} is not in the graph`);
     assert(this.solution_range.has(nodeid), `ConstraintDAG: node ${nodeid} is not in the solution_range`);
-    const intersected_range = [...intersection(new Set<Node>(this.solution_range.get(nodeid)), new Set<Node>(range))];
+    const intersected_range = [...intersection(new Set<V>(this.solution_range.get(nodeid)), new Set<V>(range))];
     assert(intersected_range.length > 0,
       `ConstraintDAG: node ${nodeid} has empty solution range.
        solution_range of ${nodeid} is ${this.solution_range.get(nodeid)!.map(t => t.str())}
@@ -148,7 +158,7 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
     }
   }
 
-  force_update(nodeid : number, range : Node[]) : void {
+  force_update(nodeid : number, range : V[]) : void {
     this.solution_range.set(nodeid, range);
   }
 
@@ -185,7 +195,7 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
     this.super.delete(`${from} ${to}`);
   }
 
-  solution_range_of(nodeid : number) : Node[] {
+  solution_range_of(nodeid : number) : V[] {
     assert(this.solution_range.has(nodeid), `${this.name}: node ${nodeid} is not in solution_range`);
     return this.solution_range.get(nodeid)!;
   }
@@ -198,24 +208,24 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
     return this.solution_range.has(nodeid);
   }
 
-  protected dominator_solution_range_should_be_shrinked(dominator_id : number, dominatee_id : number) : Node[] | undefined {
+  protected dominator_solution_range_should_be_shrinked(dominator_id : number, dominatee_id : number) : V[] | undefined {
     let minimum_solution_range_of_dominator;
     const rank = this.sub.has(`${dominator_id} ${dominatee_id}`) ? "sub" :
       this.super.has(`${dominator_id} ${dominatee_id}`) ? "super" : undefined;
     if (rank === undefined) {
       minimum_solution_range_of_dominator = [...
-        merge_set(new Set<Node>(this.solution_range.get(dominatee_id)!
-          .flatMap(t => t.supers() as Node[])), new Set<Node>(this.solution_range.get(dominatee_id)!
-            .flatMap(t => t.subs() as Node[])))
+        merge_set(new Set<V>(this.solution_range.get(dominatee_id)!
+          .flatMap(t => t.supers() as V[])), new Set<V>(this.solution_range.get(dominatee_id)!
+            .flatMap(t => t.subs() as V[])))
       ];
     }
     else if (rank === "sub") {
-      minimum_solution_range_of_dominator = [...new Set<Node>(this.solution_range.get(dominatee_id)!
-        .flatMap(t => t.supers() as Node[]))];
+      minimum_solution_range_of_dominator = [...new Set<V>(this.solution_range.get(dominatee_id)!
+        .flatMap(t => t.supers() as V[]))];
     }
     else if (rank === "super") {
-      minimum_solution_range_of_dominator = [...new Set<Node>(this.solution_range.get(dominatee_id)!
-        .flatMap(t => t.subs() as Node[]))];
+      minimum_solution_range_of_dominator = [...new Set<V>(this.solution_range.get(dominatee_id)!
+        .flatMap(t => t.subs() as V[]))];
     }
     else {
       throw new Error(`dominator_solution_range_should_be_shrinked: rank ${rank} is not supported`);
@@ -232,24 +242,24 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
     return undefined;
   }
 
-  protected dominatee_solution_range_should_be_shrinked(dominator_id : number, dominatee_id : number) : Node[] | undefined {
+  protected dominatee_solution_range_should_be_shrinked(dominator_id : number, dominatee_id : number) : V[] | undefined {
     let minimum_solution_range_of_dominatee;
     const rank = this.sub.has(`${dominator_id} ${dominatee_id}`) ? "sub" :
       this.super.has(`${dominator_id} ${dominatee_id}`) ? "super" : undefined;
     if (rank === undefined) {
       minimum_solution_range_of_dominatee = [...
-        merge_set(new Set<Node>(this.solution_range.get(dominator_id)!
-          .flatMap(t => t.subs() as Node[])), new Set<Node>(this.solution_range.get(dominator_id)!
-            .flatMap(t => t.supers() as Node[])))
+        merge_set(new Set<V>(this.solution_range.get(dominator_id)!
+          .flatMap(t => t.subs() as V[])), new Set<V>(this.solution_range.get(dominator_id)!
+            .flatMap(t => t.supers() as V[])))
       ];
     }
     else if (rank === "sub") {
-      minimum_solution_range_of_dominatee = [...new Set<Node>(this.solution_range.get(dominator_id)!
-        .flatMap(t => t.subs() as Node[]))];
+      minimum_solution_range_of_dominatee = [...new Set<V>(this.solution_range.get(dominator_id)!
+        .flatMap(t => t.subs() as V[]))];
     }
     else if (rank === "super") {
-      minimum_solution_range_of_dominatee = [...new Set<Node>(this.solution_range.get(dominator_id)!
-        .flatMap(t => t.supers() as Node[]))];
+      minimum_solution_range_of_dominatee = [...new Set<V>(this.solution_range.get(dominator_id)!
+        .flatMap(t => t.supers() as V[]))];
     }
     else {
       throw new Error(`dominatee_solution_range_should_be_shrinked: rank ${rank} is not supported`);
@@ -282,7 +292,7 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
   }
 
   initialize_resolve() : void {
-    this.solutions = new Map<number, Node>();
+    this.solutions = new Map<number, V>();
     this.solutions_collection = [];
     this.roots = new Set<number>();
     this.leaves = new Set<number>();
@@ -577,17 +587,17 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
     }
   }
 
-  protected try_shrink_dominator_solution_range(solution_range : Map<number, Node[]>,
-    dominator_id : number, dominatee_id : number) : Node[] {
+  protected try_shrink_dominator_solution_range(solution_range : Map<number, V[]>,
+    dominator_id : number, dominatee_id : number) : V[] {
     let minimum_solution_range_of_dominator;
     const rank = this.sub.has(`${dominator_id} ${dominatee_id}`) ? "sub" :
       this.super.has(`${dominator_id} ${dominatee_id}`) ? "super" : undefined;
     if (rank === undefined) minimum_solution_range_of_dominator = solution_range.get(dominatee_id)!;
     else if (rank === "sub") {
-      minimum_solution_range_of_dominator = [...new Set<Node>(solution_range.get(dominatee_id)!.flatMap(t => t.supers() as Node[]))];
+      minimum_solution_range_of_dominator = [...new Set<V>(solution_range.get(dominatee_id)!.flatMap(t => t.supers() as V[]))];
     }
     else if (rank === "super") {
-      minimum_solution_range_of_dominator = [...new Set<Node>(solution_range.get(dominatee_id)!.flatMap(t => t.subs() as Node[]))];
+      minimum_solution_range_of_dominator = [...new Set<V>(solution_range.get(dominatee_id)!.flatMap(t => t.subs() as V[]))];
     }
     else {
       throw new Error(`dominator_solution_range_should_be_shrinked: rank ${rank} is not supported`);
@@ -596,17 +606,17 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
     return intersection;
   }
 
-  protected try_shrink_dominatee_solution_range(solution_range : Map<number, Node[]>,
-    dominator_id : number, dominatee_id : number) : Node[] {
+  protected try_shrink_dominatee_solution_range(solution_range : Map<number, V[]>,
+    dominator_id : number, dominatee_id : number) : V[] {
     let minimum_solution_range_of_dominatee;
     const rank = this.sub.has(`${dominator_id} ${dominatee_id}`) ? "sub" :
       this.super.has(`${dominator_id} ${dominatee_id}`) ? "super" : undefined;
     if (rank === undefined) minimum_solution_range_of_dominatee = solution_range.get(dominator_id)!;
     else if (rank === "sub") {
-      minimum_solution_range_of_dominatee = [...new Set<Node>(solution_range.get(dominator_id)!.flatMap(t => t.subs() as Node[]))];
+      minimum_solution_range_of_dominatee = [...new Set<V>(solution_range.get(dominator_id)!.flatMap(t => t.subs() as V[]))];
     }
     else if (rank === "super") {
-      minimum_solution_range_of_dominatee = [...new Set<Node>(solution_range.get(dominator_id)!.flatMap(t => t.supers() as Node[]))];
+      minimum_solution_range_of_dominatee = [...new Set<V>(solution_range.get(dominator_id)!.flatMap(t => t.supers() as V[]))];
     }
     else {
       throw new Error(`dominatee_solution_range_should_be_shrinked: rank ${rank} is not supported`);
@@ -615,7 +625,7 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
     return intersection;
   }
 
-  try_tighten_solution_range_middle_out(node : number, new_range : Node[]) : boolean {
+  try_tighten_solution_range_middle_out(node : number, new_range : V[]) : boolean {
     const solution_range = new Map(this.solution_range);
     solution_range.set(node, new_range);
     let upwards = (node : number) : boolean => {
@@ -708,13 +718,13 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
     downwards(node);
   }
 
-  protected allocate_solutions_for_leaves_in_stream() : Generator<Map<number, Node>> {
+  protected allocate_solutions_for_leaves_in_stream() : Generator<Map<number, V>> {
     for (let leaf of this.leaves) this.solution_range.set(leaf, this.solution_range.get(leaf)!);
     const leave_array = Array.from(this.leaves);
     Log.log(`leave_array ${leave_array.length}: ${leave_array}`);
     Log.log(`====== solution_range of leaves before allocating solutions ======\n${Array.from(this.solution_range).filter(t => this.leaves.has(t[0])).map(t => [t[0], t[1].map(g => g.str())]).join("\n")}`);
     const solution_range_copy = this.solution_range;
-    let check_leaf_solution = (leaf_solution : Map<number, Node>) : boolean => {
+    let check_leaf_solution = (leaf_solution : Map<number, V>) : boolean => {
       const leaf_solution_array = Array.from(leaf_solution);
       const leaf_solution_length = leaf_solution_array.length;
       for (let i = 0; i < leaf_solution_length; i++) {
@@ -752,8 +762,8 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
       return true;
     }
 
-    class SolutionRangeList extends LinkedListNode<Node[]> {
-      new(range : Node[]) : SolutionRangeList {
+    class SolutionRangeList extends LinkedListNode<V[]> {
+      new(range : V[]) : SolutionRangeList {
         this.m_next = new SolutionRangeList(range);
         this.m_next.set_pre(this);
         return this.m_next as SolutionRangeList;
@@ -767,11 +777,11 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
 
     const narrowed_solution_range : Map<number, SolutionRangeList> = new Map<number, SolutionRangeList>();
 
-    let narrow_solution_range_for_leaves_afterwards = (id : number, solution : Node) : boolean => {
+    let narrow_solution_range_for_leaves_afterwards = (id : number, solution : V) : boolean => {
       for (let j = id + 1; j < leave_array.length; j++) {
         if (this.leaves_sub.has(`${leave_array[j]} ${leave_array[id]}`)) {
           if (!narrowed_solution_range.has(leave_array[j])) {
-            narrowed_solution_range.set(leave_array[j], new SolutionRangeList(solution.supers() as Node[]));
+            narrowed_solution_range.set(leave_array[j], new SolutionRangeList(solution.supers() as V[]));
           }
           else {
             let leave_solution_range_node = narrowed_solution_range.get(leave_array[j])!;
@@ -784,7 +794,7 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
         }
         else if (this.leaves_sub.has(`${leave_array[id]} ${leave_array[j]}`)) {
           if (!narrowed_solution_range.has(leave_array[j])) {
-            narrowed_solution_range.set(leave_array[j], new SolutionRangeList(solution.subs() as Node[]));
+            narrowed_solution_range.set(leave_array[j], new SolutionRangeList(solution.subs() as V[]));
           }
           else {
             let leave_solution_range_node = narrowed_solution_range.get(leave_array[j])!;
@@ -798,7 +808,7 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
         else if (this.leaves_same.has(`${leave_array[j]} ${leave_array[id]}`)
           || this.leaves_same.has(`${leave_array[id]} ${leave_array[j]}`)) {
           if (!narrowed_solution_range.has(leave_array[j])) {
-            narrowed_solution_range.set(leave_array[j], new SolutionRangeList([solution] as Node[]));
+            narrowed_solution_range.set(leave_array[j], new SolutionRangeList([solution] as V[]));
           }
           else {
             let leave_solution_range_node = narrowed_solution_range.get(leave_array[j])!;
@@ -812,7 +822,7 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
         else if (this.leaves_equal.has(`${leave_array[j]} ${leave_array[id]}`)
           || this.leaves_equal.has(`${leave_array[id]} ${leave_array[j]}`)) {
           if (!narrowed_solution_range.has(leave_array[j])) {
-            narrowed_solution_range.set(leave_array[j], new SolutionRangeList(solution.equivalents() as Node[]));
+            narrowed_solution_range.set(leave_array[j], new SolutionRangeList(solution.equivalents() as V[]));
           }
           else {
             let leave_solution_range_node = narrowed_solution_range.get(leave_array[j])!;
@@ -826,13 +836,13 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
         else if (this.leaves_same_range.has(`${leave_array[j]} ${leave_array[id]}`)
           || this.leaves_same_range.has(`${leave_array[id]} ${leave_array[j]}`)) {
           if (!narrowed_solution_range.has(leave_array[j])) {
-            narrowed_solution_range.set(leave_array[j], new SolutionRangeList(solution.same_range() as Node[]));
+            narrowed_solution_range.set(leave_array[j], new SolutionRangeList(solution.same_range() as V[]));
           }
           else {
             let leave_solution_range_node = narrowed_solution_range.get(leave_array[j])!;
             const leave_solution_range = leave_solution_range_node.value().filter(
               t => merge_set(
-                new Set<Node>(solution.supers() as Node[]), new Set<Node>(solution.subs() as Node[])
+                new Set<V>(solution.supers() as V[]), new Set<V>(solution.subs() as V[])
               ).has(t)
             );
             leave_solution_range_node = leave_solution_range_node.new(leave_solution_range);
@@ -877,7 +887,7 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
       }
     }
 
-    function* dfs(id : number, leaf_resolution : Map<number, Node>) : Generator<Map<number, Node>> {
+    function* dfs(id : number, leaf_resolution : Map<number, V>) : Generator<Map<number, V>> {
       if (id === leave_array.length) {
         if (check_leaf_solution(leaf_resolution)) {
           yield new Map(leaf_resolution);
@@ -908,7 +918,7 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
         }
       }
     }
-    return dfs(0, new Map<number, Node>());
+    return dfs(0, new Map<number, V>());
   }
 
   protected build_leaves_relation() : void {

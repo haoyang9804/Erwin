@@ -1,7 +1,7 @@
 import { DataLocation } from "solc-typed-ast";
-import { ConstraintNode } from "./constraintNode";
+import { Value } from "./value";
 
-export abstract class StorageLocation extends ConstraintNode<DataLocation> { }
+export abstract class StorageLocation extends Value<DataLocation> { }
 
 export class StoragePointer extends StorageLocation {
   constructor() {

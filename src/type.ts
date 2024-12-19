@@ -2,8 +2,8 @@ import { assert, cartesian_product, pick_random_subarray, merge_set } from "./ut
 import { sizeof } from "sizeof";
 import { config } from './config';
 import { decl_db } from "./db";
-import { type_dag } from "./constraintDag";
-import { ConstraintNode } from "./constraintNode";
+import { type_dag } from "./constraint";
+import { Value } from "./value";
 
 export enum TypeKind {
   ElementaryType = "TypeKind::ElementaryType",
@@ -17,7 +17,7 @@ export enum TypeKind {
   PlaceholderType = "TypeKind::PlaceholderType"
 }
 
-export abstract class Type extends ConstraintNode<TypeKind> { }
+export abstract class Type extends Value<TypeKind> { }
 
 export class PlaceholderType extends Type {
   constructor() {

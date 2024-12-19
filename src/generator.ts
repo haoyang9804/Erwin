@@ -5,8 +5,8 @@ import * as decl from "./declaration";
 import * as stmt from "./statement";
 import * as type from "./type";
 import { IDENTIFIER, decl_db, expr_db, ghost_member_of_member_inside_struct_instantiation, name_db, stmt_db, type_db, update_ghost_members_of_struct_instantiation } from "./db";
-import { type_dag, storage_location_dag, vismut_dag } from "./constraintDag";
-import { is_super_range, is_equal_range, intersection_range } from "./constraintNode";
+import { type_dag, storage_location_dag, vismut_dag } from "./constraint";
+import { is_super_range, is_equal_range, intersection_range } from "./value";
 import { config } from './config';
 import { cur_scope, decrease_indent, increase_indent, indent, new_global_id, new_scope, relocate_scope, roll_back_scope } from "./genContext";
 import { irnodes } from "./node";
@@ -19,7 +19,7 @@ import { all_func_vismut, all_var_vismut, closed_func_vismut, FuncVisMut, nonpay
 import { sig } from "./signal";
 import { Log } from "./log";
 
-export function change_node_id(node : IRNode, new_id : number) {
+function change_node_id(node : IRNode, new_id : number) {
   let origin_node_of_new_id : IRNode | undefined = irnodes.get(new_id);
   irnodes.delete(node.id);
   node.id = new_id;
@@ -30,21 +30,6 @@ export function change_node_id(node : IRNode, new_id : number) {
     irnodes.set(id, origin_node_of_new_id!);
   }
   irnodes.set(new_id, node);
-}
-
-export function initialize_variable(vardecl_id : number) {
-  assert(irnodes.has(vardecl_id), `initialize_variable: id ${vardecl_id} is not in irnodes`);
-  assert(irnodes.get(vardecl_id) instanceof decl.IRVariableDeclaration,
-    `initialize_variable: id ${vardecl_id} is not an instance of IRVariableDeclaration`);
-  const vardecl = irnodes.get(vardecl_id) as decl.IRVariableDeclaration;
-  const assignment = new expr.IRAssignment(new_global_id(), cur_scope.id(),
-    new expr.IRIdentifier(new_global_id(), cur_scope.id(), vardecl.name, vardecl.id),
-    new expr.IRIdentifier(new_global_id(), cur_scope.id(), vardecl.name, vardecl.id), '=');
-  const assignment_stmt = new stmt.IRExpressionStatement(new_global_id(), cur_scope.id(), assignment);
-  expr_db.expr_reads_variable(assignment.id, vardecl.id);
-  expr_db.expr_writes_variable(assignment.id, vardecl.id);
-  (assignment_stmt as stmt.IRStatement).exprs.push(assignment);
-  return assignment_stmt;
 }
 
 function generate_type_range_str(type_range : type.Type[]) : string {
@@ -687,6 +672,9 @@ abstract class Generator {
   }
 }
 
+/**
+ * Generate a source unit.
+ */
 export class SourceUnitGenerator extends Generator {
   constructor() {
     super();

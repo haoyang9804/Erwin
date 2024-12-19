@@ -6,104 +6,32 @@
     <img alt="NPM Version" src="https://img.shields.io/npm/v/%40__haoyang__%2Ferwin">
   </a>
   <img alt="NPM License" src="https://img.shields.io/npm/l/%40__haoyang__%2Ferwin">
+  <a href="https://haoyang9804.github.io/docs/index.html">
+    <img alt="Static Badge" src="https://img.shields.io/badge/Documentation-red">
+  </a>
 </p>
 
-:blush: Erwin is an academic attempt on introducing bounded exhaustive enumeration in random program generator to mitigate opportunism.
+***Erwin*** is an academic attempt on introducing `bounded exhaustive instantiation` in random program generator to mitigate opportunism.
+Different from [Csmith](https://github.com/csmith-project/csmith)-family tools that generate a test program in one go, ***Erwin*** separates the generation process into two sub-steps: 1) randomly generate a type/loc/vis-agnostic IR (i.e., a program without type, storage location, and visibility), and 2) conducts bounded exhaustive instantiation to instantiate the IR into a swarm of real-word test programs.
+By masking out bug-related langauge features, such as type, storage location, and visibility in the IR, ***Erwin*** shrinks the search space into a highly bug-related subspace. This way, ***Erwin*** reduce opportunism in random program generations.
 
-:smiling_imp: Erwin can generate Solidity programs by first generating an IR (an intermediate representation with a lot of holes that are ready to be filled) and then exhaustively enumerate all valid programs inside the search space formed by the IR.
-
-:innocent: Erwin is still under development, any suggestion and collaboration is welcomed.
+***Erwin*** is still under development, any suggestion and collaboration is welcomed.
 
 ## How to play it?
 
-The simplest way is `npm install` it and `npx erwin generate` with different generation flags. `npx erwin generate` is the trivial generation, in which Erwin will not explore the search space of the IR, but instead randomly pick one valid program from the space and finish the generation round.
+The simplest way is `npm install` it and `npx erwin generate` with different generation flags. `npx erwin generate` is the trivial generation, in which ***Erwin*** will not explore the search space of the IR, but perform just like Csmith, generate a test program in one go.
 
-Erwin supports exploring type spaces, storage location spaces, state mutability spaces, and visibility spaces. To invoke them, you need to use the flag `-m` to activate nontrivial modes. Please refer the general flags to learn how to use flags.
+To utilize ***Erwin***'s features in program generation, you can use `-m` to specify the bug-related features you want to mask in the IR, and use `-max` to specify the maximum test programs you want to instantiation from the generated IR.
 
-## General Flags
+To directly use ***Erwin*** to fuzz the Solidity compiler, you can invoke `--enable_test`.
 
-As planned, Erwin can both generate and mutate. But up to now, all efforts have been made on generation. Below are flags supported by `erwin generate`.
-Enjoy tuning the search space and generate diverse and valid Solidity programs.
+Below is an example command to fuzz the Solidity compiler:
 
 ```
-  -e --exprimental                                    Enable the exprimental mode.
-  -m --mode <string>                                  The mode of Erwin. The value can be 'type', 'scope', or 'loc'. (default: "")
-  -d --debug                                          Enable the debug mode.
-  -o --out_dir <string>                               The output directory for the generated program. The default is 'generated_programs' (default:
-                                                      "./generated_programs")
-  -max --maximum_solution_count <number>              The maximum number of solutions Erwin will consider. (default: "500")
-  --int_types_num <number>                            The number of int types Erwin will consider in resolving type constraints. (default: "2")
-  --uint_types_num <number>                           The number of uint types Erwin will consider in resolving type constraints. (default: "2")
-  --function_body_stmt_cnt_upper_limit <number>       The upper limit of the number of non-declaration statements of a function. This value is
-                                                      suggested to be bigger than tha value of var_count (default: "1")
-  --function_body_stmt_cnt_lower_limit <number>       The lower limit of the number of non-declaration statements of a function. (default: "1")
-  --return_count_of_function_upperlimit <number>      The upper limit of the number of return values of a function. (default: "2")
-  --return_count_of_function_lowerlimit <number>      The lower limit of the number of return values of a function. (default: "0")
-  --param_count_of_function_upperlimit <number>       The upper limit of the number of parameters of a function. (default: "1")
-  --param_count_of_function_lowerlimit <number>       The lower limit of the number of parameters of a function. (default: "0")
-  --function_count_per_contract_upper_limit <number>  The upper limit of the number of functions in a contract. (default: "2")
-  --function_count_per_contract_lower_limit <number>  The lower limit of the number of functions in a contract. (default: "1")
-  --modifier_per_function_upper_limit <number>        The upper limit of the number of modifiers in a contract. (default: "2")
-  --modifier_per_function_lower_limit <number>        The lower limit of the number of modifiers in a contract. (default: "0")
-  --modifier_count_per_contract_upper_limit <number>  The upper limit of the number of modifiers in a contract. (default: "2")
-  --modifier_count_per_contract_lower_limit <number>  The lower limit of the number of modifiers in a contract. (default: "1")
-  --struct_member_variable_count_upperlimit <number>  The upper limit of the number of member variables in a struct. (default: "2")
-  --struct_member_variable_count_lowerlimit <number>  The lower limit of the number of member variables in a struct. (default: "1")
-  --contract_count <number>                           The upper limit of the number of contracts Erwin will generate. (default: "2")
-  --state_variable_count_upperlimit <number>          The upper limit of the number of state variables in a contract. (default: "2")
-  --state_variable_count_lowerlimit <number>          The lower limit of the number of state variables in a contract. (default: "1")
-  --array_length_upperlimit <number>                  The upper limit of the length of an array. (default: "10")
-  --for_init_cnt_upper_limit <number>                 The upper limit of the number of initialization in a for loop. (default: "1")
-  --for_init_cnt_lower_limit <number>                 The lower limit of the number of initialization in a for loop. (default: "0")
-  --for_body_stmt_cnt_upper_limit <number>            The upper limit of the number of statements in the body of a for loop. (default: "1")
-  --for_body_stmt_cnt_lower_limit <number>            The lower limit of the number of statements in the body of a for loop. (default: "0")
-  --while_body_stmt_cnt_upper_limit <number>          The upper limit of the number of statements in the body of a while loop. (default: "1")
-  --while_body_stmt_cnt_lower_limit <number>          The lower limit of the number of statements in the body of a while loop. (default: "0")
-  --do_while_body_stmt_cnt_upper_limit <number>       The upper limit of the number of statements in the body of a do while loop. (default: "1")
-  --do_while_body_stmt_cnt_lower_limit <number>       The lower limit of the number of statements in the body of a do while loop. (default: "0")
-  --if_body_stmt_cnt_upper_limit <number>             The upper limit of the number of statements in the body of an if statement. (default: "1")
-  --if_body_stmt_cnt_lower_limit <number>             The lower limit of the number of statements in the body of an if statement. (default: "0")
-  --struct_decl_per_contract_upperlimit <number>      The upper limit of the number of struct declarations in a contract. (default: "2")
-  --struct_decl_per_contract_lowerlimit <number>      The lower limit of the number of struct declarations in a contract. (default: "1")
-  --event_decl_per_contract_upperlimit <number>       The upper limit of the number of events in a contract. (default: "2")
-  --event_decl_per_contract_lowerlimit <number>       The lower limit of the number of events in a contract. (default: "1")
-  --error_decl_per_contract_upperlimit <number>       The upper limit of the number of errors in a contract. (default: "2")
-  --error_decl_per_contract_lowerlimit <number>       The lower limit of the number of errors in a contract. (default: "1")
-  --expression_complexity_level <number>              The complexity level of the expression Erwin will generate.
-                                                      The suggedted range is [1,2,3]. The bigger, the more complex. (default: "1")
-  --statement_complexity__level <number>              The complexity level of the statement Erwin will generate.
-                                                      The suggedted range is [1,2]. The bigger, the more complex. (default: "1")
-  --type_complexity_level <number>                    The complexity level of the type Erwin will generate.
-                                                      The suggedted range is [1,2]. The bigger, the more complex. (default: "1")
-  --nonstructured_statement_prob <float>              The probability of generating a nonstructured statement, such as AssignmentStatment or
-                                                      FunctionCallAssignment. (default: "0.5")
-  --expression_complexity_prob <float>                The probability of generating a complex expression. (default: "0.8")
-  --literal_prob <float>                              The probability of generating a literal. (default: "0.05")
-  --tuple_prob <float>                                The probability of generating a tuple surrounding an expression. (default: "0.3")
-  --vardecl_prob <float>                              The probability of generating a variable declaration. (default: "0")
-  --new_prob <float>                                  The probability of generating a variable declaration in place. (default: "0.1")
-  --else_prob <float>                                 The probability of generating an else statement. (default: "0.3")
-  --init_state_var_in_constructor_prob <float>        The probability of initializing a state variable in the constructor. (default: "0.3")
-  --struct_prob <float>                               The probability of generating a struct. (default: "0.5")
-  --contract_type_prob <float>                        The probability of generating a contract-type variable. (default: "0.1")
-  --struct_type_prob <float>                          The probability of generating a struct-type variable. (default: "0.1")
-  --initialization_prob <float>                       The probability of generating an initialization statement. (default: "0.3")
-  --constructor_prob <float>                          The probability of generating a constructor. (default: "0.5")
-  --return_prob <float>                               The probability of generating a return statement. (default: "0.5")
-  --reuse_name_prob <float>                           The probability of reusing a name. (default: "0")
-  --mapping_type_prob <float>                         The probability of generating a mapping-type variable. (default: "0.1")
-  --array_type_prob <float>                           The probability of generating an array-type variab;e. (default: "0.1")
-  --string_type_prob <float>                          The probability of generating a string-type variable. (default: "0.1")
-  --dynamic_array_prob <float>                        The probability of generating a dynamic array. (default: "0.5")
-  --event_prob <float>                                The probability of generating an event. (default: "0.5")
-  --error_prob <float>                                The probability of generating an error. (default: "0.5")
-  --generation_rounds <number>                        The number of rounds Erwin will generate. (default: "1")
-  --log_file_path <string>                            The path of the log file. (default: "./log.txt")
-  --enable_test                                       Enable the test mode.
-  --compiler_path <string>                            The path of the Solidity compiler. (default: "")
-  --refresh_folder                                    Refresh the folder before generating the program.
+npx erwin generate -m type -d  --enable_test --compiler_path=../solidity/build/solc/solc --refresh_folder --generation_rounds 10000 -max 100
 ```
 
+For more flags, please refer to `npx erwin generation -h`.
 
 ## Detected Bugs
 
@@ -131,7 +59,7 @@ Enjoy tuning the search space and generate diverse and valid Solidity programs.
 
 ## Weird Language Features
 
-Besides bugs, Erwin only plays a role of examining the design of language features. Until now, Erwin has found the following features that may be confusing to Solidity users.
+Besides bugs, ***Erwin*** only plays a role of examining the design of language features. Until now, ***Erwin*** has found the following features that may be confusing to Solidity users.
 
 1. Solidity has a weird type inference on `int_const`, `int`, and `uint`. Many intuitive operations on int literals and (u)int variables are forbidden.
    ```solidity
@@ -142,10 +70,7 @@ Besides bugs, Erwin only plays a role of examining the design of language featur
 
 ## TODO
 
-- [ ] :hammer: Rebuild getter function generations.
-- [ ] :hammer: Finish test script that test all compilation flags.
-- [ ] :hammer: When generating identifiers, Erwin currently collects vardecls from variable declarations. But some available vardecls may hide in mappings/arrays/struct instances returned by functions. Consider them also.
-- [ ] :hammer: Support strings.
-- [ ] :hammer: Support byte and bytes (similar to array).
-- [ ] :hammer: Support Event and Error.
-- [ ] :hammer: Support contract inheritance.
+- [ ] Support byte and bytes (similar to array).
+- [ ] Support contract inheritance.
+- [ ] Support inline assembly.
+- [ ] Mutate Solidity programs.

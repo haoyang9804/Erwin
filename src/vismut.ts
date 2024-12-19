@@ -1,6 +1,6 @@
 import { FuncStatProvider, FuncStat } from "./funcstat";
 import { FuncVis, FuncVisProvider, VarVis, VarVisProvider } from "./visibility";
-import { ConstraintNode } from "./constraintNode";
+import { Value } from "./value";
 import { cartesian_product } from "./utility";
 
 export class FuncVisMutKind {
@@ -227,7 +227,7 @@ export class VisMutKindProvider {
   }
 }
 
-export abstract class VisMut extends ConstraintNode<VisMutKind> { }
+export abstract class VisMut extends Value<VisMutKind> { }
 
 export abstract class FuncVisMut extends VisMut {
   str() : string {

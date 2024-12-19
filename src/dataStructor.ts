@@ -1,5 +1,9 @@
 import { config } from "./config";
 import { assert, swap } from "./utility";
+
+/**
+ * Priority Queue Data Structure
+ */
 export class PriorityQueue<T> {
   heap : T[];
   compare : (a : T, b : T) => number;
@@ -22,7 +26,9 @@ export class PriorityQueue<T> {
   }
 }
 
-// Union-Find Data Structure
+/**
+ * Union-Find Data Structure
+ */
 export class UFD<T> {
   private ancestor_map : Map<T, T>;
   private subtree_size_map : Map<T, number>;
@@ -59,6 +65,9 @@ export class UFD<T> {
   }
 }
 
+/**
+ * Tree Data Structure
+ */
 export class Tree<T> {
   private node_set : Set<T>;
   private parent_map : Map<T, T>;
@@ -121,6 +130,9 @@ export class Tree<T> {
   }
 }
 
+/**
+ * Linked List Node Data Structure
+ */
 export class LinkedListNode<T> {
   protected m_next : LinkedListNode<T> | undefined;
   protected m_nexts : LinkedListNode<T>[] = [];

@@ -1,6 +1,10 @@
 import * as mut from "./mutators";
 import { config } from "./config";
 
+/**
+ * Mutate the source unit and write the mutants to the output directory
+ * It's experimental and not used in the current version
+ */
 export async function mutate() {
   const source_unit = await mut.read_source_unit(config.file);
   const mutants = mut.type_mutate_source_unit(source_unit);

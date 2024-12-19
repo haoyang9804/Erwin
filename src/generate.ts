@@ -1,5 +1,5 @@
 import * as gen from "./generator"
-import { vismut_dag, storage_location_dag, type_dag } from "./constraintDag";
+import { vismut_dag, storage_location_dag, type_dag } from "./constraint";
 import { irnodes } from "./node";
 import * as expr from "./expression";
 import * as decl from "./declaration";
@@ -398,7 +398,9 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
     }
   }
 }
-
+/**
+ * Generate programs
+ */
 export async function generate() {
   for (let i = 0; i < config.generation_rounds; i++) {
     Log.initialize();

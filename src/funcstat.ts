@@ -1,7 +1,7 @@
 import { FunctionStateMutability } from "solc-typed-ast";
-import { ConstraintNode } from "./constraintNode";
+import { Value } from "./value";
 
-export abstract class FuncStat extends ConstraintNode<FunctionStateMutability> { }
+export abstract class FuncStat extends Value<FunctionStateMutability> { }
 
 class Pure extends FuncStat {
   constructor() {
