@@ -11,7 +11,7 @@ import { config } from './config';
 import { cur_scope, decrease_indent, increase_indent, indent, new_global_id, new_scope, relocate_scope, roll_back_scope } from "./genContext";
 import { irnodes } from "./node";
 import { ContractKind, DataLocation, FunctionCallKind, FunctionKind, FunctionStateMutability, FunctionVisibility, StateVariableVisibility } from "solc-typed-ast";
-import { ScopeList, scopeKind, inside_function_body, inside_struct_decl_scope, get_scope_from_scope_id, unexpected_extra_stmt_belong_to_the_parent_scope, inside_constructor_body, inside_constructor_parameter_scope, inside_event_scope, inside_error_scope, inside_mapping_scope, inside_array_scope, inside_contract, inside_modifier_body } from "./scope";
+import { ScopeList, scopeKind, inside_function_body, inside_struct_decl_scope, get_scope_from_scope_id, unexpected_extra_stmt_belong_to_the_parent_scope, inside_constructor_body, inside_constructor_parameter_scope, inside_event_scope, inside_error_scope, inside_mapping_scope, inside_array_scope, inside_contract, inside_modifier_body, inside_function } from "./scope";
 import { FuncStat, FuncStatProvider } from "./funcstat";
 import { FuncVis, FuncVisProvider } from "./visibility";
 import * as loc from "./loc";
@@ -2388,12 +2388,16 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
   }
 
   private analyze_if_contains_new_contract_expr() {
-    const modifier_body_stmts = this.modifier_invokers.flatMap((invoker) => invoker.modifier_decl.body);
-    const stmts = this.body.concat(modifier_body_stmts);
-    const exprs = stmts.flatMap((stmt) => (stmt as stmt.IRStatement).exprs);
-    const modifier_invoker_args = this.modifier_invokers.flatMap((invoker) => invoker.arguments);
-    const all_exprs = exprs.concat(modifier_invoker_args);
-    this.has_new_contract_expr = all_exprs.some((e) => expr_db.is_new_contract_expr(expr.tuple_extraction(e).id));
+    if (inside_function(cur_scope)) {
+      let func_scope = cur_scope;
+      while (func_scope.kind() !== scopeKind.GLOBAL) {
+        if (func_scope.kind() === scopeKind.FUNC) {
+          break;
+        }
+        func_scope = func_scope.pre();
+      }
+      this.has_new_contract_expr = expr_db.has_new_contract_exprs_in_func(func_scope.id());
+    }
   }
 
   private removing_storage_from_parameters_or_returns_leads_to_broken_storage_location_constraint() : boolean {
@@ -4961,7 +4965,16 @@ class NewContractGenerator extends ExpressionGenerator {
     const args = this.generate_arguments(contract_decl, cur_expression_complexity_level);
     const new_function_expr = new expr.IRFunctionCall(this.id, cur_scope.id(), FunctionCallKind.FunctionCall, new_expr, args);
     this.irnode = new_function_expr;
-    expr_db.add_new_contract_expr(this.id);
+    if (inside_function(cur_scope)) {
+      let func_scope = cur_scope;
+      while (func_scope.kind() !== scopeKind.GLOBAL) {
+        if (func_scope.kind() === scopeKind.FUNC) {
+          break;
+        }
+        func_scope = func_scope.pre();
+      }
+      expr_db.add_new_contract_expr(this.id, func_scope.id());
+    }
     this.wrap_in_a_tuple();
     this.end_flag();
   }

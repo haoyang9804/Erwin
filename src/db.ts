@@ -862,7 +862,7 @@ class ExprDB {
 
   private string_exprs : Set<number> = new Set<number>();
 
-  private new_contract_exprs : Set<number> = new Set<number>();
+  private new_contract_exprs_in_func : Map<number, Set<number>> = new Map<number, Set<number>>();
 
   init() {
     this.expr2read_variables.clear();
@@ -886,20 +886,28 @@ class ExprDB {
 
     this.string_exprs.clear();
 
-    this.new_contract_exprs.clear();
+    this.new_contract_exprs_in_func.clear();
   }
 
   //! new contract expr
-  add_new_contract_expr(expr_id : number) : void {
-    this.new_contract_exprs.add(expr_id);
+  add_new_contract_expr(expr_id : number, funccall_scope_id : number) : void {
+    if (this.new_contract_exprs_in_func.has(funccall_scope_id)) {
+      this.new_contract_exprs_in_func.get(funccall_scope_id)!.add(expr_id);
+    }
+    else {
+      this.new_contract_exprs_in_func.set(funccall_scope_id, new Set([expr_id]));
+    }
   }
 
-  is_new_contract_expr(expr_id : number) : boolean {
-    return this.new_contract_exprs.has(expr_id);
+  is_new_contract_expr(expr_id : number, funccall_scope_id : number) : boolean {
+    if (!this.new_contract_exprs_in_func.has(funccall_scope_id)) {
+      return false;
+    }
+    return this.new_contract_exprs_in_func.get(funccall_scope_id)!.has(expr_id);
   }
 
-  new_contract_exprs_ids() : number[] {
-    return Array.from(this.new_contract_exprs);
+  has_new_contract_exprs_in_func(funccall_scope_id : number) : boolean {
+    return this.new_contract_exprs_in_func.has(funccall_scope_id);
   }
 
   //! Read-Write-Related
