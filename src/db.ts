@@ -58,6 +58,12 @@ class DeclDB {
   private irnode2scope : Map<number, number> = new Map<number, number>();
   private contractdecl_id_to_scope : Map<number, number> = new Map<number, number>();
   private scope_id_to_contractdecl_id : Map<number, number> = new Map<number, number>();
+  private functiondecl_id_to_scope : Map<number, number> = new Map<number, number>();
+  private scope_id_to_functiondecl_id : Map<number, number> = new Map<number, number>();
+  private constructordecl_id_to_scope : Map<number, number> = new Map<number, number>();
+  private scope_id_to_constructordecl_id : Map<number, number> = new Map<number, number>();
+  private modifierdecl_id_to_scope : Map<number, number> = new Map<number, number>();
+  private scope_id_to_modifierdecl_id : Map<number, number> = new Map<number, number>();
 
   private vardecls : Set<number> = new Set<number>();
   private structdecls : Set<number> = new Set<number>();
@@ -133,6 +139,12 @@ class DeclDB {
     this.irnode2scope.clear();
     this.contractdecl_id_to_scope.clear();
     this.scope_id_to_contractdecl_id.clear();
+    this.functiondecl_id_to_scope.clear();
+    this.scope_id_to_functiondecl_id.clear();
+    this.constructordecl_id_to_scope.clear();
+    this.scope_id_to_constructordecl_id.clear();
+    this.modifierdecl_id_to_scope.clear();
+    this.scope_id_to_modifierdecl_id.clear();
 
     this.vardecls.clear();
     this.structdecls.clear();
@@ -308,6 +320,39 @@ class DeclDB {
     return [];
   }
 
+  insert_modifierdecl_with_scope(modifierdecl_id : number, scope : ScopeList) : void {
+    assert(scope.kind() === scopeKind.MODIFIER, `The scope ${scope.id()} is not a modifier scope.`);
+    this.modifierdecl_id_to_scope.set(modifierdecl_id, scope.id());
+    this.scope_id_to_modifierdecl_id.set(scope.id(), modifierdecl_id);
+  }
+
+  modifier_scope_of_modifierdecl(modifierdecl_id : number) : number {
+    assert(this.modifierdecl_id_to_scope.has(modifierdecl_id), `The modifier declaration ${modifierdecl_id} does not exist.`);
+    return this.modifierdecl_id_to_scope.get(modifierdecl_id)!;
+  }
+
+  modifierdecl_of_scope(scope : ScopeList) : number {
+    assert(this.scope_id_to_modifierdecl_id.has(scope.id()), `The scope ${scope.id()} does not exist.`);
+    return this.scope_id_to_modifierdecl_id.get(scope.id())!;
+  }
+
+  //* constructordecl
+  insert_constructordecl_with_scope(constructordecl_id : number, scope : ScopeList) : void {
+    assert(scope.kind() === scopeKind.CONSTRUCTOR, `The scope ${scope.id()} is not a constructor scope.`);
+    this.constructordecl_id_to_scope.set(constructordecl_id, scope.id());
+    this.scope_id_to_constructordecl_id.set(scope.id(), constructordecl_id);
+  }
+
+  constructor_scope_of_constructordecl(constructordecl_id : number) : number {
+    assert(this.constructordecl_id_to_scope.has(constructordecl_id), `The constructor declaration ${constructordecl_id} does not exist.`);
+    return this.constructordecl_id_to_scope.get(constructordecl_id)!;
+  }
+
+  constructordecl_of_scope(scope : ScopeList) : number {
+    assert(this.scope_id_to_constructordecl_id.has(scope.id()), `The scope ${scope.id()} does not exist.`);
+    return this.scope_id_to_constructordecl_id.get(scope.id())!;
+  }
+
   //* funcdecl
   add_funcdecl(funcdecl_id : number) : void {
     this.funcdecls.add(funcdecl_id);
@@ -339,6 +384,22 @@ class DeclDB {
 
   called_funcdecls_ids() : number[] {
     return Array.from(this.called_function_decls_ids);
+  }
+
+  insert_function_decl_with_scope(funcdecl_id : number, scope : ScopeList) : void {
+    assert(scope.kind() === scopeKind.FUNC, `The scope ${scope.id()} is not a function scope.`);
+    this.functiondecl_id_to_scope.set(funcdecl_id, scope.id());
+    this.scope_id_to_functiondecl_id.set(scope.id(), funcdecl_id);
+  }
+
+  func_scope_of_funcdecl(funcdecl_id : number) : number {
+    assert(this.functiondecl_id_to_scope.has(funcdecl_id), `The function declaration ${funcdecl_id} does not exist.`);
+    return this.functiondecl_id_to_scope.get(funcdecl_id)!;
+  }
+
+  funcdecl_of_scope(scope : ScopeList) : number {
+    assert(this.scope_id_to_functiondecl_id.has(scope.id()), `The scope ${scope.id()} does not exist.`);
+    return this.scope_id_to_functiondecl_id.get(scope.id())!;
   }
 
   //* struct instance
@@ -420,15 +481,15 @@ class DeclDB {
   }
 
   //* contractdecl
-  pair_contractdecl_to_scope(scope_id : number, contractdecl_id : number) : void {
-    this.scope_id_to_contractdecl_id.set(scope_id, contractdecl_id);
+  pair_contractdecl_to_scope(fid : number, contractdecl_id : number) : void {
+    this.scope_id_to_contractdecl_id.set(fid, contractdecl_id);
   }
 
-  get_contractdecl_by_scope(scope_id : number) : number | undefined {
-    if (!this.scope_id_to_contractdecl_id.has(scope_id)) {
+  get_contractdecl_by_scope(fid : number) : number | undefined {
+    if (!this.scope_id_to_contractdecl_id.has(fid)) {
       return undefined;
     }
-    return this.scope_id_to_contractdecl_id.get(scope_id)!;
+    return this.scope_id_to_contractdecl_id.get(fid)!;
   }
 
   get_current_contractdecl_id(scope : ScopeList) : number | undefined {
@@ -446,14 +507,14 @@ class DeclDB {
     return undefined;
   }
 
-  insert_yin_contract(scope_id : number, contractdecl_id : number) : void {
+  insert_yin_contract(fid : number, contractdecl_id : number) : void {
     this.contractdecls.add(-contractdecl_id);
-    this.contractdecl_id_to_scope.set(-contractdecl_id, scope_id);
+    this.contractdecl_id_to_scope.set(-contractdecl_id, fid);
   }
 
-  insert_yang_contract(scope_id : number, contractdecl_id : number) : void {
+  insert_yang_contract(fid : number, contractdecl_id : number) : void {
     this.contractdecls.add(contractdecl_id);
-    this.contractdecl_id_to_scope.set(contractdecl_id, scope_id);
+    this.contractdecl_id_to_scope.set(contractdecl_id, fid);
   }
 
   remove_contractdecl(contractdecl_id : number) : void {
@@ -646,34 +707,34 @@ class DeclDB {
     return this.cannot_be_assigned_to.has(vardecl_id);
   }
 
-  set_vardecl_as_must_be_initialized(scope_id : number, vardecl_id : number) : void {
-    if (this.must_be_initialized.has(scope_id)) {
-      this.must_be_initialized.get(scope_id)!.push(vardecl_id);
+  set_vardecl_as_must_be_initialized(fid : number, vardecl_id : number) : void {
+    if (this.must_be_initialized.has(fid)) {
+      this.must_be_initialized.get(fid)!.push(vardecl_id);
     }
     else {
-      this.must_be_initialized.set(scope_id, [vardecl_id]);
+      this.must_be_initialized.set(fid, [vardecl_id]);
     }
   }
 
-  remove_vardecl_from_must_be_initialized_in_scope(scope_id : number) : void {
-    this.must_be_initialized.delete(scope_id);
+  remove_vardecl_from_must_be_initialized_in_scope(fid : number) : void {
+    this.must_be_initialized.delete(fid);
   }
 
-  remove_vardecl_from_must_be_initialized(scope_id : number, vardecl_id : number) : void {
-    if (this.must_be_initialized.has(scope_id)) {
-      this.must_be_initialized.set(scope_id, this.must_be_initialized.get(scope_id)!.filter(x => x !== vardecl_id));
+  remove_vardecl_from_must_be_initialized(fid : number, vardecl_id : number) : void {
+    if (this.must_be_initialized.has(fid)) {
+      this.must_be_initialized.set(fid, this.must_be_initialized.get(fid)!.filter(x => x !== vardecl_id));
     }
   }
 
-  scope_has_vardecls_that_must_be_initialized(scope_id : number) : boolean {
-    return this.must_be_initialized.has(scope_id);
+  scope_has_vardecls_that_must_be_initialized(fid : number) : boolean {
+    return this.must_be_initialized.has(fid);
   }
 
-  get_vardecls_that_must_be_initialized(scope_id : number) : number[] {
-    if (!this.must_be_initialized.has(scope_id)) {
+  get_vardecls_that_must_be_initialized(fid : number) : number[] {
+    if (!this.must_be_initialized.has(fid)) {
       return [];
     }
-    return this.must_be_initialized.get(scope_id)!;
+    return this.must_be_initialized.get(fid)!;
   }
 
   set_vardecl_as_initialized(vardecl_id : number) : void {
@@ -714,14 +775,14 @@ class DeclDB {
     this.scope_tree.insert(parent_scope_id, cur_scope_id);
   }
 
-  insert(node_id : number, scope_id : number) : void {
-    if (this.scope2irnode.has(scope_id)) {
-      this.scope2irnode.get(scope_id)!.push(node_id);
+  insert(node_id : number, fid : number) : void {
+    if (this.scope2irnode.has(fid)) {
+      this.scope2irnode.get(fid)!.push(node_id);
     }
     else {
-      this.scope2irnode.set(scope_id, [node_id]);
+      this.scope2irnode.set(fid, [node_id]);
     }
-    this.irnode2scope.set(node_id, scope_id);
+    this.irnode2scope.set(node_id, fid);
   }
 
   scope_of_irnode(node_id : number) : number {
@@ -729,36 +790,36 @@ class DeclDB {
     return this.irnode2scope.get(node_id)!;
   }
 
-  remove(node_id : number, scope_id : number) : void {
-    if (this.scope2irnode.has(scope_id)) {
-      this.scope2irnode.set(scope_id, this.scope2irnode.get(scope_id)!.filter(x => x !== node_id));
+  remove(node_id : number, fid : number) : void {
+    if (this.scope2irnode.has(fid)) {
+      this.scope2irnode.set(fid, this.scope2irnode.get(fid)!.filter(x => x !== node_id));
     }
     else {
-      throw new Error(`The scope ${scope_id} does not exist.`);
+      throw new Error(`The scope ${fid} does not exist.`);
     }
   }
 
   // Get IRNodes from a scope but not the scope's ancestors
-  get_irnodes_ids_nonrecursively_from_a_scope(scope_id : number) : number[] {
+  get_irnodes_ids_nonrecursively_from_a_scope(fid : number) : number[] {
     let irnodes_ids : number[] = [];
-    if (this.scope2irnode.has(scope_id)) {
+    if (this.scope2irnode.has(fid)) {
       irnodes_ids = irnodes_ids.concat(
-        this.scope2irnode.get(scope_id)!
+        this.scope2irnode.get(fid)!
       );
     }
     return irnodes_ids;
   }
 
   // Get IRNodes from a scope and the scope's ancestors
-  get_irnodes_ids_recursively_from_a_scope(scope_id : number) : number[] {
+  get_irnodes_ids_recursively_from_a_scope(fid : number) : number[] {
     let irnodes_ids : number[] = [];
     while (true) {
-      if (this.scope2irnode.has(scope_id)) {
+      if (this.scope2irnode.has(fid)) {
         irnodes_ids = irnodes_ids.concat(
-          this.scope2irnode.get(scope_id)!
+          this.scope2irnode.get(fid)!
         );
       }
-      const scope = get_scope_from_scope_id(scope_id);
+      const scope = get_scope_from_scope_id(fid);
       if (scope.kind() === scopeKind.FUNC) {
         const function_scope = scope.pre();
         const function_parameter_scope = function_scope.nexts().find(x => x.kind() === scopeKind.FUNC_PARAMETER);
@@ -788,8 +849,8 @@ class DeclDB {
           irnodes_ids = irnodes_ids.concat(this.get_irnodes_ids_nonrecursively_from_a_scope(returns_scope.id()));
         }
       }
-      if (this.scope_tree.has_parent(scope_id)) {
-        scope_id = this.scope_tree.get_parent(scope_id);
+      if (this.scope_tree.has_parent(fid)) {
+        fid = this.scope_tree.get_parent(fid);
       }
       else {
         break;
@@ -798,44 +859,44 @@ class DeclDB {
     return irnodes_ids;
   }
 
-  get_funcdecls_ids_recursively_from_a_scope(scope_id : number) : number[] {
-    let irnodes_ids = this.get_irnodes_ids_recursively_from_a_scope(scope_id);
+  get_funcdecls_ids_recursively_from_a_scope(fid : number) : number[] {
+    let irnodes_ids = this.get_irnodes_ids_recursively_from_a_scope(fid);
     return irnodes_ids.filter(x => this.funcdecls.has(x));
   }
 
-  get_structdecls_ids_recursively_from_a_scope(scope_id : number) : number[] {
-    let irnodes_ids = this.get_irnodes_ids_recursively_from_a_scope(scope_id);
+  get_structdecls_ids_recursively_from_a_scope(fid : number) : number[] {
+    let irnodes_ids = this.get_irnodes_ids_recursively_from_a_scope(fid);
     return irnodes_ids.filter(x => this.structdecls.has(x));
   }
 
-  get_eventdecls_ids_recursively_from_a_scope(scope_id : number) : number[] {
-    let irnodes_ids = this.get_irnodes_ids_recursively_from_a_scope(scope_id);
+  get_eventdecls_ids_recursively_from_a_scope(fid : number) : number[] {
+    let irnodes_ids = this.get_irnodes_ids_recursively_from_a_scope(fid);
     return irnodes_ids.filter(x => this.eventdecls.has(x));
   }
 
-  get_errordecls_ids_recursively_from_a_scope(scope_id : number) : number[] {
-    let irnodes_ids = this.get_irnodes_ids_recursively_from_a_scope(scope_id);
+  get_errordecls_ids_recursively_from_a_scope(fid : number) : number[] {
+    let irnodes_ids = this.get_irnodes_ids_recursively_from_a_scope(fid);
     return irnodes_ids.filter(x => this.errordecls.has(x));
   }
 
   get_funcdecls_ids_recursively_from_a_contract(contract_id : number) : number[] {
-    let scope_id = this.contractdecl_id_to_scope.get(contract_id);
-    return this.get_funcdecls_ids_recursively_from_a_scope(scope_id!);
+    let fid = this.contractdecl_id_to_scope.get(contract_id);
+    return this.get_funcdecls_ids_recursively_from_a_scope(fid!);
   }
 
   get_structdecls_ids_recursively_from_a_contract(contract_id : number) : number[] {
-    let scope_id = this.contractdecl_id_to_scope.get(contract_id);
-    return this.get_structdecls_ids_recursively_from_a_scope(scope_id!);
+    let fid = this.contractdecl_id_to_scope.get(contract_id);
+    return this.get_structdecls_ids_recursively_from_a_scope(fid!);
   }
 
   get_eventdecls_ids_recursively_from_a_contract(contract_id : number) : number[] {
-    let scope_id = this.contractdecl_id_to_scope.get(contract_id);
-    return this.get_eventdecls_ids_recursively_from_a_scope(scope_id!);
+    let fid = this.contractdecl_id_to_scope.get(contract_id);
+    return this.get_eventdecls_ids_recursively_from_a_scope(fid!);
   }
 
   get_errordecls_ids_recursively_from_a_contract(contract_id : number) : number[] {
-    let scope_id = this.contractdecl_id_to_scope.get(contract_id);
-    return this.get_errordecls_ids_recursively_from_a_scope(scope_id!);
+    let fid = this.contractdecl_id_to_scope.get(contract_id);
+    return this.get_errordecls_ids_recursively_from_a_scope(fid!);
   }
 
 }
@@ -862,7 +923,8 @@ class ExprDB {
 
   private string_exprs : Set<number> = new Set<number>();
 
-  private new_contract_exprs_in_func : Map<number, Set<number>> = new Map<number, Set<number>>();
+  // Records new-contract expressions in function / constructor / modifier declaration.
+  private new_contract_exprs : Map<number, Set<number>> = new Map<number, Set<number>>();
 
   init() {
     this.expr2read_variables.clear();
@@ -886,28 +948,28 @@ class ExprDB {
 
     this.string_exprs.clear();
 
-    this.new_contract_exprs_in_func.clear();
+    this.new_contract_exprs.clear();
   }
 
   //! new contract expr
-  add_new_contract_expr(expr_id : number, funccall_scope_id : number) : void {
-    if (this.new_contract_exprs_in_func.has(funccall_scope_id)) {
-      this.new_contract_exprs_in_func.get(funccall_scope_id)!.add(expr_id);
+  add_new_contract_expr(expr_id : number, fid : number) : void {
+    if (this.new_contract_exprs.has(fid)) {
+      this.new_contract_exprs.get(fid)!.add(expr_id);
     }
     else {
-      this.new_contract_exprs_in_func.set(funccall_scope_id, new Set([expr_id]));
+      this.new_contract_exprs.set(fid, new Set([expr_id]));
     }
   }
 
-  is_new_contract_expr(expr_id : number, funccall_scope_id : number) : boolean {
-    if (!this.new_contract_exprs_in_func.has(funccall_scope_id)) {
+  is_new_contract_expr(expr_id : number, fid : number) : boolean {
+    if (!this.new_contract_exprs.has(fid)) {
       return false;
     }
-    return this.new_contract_exprs_in_func.get(funccall_scope_id)!.has(expr_id);
+    return this.new_contract_exprs.get(fid)!.has(expr_id);
   }
 
-  has_new_contract_exprs_in_func(funccall_scope_id : number) : boolean {
-    return this.new_contract_exprs_in_func.has(funccall_scope_id);
+  has_new_contract_exprs(fid : number) : boolean {
+    return this.new_contract_exprs.has(fid);
   }
 
   //! Read-Write-Related
@@ -1248,39 +1310,39 @@ class StmtDB {
     return assignment_stmt;
   }
 
-  public initialize_the_vardecls_that_must_be_initialized(scope_id : number) : void {
-    for (const id of decl_db.get_vardecls_that_must_be_initialized(scope_id)!) {
+  public initialize_the_vardecls_that_must_be_initialized(fid : number) : void {
+    for (const id of decl_db.get_vardecls_that_must_be_initialized(fid)!) {
       if (decl_db.is_vardecl_initialized(id)) {
         continue;
       }
-      this.add_unexpected_extra_stmt(scope_id, this.initialize_variable(id));
+      this.add_unexpected_extra_stmt(fid, this.initialize_variable(id));
       decl_db.set_vardecl_as_initialized(id);
     }
-    decl_db.remove_vardecl_from_must_be_initialized_in_scope(scope_id);
+    decl_db.remove_vardecl_from_must_be_initialized_in_scope(fid);
   }
 
-  public add_unexpected_extra_stmt(scope_id : number, stmt : IRStatement) : void {
-    if (this.unexpected_extra_stmt.has(scope_id)) {
-      this.unexpected_extra_stmt.get(scope_id)!.push(stmt);
+  public add_unexpected_extra_stmt(fid : number, stmt : IRStatement) : void {
+    if (this.unexpected_extra_stmt.has(fid)) {
+      this.unexpected_extra_stmt.get(fid)!.push(stmt);
     }
     else {
-      this.unexpected_extra_stmt.set(scope_id, [stmt]);
+      this.unexpected_extra_stmt.set(fid, [stmt]);
     }
   }
 
-  public unexpected_extra_stmts_of_scope(scope_id : number) : IRStatement[] {
-    if (!this.unexpected_extra_stmt.has(scope_id)) {
+  public unexpected_extra_stmts_of_scope(fid : number) : IRStatement[] {
+    if (!this.unexpected_extra_stmt.has(fid)) {
       return [];
     }
-    return this.unexpected_extra_stmt.get(scope_id)!;
+    return this.unexpected_extra_stmt.get(fid)!;
   }
 
-  public remove_unexpected_extra_stmt_from_scope(scope_id : number) : void {
-    this.unexpected_extra_stmt.delete(scope_id);
+  public remove_unexpected_extra_stmt_from_scope(fid : number) : void {
+    this.unexpected_extra_stmt.delete(fid);
   }
 
-  public has_unexpected_extra_stmt(scope_id : number) : boolean {
-    return this.unexpected_extra_stmt.has(scope_id);
+  public has_unexpected_extra_stmt(fid : number) : boolean {
+    return this.unexpected_extra_stmt.has(fid);
   }
 }
 

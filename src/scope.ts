@@ -169,9 +169,29 @@ export function inside_modifier_body(scope : ScopeList) : boolean {
   return false;
 }
 
+export function inside_modifier(scope : ScopeList) : boolean {
+  while (scope.kind() !== scopeKind.GLOBAL) {
+    if (scope.kind() === scopeKind.MODIFIER) {
+      return true;
+    }
+    scope = scope.pre();
+  }
+  return false;
+}
+
 export function inside_constructor_body(cur_scope : ScopeList) : boolean {
   while (cur_scope.kind() !== scopeKind.GLOBAL) {
     if (cur_scope.kind() === scopeKind.CONSTRUCTOR_BODY) {
+      return true;
+    }
+    cur_scope = cur_scope.pre();
+  }
+  return false;
+}
+
+export function inside_constructor(cur_scope : ScopeList) : boolean {
+  while (cur_scope.kind() !== scopeKind.GLOBAL) {
+    if (cur_scope.kind() === scopeKind.CONSTRUCTOR) {
       return true;
     }
     cur_scope = cur_scope.pre();

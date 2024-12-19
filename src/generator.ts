@@ -11,7 +11,7 @@ import { config } from './config';
 import { cur_scope, decrease_indent, increase_indent, indent, new_global_id, new_scope, relocate_scope, roll_back_scope } from "./genContext";
 import { irnodes } from "./node";
 import { ContractKind, DataLocation, FunctionCallKind, FunctionKind, FunctionStateMutability, FunctionVisibility, StateVariableVisibility } from "solc-typed-ast";
-import { ScopeList, scopeKind, inside_function_body, inside_struct_decl_scope, get_scope_from_scope_id, unexpected_extra_stmt_belong_to_the_parent_scope, inside_constructor_body, inside_constructor_parameter_scope, inside_event_scope, inside_error_scope, inside_mapping_scope, inside_array_scope, inside_contract, inside_modifier_body, inside_function } from "./scope";
+import { ScopeList, scopeKind, inside_function_body, inside_struct_decl_scope, get_scope_from_scope_id, unexpected_extra_stmt_belong_to_the_parent_scope, inside_constructor_body, inside_constructor_parameter_scope, inside_event_scope, inside_error_scope, inside_mapping_scope, inside_array_scope, inside_contract, inside_modifier_body, inside_function, inside_constructor, inside_modifier } from "./scope";
 import { FuncStat, FuncStatProvider } from "./funcstat";
 import { FuncVis, FuncVisProvider } from "./visibility";
 import * as loc from "./loc";
@@ -2013,6 +2013,7 @@ class ConstructorDeclarationGenerator extends DeclarationGenerator {
     this.irnode = new decl.IRFunctionDefinition(this.fid, cur_scope.id(), "",
       FunctionKind.Constructor, false, false, this.parameters, [], [], this.modifier_invokers,
       FunctionVisibility.Public, FunctionStateMutability.NonPayable);
+    decl_db.insert_constructordecl_with_scope(this.fid, cur_scope);
     if (this.has_body) {
       this.generate_body();
     }
@@ -2156,6 +2157,7 @@ class ModifierDeclarationGenerator extends DeclarationGenerator {
     const cur_contract_id = decl_db.get_current_contractdecl_id(cur_scope);
     assert(cur_contract_id !== undefined, `ModifierDeclarationGenerator: cur_contract_id is undefined`);
     decl_db.add_modifierdecl(modifierid, cur_contract_id);
+    decl_db.insert_modifierdecl_with_scope(modifierid, cur_scope);
     roll_back_scope();
     this.end_flag();
   }
@@ -2388,16 +2390,11 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
   }
 
   private analyze_if_contains_new_contract_expr() {
-    if (inside_function(cur_scope)) {
-      let func_scope = cur_scope;
-      while (func_scope.kind() !== scopeKind.GLOBAL) {
-        if (func_scope.kind() === scopeKind.FUNC) {
-          break;
-        }
-        func_scope = func_scope.pre();
-      }
-      this.has_new_contract_expr = expr_db.has_new_contract_exprs_in_func(func_scope.id());
-    }
+    this.has_new_contract_expr = expr_db.has_new_contract_exprs(this.fid);
+    this.modifier_invokers.forEach((invoker) => {
+      this.has_new_contract_expr = this.has_new_contract_expr ||
+        expr_db.has_new_contract_exprs(invoker.modifier_decl.id)
+    });
   }
 
   private removing_storage_from_parameters_or_returns_leads_to_broken_storage_location_constraint() : boolean {
@@ -2734,6 +2731,7 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
     this.irnode = new decl.IRFunctionDefinition(this.fid, cur_scope.id(), name,
       FunctionKind.Function, virtual, overide, this.parameters, this.return_decls, [], this.modifier_invokers);
     decl_db.add_funcdecl(this.fid);
+    decl_db.insert_function_decl_with_scope(this.fid, cur_scope);
     if (this.has_body) {
       this.generate_function_body();
     }
@@ -4957,14 +4955,7 @@ class NewContractGenerator extends ExpressionGenerator {
     return args;
   }
 
-  generate(cur_expression_complexity_level : number) : void {
-    this.start_flag();
-    const contract_type = this.distill_type_range();
-    const contract_decl = irnodes.get(contract_type.referece_id) as decl.IRContractDefinition;
-    const new_expr = new expr.IRNew(new_global_id(), cur_scope.id(), contract_decl.name);
-    const args = this.generate_arguments(contract_decl, cur_expression_complexity_level);
-    const new_function_expr = new expr.IRFunctionCall(this.id, cur_scope.id(), FunctionCallKind.FunctionCall, new_expr, args);
-    this.irnode = new_function_expr;
+  private add_new_contract_expr() {
     if (inside_function(cur_scope)) {
       let func_scope = cur_scope;
       while (func_scope.kind() !== scopeKind.GLOBAL) {
@@ -4973,8 +4964,39 @@ class NewContractGenerator extends ExpressionGenerator {
         }
         func_scope = func_scope.pre();
       }
-      expr_db.add_new_contract_expr(this.id, func_scope.id());
+      expr_db.add_new_contract_expr(this.id, decl_db.funcdecl_of_scope(func_scope));
     }
+    else if (inside_constructor(cur_scope)) {
+      let constructor_scope = cur_scope;
+      while (constructor_scope.kind() !== scopeKind.GLOBAL) {
+        if (constructor_scope.kind() === scopeKind.CONSTRUCTOR) {
+          break;
+        }
+        constructor_scope = constructor_scope.pre();
+      }
+      expr_db.add_new_contract_expr(this.id, decl_db.constructordecl_of_scope(constructor_scope));
+    }
+    else if (inside_modifier(cur_scope)) {
+      let modifier_scope = cur_scope;
+      while (modifier_scope.kind() !== scopeKind.GLOBAL) {
+        if (modifier_scope.kind() === scopeKind.MODIFIER) {
+          break;
+        }
+        modifier_scope = modifier_scope.pre();
+      }
+      expr_db.add_new_contract_expr(this.id, decl_db.modifierdecl_of_scope(modifier_scope));
+    }
+  }
+
+  generate(cur_expression_complexity_level : number) : void {
+    this.start_flag();
+    const contract_type = this.distill_type_range();
+    const contract_decl = irnodes.get(contract_type.referece_id) as decl.IRContractDefinition;
+    const new_expr = new expr.IRNew(new_global_id(), cur_scope.id(), contract_decl.name);
+    const args = this.generate_arguments(contract_decl, cur_expression_complexity_level);
+    const new_function_expr = new expr.IRFunctionCall(this.id, cur_scope.id(), FunctionCallKind.FunctionCall, new_expr, args);
+    this.irnode = new_function_expr;
+    this.add_new_contract_expr();
     this.wrap_in_a_tuple();
     this.end_flag();
   }
