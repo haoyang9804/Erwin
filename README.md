@@ -121,7 +121,7 @@ Enjoy tuning the search space and generate diverse and valid Solidity programs.
 18. https://github.com/ethereum/solidity/issues/15646 (error handling) ✅
 19. https://github.com/ethereum/solidity/issues/15647 (ICE)
 20. https://github.com/ethereum/solidity/issues/15649 (ICE)
-21: https://github.com/ethereum/solidity/issues/15651 (ICE)
+21. https://github.com/ethereum/solidity/issues/15651 (ICE)
 
 ## Weird Language Features
 
