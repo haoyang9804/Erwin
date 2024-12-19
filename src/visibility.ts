@@ -1,5 +1,5 @@
 import { FunctionVisibility, StateVariableVisibility } from "solc-typed-ast";
-import { ConstraintNode } from "./constraint";
+import { ConstraintNode } from "./constraintNode";
 
 //! Visibility does not have super/sub relations
 

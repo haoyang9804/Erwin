@@ -2,7 +2,8 @@ import { assert, cartesian_product, pick_random_subarray, merge_set } from "./ut
 import { sizeof } from "sizeof";
 import { config } from './config';
 import { decl_db } from "./db";
-import { type_dag, ConstraintNode } from "./constraint";
+import { type_dag } from "./constraintDag";
+import { ConstraintNode } from "./constraintNode";
 
 export enum TypeKind {
   ElementaryType = "TypeKind::ElementaryType",

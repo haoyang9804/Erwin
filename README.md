@@ -1,5 +1,5 @@
 <p align="center">
-<img src="Erwin_icon.png" alt="erwin" width="200"/>
+<img src="https://raw.githubusercontent.com/haoyang9804/haoyang9804.github.io/master/Erwin_icon.png" alt="erwin" width="200"/>
 </p>
 
 :blush: Erwin is an academic attempt on introducing bounded exhaustive enumeration in random program generator to mitigate opportunism.

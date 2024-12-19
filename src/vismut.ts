@@ -1,6 +1,6 @@
 import { FuncStatProvider, FuncStat } from "./funcstat";
 import { FuncVis, FuncVisProvider, VarVis, VarVisProvider } from "./visibility";
-import { ConstraintNode } from "./constraint";
+import { ConstraintNode } from "./constraintNode";
 import { cartesian_product } from "./utility";
 
 export class FuncVisMutKind {

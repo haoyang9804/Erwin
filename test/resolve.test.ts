@@ -1,7 +1,7 @@
-import { type_dag, storage_location_dag, TypeConstraintDAG } from "../src/constraint";
+import { type_dag, storage_location_dag, TypeConstraintDAG } from "../src/constraintDag";
 import { MappingType, Type, uinteger_types } from "../src/type";
 import { config } from "../src/config";
-import { StorageLocationProvider } from "../src/loc";
+import { StorageLocation, StorageLocationProvider} from "../src/loc";
 import { TypeProvider } from "../src/type";
 config.unit_test_mode = true;
 test("test constraint dag 1",

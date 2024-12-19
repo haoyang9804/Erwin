@@ -149,6 +149,26 @@ export function inside_function_body(scope : ScopeList) : boolean {
   return false;
 }
 
+export function inside_function(scope : ScopeList) : boolean {
+  while (scope.kind() !== scopeKind.GLOBAL) {
+    if (scope.kind() === scopeKind.FUNC) {
+      return true;
+    }
+    scope = scope.pre();
+  }
+  return false;
+}
+
+export function inside_modifier_body(scope : ScopeList) : boolean {
+  while (scope.kind() !== scopeKind.GLOBAL) {
+    if (scope.kind() === scopeKind.MODIFIER_BODY) {
+      return true;
+    }
+    scope = scope.pre();
+  }
+  return false;
+}
+
 export function inside_constructor_body(cur_scope : ScopeList) : boolean {
   while (cur_scope.kind() !== scopeKind.GLOBAL) {
     if (cur_scope.kind() === scopeKind.CONSTRUCTOR_BODY) {

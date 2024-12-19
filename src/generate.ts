@@ -1,9 +1,10 @@
 import * as gen from "./generator"
-import { vismut_dag, storage_location_dag, type_dag } from "./constraint";
+import { vismut_dag, storage_location_dag, type_dag } from "./constraintDag";
 import { irnodes } from "./node";
 import * as expr from "./expression";
 import * as decl from "./declaration";
 import { config } from "./config";
+import { init_global_id, init_indent, init_scope } from "./genContext";
 import * as fs from "fs";
 import { assert, pick_random_element } from "./utility";
 import { MappingType, ArrayType, Type } from './type';
@@ -38,9 +39,10 @@ function init_generation() {
   vismut_dag.clear();
   storage_location_dag.clear();
   irnodes.clear();
-  gen.init_scope();
-  gen.init_global_id();
-  gen.init_indent();
+  init_scope();
+  init_global_id();
+  init_indent();
+  Log.initialize();
 }
 
 function storageLocation2loc(sl : StorageLocation) : DataLocation {

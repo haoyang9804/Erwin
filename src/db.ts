@@ -3,12 +3,14 @@ import * as sqlite3 from 'sqlite3';
 import { Tree } from './dataStructor';
 import { get_scope_from_scope_id, inside_contract, scopeKind, ScopeList } from './scope';
 import { assert } from 'console';
-import { IRContractDefinition, IRStructDefinition } from './declaration';
+import { IRContractDefinition, IRStructDefinition, IRVariableDeclaration } from './declaration';
 import { irnodes } from './node';
 import * as type from './type';
 import { merge_set } from './utility';
-import { IRStatement } from './statement';
-import { initialize_variable } from './generator';
+import { IRExpressionStatement, IRStatement } from './statement';
+import { new_global_id } from './genContext';
+import { IRAssignment, IRIdentifier } from './expression';
+import { cur_scope } from './genContext';
 
 // Deprecated Database
 export class DeprecatedDB {
@@ -121,7 +123,7 @@ class DeclDB {
 
   private cannot_be_assigned_to : Set<number> = new Set<number>();
   private must_be_initialized : Map<number, number[]> = new Map<number, number[]>();
-  private has_be_initialized : Set<number> = new Set<number>();
+  private has_been_initialized : Set<number> = new Set<number>();
 
   constructor() { }
 
@@ -171,7 +173,7 @@ class DeclDB {
 
     this.cannot_be_assigned_to.clear();
     this.must_be_initialized.clear();
-    this.has_be_initialized.clear();
+    this.has_been_initialized.clear();
   }
 
   //! ================ Decl-Related ================
@@ -653,8 +655,14 @@ class DeclDB {
     }
   }
 
-  remove_vardecl_from_must_be_initialized(scope_id : number) : void {
+  remove_vardecl_from_must_be_initialized_in_scope(scope_id : number) : void {
     this.must_be_initialized.delete(scope_id);
+  }
+
+  remove_vardecl_from_must_be_initialized(scope_id : number, vardecl_id : number) : void {
+    if (this.must_be_initialized.has(scope_id)) {
+      this.must_be_initialized.set(scope_id, this.must_be_initialized.get(scope_id)!.filter(x => x !== vardecl_id));
+    }
   }
 
   scope_has_vardecls_that_must_be_initialized(scope_id : number) : boolean {
@@ -669,11 +677,11 @@ class DeclDB {
   }
 
   set_vardecl_as_initialized(vardecl_id : number) : void {
-    this.has_be_initialized.add(vardecl_id);
+    this.has_been_initialized.add(vardecl_id);
   }
 
   is_vardecl_initialized(vardecl_id : number) : boolean {
-    return this.has_be_initialized.has(vardecl_id);
+    return this.has_been_initialized.has(vardecl_id);
   }
 
   qualifed_by_storage_qualifier(id : number) : boolean {
@@ -854,6 +862,8 @@ class ExprDB {
 
   private string_exprs : Set<number> = new Set<number>();
 
+  private new_contract_exprs : Set<number> = new Set<number>();
+
   init() {
     this.expr2read_variables.clear();
     this.expr2write_variables.clear();
@@ -875,6 +885,21 @@ class ExprDB {
     this.ghost_member_to_member.clear();
 
     this.string_exprs.clear();
+
+    this.new_contract_exprs.clear();
+  }
+
+  //! new contract expr
+  add_new_contract_expr(expr_id : number) : void {
+    this.new_contract_exprs.add(expr_id);
+  }
+
+  is_new_contract_expr(expr_id : number) : boolean {
+    return this.new_contract_exprs.has(expr_id);
+  }
+
+  new_contract_exprs_ids() : number[] {
+    return Array.from(this.new_contract_exprs);
   }
 
   //! Read-Write-Related
@@ -1200,15 +1225,30 @@ class StmtDB {
     this.unexpected_extra_stmt.clear();
   }
 
+  private initialize_variable(vardecl_id : number) {
+    assert(irnodes.has(vardecl_id), `initialize_variable: id ${vardecl_id} is not in irnodes`);
+    assert(irnodes.get(vardecl_id) instanceof IRVariableDeclaration,
+      `initialize_variable: id ${vardecl_id} is not an instance of IRVariableDeclaration`);
+    const vardecl = irnodes.get(vardecl_id) as IRVariableDeclaration;
+    const assignment = new IRAssignment(new_global_id(), cur_scope.id(),
+      new IRIdentifier(new_global_id(), cur_scope.id(), vardecl.name, vardecl.id),
+      new IRIdentifier(new_global_id(), cur_scope.id(), vardecl.name, vardecl.id), '=');
+    const assignment_stmt = new IRExpressionStatement(new_global_id(), cur_scope.id(), assignment);
+    expr_db.expr_reads_variable(assignment.id, vardecl.id);
+    expr_db.expr_writes_variable(assignment.id, vardecl.id);
+    (assignment_stmt as IRStatement).exprs.push(assignment);
+    return assignment_stmt;
+  }
+
   public initialize_the_vardecls_that_must_be_initialized(scope_id : number) : void {
     for (const id of decl_db.get_vardecls_that_must_be_initialized(scope_id)!) {
       if (decl_db.is_vardecl_initialized(id)) {
         continue;
       }
-      this.add_unexpected_extra_stmt(scope_id, initialize_variable(id));
+      this.add_unexpected_extra_stmt(scope_id, this.initialize_variable(id));
       decl_db.set_vardecl_as_initialized(id);
     }
-    decl_db.remove_vardecl_from_must_be_initialized(scope_id);
+    decl_db.remove_vardecl_from_must_be_initialized_in_scope(scope_id);
   }
 
   public add_unexpected_extra_stmt(scope_id : number, stmt : IRStatement) : void {

@@ -1,17 +1,8 @@
-export class ConstaintNode {
-  id : number;
-  inbound : number = 0;
-  outbound : number = 0;
-  ins : number[] = [];
-  outs : number[] = [];
-  constructor(id : number) {
-    this.id = id;
-  }
-}
 import { assert, intersection, merge_set } from "./utility";
 import { Type, TypeKind, MappingType, ArrayType } from "./type"
 import * as dot from 'ts-graphviz';
 import { config } from './config'
+import { new_global_id } from "./genContext";
 import { toFile } from "@ts-graphviz/adapter";
 import { Log } from "./log";
 import { DataLocation } from "solc-typed-ast";
@@ -19,85 +10,7 @@ import { StorageLocation } from "./loc";
 import { VisMut, VisMutKind } from "./vismut";
 import { LinkedListNode } from "./dataStructor";
 import { decl_db, expr_db } from "./db";
-import { new_global_id } from "./generator";
-
-export abstract class ConstraintNode<T> {
-  kind : T;
-  typeName : string;
-  constructor(kind : T) {
-    this.kind = kind;
-    this.typeName = this.constructor.name;
-  }
-  abstract str() : string;
-  abstract subs() : ConstraintNode<T>[];
-  abstract supers() : ConstraintNode<T>[];
-  abstract copy() : ConstraintNode<T>;
-  abstract same(t : ConstraintNode<T>) : boolean;
-  sub_with_lowerbound(lower_bound : ConstraintNode<T>) : ConstraintNode<T>[] {
-    return this.subs().filter(x => x.is_super_of(lower_bound));
-  }
-  super_with_upperbound(upper_bound : ConstraintNode<T>) : ConstraintNode<T>[] {
-    return this.supers().filter(x => x.is_sub_of(upper_bound));
-  }
-  same_range() : ConstraintNode<T>[] {
-    return [...merge_set(new Set(this.supers()), new Set(this.subs()))];
-  }
-  is_the_same_as(t : ConstraintNode<T>) : boolean {
-    return this.same(t);
-  }
-  is_sub_of(t : ConstraintNode<T>) : boolean {
-    return this.supers().some(g => g.same(t));
-  }
-  is_super_of(t : ConstraintNode<T>) : boolean {
-    return this.subs().some(g => g.same(t));
-  }
-  equivalents() : ConstraintNode<T>[] {
-    return this.subs().filter(t => this.supers().some(g => g.same(t)));
-  }
-  is_equivalent_of(t : ConstraintNode<T>) : boolean {
-    return this.equivalents().some(g => g.same(t));
-  }
-}
-
-export function includes<T>(arr : ConstraintNode<T>[], item : ConstraintNode<T>) : boolean {
-  for (const element of arr) {
-    if (element.kind === item.kind && element.same(item)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-export function is_super_range<T>(set : ConstraintNode<T>[], subset : ConstraintNode<T>[]) : boolean {
-  for (const element of subset) {
-    if (!includes(set, element)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-export function is_equal_range<T>(s1 : ConstraintNode<T>[], s2 : ConstraintNode<T>[]) : boolean {
-  if (s1.length !== s2.length) {
-    return false;
-  }
-  for (let i = 0; i < s1.length; i++) {
-    if (!s1[i].same(s2[i])) {
-      return false;
-    }
-  }
-  return true;
-}
-
-export function intersection_range<T>(s1 : ConstraintNode<T>[], s2 : ConstraintNode<T>[]) : ConstraintNode<T>[] {
-  const result : ConstraintNode<T>[] = [];
-  for (const element of s1) {
-    if (includes(s2, element)) {
-      result.push(element);
-    }
-  }
-  return result;
-}
+import { ConstraintNode, is_equal_range, is_super_range } from "./constraintNode";
 
 interface toLeaf {
   leaf_id : number;
@@ -112,9 +25,19 @@ interface toLeaf {
   // leaf's solution is the equivalent of the node's solution
   equal : boolean;
 };
-
+class DagNode {
+  id : number;
+  inbound : number = 0;
+  outbound : number = 0;
+  ins : number[] = [];
+  outs : number[] = [];
+  constructor(id : number) {
+    this.id = id;
+  }
+}
 export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
-  dag_nodes : Map<number, ConstaintNode> = new Map<number, ConstaintNode>();
+
+  dag_nodes : Map<number, DagNode> = new Map<number, DagNode>();
   // If 'id1 id2' is installed in sub/super, then the solution of id2 is a sub/super of the solution of id1
   sub : Set<string> = new Set();
   super : Set<string> = new Set();
@@ -184,8 +107,8 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
     // No need to check if a node connects to itself because it's forbidden in the connect function
   }
 
-  newNode(id : number) : ConstaintNode {
-    return new ConstaintNode(id);
+  newNode(id : number) : DagNode {
+    return new DagNode(id);
   }
 
   insert(nodeid : number, range : Node[]) : void {
@@ -619,7 +542,7 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
             }
             else if (this_leaf_info.same_range) {
               assert(!child_leaf_info.same && !child_leaf_info.equal,
-                `node's (${id}) solution is in the same range as the leaf's (${this_leaf_info.leaf_id}), but node's (${child}) solution is the same as or equals to the leaf's (${this_leaf_info.leaf_id}).
+                `node's (${id}) solution is in the same range as the leaf's (${this_leaf_info.leaf_id}), but node's (${child}) solution is the same as or equal to the leaf's (${this_leaf_info.leaf_id}).
                 child_leaf_info.same: ${child_leaf_info.same},
                 child_leaf_info.equal: ${child_leaf_info.equal}`);
             }
@@ -788,8 +711,8 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
   protected allocate_solutions_for_leaves_in_stream() : Generator<Map<number, Node>> {
     for (let leaf of this.leaves) this.solution_range.set(leaf, this.solution_range.get(leaf)!);
     const leave_array = Array.from(this.leaves);
-    Log.log(`leave_array: ${leave_array}`);
-    Log.log(`====== solution_range of leaves before allocating solutions ======\n,${Array.from(this.solution_range).filter(t => this.leaves.has(t[0])).map(t => [t[0], t[1].map(g => g.str())]).join("\n")}`);
+    Log.log(`leave_array ${leave_array.length}: ${leave_array}`);
+    Log.log(`====== solution_range of leaves before allocating solutions ======\n${Array.from(this.solution_range).filter(t => this.leaves.has(t[0])).map(t => [t[0], t[1].map(g => g.str())]).join("\n")}`);
     const solution_range_copy = this.solution_range;
     let check_leaf_solution = (leaf_solution : Map<number, Node>) : boolean => {
       const leaf_solution_array = Array.from(leaf_solution);
@@ -919,7 +842,7 @@ export class ConstraintDAG<T, Node extends ConstraintNode<T>> {
         if (narrowed_solution_range.has(leave_array[j])) {
           const leave_solution_range_node = narrowed_solution_range.get(leave_array[j])!;
           let leave_solution_range = leave_solution_range_node.value();
-          leave_solution_range = leave_solution_range.filter(t => solution_range_copy.get(leave_array[j])!.some(g => g.same(t)));
+          leave_solution_range = solution_range_copy.get(leave_array[j])!.filter(t => leave_solution_range.some(g => g.same(t)));
           narrowed_solution_range.get(leave_array[j])!.update(leave_solution_range);
           if (narrowed_solution_range.get(leave_array[j])!.value().length === 0) {
             return false;
@@ -1377,8 +1300,10 @@ export class TypeConstraintDAG extends ConstraintDAG<TypeKind, Type> {
       const valueid = decl_db.value_of_mapping(nodeid);
       const keyid = decl_db.key_of_mapping(nodeid);
       const range = solution_range.get(nodeid)!;
-      const value_type_range = range.filter(t => t.kind === TypeKind.MappingType).map(t => (t as MappingType).vType);
-      const key_type_range = range.filter(t => t.kind === TypeKind.MappingType).map(t => (t as MappingType).kType);
+      let value_type_range = range.filter(t => t.kind === TypeKind.MappingType).map(t => (t as MappingType).vType);
+      let key_type_range = range.filter(t => t.kind === TypeKind.MappingType).map(t => (t as MappingType).kType);
+      value_type_range = [...new Set(value_type_range)];
+      key_type_range = [...new Set(key_type_range)];
       if (value_type_range.length === 0 || key_type_range.length === 0) return "conflict";
       solution_range.set(valueid, value_type_range);
       solution_range.set(keyid, key_type_range);
@@ -1388,8 +1313,10 @@ export class TypeConstraintDAG extends ConstraintDAG<TypeKind, Type> {
       const valueid = expr_db.value_of_mapping(nodeid);
       const keyid = expr_db.key_of_mapping(nodeid);
       const range = solution_range.get(nodeid)!;
-      const value_type_range = range.filter(t => t.kind === TypeKind.MappingType).map(t => (t as MappingType).vType);
-      const key_type_range = range.filter(t => t.kind === TypeKind.MappingType).map(t => (t as MappingType).kType);
+      let value_type_range = range.filter(t => t.kind === TypeKind.MappingType).map(t => (t as MappingType).vType);
+      let key_type_range = range.filter(t => t.kind === TypeKind.MappingType).map(t => (t as MappingType).kType);
+      value_type_range = [...new Set(value_type_range)];
+      key_type_range = [...new Set(key_type_range)];
       if (value_type_range.length === 0 || key_type_range.length === 0) return "conflict";
       solution_range.set(valueid, value_type_range);
       solution_range.set(keyid, key_type_range);
@@ -1841,67 +1768,6 @@ export class TypeConstraintDAG extends ConstraintDAG<TypeKind, Type> {
     }
   }
 
-  // private align_mapping_type_range_from_kv(node_id : number) : void {
-  //   //* Align mapping from its key and value
-  //   if (expr_db.is_value_expr(node_id)) {
-  //     const range = this.solution_range.get(node_id)!;
-  //     const mapping_expr_id = expr_db.mapping_of_value(node_id)!;
-  //     assert(this.solution_range.has(mapping_expr_id),
-  //       `align_mapping_type_range_from_kv: solution_range does not have ${mapping_expr_id}`);
-  //     const mapping_expr_type_range = this.solution_range.get(mapping_expr_id)!
-  //       .filter(t => t.kind === TypeKind.MappingType)
-  //       .filter(t => range.some(g => g.same((t as MappingType).vType)));
-  //     assert(mapping_expr_type_range.length !== 0,
-  //       `solution_range_alignment: mapping_expr_type_range of ${mapping_expr_id} is empty`);
-  //     this.solution_range.set(mapping_expr_id, mapping_expr_type_range);
-  //     this.tighten_solution_range_middle_out(mapping_expr_id);
-  //     this.align_mapping_type_range_from_kv(mapping_expr_id);
-  //     this.align_array_type_range_from_base(mapping_expr_id);
-  //   }
-  //   else if (decl_db.is_mapping_value(node_id)) {
-  //     const range = this.solution_range.get(node_id)!;
-  //     const mapping_decl_id = decl_db.mapping_of_value(node_id)!;
-  //     assert(this.solution_range.has(mapping_decl_id),
-  //       `align_mapping_type_range_from_kv: solution_range does not have ${mapping_decl_id}`);
-  //     const mapping_decl_type_range = this.solution_range.get(mapping_decl_id)!
-  //       .filter(t => t.kind === TypeKind.MappingType)
-  //       .filter(t => range.some(g => g.same((t as MappingType).vType)));
-  //     assert(mapping_decl_type_range.length !== 0,
-  //       `solution_range_alignment: mapping_decl_type_range of ${mapping_decl_id} is empty`
-  //     )
-  //     this.solution_range.set(mapping_decl_id, mapping_decl_type_range);
-  //     this.tighten_solution_range_middle_out(mapping_decl_id);
-  //     this.align_mapping_type_range_from_kv(mapping_decl_id);
-  //     this.align_array_type_range_from_base(mapping_decl_id);
-  //   }
-  //   else if (expr_db.is_key_expr(node_id)) {
-  //     const range = this.solution_range.get(node_id)!;
-  //     const mapping_expr_id = expr_db.mapping_of_key(node_id)!;
-  //     assert(this.solution_range.has(mapping_expr_id),
-  //       `align_mapping_type_range_from_kv: solution_range does not have ${mapping_expr_id}`);
-  //     const mapping_expr_type_range = this.solution_range.get(mapping_expr_id)!
-  //       .filter(t => t.kind === TypeKind.MappingType)
-  //       .filter(t => range.some(g => g.same((t as MappingType).kType)));
-  //     this.solution_range.set(mapping_expr_id, mapping_expr_type_range);
-  //     this.tighten_solution_range_middle_out(mapping_expr_id);
-  //     this.align_mapping_type_range_from_kv(mapping_expr_id);
-  //     this.align_array_type_range_from_base(mapping_expr_id);
-  //   }
-  //   else if (decl_db.is_mapping_key(node_id)) {
-  //     const range = this.solution_range.get(node_id)!;
-  //     const mapping_decl_id = decl_db.mapping_of_key(node_id)!;
-  //     assert(this.solution_range.has(mapping_decl_id),
-  //       `align_mapping_type_range_from_kv: solution_range does not have ${mapping_decl_id}`);
-  //     const mapping_decl_type_range = this.solution_range.get(mapping_decl_id)!
-  //       .filter(t => t.kind === TypeKind.MappingType)
-  //       .filter(t => range.some(g => g.same((t as MappingType).kType)));
-  //     this.solution_range.set(mapping_decl_id, mapping_decl_type_range);
-  //     this.tighten_solution_range_middle_out(mapping_decl_id);
-  //     this.align_mapping_type_range_from_kv(mapping_decl_id);
-  //     this.align_array_type_range_from_base(mapping_decl_id);
-  //   }
-  // }
-
   private align_base_type_range_from_array(dominator_id : number, dominatee_id : number) : void {
     //* Align array's base
     if (decl_db.is_array_decl(dominatee_id)) {
@@ -1940,36 +1806,6 @@ export class TypeConstraintDAG extends ConstraintDAG<TypeKind, Type> {
       this.align_mapping_type_range_from_kv(array_decl_id);
     }
   }
-
-  // private align_array_type_range_from_base(node_id : number) : void {
-  //   //* Align array from its base
-  //   if (expr_db.is_base_expr(node_id)) {
-  //     const range = this.solution_range.get(node_id)!;
-  //     const array_expr_id = expr_db.array_of_base(node_id)!;
-  //     assert(this.solution_range.has(array_expr_id),
-  //       `align_array_type_range_from_base: solution_range does not have ${array_expr_id}`);
-  //     const array_expr_type_range = this.solution_range.get(array_expr_id)!
-  //       .filter(t => t.kind === TypeKind.ArrayType)
-  //       .filter(t => range.some(g => g.same((t as ArrayType).base)));
-  //     this.solution_range.set(array_expr_id, array_expr_type_range);
-  //     this.tighten_solution_range_middle_out(array_expr_id);
-  //     this.align_array_type_range_from_base(array_expr_id);
-  //     this.align_mapping_type_range_from_kv(array_expr_id);
-  //   }
-  //   else if (decl_db.is_base_decl(node_id)) {
-  //     const range = this.solution_range.get(node_id)!;
-  //     const array_decl_id = decl_db.array_of_base(node_id)!;
-  //     assert(this.solution_range.has(array_decl_id),
-  //       `align_array_type_range_from_base: solution_range does not have ${array_decl_id}`);
-  //     const array_decl_type_range = this.solution_range.get(array_decl_id)!
-  //       .filter(t => t.kind === TypeKind.ArrayType)
-  //       .filter(t => range.some(g => g.same((t as ArrayType).base)));
-  //     this.solution_range.set(array_decl_id, array_decl_type_range);
-  //     this.tighten_solution_range_middle_out(array_decl_id);
-  //     this.align_array_type_range_from_base(array_decl_id);
-  //     this.align_mapping_type_range_from_kv(array_decl_id);
-  //   }
-  // }
 
   /*
   ! First, align the solution range of the dominator and dominatee

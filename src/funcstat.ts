@@ -1,5 +1,5 @@
 import { FunctionStateMutability } from "solc-typed-ast";
-import { ConstraintNode } from "./constraint";
+import { ConstraintNode } from "./constraintNode";
 
 export abstract class FuncStat extends ConstraintNode<FunctionStateMutability> { }
 
