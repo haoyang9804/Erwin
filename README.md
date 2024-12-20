@@ -6,7 +6,7 @@
     <img alt="NPM Version" src="https://img.shields.io/npm/v/%40__haoyang__%2Ferwin">
   </a>
   <img alt="NPM License" src="https://img.shields.io/npm/l/%40__haoyang__%2Ferwin">
-  <a href="https://haoyang9804.github.io/docs/index.html">
+  <a href="https://haoyang9804.github.io/erwin/index.html">
     <img alt="Static Badge" src="https://img.shields.io/badge/Documentation-red">
   </a>
 </p>
@@ -19,7 +19,7 @@ By masking out bug-related langauge features, such as type, storage location, an
 
 ## How to play it?
 
-The simplest way is `npm install` it and `npx erwin generate` with different generation flags. `npx erwin generate` is the trivial generation, in which ***Erwin*** will not explore the search space of the IR, but perform just like Csmith, generate a test program in one go.
+The simplest way is `npm install @__haoyang__/erwin` it and `npx erwin generate` with different generation flags. `npx erwin generate` is the trivial generation, in which ***Erwin*** will not explore the search space of the IR, but perform just like Csmith, generate a test program in one go.
 
 To utilize ***Erwin***'s features in program generation, you can use `-m` to specify the bug-related features you want to mask in the IR, and use `-max` to specify the maximum test programs you want to instantiation from the generated IR.
 
@@ -53,7 +53,7 @@ For more flags, please refer to `npx erwin generation -h`.
 16. https://github.com/ethereum/solidity/issues/15583 (error handling,low effort low impact must have eventually should report better error) ✅
 17. https://github.com/ethereum/solidity/issues/15645 (ICE, duplicate) 🤡
 18. https://github.com/ethereum/solidity/issues/15646 (error handling) ✅
-19. https://github.com/ethereum/solidity/issues/15647 (ICE)
+19. https://github.com/ethereum/solidity/issues/15647 (ICE, smt) ✅
 20. https://github.com/ethereum/solidity/issues/15649 (ICE)
 21. https://github.com/ethereum/solidity/issues/15651 (ICE)
 
