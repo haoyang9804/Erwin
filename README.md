@@ -6,7 +6,7 @@
     <img alt="NPM Version" src="https://img.shields.io/npm/v/%40__haoyang__%2Ferwin">
   </a>
   <img alt="NPM License" src="https://img.shields.io/npm/l/%40__haoyang__%2Ferwin">
-  <a href="https://haoyang9804.github.io/erwin/index.html">
+  <a href="https://haoyang9804.github.io/Erwin">
     <img alt="Static Badge" src="https://img.shields.io/badge/Documentation-red">
   </a>
 </p>
