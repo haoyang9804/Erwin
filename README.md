@@ -72,5 +72,8 @@ Besides bugs, ***Erwin*** only plays a role of examining the design of language 
 
 - [ ] Support byte and bytes (similar to array).
 - [ ] Support contract inheritance.
+- [ ] support global constant variable, functions, and structs
+- [ ] support variable shallowing
+- [ ] support function type
 - [ ] Support inline assembly.
 - [ ] Mutate Solidity programs.
