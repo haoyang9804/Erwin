@@ -1996,12 +1996,12 @@ class ConstructorDeclarationGenerator extends DeclarationGenerator {
     assert(cur_scope.kind() === scopeKind.CONTRACT, `ConstructorDeclarationGenerator: scope kind should be CONTRACT, but is ${cur_scope.kind()}`);
     relocate_scope(this.function_scope);
     this.start_flag_of_constructor_decl();
+    decl_db.insert_constructordecl_with_scope(this.fid, cur_scope);
     this.generate_parameters();
     this.generate_modifier_invokers();
     this.irnode = new decl.IRFunctionDefinition(this.fid, cur_scope.id(), "",
       FunctionKind.Constructor, false, false, this.parameters, [], [], this.modifier_invokers,
       FunctionVisibility.Public, FunctionStateMutability.NonPayable);
-    decl_db.insert_constructordecl_with_scope(this.fid, cur_scope);
     if (this.has_body) {
       this.generate_body();
     }
@@ -2709,6 +2709,7 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
     const overide = false;
     relocate_scope(this.function_scope);
     this.start_flag_of_func_decl(name);
+    decl_db.insert_function_decl_with_scope(this.fid, cur_scope);
     this.generate_func_params();
     this.generate_func_return_decls();
     if (inside_contract(cur_scope)) {
@@ -2719,7 +2720,6 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
     this.irnode = new decl.IRFunctionDefinition(this.fid, cur_scope.id(), name,
       FunctionKind.Function, virtual, overide, this.parameters, this.return_decls, [], this.modifier_invokers);
     decl_db.add_funcdecl(this.fid);
-    decl_db.insert_function_decl_with_scope(this.fid, cur_scope);
     if (this.has_body) {
       this.generate_function_body();
     }
