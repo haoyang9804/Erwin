@@ -143,10 +143,11 @@ async function compile(file_path : string) : Promise<[string, string]> {
 /**
  * Test the Solidity compiler
  * 
- * @returns 0 if all the generated programs pass the compilation
- * @returns 1 if generated program triggers an error
- * @returns 2 if the output directory does not exist
- * @returns 4 if the compiler path is incorrect
+ * @returns {number} A number indicating the result of the operation:
+ * - 0 if all the generated programs pass the compilation
+ * - 1 if generated program triggers an error
+ * - 2 if the output directory does not exist
+ * - 4 if the compiler path is incorrect
  */
 export async function test_compiler() : Promise<number> {
   // Check if the "generated_programs" directory exists
@@ -196,10 +197,11 @@ export async function test_compiler() : Promise<number> {
 /**
  * Test the Slither static analysis tool
  * 
- * @returns 0 if all the generated programs pass the analysis
- * @returns 1 if generated program triggers an error
- * @returns 2 if the output directory does not exist
- * @returns 4 if slither is not installed
+ * @returns {number} A number indicating the result of the operation:
+ * - 0 if all the generated programs pass the analysis
+ * - 1 if generated program triggers an error
+ * - 2 if the output directory does not exist
+ * - 4 if slither is not installed
  */
 export async function test_slither() : Promise<number> {
   // Check if the "generated_programs" directory exists
