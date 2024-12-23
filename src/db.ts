@@ -2,7 +2,7 @@ import * as sqlite from 'sqlite';
 import * as sqlite3 from 'sqlite3';
 import { Tree } from './dataStructor';
 import { get_scope_from_scope_id, inside_contract, scopeKind, ScopeList } from './scope';
-import { assert } from 'console';
+import { assert } from './utility';
 import { IRContractDefinition, IRStructDefinition, IRVariableDeclaration } from './declaration';
 import { irnodes } from './node';
 import * as type from './type';

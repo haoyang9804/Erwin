@@ -682,13 +682,13 @@ export class SourceUnitGenerator extends Generator {
   }
 
   private start_flag() {
-    Log.log(`${" ".repeat(indent)}>>  Start generating SourceUnit, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating SourceUnit, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
   private end_flag() {
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}SourceUnit, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}SourceUnit, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
   }
 
   private generate_children() : IRNode[] {
@@ -806,14 +806,14 @@ class MappingDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag(mappingid : number) {
-    Log.log(`${" ".repeat(indent)}>>  Start generating Mapping Declaration, scope: ${cur_scope.kind()}, id: ${mappingid}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating Mapping Declaration, scope: (${cur_scope.kind()}, ${cur_scope.id()}), id: ${mappingid}`)
     increase_indent();
   }
 
   private end_flag(mappingid : number, mapping_name : string) {
     decrease_indent();
     const type_range_str = generate_type_range_str(this.type_range);
-    Log.log(`${" ".repeat(indent)}Mapping Declaration, name: ${mapping_name} scope: ${cur_scope.kind()}, id: ${mappingid}, type range: ${type_range_str}, storage loc range: ${storage_location_dag.has_solution_range(mappingid) ? storage_location_dag.solution_range_of(mappingid).map(s => s.str()) : ''}`)
+    Log.log(`${" ".repeat(indent)}Mapping Declaration, name: ${mapping_name} scope: (${cur_scope.kind()}, ${cur_scope.id()}), id: ${mappingid}, type range: ${type_range_str}, storage loc range: ${storage_location_dag.has_solution_range(mappingid) ? storage_location_dag.solution_range_of(mappingid).map(s => s.str()) : ''}`)
   }
 
   private go_back_to_contract_scope_if_required() : [boolean, ScopeList] {
@@ -905,13 +905,13 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag() {
-    Log.log(`${" ".repeat(indent)}>>  Start generating Array Declaration, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating Array Declaration, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
   private end_flag(array_name : string, arrayid : number) {
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}Array Declaration, scope: ${cur_scope.kind()}, name: ${array_name}, id: ${arrayid}, storage loc range: ${storage_location_dag.has_solution_range(arrayid) ? storage_location_dag.solution_range_of(arrayid).map(s => s.str()) : ''}`)
+    Log.log(`${" ".repeat(indent)}Array Declaration, scope: (${cur_scope.kind()}, ${cur_scope.id()}), name: ${array_name}, id: ${arrayid}, storage loc range: ${storage_location_dag.has_solution_range(arrayid) ? storage_location_dag.solution_range_of(arrayid).map(s => s.str()) : ''}`)
   }
 
   private generate_length() {
@@ -1145,7 +1145,7 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag(id : number) {
-    Log.log(`${" ".repeat(indent)}>>  Start generating Struct Instance Declaration ${id}, type_range: ${this.type_range.map(t => t.str())}, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating Struct Instance Declaration ${id}, type_range: ${this.type_range.map(t => t.str())}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
@@ -1167,7 +1167,7 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
   private end_flag(struct_instance_name : string) {
     assert(this.irnode !== undefined, `StructInstanceDeclarationGenerator: this.irnode is undefined`);
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}${this.irnode.id}: Struct Instance Declaration, name: ${struct_instance_name} scope: ${cur_scope.kind()}, type: ${type_dag.solution_range_of(this.irnode.id)!.map(t => t.str())}, storage loc range: ${storage_location_dag.has_solution_range(this.irnode.id) ? storage_location_dag.solution_range_of(this.irnode.id).map(s => s.str()) : ""}`)
+    Log.log(`${" ".repeat(indent)}${this.irnode.id}: Struct Instance Declaration, name: ${struct_instance_name} scope: (${cur_scope.kind()}, ${cur_scope.id()}), type: ${type_dag.solution_range_of(this.irnode.id)!.map(t => t.str())}, storage loc range: ${storage_location_dag.has_solution_range(this.irnode.id) ? storage_location_dag.solution_range_of(this.irnode.id).map(s => s.str()) : ""}`)
   }
 
   private init_storage_location_range() {
@@ -1341,7 +1341,7 @@ class StringDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag() {
-    Log.log(`${" ".repeat(indent)}>>  Start generating String Declaration, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating String Declaration, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
@@ -1396,7 +1396,7 @@ class StringDeclarationGenerator extends DeclarationGenerator {
 
   private end_flag(name : string) {
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}${this.irnode!.id}: String Declaration, name: ${name}, scope: ${cur_scope.kind()}, type: ${type_dag.solution_range_of(this.irnode!.id)!.map(t => t.str())}, storage loc range: ${storage_location_dag.has_solution_range(this.irnode!.id) ? storage_location_dag.solution_range_of(this.irnode!.id).map(s => s.str()) : ""}`)
+    Log.log(`${" ".repeat(indent)}${this.irnode!.id}: String Declaration, name: ${name}, scope: (${cur_scope.kind()}, ${cur_scope.id()}), type: ${type_dag.solution_range_of(this.irnode!.id)!.map(t => t.str())}, storage loc range: ${storage_location_dag.has_solution_range(this.irnode!.id) ? storage_location_dag.solution_range_of(this.irnode!.id).map(s => s.str()) : ""}`)
   }
 
   private init_storage_location_range() {
@@ -1519,13 +1519,13 @@ class EventDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag() {
-    Log.log(`${" ".repeat(indent)}>>  Start generating Event Declaration, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating Event Declaration, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
   private end_flag() {
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}Event Declaration, scope: ${cur_scope.kind()}, id: ${this.irnode!.id}, name: ${(this.irnode as decl.IREventDefinition).name}`)
+    Log.log(`${" ".repeat(indent)}Event Declaration, scope: (${cur_scope.kind()}, ${cur_scope.id()}), id: ${this.irnode!.id}, name: ${(this.irnode as decl.IREventDefinition).name}`)
   }
 
   private generate_parameters() {
@@ -1561,13 +1561,13 @@ class ErrorDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag() {
-    Log.log(`${" ".repeat(indent)}>>  Start generating Error Declaration, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating Error Declaration, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
   private end_flag() {
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}Error Declaration, scope: ${cur_scope.kind()}, id: ${this.irnode!.id}, name: ${(this.irnode as decl.IRErrorDefinition).name}`)
+    Log.log(`${" ".repeat(indent)}Error Declaration, scope: (${cur_scope.kind()}, ${cur_scope.id()}), id: ${this.irnode!.id}, name: ${(this.irnode as decl.IRErrorDefinition).name}`)
   }
 
   private generate_parameters() {
@@ -1614,7 +1614,7 @@ class ContractInstanceDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag() {
-    Log.log(`${" ".repeat(indent)}>>  Start generating Contract Instance Declaration, type_range: ${this.type_range.map(t => t.str())}, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating Contract Instance Declaration, type_range: ${this.type_range.map(t => t.str())}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
@@ -1677,7 +1677,7 @@ class ElementaryTypeVariableDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag() {
-    Log.log(`${" ".repeat(indent)}>>  Start generating Elementary Type Variable Decl, name is ${this.name}, type_range: ${this.type_range.map(t => t.str())}, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating Elementary Type Variable Decl, name is ${this.name}, type_range: ${this.type_range.map(t => t.str())}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
@@ -1728,7 +1728,7 @@ class ElementaryTypeVariableDeclarationGenerator extends DeclarationGenerator {
 
   private end_flag() {
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}${this.irnode!.id}: Elementary Type Variable Decl, name: ${this.name}, scope: ${cur_scope.kind()}, type: ${type_dag.solution_range_of(this.irnode!.id)!.map(t => t.str())}`)
+    Log.log(`${" ".repeat(indent)}${this.irnode!.id}: Elementary Type Variable Decl, name: ${this.name}, scope: (${cur_scope.kind()}, ${cur_scope.id()}), type: ${type_dag.solution_range_of(this.irnode!.id)!.map(t => t.str())}`)
   }
 
   generate() : void {
@@ -1947,13 +1947,13 @@ class ConstructorDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag_of_constructor_decl() {
-    Log.log(`${" ".repeat(indent)}>>  Start generating Constructor Declaration: ${this.fid}, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating Constructor Declaration: ${this.fid}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
   private end_flag_of_constructor_decl() {
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}${this.irnode!.id}: Constructor Declaration, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}${this.irnode!.id}: Constructor Declaration, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
   }
 
   private generate_parameters() : void {
@@ -2018,13 +2018,13 @@ class StructGenerator extends DeclarationGenerator {
   }
 
   private start_flag(id : number) {
-    Log.log(`${" ".repeat(indent)}>>  Start generating Struct Definition: ${id}, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating Struct Definition: ${id}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
   private end_flag(id : number, struct_name : string) {
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}${id}: Struct Definition, scope: ${cur_scope.kind()}, name: ${struct_name}`)
+    Log.log(`${" ".repeat(indent)}${id}: Struct Definition, scope: (${cur_scope.kind()}, ${cur_scope.id()}), name: ${struct_name}`)
   }
 
   private generate_member_variables(struct_id : number) {
@@ -2071,13 +2071,13 @@ class ModifierDeclarationGenerator extends DeclarationGenerator {
   }
 
   start_flag() {
-    Log.log(`${" ".repeat(indent)}>>  Start generating Modifier Declaration, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating Modifier Declaration, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
   end_flag() {
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}Modifier Declaration, scope: ${cur_scope.kind()}, id: ${this.irnode!.id}, name: ${(this.irnode as decl.IRModifier).name}`)
+    Log.log(`${" ".repeat(indent)}Modifier Declaration, scope: (${cur_scope.kind()}, ${cur_scope.id()}), id: ${this.irnode!.id}, name: ${(this.irnode as decl.IRModifier).name}`)
   }
 
   private start_flag_of_modifier_params() {
@@ -2091,7 +2091,7 @@ class ModifierDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag_of_modifier_body() {
-    Log.log(`${" ".repeat(indent)}>>  Start generating Modifier Body`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating Modifier Body, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
@@ -2113,8 +2113,8 @@ class ModifierDeclarationGenerator extends DeclarationGenerator {
   }
 
   private generate_modifier_body() {
-    this.start_flag_of_modifier_body();
     new_scope(scopeKind.MODIFIER_BODY);
+    this.start_flag_of_modifier_body();
     const body_stmt_count = random_int(config.function_body_stmt_cnt_lower_limit, config.function_body_stmt_cnt_upper_limit);
     Array.from({ length: body_stmt_count }, () => {
       const stmt_gen_prototype = get_stmtgenerator();
@@ -2127,14 +2127,15 @@ class ModifierDeclarationGenerator extends DeclarationGenerator {
     });
     const placeholder = new stmt.IRPlaceholderStatement(new_global_id(), cur_scope.id());
     this.body.push(placeholder);
-    roll_back_scope();
     this.end_flag_of_modifier_body();
+    roll_back_scope();
   }
 
   generate() : void {
-    this.start_flag();
     new_scope(scopeKind.MODIFIER);
+    this.start_flag();
     const modifierid = new_global_id();
+    decl_db.insert_modifierdecl_with_scope(modifierid, cur_scope);
     const modifier_name = name_db.generate_name(IDENTIFIER.MODIFIER);
     const virtual = false;
     const overide = false;
@@ -2145,9 +2146,8 @@ class ModifierDeclarationGenerator extends DeclarationGenerator {
     const cur_contract_id = decl_db.get_current_contractdecl_id(cur_scope);
     assert(cur_contract_id !== undefined, `ModifierDeclarationGenerator: cur_contract_id is undefined`);
     decl_db.add_modifierdecl(modifierid, cur_contract_id);
-    decl_db.insert_modifierdecl_with_scope(modifierid, cur_scope);
-    roll_back_scope();
     this.end_flag();
+    roll_back_scope();
   }
 }
 
@@ -2618,13 +2618,13 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag_of_func_decl(func_name : string) {
-    Log.log(`${" ".repeat(indent)}>>  Start generating Function Definition ${this.fid} ${func_name}, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating Function Definition ${this.fid} ${func_name}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
   private end_flag_of_func_decl(func_name : string) {
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}${this.fid}: Function ${func_name}, vismut range is ${vismut_dag.solution_range_of(this.fid)!.map(f => f.str())}, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}${this.fid}: Function ${func_name}, vismut range is ${vismut_dag.solution_range_of(this.fid)!.map(f => f.str())}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
   }
 
   private start_flag_of_func_params() {
@@ -2967,13 +2967,13 @@ class ContractDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag_of_contract_decl(id : number) {
-    Log.log(`${" ".repeat(indent)}>>  Start generating Contract Definition: ${id}, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating Contract Definition: ${id}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
   private end_flag_of_contract_decl(id : number) {
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}${id}: Contract, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}${id}: Contract, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
   }
 
   private generate_struct_decls() {
@@ -3161,7 +3161,7 @@ abstract class ExpressionGenerator extends Generator {
   protected wrap_in_a_tuple(must_wrap : boolean = false) {
     if (must_wrap || Math.random() < config.tuple_prob) {
       this.irnode = new expr.IRTuple(new_global_id(), cur_scope.id(), [this.irnode as expr.IRExpression]);
-      Log.log(`${" ".repeat(indent)}${this.irnode.id}: Tuple: ${this.irnode.id} scope: ${cur_scope.kind()}`);
+      Log.log(`${" ".repeat(indent)}${this.irnode.id}: Tuple: ${this.irnode.id} scope: (${cur_scope.kind()}, ${cur_scope.id()})`);
     }
   }
 
@@ -3176,7 +3176,7 @@ class LiteralGenerator extends ExpressionGenerator {
   generate(_ : number) : void {
     this.type_range = this.type_range.filter(t => t.kind === type.TypeKind.ElementaryType || t.kind === type.TypeKind.StringType);
     assert(this.type_range.length > 0, `LiteralGenerator: type_range ${this.type_range.map(t => t.str())} is invalid`);
-    Log.log(`${" ".repeat(indent)}>>  Start generating Literal ${this.id}: ${this.type_range.map(t => t.str())}, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating Literal ${this.id}: ${this.type_range.map(t => t.str())}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     if (this.type_range.some(t => t.kind === type.TypeKind.StringType)) {
       expr_db.add_string_expr(this.id);
       storage_location_dag.insert(this.id, [
@@ -3187,7 +3187,7 @@ class LiteralGenerator extends ExpressionGenerator {
     type_dag.update(this.id, this.type_range);
     this.irnode = new expr.IRLiteral(this.id, cur_scope.id());
     if (config.debug)
-      Log.log(`${" ".repeat(indent)}${this.irnode.id}: Literal, scope: ${cur_scope.kind()}, type: ${type_dag.solution_range_of(this.irnode.id)!.map(t => t.str())}`)
+      Log.log(`${" ".repeat(indent)}${this.irnode.id}: Literal, scope: (${cur_scope.kind()}, ${cur_scope.id()}), type: ${type_dag.solution_range_of(this.irnode.id)!.map(t => t.str())}`)
     this.wrap_in_a_tuple();
   }
 }
@@ -3208,14 +3208,14 @@ class IdentifierGenerator extends ExpressionGenerator {
 
   private start_flag() {
     const type_range_str = generate_type_range_str(this.type_range);
-    Log.log(`${" ".repeat(indent)}>>  Start generating Identifier ${this.id}: type: ${type_range_str}, loc: ${this.storage_range.map(t => t.str())}, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating Identifier ${this.id}: type: ${type_range_str}, loc: ${this.storage_range.map(t => t.str())}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
   private end_flag() {
     decrease_indent();
     const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
-    Log.log(`${" ".repeat(indent)}${this.id}: Identifier ${this.variable_decl === undefined ? '' : `--> ${this.variable_decl.id}`}, scope: ${cur_scope.kind()}, type: ${type_range_str}, loc: ${storage_location_dag.has_solution_range(this.id) ? storage_location_dag.solution_range_of(this.id)!.map(t => t.str()) : ''}`)
+    Log.log(`${" ".repeat(indent)}${this.id}: Identifier ${this.variable_decl === undefined ? '' : `--> ${this.variable_decl.id}`}, scope: (${cur_scope.kind()}, ${cur_scope.id()}), type: ${type_range_str}, loc: ${storage_location_dag.has_solution_range(this.id) ? storage_location_dag.solution_range_of(this.id)!.map(t => t.str()) : ''}`)
   }
 
   private generate_var_decl() : void {
@@ -3859,14 +3859,14 @@ class AssignmentGenerator extends ExpressionGenerator {
 
   private start_flag() {
     const type_range_str = generate_type_range_str(this.type_range);
-    Log.log(`${" ".repeat(indent)}>>  Start generating Assignment ${this.op}: ${this.id}: type: ${type_range_str}, loc: ${this.storage_range.map(t => t.str())}, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating Assignment ${this.op}: ${this.id}: type: ${type_range_str}, loc: ${this.storage_range.map(t => t.str())}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
   private end_flag() {
     decrease_indent();
     const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
-    Log.log(`${" ".repeat(indent)}${this.id}: Assignment ${this.op}, scope: ${cur_scope.kind()}, type: ${type_range_str}, loc: ${storage_location_dag.has_solution_range(this.id) ? storage_location_dag.solution_range_of(this.id)!.map(t => t.str()) : ''}, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}${this.id}: Assignment ${this.op}, scope: (${cur_scope.kind()}, ${cur_scope.id()}), type: ${type_range_str}, loc: ${storage_location_dag.has_solution_range(this.id) ? storage_location_dag.solution_range_of(this.id)!.map(t => t.str()) : ''}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
   }
 
   private distill_type_range() {
@@ -4018,14 +4018,14 @@ class BinaryOpGenerator extends ExpressionGenerator {
 
   private start_flag() {
     const type_range_str = generate_type_range_str(this.type_range);
-    Log.log(`${" ".repeat(indent)}>>  Start generating BinaryOp ${this.op}: ${this.id}: ${type_range_str}, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating BinaryOp ${this.op}: ${this.id}: ${type_range_str}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
   private end_flag() {
     decrease_indent();
     const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
-    Log.log(`${" ".repeat(indent)}${this.id}: BinaryOp ${this.op}, scope: ${cur_scope.kind()}, type: ${type_range_str}`)
+    Log.log(`${" ".repeat(indent)}${this.id}: BinaryOp ${this.op}, scope: (${cur_scope.kind()}, ${cur_scope.id()}), type: ${type_range_str}`)
   }
 
   private distill_type_range() {
@@ -4178,14 +4178,14 @@ class BinaryCompareOpGenerator extends ExpressionGenerator {
 
   private start_flag() {
     const type_range_str = generate_type_range_str(this.type_range);
-    Log.log(`${" ".repeat(indent)}>>  Start generating BinaryCompareOp ${this.op}: ${this.id}: ${type_range_str}, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating BinaryCompareOp ${this.op}: ${this.id}: ${type_range_str}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
   private end_flag() {
     decrease_indent();
     const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
-    Log.log(`${" ".repeat(indent)}${this.id}: BinaryCompareOp ${this.op}, scope: ${cur_scope.kind()}, type: ${type_range_str}`)
+    Log.log(`${" ".repeat(indent)}${this.id}: BinaryCompareOp ${this.op}, scope: (${cur_scope.kind()}, ${cur_scope.id()}), type: ${type_range_str}`)
   }
 
   private distill_type_range() {
@@ -4278,14 +4278,14 @@ class UnaryOpGenerator extends ExpressionGenerator {
 
   private start_flag() {
     const type_range_str = generate_type_range_str(this.type_range);
-    Log.log(`${" ".repeat(indent)}>>  Start generating UnaryOp ${this.op}: ${this.id}: ${type_range_str}, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating UnaryOp ${this.op}: ${this.id}: ${type_range_str}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
   private end_flag() {
     decrease_indent();
     const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
-    Log.log(`${" ".repeat(indent)}${this.id}: UnaryOp ${this.op}, scope: ${cur_scope.kind()}, type: ${type_range_str}`)
+    Log.log(`${" ".repeat(indent)}${this.id}: UnaryOp ${this.op}, scope: (${cur_scope.kind()}, ${cur_scope.id()}), type: ${type_range_str}`)
   }
 
   private distill_type_range() {
@@ -4339,14 +4339,14 @@ class ConditionalGenerator extends ExpressionGenerator {
 
   private start_flag() {
     const type_range_str = generate_type_range_str(this.type_range);
-    Log.log(`${" ".repeat(indent)}>>  Start generating Conditional: ${this.id}: type: ${type_range_str}, loc: ${this.storage_range.map(t => t.str())}, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating Conditional: ${this.id}: type: ${type_range_str}, loc: ${this.storage_range.map(t => t.str())}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
   private end_flag() {
     decrease_indent();
     const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
-    Log.log(`${" ".repeat(indent)}${this.id}: Conditional, scope: ${cur_scope.kind()}, type: ${type_range_str}, loc: ${storage_location_dag.has_solution_range(this.id) ? storage_location_dag.solution_range_of(this.id)!.map(t => t.str()) : ''}`)
+    Log.log(`${" ".repeat(indent)}${this.id}: Conditional, scope: (${cur_scope.kind()}, ${cur_scope.id()}), type: ${type_range_str}, loc: ${storage_location_dag.has_solution_range(this.id) ? storage_location_dag.solution_range_of(this.id)!.map(t => t.str()) : ''}`)
   }
 
   private init_storage_loc_range(e2id : number, e3id : number) {
@@ -4477,14 +4477,14 @@ class FunctionCallGenerator extends ExpressionGenerator {
 
   private start_flag(contractdecl_id : number, funcdecl_id : number) {
     const type_range_str = generate_type_range_str(this.type_range);
-    Log.log(`${" ".repeat(indent)}>>  Start generating FunctionCall: ${this.id}: type: ${type_range_str}, loc: ${this.storage_range.map(t => t.str())}, contractdecl_id: ${contractdecl_id} funcdecl_id: ${funcdecl_id}, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating FunctionCall: ${this.id}: type: ${type_range_str}, loc: ${this.storage_range.map(t => t.str())}, contractdecl_id: ${contractdecl_id} funcdecl_id: ${funcdecl_id}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
   private end_flag() {
     decrease_indent();
     const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
-    Log.log(`${" ".repeat(indent)}${this.id}: FunctionCall, id: ${this.id} scope: ${cur_scope.kind()}, type: ${type_range_str}, loc: ${storage_location_dag.has_solution_range(this.id) ? storage_location_dag.solution_range_of(this.id)!.map(t => t.str()) : ''}, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}${this.id}: FunctionCall, id: ${this.id} scope: (${cur_scope.kind()}, ${cur_scope.id()}), type: ${type_range_str}, loc: ${storage_location_dag.has_solution_range(this.id) ? storage_location_dag.solution_range_of(this.id)!.map(t => t.str()) : ''}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
   }
 
   private internal_function_call(contractdecl_id : number) : boolean {
@@ -4846,7 +4846,7 @@ class NewStructGenerator extends ExpressionGenerator {
   private start_flag() {
     if (config.debug) {
       const type_range_str = generate_type_range_str(this.type_range);
-      Log.log(`${" ".repeat(indent)}>>  Start generating NewStructGenerator ${this.id}: ${type_range_str}, scope: ${cur_scope.kind()}`);
+      Log.log(`${" ".repeat(indent)}>>  Start generating NewStructGenerator ${this.id}: ${type_range_str}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`);
       increase_indent();
     }
   }
@@ -4854,7 +4854,7 @@ class NewStructGenerator extends ExpressionGenerator {
   private end_flag() {
     decrease_indent();
     const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
-    Log.log(`${" ".repeat(indent)}${this.id}: NewStructGenerator, scope: ${cur_scope.kind()} type: ${type_range_str}, loc: ${storage_location_dag.has_solution_range(this.id) ? storage_location_dag.solution_range_of(this.id)!.map(t => t.str()) : ''}`)
+    Log.log(`${" ".repeat(indent)}${this.id}: NewStructGenerator, scope: (${cur_scope.kind()}, ${cur_scope.id()}) type: ${type_range_str}, loc: ${storage_location_dag.has_solution_range(this.id) ? storage_location_dag.solution_range_of(this.id)!.map(t => t.str()) : ''}`)
   }
 
   private distill_type_range() : [type.StructType, decl.IRStructDefinition] {
@@ -4917,14 +4917,14 @@ class NewContractGenerator extends ExpressionGenerator {
 
   private start_flag() {
     const type_range_str = generate_type_range_str(this.type_range);
-    Log.log(`${" ".repeat(indent)}>>  Start generating NewContractGenerator ${this.id}: ${type_range_str}, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating NewContractGenerator ${this.id}: ${type_range_str}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
   private end_flag() {
     decrease_indent();
     const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
-    Log.log(`${" ".repeat(indent)}${this.irnode!.id}: NewContractGenerator, scope: ${cur_scope.kind()}, type_range: ${type_range_str}`)
+    Log.log(`${" ".repeat(indent)}${this.irnode!.id}: NewContractGenerator, scope: (${cur_scope.kind()}, ${cur_scope.id()}), type_range: ${type_range_str}`)
   }
 
   private distill_type_range() : type.ContractType {
@@ -4996,13 +4996,13 @@ class EmitExpressionGenerator extends ExpressionGenerator {
   }
 
   start_flag() {
-    Log.log(`${" ".repeat(indent)}>>  Start generating EmitExpressionGenerator ${this.id}: scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating EmitExpressionGenerator ${this.id}: scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
   end_flag() {
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}${this.id}: EmitExpressionGenerator, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}${this.id}: EmitExpressionGenerator, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
   }
 
   generate(cur_expression_complexity_level : number) : void {
@@ -5037,13 +5037,13 @@ class RevertExpressionGenerator extends ExpressionGenerator {
   }
 
   start_flag() {
-    Log.log(`${" ".repeat(indent)}>>  Start generating RevertExpressionGenerator ${this.id}: scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating RevertExpressionGenerator ${this.id}: scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
   end_flag() {
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}${this.id}: RevertExpressionGenerator, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}${this.id}: RevertExpressionGenerator, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
   }
 
   generate(cur_expression_complexity_level : number) : void {
@@ -5107,12 +5107,12 @@ abstract class StatementGenerator extends Generator {
   constructor() { super(); }
   abstract generate(cur_stmt_complex_level : number) : void;
   protected start_flag() {
-    Log.log(`${" ".repeat(indent)}>>  Start generating ${this.generator_name}, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating ${this.generator_name}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
   protected end_flag() {
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}${this.irnode!.id}: ${this.generator_name}, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}${this.irnode!.id}: ${this.generator_name}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
   }
 }
 
@@ -5401,7 +5401,7 @@ class IfStatementGenerator extends NonExpressionStatementGenerator {
   }
 
   private generate_condition() : expr.IRExpression {
-    Log.log(`${" ".repeat(indent)}>>  Start generating If condition, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating If condition, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
     const cid = new_global_id();
     type_dag.insert(cid, type.bool_types);
@@ -5410,12 +5410,12 @@ class IfStatementGenerator extends NonExpressionStatementGenerator {
     this.exprs.push(expr.tuple_extraction(condition_gen.irnode as expr.IRExpression));
     roll_back_scope();
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}IfStatement Condition, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}IfStatement Condition, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     return condition_gen.irnode as expr.IRExpression;
   }
 
   private generate_true_body(cur_stmt_complex_level : number) {
-    Log.log(`${" ".repeat(indent)}>>  Start generating If true body, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating If true body, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
     new_scope(scopeKind.IF_BODY);
     let true_body : stmt.IRStatement[] = [];
@@ -5435,13 +5435,13 @@ class IfStatementGenerator extends NonExpressionStatementGenerator {
       );
     }
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}IfStatement True Body, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}IfStatement True Body, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     roll_back_scope();
     return true_body;
   }
 
   private generate_false_body(cur_stmt_complex_level : number) {
-    Log.log(`${" ".repeat(indent)}>>  Start generating If false body, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating If false body, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
     new_scope(scopeKind.IF_BODY);
     let false_body : stmt.IRStatement[] = [];
@@ -5461,7 +5461,7 @@ class IfStatementGenerator extends NonExpressionStatementGenerator {
       );
     }
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}IfStatement False Body, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}IfStatement False Body, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     return false_body;
   }
 
@@ -5489,7 +5489,7 @@ class ForStatementGenerator extends NonExpressionStatementGenerator {
   }
 
   private generate_init() {
-    Log.log(`${" ".repeat(indent)}>>  Start generating intialization, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating intialization, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
     let init_stmt_expr : stmt.IRVariableDeclarationStatement | expr.IRExpression | undefined;
     const init_cnt = random_int(config.for_init_cnt_lower_limit, config.for_init_cnt_upper_limit);
@@ -5519,12 +5519,12 @@ class ForStatementGenerator extends NonExpressionStatementGenerator {
       }
     }
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}ForStatement Initialization, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}ForStatement Initialization, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     return init_stmt_expr;
   }
 
   private generate_condition() {
-    Log.log(`${" ".repeat(indent)}>>  Start generating conditional, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating conditional, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
     const cid = new_global_id();
     type_dag.insert(cid, type.bool_types);
@@ -5532,8 +5532,8 @@ class ForStatementGenerator extends NonExpressionStatementGenerator {
     conditional_gen.generate(0);
     this.exprs = this.exprs.concat([expr.tuple_extraction(conditional_gen.irnode as expr.IRExpression)]);
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}ForStatement Conditional, scope: ${cur_scope.kind()}`)
-    Log.log(`${" ".repeat(indent)}>>  Start generating loop generation, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}ForStatement Conditional, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating loop generation, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
     return conditional_gen.irnode! as expr.IRExpression;
   }
@@ -5546,8 +5546,8 @@ class ForStatementGenerator extends NonExpressionStatementGenerator {
     loop_gen.generate(0);
     this.exprs = this.exprs.concat([expr.tuple_extraction(loop_gen.irnode as expr.IRExpression)]);
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}ForStatement Loop Generation, scope: ${cur_scope.kind()}`)
-    Log.log(`${" ".repeat(indent)}>>  Start generating body, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}ForStatement Loop Generation, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating body, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
     return loop_gen.irnode! as expr.IRExpression;
   }
@@ -5571,7 +5571,7 @@ class ForStatementGenerator extends NonExpressionStatementGenerator {
       );
     }
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}ForStatement, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}ForStatement, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     roll_back_scope();
     return body;
   }
@@ -5597,7 +5597,7 @@ class WhileStatementGenerator extends NonExpressionStatementGenerator {
   }
 
   private generate_condition() {
-    Log.log(`${" ".repeat(indent)}>>  Start generating condition, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating condition, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
     const cond_gen_prototype = get_exprgenerator(type.bool_types);
     const cid = new_global_id();
@@ -5608,12 +5608,12 @@ class WhileStatementGenerator extends NonExpressionStatementGenerator {
     this.exprs = this.exprs.concat([expr.tuple_extraction(cond_gen.irnode as expr.IRExpression)]);
     roll_back_scope();
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}WhileStatement Condition, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}WhileStatement Condition, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     return cond_gen.irnode! as expr.IRExpression;
   }
 
   private generate_body(cur_stmt_complex_level : number) {
-    Log.log(`${" ".repeat(indent)}>>  Start generating body, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating body, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
     new_scope(scopeKind.WHILE_BODY);
     const stmt_cnt = random_int(config.while_body_stmt_cnt_lower_limit, config.while_body_stmt_cnt_upper_limit);
@@ -5633,7 +5633,7 @@ class WhileStatementGenerator extends NonExpressionStatementGenerator {
       body.push(body_stmt_gen.irnode! as stmt.IRStatement);
     }
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}WhileStatement body, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}WhileStatement body, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     roll_back_scope();
     return body;
   }
@@ -5654,7 +5654,7 @@ class DoWhileStatementGenerator extends NonExpressionStatementGenerator {
   }
 
   private generate_condition() {
-    Log.log(`${" ".repeat(indent)}>>  Start generating DoWhileStatement condition, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating DoWhileStatement condition, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
     const cond_gen_prototype = get_exprgenerator(type.bool_types);
     const cid = new_global_id();
@@ -5665,12 +5665,12 @@ class DoWhileStatementGenerator extends NonExpressionStatementGenerator {
     roll_back_scope();
     this.exprs = this.exprs.concat([expr.tuple_extraction(cond_gen.irnode as expr.IRExpression)]);
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}DoWhileStatement Condition, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}DoWhileStatement Condition, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     return cond_gen.irnode! as expr.IRExpression;
   }
 
   private generate_body(cur_stmt_complex_level : number) {
-    Log.log(`${" ".repeat(indent)}>>  Start generating DoWhileStatement body, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating DoWhileStatement body, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
     new_scope(scopeKind.DOWHILE_BODY);
     const stmt_cnt = random_int(config.do_while_body_stmt_cnt_lower_limit, config.do_while_body_stmt_cnt_upper_limit);
@@ -5690,7 +5690,7 @@ class DoWhileStatementGenerator extends NonExpressionStatementGenerator {
       body.push(body_stmt_gen.irnode! as stmt.IRStatement);
     }
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}DoWhileStatement body, scope: ${cur_scope.kind()}`)
+    Log.log(`${" ".repeat(indent)}DoWhileStatement body, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     roll_back_scope();
     return body;
   }

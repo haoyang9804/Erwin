@@ -411,35 +411,38 @@ export async function generate() {
     }
     const source_unit = new gen.SourceUnitGenerator();
     source_unit.generate();
-    try {
-      let startTime = performance.now();
-      await type_dag.resolve();
-      let endTime = performance.now();
-      console.log(`Time cost of resolving type constraints: ${endTime - startTime} ms`);
-      startTime = performance.now();
-      await vismut_dag.resolve();
-      endTime = performance.now();
-      console.log(`Time cost of resolving visibility and state mutability constraints: ${endTime - startTime} ms`);
-      startTime = performance.now();
-      await storage_location_dag.resolve();
-      endTime = performance.now();
-      console.log(`Time cost of resolving storage location constraints: ${endTime - startTime} ms`);
-      type_dag.verify();
-      vismut_dag.verify();
-      storage_location_dag.verify();
-      if (config.mode === "type") {
-        generate_type_mode(source_unit);
-      }
-      else if (config.mode === "scope") {
-        generate_scope_mode(source_unit);
-      }
-      else if (config.mode === "loc") {
-        generate_loc_mode(source_unit);
-      }
-    }
-    catch (error) {
-      console.error(error);
+    let startTime = performance.now();
+    await type_dag.resolve().catch((err) => {
+      console.error(err);
       process.exit(1);
+    });
+    let endTime = performance.now();
+    console.log(`Time cost of resolving type constraints: ${endTime - startTime} ms`);
+    startTime = performance.now();
+    await vismut_dag.resolve().catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
+    endTime = performance.now();
+    console.log(`Time cost of resolving visibility and state mutability constraints: ${endTime - startTime} ms`);
+    startTime = performance.now();
+    await storage_location_dag.resolve().catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
+    endTime = performance.now();
+    console.log(`Time cost of resolving storage location constraints: ${endTime - startTime} ms`);
+    type_dag.verify();
+    vismut_dag.verify();
+    storage_location_dag.verify();
+    if (config.mode === "type") {
+      generate_type_mode(source_unit);
+    }
+    else if (config.mode === "scope") {
+      generate_scope_mode(source_unit);
+    }
+    else if (config.mode === "loc") {
+      generate_loc_mode(source_unit);
     }
     if (config.enable_test) {
       await test_validity().then((result) => {
