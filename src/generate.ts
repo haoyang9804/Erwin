@@ -25,7 +25,7 @@ import {
   StateVariableVisibility,
   FunctionStateMutability,
 } from "solc-typed-ast"
-import { test_validity } from "./test";
+import { test_compiler, test_slither } from "./test";
 const formatter = new PrettyFormatter(2, 0);
 const writer = new ASTWriter(
   DefaultASTWriterMapping,
@@ -447,9 +447,13 @@ export async function generate() {
       generate_loc_mode(source_unit);
     }
     if (config.enable_test) {
-      await test_validity().then((result) => {
+      await test_compiler().then((result) => {
         if (result !== 0) {
-          console.error("Some generated programs cause compilation errors.");
+          process.exit(1);
+        }
+      });
+      await test_slither().then((result) => {
+        if (result !== 0) {
           process.exit(1);
         }
       });
