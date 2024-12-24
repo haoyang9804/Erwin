@@ -103,7 +103,8 @@ export const config = {
   // Test Solidity
   compiler_path: "",
   enable_test: false,
-
+  no_test_compiler: false,
+  no_test_slither: false,
   // Refresh the folder of the generated programs before generating new programs
   refresh_folder: true,
 }

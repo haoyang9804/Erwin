@@ -147,6 +147,7 @@ async function compile(file_path : string) : Promise<[string, string]> {
  * - 0 if all the generated programs pass the compilation
  * - 1 if generated program triggers an error
  * - 2 if the output directory does not exist
+ * - 3 if the time limit is exceeded
  * - 4 if the compiler path is incorrect
  */
 export async function test_compiler() : Promise<number> {
@@ -221,7 +222,9 @@ export async function test_compiler() : Promise<number> {
  * - 0 if all the generated programs pass the analysis
  * - 1 if generated program triggers an error
  * - 2 if the output directory does not exist
+ * - 3 if the time limit is exceeded
  * - 4 if slither is not installed
+ * - 5 if executable solc is not found
  */
 export async function test_slither() : Promise<number> {
   return new Promise((resolve) => {
@@ -246,6 +249,14 @@ export async function test_slither() : Promise<number> {
         if (stderr) {
           console.error('Slither is not installed');
           return 4;
+        }
+
+        // Check if the executable solc is found
+        // @ts-ignore
+        const { stdout_, stderr_ } = await execPromise('solc --version');
+        if (stderr_) {
+          console.error('Executable solc not found, you should install solidity compiler and add `solc` to the PATH');
+          return 5;
         }
 
         const files = await readdir(dirPath);

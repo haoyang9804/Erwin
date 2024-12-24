@@ -100,6 +100,8 @@ program
   .option("--generation_rounds <number>", "The number of rounds Erwin will generate.", `${config.generation_rounds}`)
   .option("--log_file_path <string>", "The path of the log file.", `${config.log_file_path}`)
   .option("--enable_test", "Enable the test mode.", `${config.enable_test}`)
+  .option("--no_test_compiler", "Disable the testing for Solidity compiler.", `${config.no_test_compiler}`)
+  .option("--no_test_slither", "Disable the testing for Slither.", `${config.no_test_slither}`)
   .option("--compiler_path <string>", "The path of the Solidity compiler.", `${config.compiler_path}`)
   .option("--refresh_folder", "Refresh the folder before generating the program.", `${config.refresh_folder}`)
 program.parse(process.argv);
@@ -178,6 +180,8 @@ else if (program.args[0] === "generate") {
   if (program.commands[1].opts().refresh_folder === true) config.refresh_folder = true;
   if (program.commands[1].opts().debug === true) config.debug = true;
   if (program.commands[1].opts().enable_test === true) config.enable_test = true;
+  if (program.commands[1].opts().no_test_compiler === true) config.no_test_compiler = true;
+  if (program.commands[1].opts().no_test_slither === true) config.no_test_slither = true;
   if (config.mode == "scope") {
     config.int_num = 1;
     config.uint_num = 1;

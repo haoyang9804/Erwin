@@ -447,16 +447,20 @@ export async function generate() {
       generate_loc_mode(source_unit);
     }
     if (config.enable_test) {
-      await test_compiler().then((result) => {
-        if (result !== 0) {
-          process.exit(1);
-        }
-      });
-      await test_slither().then((result) => {
-        if (result !== 0) {
-          process.exit(1);
-        }
-      });
+      if (!config.no_test_compiler) {
+        await test_compiler().then((result) => {
+          if (result !== 0) {
+            process.exit(1);
+          }
+        });
+      }
+      if (!config.no_test_slither) {
+        await test_slither().then((result) => {
+          if (result !== 0) {
+            process.exit(1);
+          }
+        });
+      }
     }
   }
 }
