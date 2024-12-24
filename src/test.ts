@@ -150,48 +150,68 @@ async function compile(file_path : string) : Promise<[string, string]> {
  * - 4 if the compiler path is incorrect
  */
 export async function test_compiler() : Promise<number> {
-  // Check if the "generated_programs" directory exists
-  const dirPath = config.out_dir;
-  const stats = await stat(dirPath);
-  if (!stats.isDirectory()) {
-    console.error('Output directory does not exist');
-    return 2;
-  }
-  //@ts-ignore
-  const { stdout, stderr } = await execPromise(`${config.compiler_path} --version`);
-  if (stderr) {
-    console.error('Compiler path is incorrect');
-    return 4;
-  }
-  const files = await readdir(dirPath);
-  for (const file of files) {
-    const filePath = path.join(dirPath, file);
-    const stats = await stat(filePath);
-    if (stats.isFile()) {
+  return new Promise((resolve) => {
+    const timeoutDuration = 5 * 60 * 1000; // 5 minutes in milliseconds
+    const timeoutId = setTimeout(() => {
+      console.error('Time limit exceeded for compiler test');
+      resolve(3);
+    }, timeoutDuration);
+
+    const runCompilerTest = async () : Promise<number> => {
       try {
-        await compile(filePath);
+        // Check if the "generated_programs" directory exists
+        const dirPath = config.out_dir;
+        const stats = await stat(dirPath);
+        if (!stats.isDirectory()) {
+          console.error('Output directory does not exist');
+          return 2;
+        }
+
+        // @ts-ignore
+        const { stdout, stderr } = await execPromise(`${config.compiler_path} --version`);
+        if (stderr) {
+          console.error('Compiler path is incorrect');
+          return 4;
+        }
+
+        const files = await readdir(dirPath);
+        for (const file of files) {
+          const filePath = path.join(dirPath, file);
+          const stats = await stat(filePath);
+          if (stats.isFile()) {
+            try {
+              await compile(filePath);
+            } catch (error) {
+              const execError = error as ExecException & {
+                stdout : string;
+                stderr : string;
+                signal ?: string;
+              };
+              console.error(`=========Error in file ${filePath}=========`);
+              // Check for segmentation fault first
+              if (execError.signal === 'SIGSEGV') {
+                console.error('Segmentation fault (SIGSEGV) detected in compiler execution');
+              }
+              // If it's not a segmentation fault, check for other errors
+              else if (execError.stderr) {
+                console.error(`Solidity compiler error: ${execError.stderr}`);
+              }
+              return 1;
+            }
+          }
+        }
+        return 0;
       } catch (error) {
-        const execError = error as ExecException & {
-          stdout : string;
-          stderr : string;
-          signal ?: string;
-        };
-
-        console.error(`=========Error in file ${filePath}=========`);
-
-        // Check for segmentation fault first
-        if (execError.signal === 'SIGSEGV') {
-          console.error('Segmentation fault (SIGSEGV) detected in compiler execution');
-        }
-        // If it's not a segmentation fault, check for other errors
-        else if (execError.stderr) {
-          console.error(`Solidity compiler error: ${execError.stderr}`);
-        }
+        console.error('Unexpected error:', error);
         return 1;
       }
-    }
-  }
-  return 0;
+    };
+
+    runCompilerTest().then((result) => {
+      clearTimeout(timeoutId);
+      resolve(result);
+    });
+  });
 }
 
 /**
@@ -204,48 +224,71 @@ export async function test_compiler() : Promise<number> {
  * - 4 if slither is not installed
  */
 export async function test_slither() : Promise<number> {
-  // Check if the "generated_programs" directory exists
-  const dirPath = config.out_dir;
-  const stats = await stat(dirPath);
-  if (!stats.isDirectory()) {
-    console.error('Output directory does not exist');
-    return 2;
-  }
-  //@ts-ignore
-  const { stdout, stderr } = await execPromise('slither --version');
-  if (stderr) {
-    console.error('Slither is not installed');
-    return 4;
-  }
-  const files = await readdir(dirPath);
-  for (const file of files) {
-    const filePath = path.join(dirPath, file);
-    const stats = await stat(filePath);
-    if (stats.isFile()) {
-      try {
-        const slither_command = `slither ${filePath}`;
-        await execPromise(slither_command);
-      } catch (error) {
-        const execError = error as ExecException & {
-          stdout : string;
-          stderr : string;
-          signal ?: string;
-        };
+  return new Promise((resolve) => {
+    const timeoutDuration = 5 * 60 * 1000; // 5 minutes in milliseconds
+    const timeoutId = setTimeout(() => {
+      console.error('Time limit exceeded for slither test');
+      resolve(3);
+    }, timeoutDuration);
 
-        // Check for segmentation fault first
-        if (execError.signal === 'SIGSEGV') {
-          console.error(`=========Error in file ${filePath}=========`);
-          console.error('Segmentation fault (SIGSEGV) detected in Slither execution');
-          return 1;
+    const runSlitherTest = async () : Promise<number> => {
+      try {
+        // Check if the "generated_programs" directory exists
+        const dirPath = config.out_dir;
+        const stats = await stat(dirPath);
+        if (!stats.isDirectory()) {
+          console.error('Output directory does not exist');
+          return 2;
         }
-        else if (execError.stderr &&
-          (execError.stderr.includes('ERROR:') || execError.stderr.includes('Traceback'))) {
-          console.error(`=========Error in file ${filePath}=========`);
-          console.error(`Slither error: ${execError.stderr}`);
-          return 1;
+
+        // @ts-ignore
+        const { stdout, stderr } = await execPromise('slither --version');
+        if (stderr) {
+          console.error('Slither is not installed');
+          return 4;
         }
+
+        const files = await readdir(dirPath);
+        for (const file of files) {
+          const filePath = path.join(dirPath, file);
+          const stats = await stat(filePath);
+          if (stats.isFile()) {
+            try {
+              const slither_command = `slither ${filePath}`;
+              await execPromise(slither_command);
+            } catch (error) {
+              const execError = error as ExecException & {
+                stdout : string;
+                stderr : string;
+                signal ?: string;
+              };
+              // Check for segmentation fault first
+              if (execError.signal === 'SIGSEGV') {
+                console.error(`=========Error in file ${filePath}=========`);
+                console.error('Segmentation fault (SIGSEGV) detected in Slither execution');
+                return 1;
+              } else if (
+                execError.stderr &&
+                (execError.stderr.includes('ERROR:') || execError.stderr.includes('Traceback'))
+              ) {
+                console.error(`=========Error in file ${filePath}=========`);
+                console.error(`Slither error: ${execError.stderr}`);
+                return 1;
+              }
+              console.error(`Slither error: ${execError.stderr}`);
+            }
+          }
+        }
+        return 0;
+      } catch (error) {
+        console.error('Unexpected error:', error);
+        return 1;
       }
-    }
-  }
-  return 0;
+    };
+
+    runSlitherTest().then((result) => {
+      clearTimeout(timeoutId);
+      resolve(result);
+    });
+  });
 }

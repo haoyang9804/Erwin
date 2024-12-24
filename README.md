@@ -56,6 +56,7 @@ For more flags, please refer to `npx erwin generation -h`.
 19. https://github.com/ethereum/solidity/issues/15647 (ICE, smt) ✅
 20. https://github.com/ethereum/solidity/issues/15649 (ICE)
 21. https://github.com/ethereum/solidity/issues/15651 (ICE)
+22. https://github.com/crytic/slither/issues/2619 (hang)
 
 ## Weird Language Features
 
