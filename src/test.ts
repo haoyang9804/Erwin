@@ -238,6 +238,12 @@ export async function test_slither() : Promise<number> {
           console.error('Segmentation fault (SIGSEGV) detected in Slither execution');
           return 1;
         }
+        else if (execError.stderr &&
+          (execError.stderr.includes('ERROR:') || execError.stderr.includes('Traceback'))) {
+          console.error(`=========Error in file ${filePath}=========`);
+          console.error(`Slither error: ${execError.stderr}`);
+          return 1;
+        }
       }
     }
   }
