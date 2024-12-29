@@ -7,7 +7,7 @@
   </a>
   <img alt="NPM License" src="https://img.shields.io/npm/l/%40__haoyang__%2Ferwin">
   <a href="https://haoyang9804.github.io/Erwin">
-    <img alt="Static Badge" src="https://img.shields.io/badge/Documentation-red">
+    <img alt="Static Badge" src="https://img.shields.io/badge/Erwin-doc-pink">
   </a>
 </p>
 
