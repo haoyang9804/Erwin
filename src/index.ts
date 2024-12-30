@@ -225,8 +225,8 @@ else if (program.args[0] === "generate") {
   assert(config.vardecl_prob >= 0 && config.vardecl_prob <= 1.0, "The probability of generating a variable declaration must be in the range [0,1].");
   assert(config.new_prob >= 0 && config.new_prob <= 1.0, "The probability of generating a variable declaration in place must be in the range [0,1].");
   assert(config.else_prob >= 0.0 && config.else_prob <= 1.0, "The probability of generating an else statement must be in the range [0,1].");
-  assert(config.mapping_type_prob > 0.0 && config.mapping_type_prob <= 1.0, "The probability of generating a mapping must be in the range (0,1].");
-  assert(config.array_type_prob > 0.0 && config.array_type_prob <= 1.0, "The probability of generating an array must be in the range (0,1].");
+  assert(config.mapping_type_prob >= 0.0 && config.mapping_type_prob <= 1.0, "The probability of generating a mapping must be in the range [0,1].");
+  assert(config.array_type_prob >= 0.0 && config.array_type_prob <= 1.0, "The probability of generating an array must be in the range [0,1].");
   assert(config.string_type_prob >= 0.0 && config.string_type_prob <= 1.0, "The probability of generating a string must be in the range [0,1].");
   assert(config.contract_type_prob >= 0.0 && config.contract_type_prob <= 1.0, "The probability of generating a contract instance must be in the range [0,1].");
   assert(config.struct_type_prob >= 0.0 && config.struct_type_prob <= 1.0, "The probability of generating a struct instance must be in the range [0,1].");

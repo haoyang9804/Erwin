@@ -9,6 +9,7 @@ import { IRExpressionStatement, IRStatement } from './statement';
 import { new_global_id } from './genContext';
 import { IRAssignment, IRIdentifier } from './expression';
 import { cur_scope } from './genContext';
+import { config } from './config';
 /**
  * A class to store the declaration information.
  */
@@ -1327,11 +1328,16 @@ class TypeDB {
   private user_defined_types : type.UserDefinedType[] = [];
 
   public init() : void {
-    this.all_types = [...type.elementary_types,
-    type.TypeProvider.trivial_mapping(),
-    type.TypeProvider.trivial_array(),
-    type.TypeProvider.string()
-    ];
+    this.all_types = [...type.elementary_types];
+    if (config.string_type_prob > 0) {
+      this.all_types.push(type.TypeProvider.string());
+    }
+    if (config.array_type_prob > 0) {
+      this.all_types.push(type.TypeProvider.trivial_array());
+    }
+    if (config.mapping_type_prob > 0) {
+      this.all_types.push(type.TypeProvider.trivial_mapping());
+    }
     this.contract_types.clear();
     this.internal_struct_types.clear();
     this.internal_struct_type_to_external_struct_type.clear();
@@ -1363,7 +1369,9 @@ class TypeDB {
   }
 
   public add_contract_type(contract_id : number, t : type.ContractType) : void {
+    this.add_type(t);
     this.contract_types.set(contract_id, t);
+    this.add_user_defined_type(t);
   }
 
   public contract_type_of(contract_id : number) : type.ContractType {
@@ -1396,6 +1404,9 @@ class TypeDB {
   }
 
   public add_struct_type(struct_type : type.StructType, scope : ScopeList) : void {
+    if (config.struct_type_prob == 0) {
+      return;
+    }
     this.add_type(struct_type);
     this.add_user_defined_type(struct_type);
     if (inside_contract(scope)) {

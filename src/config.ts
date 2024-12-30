@@ -61,7 +61,7 @@ export const config = {
   expression_complexity_prob: 0.8,
   literal_prob: 0.05,
   tuple_prob: 0.3,
-  vardecl_prob: 0.0,
+  vardecl_prob: 0.3,
   new_prob: 0.1,
   else_prob: 0.3,
   init_state_var_in_constructor_prob: 0.3,

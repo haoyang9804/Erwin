@@ -570,7 +570,7 @@ function vardecl_storage_loc_range_is_ok(vardecl_id : number, storage_loc_range 
 }
 
 function get_vardecls(types : type.Type[], storage_locs : loc.StorageLocation[]) : decl.IRVariableDeclaration[] {
-  const collection : decl.IRVariableDeclaration[] = [];
+  let collection : decl.IRVariableDeclaration[] = [];
   //! Search for struct members
   for (const struct_decl_id of decl_db.structdecls_ids()) {
     const struct_decl = irnodes.get(struct_decl_id) as decl.IRStructDefinition;
@@ -654,6 +654,15 @@ function get_vardecls(types : type.Type[], storage_locs : loc.StorageLocation[])
       }
     }
   }
+
+  // If Erwin is forbidden to generate struct instances or new struct expressions,
+  // struct members are naturally out of consideration.
+  if (config.struct_type_prob == 0) {
+    collection = collection.filter(
+      (irdecl) => !decl_db.is_member_of_struct_decl(irdecl.id)
+    );
+  }
+
   return collection.filter(
     (irdecl) =>
       vardecl_type_range_is_ok(irdecl.id, types) &&
@@ -3107,9 +3116,7 @@ class ContractDeclarationGenerator extends DeclarationGenerator {
 
   private add_contract_type(id : number, contract_name : string) {
     const contract_type = new type.ContractType(id, contract_name);
-    type_db.add_type(contract_type);
     type_db.add_contract_type(id, contract_type);
-    type_db.add_user_defined_type(contract_type)
   }
 
   generate() : void {
