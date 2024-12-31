@@ -9,7 +9,9 @@
   <a href="https://haoyang9804.github.io/Erwin">
     <img alt="Static Badge" src="https://img.shields.io/badge/Erwin-doc-pink">
   </a>
+  <img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/haoyang9804/Erwin/npm.yml">
 </p>
+
 
 ***Erwin*** is an academic attempt on introducing `bounded exhaustive instantiation` in random program generator to mitigate opportunism.
 Different from [Csmith](https://github.com/csmith-project/csmith)-family tools that generate a test program in one go, ***Erwin*** separates the generation process into two sub-steps: 1) randomly generate a type/loc/vis-agnostic IR (i.e., a program without type, storage location, and visibility), and 2) conducts bounded exhaustive instantiation to instantiate the IR into a swarm of real-word test programs.
