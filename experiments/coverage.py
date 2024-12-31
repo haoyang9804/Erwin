@@ -8,6 +8,124 @@ import os
 from collections import defaultdict, namedtuple
 import sys
 import time
+import colorama
+from colorama import Fore, Back, Style
+import random
+import subprocess
+import asyncio
+
+def solidity_compilation_flags() -> str:
+  output_flags = [
+    '--ast-compact-json',
+    '--asm',
+    '--asm-json',
+    '--opcodes',
+    '--bin',
+    '--bin-runtime',
+    '--abi',
+    '--ir',
+    '--ir-ast-json',
+    '--ir-optimized',
+    '--ir-optimized-ast-json',
+    '--hashes',
+    '--userdoc',
+    '--devdoc',
+    '--metadata',
+    '--storage-layout',
+  ]
+  opt_flags = [
+    '--optimize',
+    '--optimize-runs',  # followed by a number
+    '--optimize-yul',
+    '--no-optimize-yul',
+    '--yul-optimizations'  # followed by valid alphabets
+  ]
+  yul_optimizations = ['f', 'l', 'c', 'C', 'U', 'n', 'D', 'E', 'v', 'e',
+    'j', 's', 'x', 'I', 'O', 'o', 'i', 'g', 'h', 'F', 'T', 'L', 'M', 'm', 'V',
+    'a', 't', 'r', 'p', 'S', 'u', 'd']
+  # --optimize-yul and --no-optimize-yul are mutually exclusive
+  model_checker_flags = [
+    '--model-checker-div-mod-no-slacks',
+    '--model-checker-engine',  # followed by all,bmc,chc,none
+    '--model-checker-ext-calls',  # followed by untrusted,trusted
+    '--model-checker-invariants',  # followed by default,all,contract,reentrancy
+    '--model-checker-print-query',
+    '--model-checker-show-proved-safe',
+    '--model-checker-show-unproved',
+    '--model-checker-show-unsupported',
+    '--model-checker-solvers',  # followed by cvc5,eld,z3,smtlib2
+    '--model-checker-targets',  # followed by default,all,constantCondition,underflow,overflow,divByZero,balance,assert,popEmptyArray,outOfBounds
+    '--model-checker-timeout',  # followed by a number (ms)
+    '--model-checker-bmc-loop-iterations',  # followed by a number
+  ]
+  # Only smtlib2 can print query
+
+  def select_random_elements(lst, n):
+    return random.sample(lst, n)
+
+  def random_int(start, end):
+    return random.randint(start, end)
+
+  def pick_random_element(lst):
+    return random.choice(lst)
+
+  selected_output_flags = select_random_elements(output_flags, random_int(1, len(output_flags)))
+  selected_opt_flags = select_random_elements(opt_flags, random_int(1, len(opt_flags)))
+  selected_model_checker_flags = select_random_elements(model_checker_flags, random_int(1, len(model_checker_flags)))
+
+  if '--no-optimize-yul' in selected_opt_flags and '--optimize-yul' in selected_opt_flags:
+    index = selected_opt_flags.index('--optimize-yul' if random.random() < 0.5 else '--no-optimize-yul')
+    selected_opt_flags.pop(index)
+
+  if '--no-optimize-yul' in selected_opt_flags and '--optimize' in selected_opt_flags:
+    index = selected_opt_flags.index('--optimize' if random.random() < 0.5 else '--no-optimize-yul')
+    selected_opt_flags.pop(index)
+
+  if '--optimize-yul' not in selected_opt_flags and '--yul-optimizations' in selected_opt_flags:
+    index = selected_opt_flags.index('--yul-optimizations')
+    selected_opt_flags.pop(index)
+
+  for i, flag in enumerate(selected_opt_flags):
+    if flag == '--optimize-runs':
+      selected_opt_flags[i] = f"{flag} {random_int(1, 10)}"
+    elif flag == '--yul-optimizations':
+      selected_opt_flags[i] = f"{flag} {''.join(select_random_elements(yul_optimizations, random_int(1, len(yul_optimizations))))}"
+
+  if '--model-checker-bmc-loop-iterations' in selected_model_checker_flags and '--model-checker-engine' in selected_model_checker_flags:
+    if random.random() < 0.5:
+      selected_model_checker_flags.remove('--model-checker-bmc-loop-iterations')
+    else:
+      index = selected_model_checker_flags.index('--model-checker-engine')
+      selected_model_checker_flags[index] = '--model-checker-engine bmc'
+  elif '--model-checker-bmc-loop-iterations' in selected_model_checker_flags and '--model-checker-engine' not in selected_model_checker_flags:
+      selected_model_checker_flags.append('--model-checker-engine bmc')
+
+  for i, flag in enumerate(selected_model_checker_flags):
+    if flag == '--model-checker-engine':
+      selected_model_checker_flags[i] = f"{flag} {pick_random_element(['all', 'bmc', 'chc', 'none'])}"
+    elif flag == '--model-checker-ext-calls':
+      selected_model_checker_flags[i] = f"{flag} {pick_random_element(['untrusted', 'trusted'])}"
+    elif flag == '--model-checker-invariants':
+      selected_model_checker_flags[i] = f"{flag} {pick_random_element(['default', 'all', 'contract', 'reentrancy'])}"
+    elif flag == '--model-checker-solvers':
+      selected_model_checker_flags[i] = f"{flag} {pick_random_element(['cvc5', 'eld', 'z3', 'smtlib2'])}"
+    elif flag == '--model-checker-targets':
+      selected_model_checker_flags[i] = f"{flag} {pick_random_element(['default', 'all', 'constantCondition', 'underflow', 'overflow', 'divByZero', 'balance', 'assert', 'popEmptyArray', 'outOfBounds'])}"
+    elif flag in ['--model-checker-timeout', '--model-checker-bmc-loop-iterations']:
+      selected_model_checker_flags[i] = f"{flag} {random_int(1, 10)}"
+
+  if '--model-checker-print-query' in selected_model_checker_flags and '--model-checker-solvers' in selected_model_checker_flags:
+    index = selected_model_checker_flags.index('--model-checker-solvers')
+    if index != -1:
+        selected_model_checker_flags[index] = '--model-checker-solvers smtlib2'
+  elif '--model-checker-solvers' in selected_model_checker_flags:
+    index = selected_model_checker_flags.index('--model-checker-solvers')
+    selected_model_checker_flags[index] = f"--model-checker-solvers {pick_random_element(['default', 'all', 'constantCondition', 'underflow', 'overflow', 'divByZero', 'balance', 'assert', 'popEmptyArray', 'outOfBounds'])}"
+  elif '--model-checker-print-query' in selected_model_checker_flags:
+    selected_model_checker_flags.remove('--model-checker-print-query')
+
+  flags = f"{pick_random_element(selected_output_flags)} {' '.join(selected_opt_flags)} {' '.join(selected_model_checker_flags)} --via-ir"
+  return flags
 
 def int_to_string_array(int_array):
   string_array = [str(num) for num in int_array]
@@ -17,7 +135,6 @@ def int_to_string_array(int_array):
 def extract_collected_edges(coverage_data) -> dict :
   position = namedtuple('Position', ['function_name', 'line_start', 'column_start', 'line_end', 'column_end'])
   collected_edges = defaultdict(int)
-  # collected_edges = defaultdict(lambda: {'line_start': int, 'column_start': int, 'line_end': int, 'column_end': int, 'count': int})
   # Iterate through the functions in the coverage data
   for function in coverage_data['data'][0]['functions']:
     function_name = function['name']
@@ -133,7 +250,9 @@ def generate_solidity_edge_coverage(solc_path, sol_dir):
   for sol_file in glob.glob(os.path.join(sol_dir, '*.sol')):
     filename = os.path.basename(sol_file)
     profraw_file = os.path.join('temp_profiles', f"{os.path.splitext(filename)[0]}.profraw")
-    subprocess.run(f'LLVM_PROFILE_FILE="{profraw_file}" {solc_path} {sol_file}', shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    compiler_command = f'LLVM_PROFILE_FILE="{profraw_file}" {solc_path} {solidity_compilation_flags()} {sol_file}'
+    print(Fore.GREEN + f'compiler_command: {compiler_command}')
+    subprocess.run(compiler_command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
   #!Step 2: Merge all raw profile data
   # Get all .profraw files in the temp_profiles directory
   profraw_files = glob.glob('temp_profiles/*.profraw')
@@ -336,7 +455,7 @@ def draw_previous_experiment1():
   
   store_fig_experiment1(ax_edge, ax_line, fig_edge, fig_line)
 
-def run_experiment1(name, executions, rounds, command_prefix, command_suffix, solc_path, generated_programs_folder_path, gcov_folder_path, ax_edge, ax_line, color):
+def run_experiment1(name, executions, rounds, time_limit, command_prefix, command_suffix, solc_path, generated_programs_folder_path, gcov_folder_path, ax_edge, ax_line, color):
   g_covered_edgecnts = []
   g_covered_linecnts = []
   g_edgecnt = -1
@@ -354,13 +473,16 @@ def run_experiment1(name, executions, rounds, command_prefix, command_suffix, so
     os.makedirs('temp_profiles')
     covered_edgecnts = []
     covered_linecnts = []
-    for j in range(rounds):
-      start = time.time()
+    # for j in range(rounds):
+    time_budget = time_limit
+    while time_budget > 0:
+      gen_start = time.time()
       command = f'{np.random.choice(commands) if command_prefix=="" else command_prefix} {command_suffix} {" ".join(optional_command_suffix())}'
-      print(f"> Execution {i+1}, Round {j+1}: {command}")
+      print(Fore.CYAN + f"Erwin command: {command}")
       covered_edgecnt, edgecnt, covered_linecnt, linecnt = generate_compile_covcollect(command, solc_path, generated_programs_folder_path, gcov_folder_path)
-      end = time.time()
-      print(f"> Execution {i+1}, Round {j+1}, Time Cost: {end-start} seconds: {covered_edgecnt}/{edgecnt} edges covered, {covered_linecnt}/{linecnt} lines covered")
+      gen_end = time.time()
+      time_budget -= gen_end-gen_start
+      print(Fore.BLUE + f"> Execution {i+1}, Time Cost: {gen_end-gen_start} seconds, Time Budget: {time_budget} seconds, {covered_edgecnt}/{edgecnt} edges covered, {covered_linecnt}/{linecnt} lines covered")
       g_edgecnt = max(edgecnt, g_edgecnt)
       g_linecnt = max(linecnt, g_linecnt)
       g_covered_edgecnt = max(covered_edgecnt, g_covered_edgecnt)
@@ -406,9 +528,9 @@ def experiment1():
   # generated_programs_folder_path = input("Enter the path to the generated program folder: ")
   # gcov_folder_path = input("Enter the absolute path to the gcov folder: ")
 
-  solc_path = '/home/linuxbrew/solidity/build_experiment1/solc/solc'
-  generated_programs_folder_path = '/home/linuxbrew/Erwin/generated_programs'
-  gcov_folder_path = '/home/linuxbrew/solidity/build_experiment1'
+  solc_path = '/data/hmaaj/solidity/build-experiment1/solc/solc'
+  generated_programs_folder_path = '/data/hmaaj/Erwin/generated_programs'
+  gcov_folder_path = '/data/hmaaj/solidity/build-experiment1'
 
   # solc_path = '/Users/mac/repo/solidity/build-lcov/solc/solc'
   # generated_programs_folder_path = '/Users/mac/repo/Erwin/generated_programs'
@@ -417,21 +539,22 @@ def experiment1():
   command_suffix = f'--generation_rounds 1 --refresh_folder'
   executions = 5 # Number of executions of this experiment, used to mitigate the impact of randomness
   rounds = 1000 # Number of rounds of each execution, the x-axis of the plot
+  time_limit = 3600*5 # Time limit for each round, in seconds
   fig_edge, ax_edge = plt.subplots(figsize = (8,5))
   fig_line, ax_line = plt.subplots(figsize = (8,5))
   
   #!1. Trivial generation
   print('Setting 1: Trivial generation')
-  run_experiment1('trivial', executions, rounds, 'npx erwin generate', command_suffix, solc_path, generated_programs_folder_path, gcov_folder_path, ax_edge, ax_line, plt.cm.Purples(0.9))
+  run_experiment1('trivial', executions, rounds, time_limit, 'npx erwin generate', command_suffix, solc_path, generated_programs_folder_path, gcov_folder_path, ax_edge, ax_line, plt.cm.Purples(0.9))
   # #!2. generate at most 100 programs from an IR
   print('Setting 2: Generate at most 50 programs from an IR')
-  run_experiment1('gen100', executions, rounds, '', f'--max 100 {command_suffix}', solc_path, generated_programs_folder_path, gcov_folder_path, ax_edge, ax_line, plt.cm.Greens(0.9))
+  run_experiment1('gen100', executions, rounds, time_limit, '', f'--max 100 {command_suffix}', solc_path, generated_programs_folder_path, gcov_folder_path, ax_edge, ax_line, plt.cm.Greens(0.9))
   # #!3. generate 500 programs from an IR
   print('Setting 3: Generate at most 100 programs from an IR')
-  run_experiment1('gen500', executions, rounds, '', f'--max 500 {command_suffix}', solc_path, generated_programs_folder_path, gcov_folder_path, ax_edge, ax_line, plt.cm.Blues(0.9))
+  run_experiment1('gen500', executions, rounds, time_limit, '', f'--max 500 {command_suffix}', solc_path, generated_programs_folder_path, gcov_folder_path, ax_edge, ax_line, plt.cm.Blues(0.9))
   # #!4. generate at most 1000 programs from an IR
   print('Setting 4: Generate at most 1000 programs from an IR')
-  run_experiment1('gen1000', executions, rounds, '', f'--max 1000 {command_suffix}', solc_path, generated_programs_folder_path, gcov_folder_path, ax_edge, ax_line, plt.cm.Reds(0.9))
+  run_experiment1('gen1000', executions, rounds, time_limit, '', f'--max 1000 {command_suffix}', solc_path, generated_programs_folder_path, gcov_folder_path, ax_edge, ax_line, plt.cm.Reds(0.9))
 
   store_fig_experiment1(ax_edge, ax_line, fig_edge, fig_line)
 
