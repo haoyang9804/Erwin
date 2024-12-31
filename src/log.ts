@@ -10,6 +10,8 @@ export class Log {
   }
 
   static log(message : string) {
-    fs.writeFileSync(`${config.log_file_path}`, message + "\n", { flag: 'a' });
+    if (config.debug || config.unit_test_mode) {
+      fs.writeFileSync(`${config.log_file_path}`, message + "\n", { flag: 'a' });
+    }
   }
 }

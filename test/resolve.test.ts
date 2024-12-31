@@ -1,12 +1,10 @@
-import { type_dag, storage_location_dag, TypeConstraintDAG } from "../src/constraintDag";
-import { MappingType, Type, uinteger_types } from "../src/type";
+import { type_dag, storage_location_dag, TypeConstraintDAG } from "../src/constraint";
+import { Type, uinteger_types } from "../src/type";
 import { config } from "../src/config";
-import { StorageLocation, StorageLocationProvider} from "../src/loc";
-import { TypeProvider } from "../src/type";
+import { StorageLocationProvider} from "../src/loc";
 config.unit_test_mode = true;
 test("test constraint dag 1",
 async () => {
-  console.log('========== test constraint dag 1 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -25,7 +23,6 @@ async () => {
 
 test("test constraint dag 2",
 async () => {
-  console.log('========== test constraint dag 2 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -48,7 +45,6 @@ async () => {
 
 test("test constraint dag 3",
 async () => {
-  console.log('========== test constraint dag 3 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -80,7 +76,6 @@ async () => {
 
 test("test constraint dag 4",
 async () => {
-  console.log('========== test constraint dag 4 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -116,7 +111,6 @@ async () => {
 test("test constraint pyramids 1",
 // graph: constraintDAGs/constraint2
 async () => {
-  console.log('========== test constraint pyramids 1 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -138,7 +132,6 @@ async () => {
 test("test constraint pyramids 2",
   // graph: constraintDAGs/constraint3
 async () => {
-  console.log('========== test constraint pyramids 2 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -162,7 +155,6 @@ async () => {
 test("test constraint pyramids 3",
   // mutation of test constraint pyramids 2
 async () => {
-  console.log('========== test constraint pyramids 3 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -186,7 +178,6 @@ async () => {
 test("test constraint multi-constraint",
   // graph: constraintDAGs/constraint1
 async () => {
-  console.log('========== test constraint multi-constraint ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -205,7 +196,6 @@ async () => {
 
 test("test resolve 1",
 async () => {
-  console.log('========== test resolve 1 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -229,7 +219,6 @@ async () => {
 
 test("test resolve 2",
 async () => {
-  console.log('========== test resolve 2 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -255,7 +244,6 @@ async () => {
 
 test("test resolve 3",
 async () => {
-  console.log('========== test resolve 3 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -272,7 +260,6 @@ async () => {
 
 test("test resolve 4",
 async () => {
-  console.log('========== test resolve 4 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -290,7 +277,6 @@ async () => {
 
 test("test subsuper support 1",
 async () => {
-  console.log('========== test subsuper support 1 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -305,7 +291,6 @@ async () => {
 
 test("test subsuper support 2",
 async () => {
-  console.log('========== test subsuper support 2 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -320,7 +305,6 @@ async () => {
 
 test("test subsuper support 3",
 async () => {
-  console.log('========== test subsuper support 3 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -335,7 +319,6 @@ async () => {
 
 test("test subsuper support 4",
 async () => {
-  console.log('========== test subsuper support 4 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -350,7 +333,6 @@ async () => {
 
 test("test check_property 1",
 async () => {
-  console.log('========== test check_property 1 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.connect(1, 2);
@@ -364,7 +346,6 @@ async () => {
 
 test("test check_property 2",
 async () => {
-  console.log('========== test check_property 2 ==========');
   type_dag.insert(1, uinteger_types);
   type_dag.insert(2, uinteger_types);
   type_dag.insert(3, uinteger_types);
@@ -382,7 +363,6 @@ async () => {
 
 test("test align storage loc range 1",
 async() => {
-  console.log('========== test align storage loc range 1 ==========');
   storage_location_dag.insert(1, [
     StorageLocationProvider.calldata(),
     StorageLocationProvider.memory(),
@@ -393,8 +373,6 @@ async() => {
     StorageLocationProvider.storage_ref()
   ]);
   storage_location_dag.connect(1, 2);
-  console.log(storage_location_dag.solution_range_of(1).map(x => x.str()));
-  console.log(storage_location_dag.solution_range_of(2).map(x => x.str()));
   expect(storage_location_dag.solution_range_of(1)).toEqual(
     [
       StorageLocationProvider.calldata(),
@@ -414,7 +392,6 @@ async() => {
 
 test("test align storage loc range 2",
 async() => {
-  console.log('========== test align storage loc range 2 ==========');
   storage_location_dag.insert(1, [
     StorageLocationProvider.calldata(),
     StorageLocationProvider.memory(),
@@ -427,9 +404,6 @@ async() => {
   storage_location_dag.insert(3, storage_location_dag.solution_range_of(2));
   storage_location_dag.connect(3, 2);
   storage_location_dag.connect(3, 1);
-  console.log(storage_location_dag.solution_range_of(1).map(x => x.str()));
-  console.log(storage_location_dag.solution_range_of(2).map(x => x.str()));
-  console.log(storage_location_dag.solution_range_of(3).map(x => x.str()));
   expect(storage_location_dag.solution_range_of(1)).toEqual(
     [
       StorageLocationProvider.calldata(),
@@ -452,6 +426,7 @@ async() => {
 }
 )
 
+//@ts-ignore
 class TestStorageLocationDominanceDAG extends TypeConstraintDAG {
   dominatee_solution_range_should_be_shrinked(dominator_id : number, dominatee_id : number) : Type[] | undefined {
     return super.dominatee_solution_range_should_be_shrinked(dominator_id, dominatee_id);
@@ -460,40 +435,3 @@ class TestStorageLocationDominanceDAG extends TypeConstraintDAG {
     return super.dominator_solution_range_should_be_shrinked(dominator_id, dominatee_id);
   }
 }
-
-test("test align type range 1",
-async() => {
-  console.log('========== test align type range 1 ==========');
-  let dominance_dag = new TestStorageLocationDominanceDAG();
-  dominance_dag.insert(1, [TypeProvider.trivial_mapping()]);
-  dominance_dag.insert(2, [new MappingType(TypeProvider.int128(), TypeProvider.int128())]);
-  console.log(dominance_dag.solution_range_of(1).map(x => x.str()));
-  console.log(dominance_dag.solution_range_of(2).map(x => x.str()));
-  // dominance_dag.force_update(1, dominance_dag.solution_range_of(2));
-  dominance_dag.connect(1, 2);
-  console.log(dominance_dag.dominatee_solution_range_should_be_shrinked(1, 2));
-  console.log(dominance_dag.dominator_solution_range_should_be_shrinked(1, 2));
-  dominance_dag.clear();
-}
-)
-
-test("test align type range 2",
-async() => {
-  console.log('========== test align type range 2 ==========');
-  let dominance_dag = new TestStorageLocationDominanceDAG();
-  dominance_dag.insert(1, [
-    new MappingType(TypeProvider.int128(), TypeProvider.int128())
-  ]);
-  dominance_dag.insert(2, [
-    new MappingType(TypeProvider.int128(), TypeProvider.int128()),
-    new MappingType(TypeProvider.int64(), TypeProvider.int128()),
-    new MappingType(TypeProvider.bool(), TypeProvider.int128())
-  ]);
-  console.log(dominance_dag.solution_range_of(1).map(x => x.str()));
-  console.log(dominance_dag.solution_range_of(2).map(x => x.str()));
-  dominance_dag.connect(1, 2);
-  console.log(dominance_dag.dominatee_solution_range_should_be_shrinked(1, 2));
-  console.log(dominance_dag.dominator_solution_range_should_be_shrinked(1, 2));
-  dominance_dag.clear();
-}
-)

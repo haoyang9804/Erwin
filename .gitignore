@@ -11,3 +11,4 @@ erwin-*.tgz
 .DS_Store
 package
 docs/
+coverage_report/

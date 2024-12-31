@@ -1,4 +1,3 @@
-import { config } from "./config";
 import { assert, swap } from "./utility";
 
 /**
@@ -41,8 +40,7 @@ export class UFD<T> {
     this.subtree_size_map.set(node, 1);
   }
   find_ancestor(node : T) : T {
-    if (config.debug)
-      assert(this.ancestor_map.has(node), "The id must be in the ancestor map.");
+    assert(this.ancestor_map.has(node), "The id must be in the ancestor map.");
     const ancestor = this.ancestor_map.get(node)!;
     return ancestor === node ? node : this.find_ancestor(ancestor);
   }
@@ -105,8 +103,7 @@ export class Tree<T> {
     return this.parent_map.has(child);
   }
   get_parent(child : T) : T {
-    if (config.debug)
-      assert(this.parent_map.has(child), `The child must have a parent.`);
+    assert(this.parent_map.has(child), `The child must have a parent.`);
     return this.parent_map.get(child)!;
   }
   get_root() : T {
@@ -124,8 +121,7 @@ export class Tree<T> {
         break;
       }
     }
-    if (config.debug)
-      assert(this.root !== undefined, "The root must be found.");
+    assert(this.root !== undefined, "The root must be found.");
     return this.root!;
   }
 }

@@ -199,7 +199,8 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
     let hour = date.getHours();
     let minute = date.getMinutes();
     let second = date.getSeconds();
-    let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_0.sol`;
+    let millisecond = date.getMilliseconds();
+    let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}:${millisecond}_0.sol`;
     fs.writeFileSync(`${config.out_dir}/${program_name}`, program, "utf-8");
   }
   else {
@@ -230,7 +231,8 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
       let hour = date.getHours();
       let minute = date.getMinutes();
       let second = date.getSeconds();
-      let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_${cnt}.sol`;
+      let millisecond = date.getMilliseconds();
+      let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}:${millisecond}_${cnt}.sol`;
       cnt++;
       fs.writeFileSync(`${config.out_dir}/${program_name}`, program, "utf-8");
     }
@@ -279,7 +281,8 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
     let hour = date.getHours();
     let minute = date.getMinutes();
     let second = date.getSeconds();
-    let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_0.sol`;
+    let millisecond = date.getMilliseconds();
+    let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}:${millisecond}_0.sol`;
     fs.writeFileSync(`${config.out_dir}/${program_name}`, program, "utf-8");
   }
   else {
@@ -313,7 +316,8 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
       let hour = date.getHours();
       let minute = date.getMinutes();
       let second = date.getSeconds();
-      let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_${cnt}.sol`;
+      let millisecond = date.getMilliseconds();
+      let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}:${millisecond}_${cnt}.sol`;
       cnt++;
       fs.writeFileSync(`${config.out_dir}/${program_name}`, program, "utf-8");
     }
@@ -364,7 +368,8 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
     let hour = date.getHours();
     let minute = date.getMinutes();
     let second = date.getSeconds();
-    let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_0.sol`;
+    let millisecond = date.getMilliseconds();
+    let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}:${millisecond}_0.sol`;
     fs.writeFileSync(`${config.out_dir}/${program_name}`, program, "utf-8");
   }
   else {
@@ -394,7 +399,8 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
       let hour = date.getHours();
       let minute = date.getMinutes();
       let second = date.getSeconds();
-      let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}_${cnt}.sol`;
+      let millisecond = date.getMilliseconds();
+      let program_name = `program_${year}-${month}-${day}_${hour}:${minute}:${second}:${millisecond}_${cnt}.sol`;
       cnt++;
       fs.writeFileSync(`${config.out_dir}/${program_name}`, program, "utf-8");
     }

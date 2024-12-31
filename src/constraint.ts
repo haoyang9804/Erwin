@@ -98,18 +98,24 @@ export class ConstraintDAG<T, V extends Value<T>> {
     this.get_roots_and_leaves();
     // Check if the graph have roots and leaves
     if (this.roots.size === 0 && this.dag_nodes.size !== 0) {
-      await this.draw("graph_for_check_property.svg");
+      if (config.unit_test_mode || config.debug) {
+        await this.draw("graph_for_check_property.svg");
+      }
       throw new Error(`ConstraintDAG: no root`);
     }
     if (this.leaves.size === 0 && this.roots.size !== this.dag_nodes.size) {
-      await this.draw("graph_for_check_property.svg");
+      if (config.unit_test_mode || config.debug) {
+        await this.draw("graph_for_check_property.svg");
+      }
       throw new Error(`ConstraintDAG: no leaf`);
     }
     // Check if the non-leaf node has only one inbound edge or is a root
     for (const [nodeid, node] of this.dag_nodes) {
       if (!this.leaves.has(nodeid)) {
         if (!(node.inbound === 1 || node.inbound === 0 && this.roots.has(nodeid))) {
-          await this.draw("graph_for_check_property.svg");
+          if (config.unit_test_mode || config.debug) {
+            await this.draw("graph_for_check_property.svg");
+          }
           throw new Error(`ConstraintDAG: node ${nodeid} has more than one inbound edge`);
         }
       }
@@ -175,8 +181,7 @@ export class ConstraintDAG<T, V extends Value<T>> {
     this.dag_nodes.get(from)!.outs.push(to);
     this.dag_nodes.get(to)!.inbound++;
     this.dag_nodes.get(from)!.outbound++;
-    if (config.debug)
-      assert(rank === undefined || rank === "sub" || rank === "super", `ConstraintDAG: rank ${rank} is not supported`)
+    assert(rank === undefined || rank === "sub" || rank === "super", `ConstraintDAG: rank ${rank} is not supported`)
     if (rank === "sub") {
       this.sub.add(`${from} ${to}`);
     }
@@ -1123,11 +1128,9 @@ export class ConstraintDAG<T, V extends Value<T>> {
     // If there are multiple paths from node to leaf, then the sub does not hold as long as there exists a path on which sub domination does not hold.
     // leaf_ids are not in this.node2leaf
     this.dfs4node2leaf();
-    if (config.debug || config.unit_test_mode) {
-      for (let [id, leaf_infos] of this.node2leaf) {
-        for (const leaf_info of leaf_infos) {
-          Log.log(`node ${id} constraints leaf ${leaf_info.leaf_id}: sub: ${leaf_info.sub}, super: ${leaf_info.super}, same_range: ${leaf_info.same_range}, same: ${leaf_info.same}`);
-        }
+    for (let [id, leaf_infos] of this.node2leaf) {
+      for (const leaf_info of leaf_infos) {
+        Log.log(`node ${id} constraints leaf ${leaf_info.leaf_id}: sub: ${leaf_info.sub}, super: ${leaf_info.super}, same_range: ${leaf_info.same_range}, same: ${leaf_info.same}`);
       }
     }
     this.build_leaves_relation();

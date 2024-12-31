@@ -12,10 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
+  
   publish-npm:
     needs: build
     runs-on: ubuntu-latest
@@ -25,9 +22,29 @@ jobs:
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org/
-      - run: npm install
-      - run: npm run build
-      - run: npm publish --access public
+      - name: Install Graphviz
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y graphviz
+      - name: Verify dot installation
+        run: dot -V
+      - run: npm ci
+      - run: npm test
+      - name: Check if version has changed
+        id: check
+        uses: EndBug/version-check@v2
+        with:
+          file-name: package.json
+          file-url: https://unpkg.com/@__haoyang__/erwin@1.1.4/package.json
+          static-checking: localIsNew
+      - name: Log when version is unchanged
+        if: steps.check.outputs.changed == 'false'
+        run: 'echo "Version unchanged. Skipping npm publish."'
+      - name: Build and publish if version changed
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          npm run build
+          npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}

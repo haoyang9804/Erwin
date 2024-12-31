@@ -59,8 +59,7 @@ export class IRLiteral extends IRExpression {
             bits = parseInt(typename.slice(4));
           }
           else {
-            if (config.debug)
-              assert(typename.startsWith("int"), `IRLiteral: typename ${typename} is not supported`);
+            assert(typename.startsWith("int"), `IRLiteral: typename ${typename} is not supported`);
             bits = parseInt(typename.slice(3));
           }
           if (typename === "int256" || typename === "int128" || typename === "int64" ||
@@ -229,8 +228,7 @@ export class IRBinaryOp extends IRExpression {
     this.operator = operator;
   }
   lower() : Expression {
-    if (config.debug)
-      assert(this.operator !== undefined, "IRBinaryOp: operator is not generated")
+    assert(this.operator !== undefined, "IRBinaryOp: operator is not generated")
     return factory.makeBinaryOperation("", this.operator!, this.left.lower() as Expression, this.right.lower() as Expression);
   }
 }
@@ -255,8 +253,7 @@ export class IRUnaryOp extends IRExpression {
     }
   }
   lower() : Expression {
-    if (config.debug)
-      assert(this.operator !== undefined, "IRUnaryOp: operator is not generated")
+    assert(this.operator !== undefined, "IRUnaryOp: operator is not generated")
     return factory.makeUnaryOperation("", this.prefix, this.operator, this.expression.lower() as Expression);
   }
 }

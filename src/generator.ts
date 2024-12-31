@@ -3193,8 +3193,7 @@ class LiteralGenerator extends ExpressionGenerator {
     expr_db.add_literal(this.id);
     type_dag.update(this.id, this.type_range);
     this.irnode = new expr.IRLiteral(this.id, cur_scope.id());
-    if (config.debug)
-      Log.log(`${" ".repeat(indent)}${this.irnode.id}: Literal, scope: (${cur_scope.kind()}, ${cur_scope.id()}), type: ${type_dag.solution_range_of(this.irnode.id)!.map(t => t.str())}`)
+    Log.log(`${" ".repeat(indent)}${this.irnode.id}: Literal, scope: (${cur_scope.kind()}, ${cur_scope.id()}), type: ${type_dag.solution_range_of(this.irnode.id)!.map(t => t.str())}`)
     this.wrap_in_a_tuple();
   }
 }
@@ -4639,7 +4638,7 @@ class FunctionCallGenerator extends ExpressionGenerator {
         }
       }
     }
-    if (config.debug && selected_ret_decl !== null) {
+    if (selected_ret_decl !== null) {
       Log.log(`${" ".repeat(indent)}>>  The type range of the selected ret decl (ID: ${selected_ret_decl.id}) is: ${type_dag.solution_range_of(selected_ret_decl.id)!.map(t => t.str())}. The storage location range is ${storage_location_dag.has_solution_range(selected_ret_decl.id) ? storage_location_dag.solution_range_of(selected_ret_decl.id)!.map(t => t.str()) : ''}`)
     }
   }
@@ -4851,11 +4850,9 @@ class NewStructGenerator extends ExpressionGenerator {
   }
 
   private start_flag() {
-    if (config.debug) {
-      const type_range_str = generate_type_range_str(this.type_range);
-      Log.log(`${" ".repeat(indent)}>>  Start generating NewStructGenerator ${this.id}: ${type_range_str}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`);
-      increase_indent();
-    }
+    const type_range_str = generate_type_range_str(this.type_range);
+    Log.log(`${" ".repeat(indent)}>>  Start generating NewStructGenerator ${this.id}: ${type_range_str}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`);
+    increase_indent();
   }
 
   private end_flag() {
