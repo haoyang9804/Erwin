@@ -1,20 +1,10 @@
-# This workflow will run tests using node and then publish a package to GitHub Packages when a release is created
-# For more information see: https://docs.github.com/en/actions/publishing-packages/publishing-nodejs-packages
-
 name: Node.js Package
-
 on:
   push:
-    branches: [ master ]  # Set this to your default branch
+    branches: [ master ]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-  
-  publish-npm:
-    needs: build
+  build-and-publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,29 +12,41 @@ jobs:
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org/
+
       - name: Install Graphviz
         run: |
           sudo apt-get update
           sudo apt-get install -y graphviz
+
       - name: Verify dot installation
         run: dot -V
+
       - run: npm ci
       - run: npm test
-      - name: Check if version has changed
-        id: check
-        uses: EndBug/version-check@v2
-        with:
-          file-name: package.json
-          file-url: https://unpkg.com/@__haoyang__/erwin@1.1.4/package.json
-          static-checking: localIsNew
-      - name: Log when version is unchanged
-        if: steps.check.outputs.changed == 'false'
-        run: 'echo "Version unchanged. Skipping npm publish."'
+
+      - name: Get current version
+        id: package-version
+        uses: martinbeentjes/npm-get-version-action@v1.3.1
+
+      - name: Check if version exists on npm
+        id: npm-version-check
+        run: |
+          NPM_VERSION=$(npm view @__haoyang__/erwin version 2>/dev/null || echo "")
+          if [ "$NPM_VERSION" != "${{ steps.package-version.outputs.current-version }}" ]; then
+            echo "NEW_VERSION=true" >> $GITHUB_OUTPUT
+          else
+            echo "NEW_VERSION=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build and publish if version changed
-        if: steps.check.outputs.changed == 'true'
+        if: steps.npm-version-check.outputs.NEW_VERSION == 'true'
         run: |
           npm run build
           npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+      - name: Log when version is unchanged
+        if: steps.npm-version-check.outputs.NEW_VERSION == 'false'
+        run: 'echo "Version unchanged. Skipping npm publish."'

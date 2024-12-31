@@ -6,6 +6,7 @@ import numpy as np
 import subprocess
 import os
 from collections import defaultdict, namedtuple
+import sys
 
 def int_to_string_array(int_array):
   string_array = [str(num) for num in int_array]
@@ -213,19 +214,146 @@ def generate_compile_covcollect(command, solc_path, generated_programs_folder_pa
       covered_edgecnt += 1
   return covered_edgecnt, edgecnt, len(collected_lines), lines_count
 
-def draw_experiment1(rounds, ax_edge, ax_line, color, g_covered_edgecnts, g_covered_linecnts):
+def draw_experiment1(name, rounds, ax_edge, ax_line, color, g_covered_edgecnts, g_covered_linecnts):
   # Plot the coverage data of all executions
   x = np.arange(1, rounds+1)
   median_covered_edgecnts = np.median(g_covered_edgecnts, axis=0)
   upper_covered_edgecnts = np.max(g_covered_edgecnts, axis=0)
   lower_covered_edgecnts = np.min(g_covered_edgecnts, axis=0)
-  ax_edge.plot(x, median_covered_edgecnts, label = 'Median', color = color)
+  ax_edge.plot(x, median_covered_edgecnts, label = name, color = color)
   ax_edge.fill_between(x, lower_covered_edgecnts, upper_covered_edgecnts, alpha=0.3, edgecolor=color, facecolor=color)
   median_covered_linecnts = np.median(g_covered_linecnts, axis=0)
   upper_covered_linecnts = np.max(g_covered_linecnts, axis=0)
   lower_covered_linecnts = np.min(g_covered_linecnts, axis=0)
-  ax_line.plot(x, median_covered_linecnts, label = 'Median', color = color)
+  ax_line.plot(x, median_covered_linecnts, label = name, color = color)
   ax_line.fill_between(x, lower_covered_linecnts, upper_covered_linecnts, alpha=0.3, edgecolor=color, facecolor=color)
+
+def store_fig_experiment1(ax_edge, ax_line, fig_edge, fig_line):
+  ax_edge.set_xlabel('#Generated Programs', fontsize = 25)
+  ax_edge.set_ylabel('Edge Coverage', fontsize = 25)
+  ax_edge.spines['right'].set_visible(False)
+  ax_edge.spines['top'].set_visible(False)
+  ax_edge.legend(fontsize=12)
+  ax_line.set_xlabel('#Generated Programs', fontsize = 25)
+  ax_line.set_ylabel('Line Coverage', fontsize = 25)
+  ax_line.spines['right'].set_visible(False)
+  ax_line.spines['top'].set_visible(False)
+  ax_line.legend(fontsize=12)
+  # Save the figures
+  fig_edge.savefig('coverage_report/edge_plot.pdf', format='pdf', dpi=300, bbox_inches='tight')
+  fig_edge.savefig('coverage_report/edge_plot.svg', format='svg', dpi=300, bbox_inches='tight')
+  fig_line.savefig('coverage_report/line_plot.pdf', format='pdf', dpi=300, bbox_inches='tight')
+  fig_line.savefig('coverage_report/line_plot.svg', format='svg', dpi=300, bbox_inches='tight')
+
+  # Optionally, close the figures to free up memory
+  plt.close(fig_edge)
+  plt.close(fig_line)
+
+# Draw from log files of previous experiments
+def draw_previous_experiment1():
+  fig_edge, ax_edge = plt.subplots(figsize = (8,5))
+  fig_line, ax_line = plt.subplots(figsize = (8,5))
+  #! collect experimental results of the trivial setting
+  g_covered_edgecnts_trivial = []
+  g_covered_linecnts_trivial = []
+  g_edgecnt_trivial = -1
+  g_linecnt_trivial = -1
+  g_edgecnt_covered_trivial = -1
+  g_linecnt_covered_trivial = -1
+  if os.path.exists('coverage_report/edgecov_trivial.txt'):
+    with open('coverage_report/edgecov_trivial.txt', 'r') as f:
+      edgecov_trivial = f.readlines()
+    edgecov_trivial_ = [list(map(int, line.strip().split(','))) for line in edgecov_trivial[:-1]]
+    g_covered_edgecnts_trivial = edgecov_trivial_
+    g_edgecnt_trivial = edgecov_trivial[-1].split('>')[1].strip().split('/')[1]
+    g_edgecnt_covered_trivial = edgecov_trivial[-1].split('>')[1].strip().split('/')[0]
+  if os.path.exists('coverage_report/linecov_trivial.txt'):
+    with open('coverage_report/linecov_trivial.txt', 'r') as f:
+      linecov_trivial = f.readlines()
+    linecov_trivial_ = [list(map(int, line.strip().split(','))) for line in linecov_trivial[:-1]]
+    g_covered_linecnts_trivial = linecov_trivial_
+    g_linecnt_trivial = linecov_trivial[-1].split('>')[1].strip().split('/')[1]
+    g_linecnt_covered_trivial = linecov_trivial[-1].split('>')[1].strip().split('/')[0]
+  if os.path.exists('coverage_report/edgecov_trivial.txt') and os.path.exists('coverage_report/linecov_trivial.txt'):
+    print(f"Trivial: Covered {percentage(g_edgecnt_covered_trivial, g_edgecnt_trivial)} edges, {percentage(g_linecnt_covered_trivial, g_linecnt_trivial)} lines")
+    draw_experiment1('trivial', len(g_covered_edgecnts_trivial[0]), ax_edge, ax_line, plt.cm.Purples(0.9), g_covered_edgecnts_trivial, g_covered_linecnts_trivial)
+
+  #! collect experimental results from the gen100 setting
+  g_covered_edgecnts_gen100 = []
+  g_covered_linecnts_gen100 = []
+  g_edgecnt_gen100 = -1
+  g_linecnt_gen100 = -1
+  g_edgecnt_covered_gen100 = -1
+  g_linecnt_covered_gen100 = -1
+  if os.path.exists('coverage_report/edgecov_gen100.txt'):
+    with open('coverage_report/edgecov_gen100.txt', 'r') as f:
+      edgecov_gen100 = f.readlines()
+    edgecov_gen100_ = [list(map(int, line.strip().split(','))) for line in edgecov_gen100[:-1]]
+    g_covered_edgecnts_gen100 = edgecov_gen100_
+    g_edgecnt_gen100 = edgecov_gen100[-1].split('>')[1].strip().split('/')[1]
+    g_edgecnt_covered_gen100 = edgecov_gen100[-1].split('>')[1].strip().split('/')[0]
+  if os.path.exists('coverage_report/linecov_gen100.txt'):
+    with open('coverage_report/linecov_gen100.txt', 'r') as f:
+      linecov_gen100 = f.readlines()
+    linecov_gen100_ = [list(map(int, line.strip().split(','))) for line in linecov_gen100[:-1]]
+    g_covered_linecnts_gen100 = linecov_gen100_
+    g_linecnt_gen100 = linecov_gen100[-1].split('>')[1].strip().split('/')[1]
+    g_linecnt_covered_gen100 = linecov_gen100[-1].split('>')[1].strip().split('/')[0]
+  if os.path.exists('coverage_report/edgecov_gen100.txt') and os.path.exists('coverage_report/linecov_gen100.txt'):
+    print(f"Gen100: Covered {percentage(g_edgecnt_covered_gen100, g_edgecnt_gen100)} edges, {percentage(g_linecnt_covered_gen100, g_linecnt_gen100)} lines")
+    draw_experiment1('gen100', len(g_covered_edgecnts_gen100[0]), ax_edge, ax_line, plt.cm.Greens(0.9), g_covered_edgecnts_gen100, g_covered_linecnts_gen100)
+  
+  #! collect experimental results from the gen500 setting
+  g_covered_edgecnts_gen500 = []
+  g_covered_linecnts_gen500 = []
+  g_edgecnt_gen500 = -1
+  g_linecnt_gen500 = -1
+  g_edgecnt_covered_gen500 = -1
+  g_linecnt_covered_gen500 = -1
+  if os.path.exists('coverage_report/edgecov_gen500.txt'):
+    with open('coverage_report/edgecov_gen500.txt', 'r') as f:
+      edgecov_gen500 = f.readlines()
+    edgecov_gen500_ = [list(map(int, line.strip().split(','))) for line in edgecov_gen500[:-1]]
+    g_covered_edgecnts_gen500 = edgecov_gen500_
+    g_edgecnt_gen500 = edgecov_gen500[-1].split('>')[1].strip().split('/')[1]
+    g_edgecnt_covered_gen500 = edgecov_gen500[-1].split('>')[1].strip().split('/')[0]
+  if os.path.exists('coverage_report/linecov_gen500.txt'):
+    with open('coverage_report/linecov_gen500.txt', 'r') as f:
+      linecov_gen500 = f.readlines()
+    linecov_gen500_ = [list(map(int, line.strip().split(','))) for line in linecov_gen500[:-1]]
+    g_covered_linecnts_gen500 = linecov_gen500_
+    g_linecnt_gen500 = linecov_gen500[-1].split('>')[1].strip().split('/')[1]
+    g_linecnt_covered_gen500 = linecov_gen500[-1].split('>')[1].strip().split('/')[0]
+  if os.path.exists('coverage_report/edgecov_gen500.txt') and os.path.exists('coverage_report/linecov_gen500.txt'):
+    print(f"Gen500: Covered {percentage(g_edgecnt_covered_gen500, g_edgecnt_gen500)} edges, {percentage(g_linecnt_covered_gen500, g_linecnt_gen500)} lines")
+    draw_experiment1('gen500', len(g_covered_edgecnts_gen500[0]), ax_edge, ax_line, plt.cm.Blues(0.9), g_covered_edgecnts_gen500, g_covered_linecnts_gen500)
+    
+  #! collect experimental results from the gen1000 setting
+  g_covered_edgecnts_gen1000 = []
+  g_covered_linecnts_gen1000 = []
+  g_edgecnt_gen1000 = -1
+  g_linecnt_gen1000 = -1
+  g_edgecnt_covered_gen1000 = -1
+  g_linecnt_covered_gen1000 = -1
+  if os.path.exists('coverage_report/edgecov_gen1000.txt'):
+    with open('coverage_report/edgecov_gen1000.txt', 'r') as f:
+      edgecov_gen1000 = f.readlines()
+    edgecov_gen1000_ = [list(map(int, line.strip().split(','))) for line in edgecov_gen1000[:-1]]
+    g_covered_edgecnts_gen1000 = edgecov_gen1000_
+    g_edgecnt_gen1000 = edgecov_gen1000[-1].split('>')[1].strip().split('/')[1]
+    g_edgecnt_covered_gen1000 = edgecov_gen1000[-1].split('>')[1].strip().split('/')[0]
+  if os.path.exists('coverage_report/linecov_gen1000.txt'):
+    with open('coverage_report/linecov_gen1000.txt', 'r') as f:
+      linecov_gen1000 = f.readlines()
+    linecov_gen1000_ = [list(map(int, line.strip().split(','))) for line in linecov_gen1000[:-1]]
+    g_covered_linecnts_gen1000 = linecov_gen1000_
+    g_linecnt_gen1000 = linecov_gen1000[-1].split('>')[1].strip().split('/')[1]
+    g_linecnt_covered_gen1000 = linecov_gen1000[-1].split('>')[1].strip().split('/')[0]
+  if os.path.exists('coverage_report/edgecov_gen1000.txt') and os.path.exists('coverage_report/linecov_gen1000.txt'):
+    print(f"Gen1000: Covered {percentage(g_edgecnt_covered_gen1000, g_edgecnt_gen1000)} edges, {percentage(g_linecnt_covered_gen1000, g_linecnt_gen1000)} lines")
+    draw_experiment1('gen1000', len(g_covered_edgecnts_gen1000[0]), ax_edge, ax_line, plt.cm.Reds(0.9), g_covered_edgecnts_gen1000, g_covered_linecnts_gen1000)
+  
+  store_fig_experiment1(ax_edge, ax_line, fig_edge, fig_line)
 
 def run_experiment1(name, executions, rounds, command_prefix, command_suffix, solc_path, generated_programs_folder_path, gcov_folder_path, ax_edge, ax_line, color):
   g_covered_edgecnts = []
@@ -273,17 +401,17 @@ def run_experiment1(name, executions, rounds, command_prefix, command_suffix, so
     g_covered_edgecnts.append(covered_edgecnts)
     g_covered_linecnts.append(covered_linecnts)
   print(f"Covered {percentage(g_covered_edgecnt, g_edgecnt)} edges, {percentage(g_covered_linecnt, g_linecnt)} lines")
-  if os.path.exists('coverage_report/edgecov_{name}.txt'):
+  if os.path.exists(f'coverage_report/edgecov_{name}.txt'):
     with open(f'./coverage_report/edgecov_{name}.txt', 'a') as f:
       f.write(f'> {g_covered_edgecnt}/{g_edgecnt}\n')
-  if os.path.exists('coverage_report/linecov_{name}.txt'):
+  if os.path.exists(f'coverage_report/linecov_{name}.txt'):
     with open(f'./coverage_report/linecov_{name}.txt', 'a') as f:
       f.write(f'> {g_covered_linecnt}/{g_linecnt}\n')
   # Clean up intermediate profraw files
   for file in glob.glob('temp_profiles/*'):
     os.remove(file)
   os.rmdir('temp_profiles')
-  draw_experiment1(rounds, ax_edge, ax_line, color, g_covered_edgecnts, g_covered_linecnts)
+  draw_experiment1(name, rounds, ax_edge, ax_line, color, g_covered_edgecnts, g_covered_linecnts)
 
 '''
 Experiment 1.
@@ -296,38 +424,33 @@ def experiment1():
   # gcov_folder_path = input("Enter the absolute path to the gcov folder: ")
 
   solc_path = '/home/linuxbrew/solidity/build_experiment1/solc/solc'
+  generated_programs_folder_path = '/home/linuxbrew/Erwin/generated_programs'
+  gcov_folder_path = '/home/linuxbrew/solidity/build_experiment1'
 
-  solc_path = '/Users/mac/repo/solidity/build-lcov/solc/solc'
-  generated_programs_folder_path = '/Users/mac/repo/Erwin/generated_programs'
-  gcov_folder_path = '/Users/mac/repo/solidity/build-lcov'
+  # solc_path = '/Users/mac/repo/solidity/build-lcov/solc/solc'
+  # generated_programs_folder_path = '/Users/mac/repo/Erwin/generated_programs'
+  # gcov_folder_path = '/Users/mac/repo/solidity/build-lcov'
   
   command_suffix = f'--generation_rounds 1 --refresh_folder'
   executions = 3 # Number of executions of this experiment, used to mitigate the impact of randomness
   rounds = 2 # Number of rounds of each execution, the x-axis of the plot
-  _, ax_edge = plt.subplots(figsize = (8,5))
-  _, ax_line = plt.subplots(figsize = (8,5))
+  fig_edge, ax_edge = plt.subplots(figsize = (8,5))
+  fig_line, ax_line = plt.subplots(figsize = (8,5))
   
   #!1. Trivial generation
   print('Setting 1: Trivial generation')
   run_experiment1('trivial', executions, rounds, 'npx erwin generate', command_suffix, solc_path, generated_programs_folder_path, gcov_folder_path, ax_edge, ax_line, plt.cm.Purples(0.9))
   # #!2. generate at most 100 programs from an IR
-  # print('Setting 2: Generate at most 100 programs from an IR')
-  # run_experiment1(executions, rounds, '', f'--max 100 {command_suffix}', solc_path, generated_programs_folder_path, gcov_folder_path, ax_edge, ax_line, plt.cm.Greens(0.9))
+  print('Setting 2: Generate at most 100 programs from an IR')
+  run_experiment1('gen100', executions, rounds, '', f'--max 100 {command_suffix}', solc_path, generated_programs_folder_path, gcov_folder_path, ax_edge, ax_line, plt.cm.Greens(0.9))
   # #!3. generate 500 programs from an IR
-  # print('Setting 3: Generate at most 500 programs from an IR')
-  # run_experiment1(executions, rounds, '', f'--max 500 {command_suffix}', solc_path, generated_programs_folder_path, gcov_folder_path, ax_edge, ax_line, plt.cm.Blues(0.9))
+  print('Setting 3: Generate at most 500 programs from an IR')
+  run_experiment1('gen500', executions, rounds, '', f'--max 500 {command_suffix}', solc_path, generated_programs_folder_path, gcov_folder_path, ax_edge, ax_line, plt.cm.Blues(0.9))
   # #!4. generate at most 1000 programs from an IR
-  # print('Setting 4: Generate at most 1000 programs from an IR')
-  # run_experiment1(executions, rounds, '', f'--max 1000 {command_suffix}', solc_path, generated_programs_folder_path, gcov_folder_path, ax_edge, ax_line, plt.cm.Reds(0.9))
+  print('Setting 4: Generate at most 1000 programs from an IR')
+  run_experiment1('gen1000', executions, rounds, '', f'--max 1000 {command_suffix}', solc_path, generated_programs_folder_path, gcov_folder_path, ax_edge, ax_line, plt.cm.Reds(0.9))
 
-  ax_edge.set_xlabel('#Generated Programs', fontsize = 25)
-  ax_edge.set_ylabel('Line Coverage', fontsize = 25)
-  ax_edge.spines['right'].set_visible(False)
-  ax_edge.spines['top'].set_visible(False)
-  ax_edge.legend(fontsize=12)
-  plt.tight_layout()
-  plt.show()
-
+  store_fig_experiment1(ax_edge, ax_line, fig_edge, fig_line)
 
 '''
 Experiment 2.
@@ -376,4 +499,12 @@ def experiment3(gcovfolder1, gcovfolder2):
   
 
 if __name__ == '__main__':
-  experiment1()
+  # args
+  if len(sys.argv) < 2:
+    print("Usage: python coverage.py <experiment_number>")
+    exit(1)
+  experiment_desc = sys.argv[1]
+  if experiment_desc == 'experiment1':
+    experiment1()
+  elif experiment_desc == 'draw_previous_experiment1':
+    draw_previous_experiment1()
