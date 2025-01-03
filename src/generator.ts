@@ -3010,7 +3010,7 @@ class ContractDeclarationGenerator extends DeclarationGenerator {
   private generate_error_decls() {
     const error_count = random_int(config.error_decl_per_contract_lowerlimit, config.error_decl_per_contract_upperlimit);
     for (let i = 0; i < error_count; i++) {
-      if (Math.random() < config.event_prob) {
+      if (Math.random() < config.error_prob) {
         const error_gen = new ErrorDeclarationGenerator();
         error_gen.generate();
         this.body.push(error_gen.irnode!);

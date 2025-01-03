@@ -12,3 +12,5 @@ erwin-*.tgz
 package
 docs/
 coverage_report/
+__pycache__
+ISSTA24-Solidity-Study/*

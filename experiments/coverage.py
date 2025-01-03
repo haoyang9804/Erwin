@@ -18,119 +18,7 @@ import argparse
 import asyncio
 import pandas as pd
 from matplotlib.dates import DateFormatter, MinuteLocator
-
-def solidity_compilation_flags() -> str:
-  output_flags = [
-    '--ast-compact-json',
-    '--asm',
-    '--asm-json',
-    '--opcodes',
-    '--bin',
-    '--bin-runtime',
-    '--abi',
-    '--ir',
-    '--ir-ast-json',
-    '--ir-optimized',
-    '--ir-optimized-ast-json',
-    '--hashes',
-    '--userdoc',
-    '--devdoc',
-    '--metadata',
-    '--storage-layout',
-  ]
-  opt_flags = [
-    '--optimize',
-    '--optimize-runs',  # followed by a number
-    '--optimize-yul',
-    '--no-optimize-yul',
-    '--yul-optimizations'  # followed by valid alphabets
-  ]
-  yul_optimizations = ['f', 'l', 'c', 'C', 'U', 'n', 'D', 'E', 'v', 'e',
-    'j', 's', 'x', 'I', 'O', 'o', 'i', 'g', 'h', 'F', 'T', 'L', 'M', 'm', 'V',
-    'a', 't', 'r', 'p', 'S', 'u', 'd']
-  # --optimize-yul and --no-optimize-yul are mutually exclusive
-  model_checker_flags = [
-    '--model-checker-div-mod-no-slacks',
-    '--model-checker-engine',  # followed by all,bmc,chc,none
-    '--model-checker-ext-calls',  # followed by untrusted,trusted
-    '--model-checker-invariants',  # followed by default,all,contract,reentrancy
-    '--model-checker-print-query',
-    '--model-checker-show-proved-safe',
-    '--model-checker-show-unproved',
-    '--model-checker-show-unsupported',
-    '--model-checker-solvers',  # followed by cvc5,eld,z3,smtlib2
-    '--model-checker-targets',  # followed by default,all,constantCondition,underflow,overflow,divByZero,balance,assert,popEmptyArray,outOfBounds
-    '--model-checker-timeout',  # followed by a number (ms)
-    '--model-checker-bmc-loop-iterations',  # followed by a number
-  ]
-  # Only smtlib2 can print query
-
-  def select_random_elements(lst, n):
-    return random.sample(lst, n)
-
-  def random_int(start, end):
-    return random.randint(start, end)
-
-  def pick_random_element(lst):
-    return random.choice(lst)
-
-  selected_output_flags = select_random_elements(output_flags, random_int(1, len(output_flags)))
-  selected_opt_flags = select_random_elements(opt_flags, random_int(1, len(opt_flags)))
-  selected_model_checker_flags = select_random_elements(model_checker_flags, random_int(1, len(model_checker_flags)))
-
-  if '--no-optimize-yul' in selected_opt_flags and '--optimize-yul' in selected_opt_flags:
-    index = selected_opt_flags.index('--optimize-yul' if random.random() < 0.5 else '--no-optimize-yul')
-    selected_opt_flags.pop(index)
-
-  if '--no-optimize-yul' in selected_opt_flags and '--optimize' in selected_opt_flags:
-    index = selected_opt_flags.index('--optimize' if random.random() < 0.5 else '--no-optimize-yul')
-    selected_opt_flags.pop(index)
-
-  if '--optimize-yul' not in selected_opt_flags and '--yul-optimizations' in selected_opt_flags:
-    index = selected_opt_flags.index('--yul-optimizations')
-    selected_opt_flags.pop(index)
-
-  for i, flag in enumerate(selected_opt_flags):
-    if flag == '--optimize-runs':
-      selected_opt_flags[i] = f"{flag} {random_int(1, 10)}"
-    elif flag == '--yul-optimizations':
-      selected_opt_flags[i] = f"{flag} {''.join(select_random_elements(yul_optimizations, random_int(1, len(yul_optimizations))))}"
-
-  if '--model-checker-bmc-loop-iterations' in selected_model_checker_flags and '--model-checker-engine' in selected_model_checker_flags:
-    if random.random() < 0.5:
-      selected_model_checker_flags.remove('--model-checker-bmc-loop-iterations')
-    else:
-      index = selected_model_checker_flags.index('--model-checker-engine')
-      selected_model_checker_flags[index] = '--model-checker-engine bmc'
-  elif '--model-checker-bmc-loop-iterations' in selected_model_checker_flags and '--model-checker-engine' not in selected_model_checker_flags:
-      selected_model_checker_flags.append('--model-checker-engine bmc')
-
-  for i, flag in enumerate(selected_model_checker_flags):
-    if flag == '--model-checker-engine':
-      selected_model_checker_flags[i] = f"{flag} {pick_random_element(['all', 'bmc', 'chc', 'none'])}"
-    elif flag == '--model-checker-ext-calls':
-      selected_model_checker_flags[i] = f"{flag} {pick_random_element(['untrusted', 'trusted'])}"
-    elif flag == '--model-checker-invariants':
-      selected_model_checker_flags[i] = f"{flag} {pick_random_element(['default', 'all', 'contract', 'reentrancy'])}"
-    elif flag == '--model-checker-solvers':
-      selected_model_checker_flags[i] = f"{flag} {pick_random_element(['cvc5', 'eld', 'z3', 'smtlib2'])}"
-    elif flag == '--model-checker-targets':
-      selected_model_checker_flags[i] = f"{flag} {pick_random_element(['default', 'all', 'constantCondition', 'underflow', 'overflow', 'divByZero', 'balance', 'assert', 'popEmptyArray', 'outOfBounds'])}"
-    elif flag in ['--model-checker-timeout', '--model-checker-bmc-loop-iterations']:
-      selected_model_checker_flags[i] = f"{flag} {random_int(1, 10)}"
-
-  if '--model-checker-print-query' in selected_model_checker_flags and '--model-checker-solvers' in selected_model_checker_flags:
-    index = selected_model_checker_flags.index('--model-checker-solvers')
-    if index != -1:
-        selected_model_checker_flags[index] = '--model-checker-solvers smtlib2'
-  elif '--model-checker-solvers' in selected_model_checker_flags:
-    index = selected_model_checker_flags.index('--model-checker-solvers')
-    selected_model_checker_flags[index] = f"--model-checker-solvers {pick_random_element(['default', 'all', 'constantCondition', 'underflow', 'overflow', 'divByZero', 'balance', 'assert', 'popEmptyArray', 'outOfBounds'])}"
-  elif '--model-checker-print-query' in selected_model_checker_flags:
-    selected_model_checker_flags.remove('--model-checker-print-query')
-
-  flags = f"{pick_random_element(selected_output_flags)} {' '.join(selected_opt_flags)} {' '.join(selected_model_checker_flags)} --via-ir"
-  return flags
+from compile import solidity_compilation_flags
 
 def int_to_string_array(int_array):
   string_array = [str(num) for num in int_array]
@@ -333,9 +221,9 @@ def compile(sol_dir, mode):
     filename = os.path.basename(sol_file)
     profraw_file = os.path.join('temp_profiles', f"{os.path.splitext(filename)[0]}.profraw")
     if mode == 'edge':
-      compiler_command = f'LLVM_PROFILE_FILE="{profraw_file}" {solc_path} {solidity_compilation_flags()} {sol_file}'
+      compiler_command = f'LLVM_PROFILE_FILE="{profraw_file}" {parser_args.solc_path} {solidity_compilation_flags()} {sol_file}'
     elif mode == 'line':
-      compiler_command = f'{solc_path} {solidity_compilation_flags()} {sol_file}'
+      compiler_command = f'{parser_args.solc_path} {solidity_compilation_flags()} {sol_file}'
     print(Fore.GREEN + f'compiler_command: {compiler_command}')
     subprocess.run(compiler_command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -539,6 +427,8 @@ def draw_from_experiment1_data():
   store_fig_experiment1(ax_edge, ax_line, fig_edge, fig_line)
 
 def run_experiment1_line(name, executions, time_limit, command_prefix, command_suffix, solc_path, generated_programs_folder_path, gcov_folder_path):
+  if not os.path.exists('coverage_report'):
+    os.makedirs('coverage_report')
   for i in range(executions):
     remove_gcda_files(gcov_folder_path)
     time_budget = time_limit
@@ -547,10 +437,17 @@ def run_experiment1_line(name, executions, time_limit, command_prefix, command_s
     while time_budget > 0:
       remove_gcov_files(gcov_folder_path)
       command = f'{np.random.choice(commands) if command_prefix=="" else command_prefix} {command_suffix} {" ".join(optional_command_suffix())}'
-      gen_start = time.time()
-      subprocess.run(command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-      gen_end = time.time()
       print(Fore.CYAN + f"Erwin command: {command}")
+      gen_start = time.time()
+      try:
+        p = subprocess.run(command, shell=True, capture_output=True, text=True)
+      except Exception as e:
+        print(f"Error: {e}\n{p.stderr}\n{p.stdout}")
+        continue
+      gen_end = time.time()
+      print(Fore.CYAN + f"Erwin execution: {gen_end-gen_start} seconds")
+      if not os.path.exists(generated_programs_folder_path) or len(os.listdir(generated_programs_folder_path)) == 0:
+        continue
       start = time.time()
       compile(generated_programs_folder_path, 'line')
       end = time.time()
@@ -569,6 +466,8 @@ def run_experiment1_line(name, executions, time_limit, command_prefix, command_s
     fline.close()
 
 def run_experiment1_edge(name, executions, time_limit, command_prefix, command_suffix, solc_path, generated_programs_folder_path, gcov_folder_path):
+  if not os.path.exists('coverage_report'):
+    os.makedirs('coverage_report')
   for i in range(executions):
     time_budget = time_limit
     fedge = open(f'./coverage_report/edgecov_{name}_{i}.txt', 'w')
@@ -579,13 +478,22 @@ def run_experiment1_edge(name, executions, time_limit, command_prefix, command_s
         os.rmdir('temp_profiles')
       os.makedirs('temp_profiles')
       command = f'{np.random.choice(commands) if command_prefix=="" else command_prefix} {command_suffix} {" ".join(optional_command_suffix())}'
-      gen_start = time.time()
-      subprocess.run(command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-      gen_end = time.time()
       print(Fore.CYAN + f"Erwin command: {command}")
+      gen_start = time.time()
+      try:
+        p = subprocess.run(command, shell=True, capture_output=True, text=True)
+      except Exception as e:
+        print(f"Error: {e}\n{p.stderr}\n{p.stdout}")
+        continue
+      gen_end = time.time()
+      print(Fore.CYAN + f"Erwin execution: {gen_end-gen_start} seconds")
+      if not os.path.exists(generated_programs_folder_path) or len(os.listdir(generated_programs_folder_path)) == 0:
+        continue
       start = time.time()
       compile(generated_programs_folder_path, 'edge')
       end = time.time()
+      if not os.path.exists('temp_profiles'):
+        continue
       print(Fore.MAGENTA + f"compile: {end-start} seconds")
       start = time.time()
       # Compile the generated programs and generate coverage json file
