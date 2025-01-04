@@ -21,7 +21,7 @@ jobs:
       - name: Verify dot installation
         run: dot -V
 
-      - run: npm ci
+      - run: npm install
       - run: npm test
 
       - name: Get current version

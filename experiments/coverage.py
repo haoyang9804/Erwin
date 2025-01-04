@@ -471,6 +471,8 @@ def run_experiment1_edge(name, executions, time_limit, command_prefix, command_s
   for i in range(executions):
     time_budget = time_limit
     fedge = open(f'./coverage_report/edgecov_{name}_{i}.txt', 'w')
+    if os.path.exists(f'./coverage_report/solc_combined.profdata'):
+      os.remove(f'./coverage_report/solc_combined.profdata')
     while time_budget > 0:
       if os.path.exists('temp_profiles'):
         for file in glob.glob('temp_profiles/*'):

@@ -14,3 +14,5 @@ docs/
 coverage_report/
 __pycache__
 ISSTA24-Solidity-Study/*
+test_programs
+package-lock.json

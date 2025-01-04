@@ -60,23 +60,22 @@ For more flags, please refer to `npx erwin generation -h`.
 21. https://github.com/ethereum/solidity/issues/15651 (ICE)
 22. https://github.com/crytic/slither/issues/2619 (hang)
 
-## Weird Language Features
-
-Besides bugs, ***Erwin*** only plays a role of examining the design of language features. Until now, ***Erwin*** has found the following features that may be confusing to Solidity users.
-
-1. Solidity has a weird type inference on `int_const`, `int`, and `uint`. Many intuitive operations on int literals and (u)int variables are forbidden.
-   ```solidity
-    int8 var21;
-    false ? var21 : 62;
-   ```
-   The second line raises an type error:  `TypeError: True expression's type int8 does not match false expression's type uint8.`.
 
 ## TODO
 
-- [ ] Support byte and bytes (similar to array).
-- [ ] Support contract inheritance.
-- [ ] support global constant variable, functions, and structs
-- [ ] support variable shallowing
-- [ ] support function type
-- [ ] Support inline assembly.
-- [ ] Mutate Solidity programs.
+- 🔨 Support fixed
+- 🔨 Support .push .pop for arrays
+- 🔨 Support byte
+- 🔨 Support type definition (for instance, `type T is bool;`)
+- 🔨 Support enum type
+- 🔨 Support assertion
+- 🔨 Support using for
+- 🔨 Support inherent keywords, such as `msg.sender`, `abi.encode`, etc
+- 🔨 Support bytes
+- 🔨 Support contract inheritance
+- 🔨 Support global constant variable, functions, and structs
+- 🔨 Support variable shallowing
+- 🔨 Support function type
+- 🔨 Support inline assembly
+- 🔨 Support try catch
+- 🔨 Mutate Solidity programs.
