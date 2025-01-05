@@ -10,6 +10,7 @@
     <img alt="Static Badge" src="https://img.shields.io/badge/Erwin-doc-pink">
   </a>
   <img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/haoyang9804/Erwin/npm.yml">
+  <img alt="NPM Downloads" src="https://img.shields.io/npm/d18m/%40__haoyang__%2Ferwin">
 </p>
 
 
