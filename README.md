@@ -64,6 +64,7 @@ For more flags, please refer to `npx erwin generation -h`.
 
 ## TODO
 
+- 🔨 Support Solar testing workflow
 - 🔨 Support fixed
 - 🔨 Support .push .pop for arrays
 - 🔨 Support byte
@@ -79,4 +80,4 @@ For more flags, please refer to `npx erwin generation -h`.
 - 🔨 Support function type
 - 🔨 Support inline assembly
 - 🔨 Support try catch
-- 🔨 Mutate Solidity programs.
+- 🔨 Mutate Solidity programs
