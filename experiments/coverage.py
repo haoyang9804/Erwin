@@ -380,10 +380,10 @@ def experiment1():
     print('Setting 1: Trivial generation')
     run_experiment1('trivial', parser_args.executions, parser_args.time_limit, 'npx erwin generate', command_suffix, parser_args.solc_path, parser_args.generated_programs_folder_path, parser_args.gcov_folder_path)
   elif (parser_args.setting == 'gen100'):
-    print('Setting 2: Generate at most 50 programs from an IR')
+    print('Setting 2: Generate at most 100 programs from an IR')
     run_experiment1('gen100', parser_args.executions, parser_args.time_limit, '', f'--max 100 {command_suffix}', parser_args.solc_path, parser_args.generated_programs_folder_path, parser_args.gcov_folder_path)
   elif (parser_args.setting == 'gen500'):
-    print('Setting 3: Generate at most 100 programs from an IR')
+    print('Setting 3: Generate at most 500 programs from an IR')
     run_experiment1('gen500', parser_args.executions, parser_args.time_limit, '', f'--max 500 {command_suffix}', parser_args.solc_path, parser_args.generated_programs_folder_path, parser_args.gcov_folder_path)
   elif (parser_args.setting == 'gen1000'):
     print('Setting 4: Generate at most 1000 programs from an IR')
