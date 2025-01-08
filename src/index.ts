@@ -26,6 +26,7 @@ program
   .option("-m --mode <string>", "The mode of Erwin. The value can be 'type', 'scope', or 'loc'.", `${config.mode}`)
   .option("-d --debug", "Enable the debug mode.", `${config.debug}`)
   .option("-o --out_dir <string>", "The output directory for the generated program. The default is 'generated_programs'", `${config.out_dir}`)
+  .option('-t --target <string>', 'The testing target. The value can be "solidity", "solang", "solar", and "slither". Default to solidity', `${config.target}`)
   // Dominance Constraint Solution
   .option("-max --maximum_solution_count <number>", "The maximum number of solutions Erwin will consider.", `${config.maximum_solution_count}`)
   // Type
@@ -78,7 +79,7 @@ program
   // Probability
   .option("--nonstructured_statement_prob <float>", "The probability of generating a nonstructured statement, such as AssignmentStatment or FunctionCallAssignment.", `${config.nonstructured_statement_prob}`)
   .option("--expression_complexity_prob <float>", "The probability of generating a complex expression.", `${config.expression_complexity_prob}`)
-  .option("--literal_prob <float>", "The probability of generating a literal.", `${config.literal_prob}`)
+  .option("--literal_prob <float>", "The probability of generating a literal when initializing a variable.", `${config.literal_prob}`)
   .option("--tuple_prob <float>", "The probability of generating a tuple surrounding an expression.", `${config.tuple_prob}`)
   .option("--vardecl_prob <float>", "The probability of generating a variable declaration.", `${config.vardecl_prob}`)
   .option("--new_prob <float>", "The probability of generating a variable declaration in place.", `${config.new_prob}`)
@@ -87,7 +88,8 @@ program
   .option("--struct_prob <float>", "The probability of generating a struct.", `${config.struct_prob}`)
   .option("--contract_type_prob <float>", "The probability of generating a contract-type variable.", `${config.contract_type_prob}`)
   .option("--struct_type_prob <float>", "The probability of generating a struct-type variable.", `${config.struct_type_prob}`)
-  .option("--initialization_prob <float>", "The probability of generating an initialization statement.", `${config.initialization_prob}`)
+  .option("--in_func_initialization_prob <float>", "The probability of initializing a variable during its declaration inside a function.", `${config.in_func_initialization_prob}`)
+  .option("--contract_member_initialization_prob <float>", "The probability of initializing a state variable during its declaration inside a contract.", `${config.contract_member_initialization_prob}`)
   .option("--constructor_prob <float>", "The probability of generating a constructor.", `${config.constructor_prob}`)
   .option("--return_prob <float>", "The probability of generating a return statement.", `${config.return_prob}`)
   .option("--reuse_name_prob <float>", "The probability of reusing a name.", `${config.reuse_name_prob}`)
@@ -100,8 +102,6 @@ program
   .option("--generation_rounds <number>", "The number of rounds Erwin will generate.", `${config.generation_rounds}`)
   .option("--log_file_path <string>", "The path of the log file.", `${config.log_file_path}`)
   .option("--enable_test", "Enable the test mode.", `${config.enable_test}`)
-  .option("--no_test_compiler", "Disable the testing for Solidity compiler.", `${config.no_test_compiler}`)
-  .option("--no_test_slither", "Disable the testing for Slither.", `${config.no_test_slither}`)
   .option("--compiler_path <string>", "The path of the Solidity compiler.", `${config.compiler_path}`)
   .option("--refresh_folder", "Refresh the folder before generating the program.", `${config.refresh_folder}`)
 program.parse(process.argv);
@@ -147,7 +147,8 @@ else if (program.args[0] === "generate") {
   config.struct_prob = parseFloat(program.commands[1].opts().struct_prob);
   config.contract_type_prob = parseFloat(program.commands[1].opts().contract_type_prob);
   config.struct_type_prob = parseFloat(program.commands[1].opts().struct_type_prob);
-  config.initialization_prob = parseFloat(program.commands[1].opts().initialization_prob);
+  config.in_func_initialization_prob = parseFloat(program.commands[1].opts().in_func_initialization_prob);
+  config.contract_member_initialization_prob = parseFloat(program.commands[1].opts().contract_member_initialization_prob);
   config.constructor_prob = parseFloat(program.commands[1].opts().constructor_prob);
   config.return_prob = parseFloat(program.commands[1].opts().return_prob);
   config.reuse_name_prob = parseFloat(program.commands[1].opts().reuse_name_prob);
@@ -177,11 +178,10 @@ else if (program.args[0] === "generate") {
   config.error_decl_per_contract_lowerlimit = parseInt(program.commands[1].opts().error_decl_per_contract_lowerlimit);
   config.generation_rounds = parseInt(program.commands[1].opts().generation_rounds);
   config.compiler_path = program.commands[1].opts().compiler_path;
+  config.target = program.commands[1].opts().target;
   if (program.commands[1].opts().refresh_folder === true) config.refresh_folder = true;
   if (program.commands[1].opts().debug === true) config.debug = true;
   if (program.commands[1].opts().enable_test === true) config.enable_test = true;
-  if (program.commands[1].opts().no_test_compiler === true) config.no_test_compiler = true;
-  if (program.commands[1].opts().no_test_slither === true) config.no_test_slither = true;
   if (config.mode == "scope") {
     config.int_num = 1;
     config.uint_num = 1;
@@ -263,12 +263,16 @@ else if (program.args[0] === "generate") {
   assert(config.error_decl_per_contract_lowerlimit <= config.error_decl_per_contract_upperlimit, "The lower limit of the number of errors in a contract must be less than or equal to the upper limit.");
   assert(config.error_decl_per_contract_lowerlimit >= 1, "The lower limit of the number of errors in a contract must be not less than 1.");
   assert(config.struct_prob >= 0 && config.struct_prob <= 1, "The probability of generating a struct must be in the range [0,1].");
-  assert(config.initialization_prob >= 0 && config.initialization_prob <= 1, "The probability of generating an initialization statement must be in the range [0,1].");
+  assert(config.in_func_initialization_prob >= 0 && config.in_func_initialization_prob <= 1, "The probability of generating an initialization statement must be in the range [0,1].");
+  assert(config.contract_member_initialization_prob >= 0 && config.contract_member_initialization_prob <= 1, "The probability of generating an initialization statement must be in the range [0,1].");
   assert(config.constructor_prob >= 0 && config.constructor_prob <= 1, "The probability of generating a constructor must be in the range [0,1].");
   assert(config.return_prob >= 0 && config.return_prob <= 1, "The probability of generating a return statement must be in the range [0,1].");
   assert(config.reuse_name_prob >= 0 && config.reuse_name_prob < 1, "The probability of reusing a name must be in the range [0,1).");
   assert(config.generation_rounds >= 1, "The number of generation rounds must be not less than 1.");
-  assert(!config.enable_test || config.compiler_path !== "", "The path of the compiler path is not provided while enabling the testing mode.");
+  if (config.enable_test) {
+    assert(config.compiler_path !== "", "The path of the compiler path is not provided while enabling the testing mode.");
+  }
+  assert(['solidity', '', 'solang', 'solar', 'slither'].includes(config.target), "The target is not either 'solidity', 'solang', 'solar', or 'slither'.");
 }
 
 if (program.args[0] === "mutate") {

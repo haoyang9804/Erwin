@@ -25,7 +25,7 @@ import {
   StateVariableVisibility,
   FunctionStateMutability,
 } from "solc-typed-ast"
-import { test_compiler, test_slither } from "./test";
+import { test_solidity_compiler, test_slither } from "./test";
 const formatter = new PrettyFormatter(2, 0);
 const writer = new ASTWriter(
   DefaultASTWriterMapping,
@@ -417,6 +417,10 @@ export async function generate() {
       fs.rmSync(`${config.out_dir}`, { recursive: true, force: true });
       fs.mkdirSync(`${config.out_dir}`);
     }
+    if (config.target === "solang") {
+      config.error_prob = 0.0;
+      config.in_func_initialization_prob = 1.0;
+    }
     const source_unit = new gen.SourceUnitGenerator();
     source_unit.generate();
     let startTime = performance.now();
@@ -453,19 +457,22 @@ export async function generate() {
       generate_loc_mode(source_unit);
     }
     if (config.enable_test) {
-      if (!config.no_test_compiler) {
-        await test_compiler().then((result) => {
+      if (config.target === "solidity") {
+        await test_solidity_compiler().then((result) => {
           if (result !== 0) {
             process.exit(1);
           }
         });
       }
-      if (!config.no_test_slither) {
+      else if (config.target === "slither") {
         await test_slither().then((result) => {
           if (result !== 0) {
             process.exit(1);
           }
         });
+      }
+      else {
+        throw new Error(`The testing target ${config.target} is not supported.`);
       }
     }
   }

@@ -8,7 +8,61 @@ import { select_random_elements, random_int, pick_random_element } from './utili
 // Promisify exec to use it with async/await
 const execPromise = promisify(exec);
 
-async function compile(file_path : string) : Promise<[string, string]> {
+//@ts-ignore
+async function compile_by_solang(file_path : string) : Promise<[string, string]> {
+  //! the argument '--emit <EMIT>' cannot be used with '--standard-json'
+  const output_flags = [
+    '--emit', // followed by ast-dot, cfg, llvm-ir, llvm-bc, object, asm
+    '--standard-json',
+    '--target', // followed by solana, polkadot
+    '--address-length',
+    '--value-length'
+  ]
+  const debug_flags = [
+    '--generate-debug-info',
+    '--release'
+  ]
+  const opt_flags = [
+    '--no-constant-folding',
+    '--no-dead-storage',
+    '--no-vector-to-slice',
+    '--no-cse',
+  ]
+  const llvm_flags = [
+    '-O', // followed by none, less, default, aggressive
+    '--wasm-opt' // followed by 0, 1, 2, 3, 4, s or z
+  ]
+  const selected_output_flags = [...output_flags];
+  if (selected_output_flags.includes('--standard-json') && selected_output_flags.includes('--emit')) {
+    const index = Math.random() < 0.5 ? selected_output_flags.indexOf('--standard-json') : selected_output_flags.indexOf('--emit');
+    selected_output_flags.splice(index, 1);
+  }
+  const index = selected_output_flags.indexOf('--target');
+  //* Currently only solana is supported
+  selected_output_flags[index] = '--target ' + select_random_elements(['solana'], 1).join('');
+  if (selected_output_flags[index] == '--target solana') {
+    selected_output_flags.splice(selected_output_flags.indexOf('--address-length'), 1);
+    selected_output_flags.splice(selected_output_flags.indexOf('--value-length'), 1);
+  }
+  const selected_debug_flags = select_random_elements(debug_flags, random_int(1, debug_flags.length));
+  const selected_opt_flags = select_random_elements(opt_flags, random_int(1, opt_flags.length));
+  const selected_llvm_flags = [...llvm_flags];
+  selected_llvm_flags.forEach((flag) => {
+    if (flag === '-O') {
+      const index = selected_llvm_flags.indexOf(flag);
+      selected_llvm_flags[index] = flag + ' ' + select_random_elements(['none', 'less', 'default', 'aggressive'], 1).join('');
+    }
+    else if (flag === '--wasm-opt') {
+      const index = selected_llvm_flags.indexOf(flag);
+      selected_llvm_flags[index] = flag + ' ' + select_random_elements(['0', '1', '2', '3', '4', 's', 'z'], 1).join('');
+    }
+  });
+  const compile_command = `${config.compiler_path} ${file_path} ${selected_output_flags.join(' ')} ${selected_debug_flags.join(' ')} ${selected_opt_flags.join(' ')} ${selected_llvm_flags.join(' ')}`;
+  const { stdout, stderr } = await execPromise(compile_command);
+  return [stdout, stderr];
+}
+
+async function compile_by_solidity(file_path : string) : Promise<[string, string]> {
   const output_flags = [
     '--ast-compact-json',
     '--asm',
@@ -150,7 +204,7 @@ async function compile(file_path : string) : Promise<[string, string]> {
  * - 3 if the time limit is exceeded
  * - 4 if the compiler path is incorrect
  */
-export async function test_compiler() : Promise<number> {
+export async function test_solidity_compiler() : Promise<number> {
   return new Promise((resolve) => {
     const timeoutDuration = 5 * 60 * 1000; // 5 minutes in milliseconds
     const timeoutId = setTimeout(() => {
@@ -181,7 +235,7 @@ export async function test_compiler() : Promise<number> {
           const stats = await stat(filePath);
           if (stats.isFile()) {
             try {
-              await compile(filePath);
+              await compile_by_solidity(filePath);
             } catch (error) {
               const execError = error as ExecException & {
                 stdout : string;
