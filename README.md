@@ -26,12 +26,12 @@ The simplest way is `npm install @__haoyang__/erwin` it and `npx erwin generate`
 
 To utilize ***Erwin***'s features in program generation, you can use `-m` to specify the bug-related features you want to mask in the IR, and use `-max` to specify the maximum test programs you want to instantiation from the generated IR.
 
-To directly use ***Erwin*** to fuzz the Solidity compiler, you can invoke `--enable_test`.
+To directly use ***Erwin*** to fuzz the Solidity compiler, you can invoke `--enable_test`, followed by the target you want to test, including, solidity, solang, solar, and slither. The first three are compilers for Solidity programs, while the last is a static analyzer for solidity.
 
 Below is an example command to fuzz the Solidity compiler:
 
 ```
-npx erwin generate -m type -d  --enable_test --compiler_path=../solidity/build/solc/solc --refresh_folder --generation_rounds 10000 -max 100
+npx erwin generate -m type -d  --enable_test solidity --compiler_path=../solidity/build/solc/solc --refresh_folder --generation_rounds 10000 -max 100
 ```
 
 For more flags, please refer to `npx erwin generation -h`.
@@ -60,6 +60,8 @@ For more flags, please refer to `npx erwin generation -h`.
 20. https://github.com/ethereum/solidity/issues/15649 (ICE)
 21. https://github.com/ethereum/solidity/issues/15651 (ICE)
 22. https://github.com/crytic/slither/issues/2619 (hang)
+23. https://github.com/hyperledger-solang/solang/issues/1687 (ICE)
+24. https://github.com/hyperledger-solang/solang/issues/1688 (error handling)
 
 
 ## TODO

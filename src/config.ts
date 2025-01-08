@@ -59,7 +59,7 @@ export const config = {
   // Probability
   nonstructured_statement_prob: 0.5,
   expression_complexity_prob: 0.8,
-  literal_prob: 0.05,
+  literal_prob: 0.8,
   tuple_prob: 0.3,
   vardecl_prob: 0.3,
   new_prob: 0.1,
@@ -71,7 +71,8 @@ export const config = {
   mapping_type_prob: 0.1,
   array_type_prob: 0.1,
   string_type_prob: 0.1,
-  initialization_prob: 0.3,
+  in_func_initialization_prob: 0.3,
+  contract_member_initialization_prob: 0.2,
   constructor_prob: 0.5,
   return_prob: 0.5,
   reuse_name_prob: 0.0,
@@ -100,11 +101,10 @@ export const config = {
   // Log file path
   log_file_path: "./log.txt",
 
-  // Test Solidity
+  // Test
+  target: 'solidity',
   compiler_path: "",
   enable_test: false,
-  no_test_compiler: false,
-  no_test_slither: false,
   // Refresh the folder of the generated programs before generating new programs
   refresh_folder: false,
 }
