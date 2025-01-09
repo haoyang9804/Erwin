@@ -208,7 +208,6 @@ def compile(sol_dir, mode):
       compiler_command = f'LLVM_PROFILE_FILE="{profraw_file}" {parser_args.solc_path} {solidity_compilation_flags()} {sol_file}'
     elif mode == 'line':
       compiler_command = f'{parser_args.solc_path} {solidity_compilation_flags()} {sol_file}'
-    print(Fore.GREEN + f'compiler_command: {compiler_command}')
     subprocess.run(compiler_command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def generate_solidity_edge_coverage(solc_path, sol_dir):
@@ -268,6 +267,7 @@ def run_experiment1_line(name, executions, time_limit, command_prefix, command_s
     fline = open(f'./coverage_report/linecov_{name}_{i}.txt', 'w')
     g_covered_line = set()
     while time_budget > 0:
+      all_start = time.time()
       remove_gcov_files(gcov_folder_path)
       command = f'{np.random.choice(commands) if command_prefix=="" else command_prefix} {command_suffix} {" ".join(optional_command_suffix())}'
       print(Fore.CYAN + f"Erwin command: {command}")
@@ -281,16 +281,17 @@ def run_experiment1_line(name, executions, time_limit, command_prefix, command_s
       print(Fore.CYAN + f"Erwin execution: {gen_end-gen_start} seconds")
       if not os.path.exists(generated_programs_folder_path) or len(os.listdir(generated_programs_folder_path)) == 0:
         continue
-      start = time.time()
+      compile_start = time.time()
       compile(generated_programs_folder_path, 'line')
-      end = time.time()
-      print(Fore.MAGENTA + f"compile: {end-start} seconds")
+      compile_end = time.time()
+      print(Fore.MAGENTA + f"compile: {compile_end-compile_start} seconds")
       covered_line, line = extract_collected_lines(gcov_folder_path)
       g_covered_line = covered_line
       covered_linecnt = len(covered_line)
       linecnt = len(line)
-      time_budget -= gen_end-gen_start
-      print(Fore.BLUE + f"> Execution {i+1}, Time Cost: {gen_end-gen_start} seconds, Time Budget: {time_budget} seconds, {covered_linecnt}/{linecnt} lines covered")
+      all_end = time.time()
+      time_budget -= all_end - all_start
+      print(Fore.BLUE + f"> Execution {i+1}, Time Cost: {all_end - all_start} seconds, Time Budget: {time_budget} seconds, {covered_linecnt}/{linecnt} lines covered")
       fline.write(f'{time_limit - time_budget}: {covered_linecnt}/{linecnt}\n')
       fline.flush()
     with open(f'./coverage_report/linecovmap_{name}_{i}.txt', 'a') as f:
@@ -307,6 +308,7 @@ def run_experiment1_edge(name, executions, time_limit, command_prefix, command_s
     if os.path.exists(f'./coverage_report/solc_combined.profdata'):
       os.remove(f'./coverage_report/solc_combined.profdata')
     while time_budget > 0:
+      all_start = time.time()
       if os.path.exists('temp_profiles'):
         for file in glob.glob('temp_profiles/*'):
           os.remove(file)
@@ -324,12 +326,12 @@ def run_experiment1_edge(name, executions, time_limit, command_prefix, command_s
       print(Fore.CYAN + f"Erwin execution: {gen_end-gen_start} seconds")
       if not os.path.exists(generated_programs_folder_path) or len(os.listdir(generated_programs_folder_path)) == 0:
         continue
-      start = time.time()
+      compile_start = time.time()
       compile(generated_programs_folder_path, 'edge')
-      end = time.time()
+      compile_end = time.time()
       if not os.path.exists('temp_profiles'):
         continue
-      print(Fore.MAGENTA + f"compile: {end-start} seconds")
+      print(Fore.MAGENTA + f"compile: {compile_end-compile_start} seconds")
       start = time.time()
       # Compile the generated programs and generate coverage json file
       generate_solidity_edge_coverage(solc_path, generated_programs_folder_path)
@@ -348,8 +350,9 @@ def run_experiment1_edge(name, executions, time_limit, command_prefix, command_s
         edgecnt += 1
         if collected_edges[edge] > 0:
           covered_edgecnt += 1
-      time_budget -= gen_end-gen_start
-      print(Fore.BLUE + f"> Execution {i+1}, Time Cost: {gen_end-gen_start} seconds, Time Budget: {time_budget} seconds, {covered_edgecnt}/{edgecnt} edges covered")
+      all_end = time.time()
+      time_budget -= all_end - all_start
+      print(Fore.BLUE + f"> Execution {i+1}, Time Cost: {all_end - all_start} seconds, Time Budget: {time_budget} seconds, {covered_edgecnt}/{edgecnt} edges covered")
       fedge.write(f'{time_limit - time_budget}: {covered_edgecnt}/{edgecnt}\n')
       fedge.flush()
     fedge.close()
@@ -379,15 +382,15 @@ def experiment1():
   if (parser_args.setting == 'trivial'):
     print('Setting 1: Trivial generation')
     run_experiment1('trivial', parser_args.executions, parser_args.time_limit, 'npx erwin generate', command_suffix, parser_args.solc_path, parser_args.generated_programs_folder_path, parser_args.gcov_folder_path)
+  elif (parser_args.setting == 'gen50'):
+    print('Setting 2: Generate at most 50 programs from an IR')
+    run_experiment1('gen50', parser_args.executions, parser_args.time_limit, '', f'-max 50 {command_suffix}', parser_args.solc_path, parser_args.generated_programs_folder_path, parser_args.gcov_folder_path)
   elif (parser_args.setting == 'gen100'):
-    print('Setting 2: Generate at most 100 programs from an IR')
-    run_experiment1('gen100', parser_args.executions, parser_args.time_limit, '', f'--max 100 {command_suffix}', parser_args.solc_path, parser_args.generated_programs_folder_path, parser_args.gcov_folder_path)
-  elif (parser_args.setting == 'gen500'):
-    print('Setting 3: Generate at most 500 programs from an IR')
-    run_experiment1('gen500', parser_args.executions, parser_args.time_limit, '', f'--max 500 {command_suffix}', parser_args.solc_path, parser_args.generated_programs_folder_path, parser_args.gcov_folder_path)
-  elif (parser_args.setting == 'gen1000'):
-    print('Setting 4: Generate at most 1000 programs from an IR')
-    run_experiment1('gen1000', parser_args.executions, parser_args.time_limit, '', f'--max 1000 {command_suffix}', parser_args.solc_path, parser_args.generated_programs_folder_path, parser_args.gcov_folder_path)
+    print('Setting 3: Generate at most 100 programs from an IR')
+    run_experiment1('gen100', parser_args.executions, parser_args.time_limit, '', f'-max 100 {command_suffix}', parser_args.solc_path, parser_args.generated_programs_folder_path, parser_args.gcov_folder_path)
+  elif (parser_args.setting == 'gen150'):
+    print('Setting 4: Generate at most 150 programs from an IR')
+    run_experiment1('gen150', parser_args.executions, parser_args.time_limit, '', f'-max 150 {command_suffix}', parser_args.solc_path, parser_args.generated_programs_folder_path, parser_args.gcov_folder_path)
 
 '''
 Experiment 2.
@@ -435,29 +438,19 @@ Compare line coverage increase speed over different generation setting.
 #   plt.show()
   
 
-solc_path = '/data/hmaaj/solidity/build-experiment1/solc/solc'
-generated_programs_folder_path = '/data/hmaaj/Erwin/generated_programs'
-gcov_folder_path = '/data/hmaaj/solidity/build-experiment1'
-compiler_source_folder_path = '/data/hmaaj/solidity'
-
-solc_path = '/Users/mac/repo/solidity/build-lcov/solc/solc'
-generated_programs_folder_path = '/Users/mac/repo/Erwin/generated_programs'
-gcov_folder_path = '/Users/mac/repo/solidity/build-lcov'
-compiler_source_folder_path = '/Users/mac/repo/solidity'
-
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(
                     prog='coverage',
                     description='Collect coverage data from Solidity compilers.')
   subparsers = parser.add_subparsers(dest='experiment', help='Experiment-specific arguments')
   parser_exp1 = subparsers.add_parser('experiment1', help='Arguments for Experiment 1')
-  parser_exp1.add_argument('--setting', type=str, help='Generation setting', choices=['trivial', 'gen100', 'gen500', 'gen1000'], default='trivial')
-  parser_exp1.add_argument('--executions', type=int, help='Number of executions of this experiment', default=3)
-  parser_exp1.add_argument('--time_limit', type=float, help='Time limit for each executions, in seconds', default=3600*4)
-  parser_exp1.add_argument('--solc_path', type=str, help='Path to the instrumented Solidity compiler', default=solc_path)
-  parser_exp1.add_argument('--generated_programs_folder_path', type=str, help='Path to the generated programs folder', default=generated_programs_folder_path)
-  parser_exp1.add_argument('--gcov_folder_path', type=str, help='Path to the gcov folder', default=gcov_folder_path)
-  parser_exp1.add_argument('--compiler_source_folder_path', type=str, help='Path to the compiler source folder', default=compiler_source_folder_path)
+  parser_exp1.add_argument('--setting', type=str, help='Generation setting', choices=['trivial', 'gen50', 'gen100', 'gen150'], default='trivial')
+  parser_exp1.add_argument('--executions', type=int, help='Number of executions of this experiment', default=5)
+  parser_exp1.add_argument('--time_limit', type=float, help='Time limit for each executions, in seconds', default=3600*24)
+  parser_exp1.add_argument('--solc_path', type=str, help='Path to the instrumented Solidity compiler', required=True)
+  parser_exp1.add_argument('--generated_programs_folder_path', type=str, help='Path to the generated programs folder', required=True)
+  parser_exp1.add_argument('--gcov_folder_path', type=str, help='Path to the gcov folder', required=True)
+  parser_exp1.add_argument('--compiler_source_folder_path', type=str, help='Path to the compiler source folder', required=True)
   parser_exp1.add_argument('--line', action='store_true', help='Collect line coverage data')
   parser_exp1.add_argument('--edge', action='store_true', help='Collect edge coverage data')
 
