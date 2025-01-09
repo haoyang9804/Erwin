@@ -726,7 +726,11 @@ abstract class DeclarationGenerator extends Generator {
   initializable() : boolean {
     assert(this.irnode !== undefined,
       `DeclarationGenerator::initializable: this.irnode is undefined`);
-    return cur_scope.kind() === scopeKind.FUNC_BODY && Math.random() < config.in_func_initialization_prob ||
+    return ((inside_constructor_body(cur_scope) ||
+      inside_function_body(cur_scope) ||
+      inside_modifier_body(cur_scope)) &&
+      !inside_array_scope(cur_scope) &&
+      !inside_mapping_scope(cur_scope)) && Math.random() < config.in_func_initialization_prob ||
       cur_scope.kind() === scopeKind.CONTRACT && Math.random() < config.contract_member_initialization_prob;
   }
 
@@ -804,10 +808,10 @@ class MappingDeclarationGenerator extends DeclarationGenerator {
         `MappingDeclarationGenerator: function_body_scope.kind() is not FUNC_BODY but ${function_body_scope.kind()}`);
       assert(this.irnode !== undefined,
         `MappingDeclarationGenerator: this.irnode is undefined`);
-      decl_db.set_vardecl_as_must_be_initialized(function_body_scope.id(), this.irnode!.id);
+      decl_db.set_vardecl_as_must_be_initialized_later(function_body_scope.id(), this.irnode!.id);
     }
     else if (inside_function_without_init()) {
-      decl_db.set_vardecl_as_must_be_initialized(cur_scope.id(), this.irnode!.id);
+      decl_db.set_vardecl_as_must_be_initialized_later(cur_scope.id(), this.irnode!.id);
     }
   }
 
@@ -886,7 +890,9 @@ class MappingDeclarationGenerator extends DeclarationGenerator {
     type_dag.insert(mappingid, this.type_range);
     //haoyang
     decl_db.set_vardecl_as_nonassignable(mappingid);
-    this.mapping_must_be_initialized_if_in_function_return_scope_or_funcbody();
+    if (config.target === 'solidity') {
+      this.mapping_must_be_initialized_if_in_function_return_scope_or_funcbody();
+    }
     decl_db.add_mapping_decl(mappingid, keyid, valueid);
     decl_db.add_vardecl_with_scope(mappingid, cur_scope);
     this.update_storage_location_range(mappingid);
@@ -959,13 +965,27 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
     let initializer : expr.IRExpression | undefined;
     //haoyang
     if (this.initializable() && !decl_db.contains_mapping_decl(this.irnode!.id)) {
-      const nid = new_global_id();
-      assert(this.irnode !== undefined, `ArrayDeclarationGenerator: this.irnode is undefined`);
-      type_dag.insert(nid, type_dag.solution_range_of(this.irnode.id)!);
-      type_dag.connect(nid, this.irnode.id, "super");
-      const identifier_gen = new IdentifierGenerator(nid);
-      identifier_gen.generate(0);
-      initializer = identifier_gen.irnode as expr.IRExpression;
+      let generate_identifier_for_initialziation = () => {
+        const nid = new_global_id();
+        assert(this.irnode !== undefined, `ArrayDeclarationGenerator: this.irnode is undefined`);
+        type_dag.insert(nid, type_dag.solution_range_of(this.irnode.id)!);
+        type_dag.connect(nid, this.irnode.id, "super");
+        const identifier_gen = new IdentifierGenerator(nid);
+        identifier_gen.generate(0);
+        initializer = identifier_gen.irnode as expr.IRExpression;
+      }
+      if (cur_scope.kind() !== scopeKind.CONTRACT && Math.random() < 0.8) {
+        const snapshot = cur_scope.snapshot();
+        while (cur_scope.kind() !== scopeKind.CONTRACT) {
+          roll_back_scope();
+        }
+        Log.log(`${" ".repeat(indent)}ArrayDeclarationGenerator: go back to contract scope`)
+        generate_identifier_for_initialziation();
+        relocate_scope(snapshot);
+      }
+      else {
+        generate_identifier_for_initialziation();
+      }
     }
     (this.irnode as decl.IRVariableDeclaration).value = initializer;
   }
@@ -1067,7 +1087,12 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
       assert(storage_location_dag.has_solution_range(this.irnode.id),
         `ArrayDeclarationGenerator: storage_location_dag.has_solution_range(${this.irnode.id}) is false`);
       const initializer_id = expr.tuple_extraction(value).id;
-      storage_location_dag.connect(initializer_id, this.irnode.id, "super");
+      if (config.target === "solang") {
+        storage_location_dag.connect(initializer_id, this.irnode.id);
+      }
+      else {
+        storage_location_dag.connect(initializer_id, this.irnode.id, "super");
+      }
       storage_location_dag.solution_range_alignment(initializer_id, this.irnode.id);
     }
     update_storage_loc_range_for_compound_type(this.irnode.id);
@@ -1098,10 +1123,10 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
         `ArrayDeclarationGenerator: function_body_scope.kind() is not FUNC_BODY but ${function_body_scope.kind()}`);
       assert(this.irnode !== undefined,
         `ArrayDeclarationGenerator: this.irnode is undefined`);
-      decl_db.set_vardecl_as_must_be_initialized(function_body_scope.id(), this.irnode!.id);
+      decl_db.set_vardecl_as_must_be_initialized_later(function_body_scope.id(), this.irnode!.id);
     }
     else if (inside_function_without_init()) {
-      decl_db.set_vardecl_as_must_be_initialized(cur_scope.id(), this.irnode!.id);
+      decl_db.set_vardecl_as_must_be_initialized_later(cur_scope.id(), this.irnode!.id);
     }
   }
 
@@ -1126,7 +1151,9 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
     decl_db.add_vardecl_with_scope(arrayid, cur_scope);
     this.update_storage_location_range();
     this.update_vismut_dag(arrayid);
-    this.array_must_be_initialized_if_in_function_return_scope_or_funcbody();
+    if (config.target === "solidity") {
+      this.array_must_be_initialized_if_in_function_return_scope_or_funcbody();
+    }
     this.end_flag(array_name, arrayid);
   }
 }
@@ -1164,12 +1191,27 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
     assert(this.struct_id !== undefined, `StructInstanceDeclarationGenerator: this.struct_id is undefined`);
     //haoyang
     if (this.initializable() && !decl_db.contains_mapping_decl(this.struct_id)) {
-      const nid = new_global_id();
-      type_dag.insert(nid, type_dag.solution_range_of(this.irnode.id)!);
-      type_dag.connect(nid, this.irnode.id, "super");
-      const new_struct_gen = new NewStructGenerator(nid);
-      new_struct_gen.generate(0);
-      initializer = new_struct_gen.irnode as expr.IRExpression;
+      let generate_identifier_for_initialziation = () => {
+        const nid = new_global_id();
+        type_dag.insert(nid, type_dag.solution_range_of(this.irnode!.id)!);
+        type_dag.connect(nid, this.irnode!.id, "super");
+        const new_struct_gen = new NewStructGenerator(nid);
+        new_struct_gen.generate(0);
+        initializer = new_struct_gen.irnode as expr.IRExpression;
+      };
+      let generate_new_struct_expression_for_initialization = () => {
+        const nid = new_global_id();
+        type_dag.insert(nid, type_dag.solution_range_of(this.irnode!.id)!);
+        const new_struct_expr_gen = new NewStructGenerator(nid);
+        new_struct_expr_gen.generate(0);
+        initializer = new_struct_expr_gen.irnode as expr.IRExpression;
+      }
+      if (Math.random() < config.new_prob) {
+        generate_new_struct_expression_for_initialization();
+      }
+      else {
+        generate_identifier_for_initialziation();
+      }
     }
     (this.irnode as decl.IRVariableDeclaration).value = initializer;
   }
@@ -1284,7 +1326,12 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
       assert(storage_location_dag.non_empty_solution_range_of(this.irnode.id),
         `StructInstanceDeclarationGenerator: storage_location_dag.non_empty_solution_range_of(${this.irnode.id}) is empty`);
       const initializer_id = expr.tuple_extraction(value).id;
-      storage_location_dag.connect(initializer_id, this.irnode.id, "super");
+      if (config.target === "solang") {
+        storage_location_dag.connect(initializer_id, this.irnode.id);
+      }
+      else {
+        storage_location_dag.connect(initializer_id, this.irnode.id, "super");
+      }
       storage_location_dag.solution_range_alignment(initializer_id, this.irnode.id);
     }
   }
@@ -1315,10 +1362,10 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
         `StructInstanceDeclarationGenerator: function_body_scope.kind() is not FUNC_BODY but ${function_body_scope.kind()}`);
       assert(this.irnode !== undefined,
         `StructInstanceDeclarationGenerator: this.irnode is undefined`);
-      decl_db.set_vardecl_as_must_be_initialized(function_body_scope.id(), this.irnode!.id);
+      decl_db.set_vardecl_as_must_be_initialized_later(function_body_scope.id(), this.irnode!.id);
     }
     else if (inside_function_without_init()) {
-      decl_db.set_vardecl_as_must_be_initialized(cur_scope.id(), this.irnode!.id);
+      decl_db.set_vardecl_as_must_be_initialized_later(cur_scope.id(), this.irnode!.id);
     }
   }
 
@@ -1339,7 +1386,9 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
     this.generate_initializer();
     this.assign_storage_location_range();
     this.update_vismut_dag();
-    this.struct_instance_must_be_initialized_if_in_function_return_scope_or_funcbody();
+    if (config.target === "solidity") {
+      this.struct_instance_must_be_initialized_if_in_function_return_scope_or_funcbody();
+    }
     this.end_flag(struct_instance_name);
   }
 }
@@ -1390,7 +1439,12 @@ class StringDeclarationGenerator extends DeclarationGenerator {
           type_dag.solution_range_alignment(expr_id, this.irnode!.id);
           assert(storage_location_dag.has_solution_range(expr_id),
             `StringDeclarationGenerator::generate_initializer: storage_location_dag's solution range of ${expr_id} is empty`);
-          storage_location_dag.connect(expr_id, this.irnode!.id, "super");
+          if (config.target === "solang") {
+            storage_location_dag.connect(expr_id, this.irnode!.id);
+          }
+          else {
+            storage_location_dag.connect(expr_id, this.irnode!.id, "super");
+          }
         }
         (this.irnode as decl.IRVariableDeclaration).value = expr_gen.irnode! as expr.IRExpression;
       }
@@ -1499,10 +1553,10 @@ class StringDeclarationGenerator extends DeclarationGenerator {
         `StringDeclarationGenerator: function_body_scope.kind() is not FUNC_BODY but ${function_body_scope.kind()}`);
       assert(this.irnode !== undefined,
         `StringDeclarationGenerator: this.irnode is undefined`);
-      decl_db.set_vardecl_as_must_be_initialized(function_body_scope.id(), this.irnode!.id);
+      decl_db.set_vardecl_as_must_be_initialized_later(function_body_scope.id(), this.irnode!.id);
     }
     else if (inside_function_without_init()) {
-      decl_db.set_vardecl_as_must_be_initialized(cur_scope.id(), this.irnode!.id);
+      decl_db.set_vardecl_as_must_be_initialized_later(cur_scope.id(), this.irnode!.id);
     }
   }
 
@@ -1517,7 +1571,9 @@ class StringDeclarationGenerator extends DeclarationGenerator {
     type_dag.insert(this.irnode.id, [type.TypeProvider.string()]);
     this.generate_initializer();
     this.update_vismut_dag();
-    this.stringdecl_must_be_initialized_if_in_function_return_scope_or_funcbody();
+    if (config.target === "solidity") {
+      this.stringdecl_must_be_initialized_if_in_function_return_scope_or_funcbody();
+    }
     this.end_flag(string_name);
   }
 }
@@ -1925,7 +1981,9 @@ class ConstructorDeclarationGenerator extends DeclarationGenerator {
     const stmt_gen_prototype = get_stmtgenerator();
     const stmt_gen = new stmt_gen_prototype();
     stmt_gen.generate(0);
-    stmt_db.initialize_the_vardecls_that_must_be_initialized(cur_scope.id());
+    if (config.target === "solidity") {
+      stmt_db.initialize_the_vardecls_that_must_be_initialized_later(cur_scope.id());
+    }
     this.body = this.body.concat(stmt_db.unexpected_extra_stmts_of_scope(cur_scope.id()));
     stmt_db.remove_unexpected_extra_stmt_from_scope(cur_scope.id());
     this.body.push(stmt_gen.irnode! as stmt.IRStatement);
@@ -2124,7 +2182,9 @@ class ModifierDeclarationGenerator extends DeclarationGenerator {
       const stmt_gen_prototype = get_stmtgenerator();
       const stmt_gen = new stmt_gen_prototype();
       stmt_gen.generate(0);
-      stmt_db.initialize_the_vardecls_that_must_be_initialized(cur_scope.id());
+      if (config.target === "solidity") {
+        stmt_db.initialize_the_vardecls_that_must_be_initialized_later(cur_scope.id());
+      }
       this.body = this.body.concat(stmt_db.unexpected_extra_stmts_of_scope(cur_scope.id()));
       stmt_db.remove_unexpected_extra_stmt_from_scope(cur_scope.id());
       this.body.push(stmt_gen.irnode! as stmt.IRStatement);
@@ -2292,10 +2352,6 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
     Log.log(`${" ".repeat(indent)}Function Body for ${this.fid}. vismut range is ${vismut_dag.solution_range_of(this.irnode!.id)!.map(f => f.str())}`)
   }
 
-  private initialize_the_vardecls_that_must_be_initialized() {
-    stmt_db.initialize_the_vardecls_that_must_be_initialized(cur_scope.id());
-  }
-
   private generate_func_body_stmts() {
     for (let i = 0; i < this.body_stmt_count; i++) {
       if (this.removing_storage_from_parameters_or_returns_leads_to_broken_storage_location_constraint()) {
@@ -2306,7 +2362,9 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
       const stmt_gen_prototype = get_stmtgenerator();
       const stmt_gen = new stmt_gen_prototype();
       stmt_gen.generate(0);
-      stmt_db.initialize_the_vardecls_that_must_be_initialized(cur_scope.id());
+      if (config.target === "solidity") {
+        stmt_db.initialize_the_vardecls_that_must_be_initialized_later(cur_scope.id());
+      }
       this.body = this.body.concat(stmt_db.unexpected_extra_stmts_of_scope(cur_scope.id()));
       stmt_db.remove_unexpected_extra_stmt_from_scope(cur_scope.id());
       this.body.push(stmt_gen.irnode! as stmt.IRStatement);
@@ -2336,7 +2394,9 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
         expr_gen.generate(0);
         const exp = expr_gen.irnode! as expr.IRExpression;
         this.return_values.push(exp);
-        stmt_db.initialize_the_vardecls_that_must_be_initialized(cur_scope.id());
+        if (config.target === "solidity") {
+          stmt_db.initialize_the_vardecls_that_must_be_initialized_later(cur_scope.id());
+        }
         this.body = this.body.concat(stmt_db.unexpected_extra_stmts_of_scope(cur_scope.id()));
         stmt_db.remove_unexpected_extra_stmt_from_scope(cur_scope.id());
         align_solution_ranges_of_arguments_and_parameters(expr_id, return_decl.id, ghost_id);
@@ -2567,7 +2627,9 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
     sig.forbid_external_call = this.forbid_external_call;
     this.throw_no_state_variable_signal_at_random();
     this.start_flag_of_func_body();
-    this.initialize_the_vardecls_that_must_be_initialized();
+    if (config.target === "solidity") {
+      stmt_db.initialize_the_vardecls_that_must_be_initialized_later(cur_scope.id());
+    }
     this.generate_func_body_stmts();
     this.generate_func_return_exprs();
     this.analyze_what_vardecls_are_read_and_written_in_the_func_body();
@@ -2937,6 +2999,9 @@ class ContractDeclarationGenerator extends DeclarationGenerator {
   }
 
   private generate_getter_function(variable_decl : decl.IRVariableDeclaration) {
+    if (config.target === 'solang') {
+      return;
+    }
     assert(type_dag.has_solution_range(variable_decl.id),
       `ContractDeclarationGenerator: type_dag.solution_range should have ${variable_decl.id}`);
     const type_range_of_vardecl = type_dag.solution_range_of(variable_decl.id)!;
@@ -3240,11 +3305,15 @@ class IdentifierGenerator extends ExpressionGenerator {
     if (decl_db.is_mapping_decl(this.variable_decl.id)) {
       const scope_id = decl_db.scope_of_irnode(this.variable_decl.id);
       stmt_db.add_unexpected_extra_stmt(scope_id, variable_decl_stmt);
-      stmt_db.initialize_the_vardecls_that_must_be_initialized(scope_id);
+      if (config.target === "solidity") {
+        stmt_db.initialize_the_vardecls_that_must_be_initialized_later(scope_id);
+      }
     }
     else {
       stmt_db.add_unexpected_extra_stmt(cur_scope.id(), variable_decl_stmt);
-      stmt_db.initialize_the_vardecls_that_must_be_initialized(cur_scope.id());
+      if (config.target === "solidity") {
+        stmt_db.initialize_the_vardecls_that_must_be_initialized_later(cur_scope.id());
+      }
     }
     if (roll_back > 0) {
       relocate_scope(snapshot_scope);
@@ -3592,7 +3661,9 @@ class IdentifierGenerator extends ExpressionGenerator {
     }
     (struct_instance_gen.irnode as decl.IRVariableDeclaration).value = undefined;
     stmt_db.add_unexpected_extra_stmt(cur_scope.id(), vardeclstmt);
-    stmt_db.initialize_the_vardecls_that_must_be_initialized(cur_scope.id());
+    if (config.target === "solidity") {
+      stmt_db.initialize_the_vardecls_that_must_be_initialized_later(cur_scope.id());
+    }
     if (rollback > 0) {
       relocate_scope(snapshot_scope);
     }
@@ -3810,7 +3881,7 @@ class IdentifierGenerator extends ExpressionGenerator {
             loc.StorageLocationProvider.calldata(),
             loc.StorageLocationProvider.memory()
           ]);
-          decl_db.remove_vardecl_from_must_be_initialized(scope.id(), this.variable_decl.id);
+          decl_db.remove_vardecl_from_must_be_initialized_later(scope.id(), this.variable_decl.id);
         }
       }
     }
@@ -3903,8 +3974,14 @@ class AssignmentGenerator extends ExpressionGenerator {
     if (this.op === "=" && this.storage_range.length > 0) {
       storage_location_dag.insert(leftid, loc.range_of_locs(this.storage_range, 'same'));
       storage_location_dag.connect(this.id, leftid);
-      storage_location_dag.insert(rightid, loc.range_of_locs(this.storage_range, 'sub'));
-      storage_location_dag.connect(this.id, rightid, "sub");
+      if (config.target === "solang") {
+        storage_location_dag.insert(rightid, loc.range_of_locs(this.storage_range, 'same'));
+        storage_location_dag.connect(this.id, rightid, "same");
+      }
+      else {
+        storage_location_dag.insert(rightid, loc.range_of_locs(this.storage_range, 'sub'));
+        storage_location_dag.connect(this.id, rightid, "sub");
+      }
     }
     return [leftid, rightid];
   }
@@ -3939,7 +4016,12 @@ class AssignmentGenerator extends ExpressionGenerator {
       }
       storage_location_dag.connect(this.id, leftid);
       storage_location_dag.solution_range_alignment(this.id, leftid);
-      storage_location_dag.connect(this.id, rightid, "sub");
+      if (config.target === "solang") {
+        storage_location_dag.connect(this.id, rightid);
+      }
+      else {
+        storage_location_dag.connect(this.id, rightid, "sub");
+      }
       storage_location_dag.solution_range_alignment(this.id, rightid);
     }
   }
@@ -3957,7 +4039,12 @@ class AssignmentGenerator extends ExpressionGenerator {
     if (right_storage_range.length > 0) {
       assert(this.op === "=", `AssignmentGenerator: op is not =, but is ${this.op}`);
       storage_location_dag.insert(this.id, loc.range_of_locs(right_storage_range, "sub"));
-      storage_location_dag.connect(this.id, rightid, "sub");
+      if (config.target === "solang") {
+        storage_location_dag.connect(this.id, rightid);
+      }
+      else {
+        storage_location_dag.connect(this.id, rightid, "sub");
+      }
       storage_location_dag.insert(leftid, loc.range_of_locs(storage_location_dag.solution_range_of(this.id), 'same'));
       storage_location_dag.connect(this.id, leftid);
       storage_location_dag.update(leftid, loc.range_of_locs(right_storage_range, "sub"));
@@ -4354,8 +4441,14 @@ class ConditionalGenerator extends ExpressionGenerator {
     if (this.storage_range.length > 0) {
       storage_location_dag.insert(e2id, loc.range_of_locs(this.storage_range, 'same'));
       storage_location_dag.connect(this.id, e2id);
-      storage_location_dag.insert(e3id, loc.range_of_locs(this.storage_range, 'super'));
-      storage_location_dag.connect(this.id, e3id, "sub");
+      if (config.target === "solang") {
+        storage_location_dag.insert(e3id, loc.range_of_locs(this.storage_range, 'same'));
+        storage_location_dag.connect(this.id, e3id);
+      }
+      else {
+        storage_location_dag.insert(e3id, loc.range_of_locs(this.storage_range, 'super'));
+        storage_location_dag.connect(this.id, e3id, "sub");
+      }
     }
   }
 
@@ -4399,8 +4492,14 @@ class ConditionalGenerator extends ExpressionGenerator {
     const e3_storage_range = storage_location_dag.has_solution_range(e3id) ?
       storage_location_dag.solution_range_of(e3id)! : [];
     if (e3_storage_range.length > 0) {
-      storage_location_dag.insert(this.id, loc.range_of_locs(e3_storage_range, "sub"));
-      storage_location_dag.connect(this.id, e3id, "sub");
+      if (config.target === "solang") {
+        storage_location_dag.insert(this.id, loc.range_of_locs(e3_storage_range, "same"));
+        storage_location_dag.connect(this.id, e3id);
+      }
+      else {
+        storage_location_dag.insert(this.id, loc.range_of_locs(e3_storage_range, "sub"));
+        storage_location_dag.connect(this.id, e3id, "sub");
+      }
       storage_location_dag.insert(e2id, loc.range_of_locs(storage_location_dag.solution_range_of(this.id), 'same'));
       storage_location_dag.connect(this.id, e2id);
       storage_location_dag.update(e2id, loc.range_of_locs(e3_storage_range, "sub"));
@@ -4428,7 +4527,12 @@ class ConditionalGenerator extends ExpressionGenerator {
         );
       }
       storage_location_dag.connect(this.id, e2id);
-      storage_location_dag.connect(this.id, e3id, "sub");
+      if (config.target === "solang") {
+        storage_location_dag.connect(this.id, e3id);
+      }
+      else {
+        storage_location_dag.connect(this.id, e3id, "sub");
+      }
       storage_location_dag.solution_range_alignment(this.id, e3id);
     }
   }
@@ -5423,7 +5527,9 @@ class IfStatementGenerator extends NonExpressionStatementGenerator {
       const then_stmt_gen_prototype = get_stmtgenerator(cur_stmt_complex_level + 1);
       const then_stmt_gen = new then_stmt_gen_prototype();
       then_stmt_gen.generate(cur_stmt_complex_level + 1);
-      stmt_db.initialize_the_vardecls_that_must_be_initialized(cur_scope.id());
+      if (config.target === "solidity") {
+        stmt_db.initialize_the_vardecls_that_must_be_initialized_later(cur_scope.id());
+      }
       true_body = true_body.concat(stmt_db.unexpected_extra_stmts_of_scope(cur_scope.id()));
       stmt_db.remove_unexpected_extra_stmt_from_scope(cur_scope.id());
       true_body.push(then_stmt_gen.irnode! as stmt.IRStatement);
@@ -5449,7 +5555,9 @@ class IfStatementGenerator extends NonExpressionStatementGenerator {
       const else_stmt_gen_prototype = get_stmtgenerator(cur_stmt_complex_level + 1);
       const else_stmt_gen = new else_stmt_gen_prototype();
       else_stmt_gen.generate(cur_stmt_complex_level + 1);
-      stmt_db.initialize_the_vardecls_that_must_be_initialized(cur_scope.id());
+      if (config.target === "solidity") {
+        stmt_db.initialize_the_vardecls_that_must_be_initialized_later(cur_scope.id());
+      }
       false_body = false_body.concat(stmt_db.unexpected_extra_stmts_of_scope(cur_scope.id()));
       stmt_db.remove_unexpected_extra_stmt_from_scope(cur_scope.id());
       false_body.push(else_stmt_gen.irnode! as stmt.IRStatement);
@@ -5559,7 +5667,9 @@ class ForStatementGenerator extends NonExpressionStatementGenerator {
       const body_stmt_gen_prototype = get_stmtgenerator(cur_stmt_complex_level + 1);
       const body_stmt_gen = new body_stmt_gen_prototype();
       body_stmt_gen.generate(cur_stmt_complex_level + 1);
-      stmt_db.initialize_the_vardecls_that_must_be_initialized(cur_scope.id());
+      if (config.target === "solidity") {
+        stmt_db.initialize_the_vardecls_that_must_be_initialized_later(cur_scope.id());
+      }
       body = body.concat(stmt_db.unexpected_extra_stmts_of_scope(cur_scope.id()));
       stmt_db.remove_unexpected_extra_stmt_from_scope(cur_scope.id());
       body.push(body_stmt_gen.irnode! as stmt.IRStatement);
@@ -5626,7 +5736,9 @@ class WhileStatementGenerator extends NonExpressionStatementGenerator {
           [expr.tuple_extraction(body_stmt_gen.expr!)] :
           body_stmt_gen.exprs
       );
-      stmt_db.initialize_the_vardecls_that_must_be_initialized(cur_scope.id());
+      if (config.target === "solidity") {
+        stmt_db.initialize_the_vardecls_that_must_be_initialized_later(cur_scope.id());
+      }
       body = body.concat(stmt_db.unexpected_extra_stmts_of_scope(cur_scope.id()));
       stmt_db.remove_unexpected_extra_stmt_from_scope(cur_scope.id());
       body.push(body_stmt_gen.irnode! as stmt.IRStatement);
@@ -5683,7 +5795,9 @@ class DoWhileStatementGenerator extends NonExpressionStatementGenerator {
           [expr.tuple_extraction(body_stmt_gen.expr!)] :
           body_stmt_gen.exprs
       );
-      stmt_db.initialize_the_vardecls_that_must_be_initialized(cur_scope.id());
+      if (config.target === "solidity") {
+        stmt_db.initialize_the_vardecls_that_must_be_initialized_later(cur_scope.id());
+      }
       body = body.concat(stmt_db.unexpected_extra_stmts_of_scope(cur_scope.id()));
       stmt_db.remove_unexpected_extra_stmt_from_scope(cur_scope.id());
       body.push(body_stmt_gen.irnode! as stmt.IRStatement);

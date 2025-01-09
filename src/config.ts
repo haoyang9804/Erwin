@@ -59,7 +59,7 @@ export const config = {
   // Probability
   nonstructured_statement_prob: 0.5,
   expression_complexity_prob: 0.8,
-  literal_prob: 0.8,
+  literal_prob: 0.5,
   tuple_prob: 0.3,
   vardecl_prob: 0.3,
   new_prob: 0.1,
