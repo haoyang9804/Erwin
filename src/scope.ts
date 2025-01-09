@@ -262,3 +262,12 @@ export function inside_array_scope(cur_scope : ScopeList) : boolean {
   }
   return false;
 }
+
+export function initializable_scope(cur_scope : ScopeList) : boolean {
+  return (inside_constructor_body(cur_scope) ||
+    inside_function_body(cur_scope) ||
+    inside_modifier_body(cur_scope) ||
+    cur_scope.kind() === scopeKind.CONTRACT) &&
+    !inside_array_scope(cur_scope) &&
+    !inside_mapping_scope(cur_scope);
+}

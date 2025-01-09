@@ -90,7 +90,19 @@ class DeclDB {
   private struct_instance_to_struct_decl : Map<number, number> = new Map<number, number>();
 
   private cannot_be_assigned_to : Set<number> = new Set<number>();
-  private must_be_initialized : Map<number, number[]> = new Map<number, number[]>();
+  /*
+  In Solidity, there exists a workaround to initialize a variable later.
+  For instance,
+  ```solidity
+  function f() public {
+    int[] memory arr;
+    arr = arr;
+  }
+  ```
+  `arr = arr` is a must.
+  `arr` in this example is a variable that must be initialized later.
+  */
+  private must_be_initialized_later : Map<number, number[]> = new Map<number, number[]>();
   private has_been_initialized : Set<number> = new Set<number>();
 
   constructor() { }
@@ -146,7 +158,7 @@ class DeclDB {
     this.struct_instance_to_struct_decl.clear();
 
     this.cannot_be_assigned_to.clear();
-    this.must_be_initialized.clear();
+    this.must_be_initialized_later.clear();
     this.has_been_initialized.clear();
   }
 
@@ -669,34 +681,34 @@ class DeclDB {
     return this.cannot_be_assigned_to.has(vardecl_id);
   }
 
-  set_vardecl_as_must_be_initialized(fid : number, vardecl_id : number) : void {
-    if (this.must_be_initialized.has(fid)) {
-      this.must_be_initialized.get(fid)!.push(vardecl_id);
+  set_vardecl_as_must_be_initialized_later(fid : number, vardecl_id : number) : void {
+    if (this.must_be_initialized_later.has(fid)) {
+      this.must_be_initialized_later.get(fid)!.push(vardecl_id);
     }
     else {
-      this.must_be_initialized.set(fid, [vardecl_id]);
+      this.must_be_initialized_later.set(fid, [vardecl_id]);
     }
   }
 
-  remove_vardecl_from_must_be_initialized_in_scope(fid : number) : void {
-    this.must_be_initialized.delete(fid);
+  remove_vardecl_from_must_be_initialized_later_in_scope(fid : number) : void {
+    this.must_be_initialized_later.delete(fid);
   }
 
-  remove_vardecl_from_must_be_initialized(fid : number, vardecl_id : number) : void {
-    if (this.must_be_initialized.has(fid)) {
-      this.must_be_initialized.set(fid, this.must_be_initialized.get(fid)!.filter(x => x !== vardecl_id));
+  remove_vardecl_from_must_be_initialized_later(fid : number, vardecl_id : number) : void {
+    if (this.must_be_initialized_later.has(fid)) {
+      this.must_be_initialized_later.set(fid, this.must_be_initialized_later.get(fid)!.filter(x => x !== vardecl_id));
     }
   }
 
-  scope_has_vardecls_that_must_be_initialized(fid : number) : boolean {
-    return this.must_be_initialized.has(fid);
+  scope_has_vardecls_that_must_be_initialized_later(fid : number) : boolean {
+    return this.must_be_initialized_later.has(fid);
   }
 
-  get_vardecls_that_must_be_initialized(fid : number) : number[] {
-    if (!this.must_be_initialized.has(fid)) {
+  get_vardecls_that_must_be_initialized_later(fid : number) : number[] {
+    if (!this.must_be_initialized_later.has(fid)) {
       return [];
     }
-    return this.must_be_initialized.get(fid)!;
+    return this.must_be_initialized_later.get(fid)!;
   }
 
   set_vardecl_as_initialized(vardecl_id : number) : void {
@@ -1281,15 +1293,15 @@ class StmtDB {
     return assignment_stmt;
   }
 
-  public initialize_the_vardecls_that_must_be_initialized(fid : number) : void {
-    for (const id of decl_db.get_vardecls_that_must_be_initialized(fid)!) {
+  public initialize_the_vardecls_that_must_be_initialized_later(fid : number) : void {
+    for (const id of decl_db.get_vardecls_that_must_be_initialized_later(fid)!) {
       if (decl_db.is_vardecl_initialized(id)) {
         continue;
       }
       this.add_unexpected_extra_stmt(fid, this.initialize_variable(id));
       decl_db.set_vardecl_as_initialized(id);
     }
-    decl_db.remove_vardecl_from_must_be_initialized_in_scope(fid);
+    decl_db.remove_vardecl_from_must_be_initialized_later_in_scope(fid);
   }
 
   public add_unexpected_extra_stmt(fid : number, stmt : IRStatement) : void {

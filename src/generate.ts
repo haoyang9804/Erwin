@@ -420,6 +420,11 @@ export async function generate() {
     if (config.target === "solang") {
       config.error_prob = 0.0;
       config.in_func_initialization_prob = 1.0;
+      config.literal_prob = 0.9;
+      config.new_prob = 0.9;
+      config.contract_type_prob = 0.0;
+      config.modifier_count_per_contract_lower_limit = 0;
+      config.modifier_count_per_contract_upper_limit = 0;
     }
     const source_unit = new gen.SourceUnitGenerator();
     source_unit.generate();
