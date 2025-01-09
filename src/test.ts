@@ -8,7 +8,6 @@ import { select_random_elements, random_int, pick_random_element } from './utili
 // Promisify exec to use it with async/await
 const execPromise = promisify(exec);
 
-//@ts-ignore
 async function compile_by_solang(file_path : string) : Promise<[string, string]> {
   //! the argument '--emit <EMIT>' cannot be used with '--standard-json'
   const output_flags = [
@@ -37,13 +36,15 @@ async function compile_by_solang(file_path : string) : Promise<[string, string]>
     const index = Math.random() < 0.5 ? selected_output_flags.indexOf('--standard-json') : selected_output_flags.indexOf('--emit');
     selected_output_flags.splice(index, 1);
   }
-  const index = selected_output_flags.indexOf('--target');
+  const target_index = selected_output_flags.indexOf('--target');
   //* Currently only solana is supported
-  selected_output_flags[index] = '--target ' + select_random_elements(['solana'], 1).join('');
-  if (selected_output_flags[index] == '--target solana') {
+  selected_output_flags[target_index] = '--target ' + select_random_elements(['solana'], 1).join('');
+  if (selected_output_flags[target_index] == '--target solana') {
     selected_output_flags.splice(selected_output_flags.indexOf('--address-length'), 1);
     selected_output_flags.splice(selected_output_flags.indexOf('--value-length'), 1);
   }
+  const emit_index = selected_output_flags.indexOf('--emit');
+  selected_output_flags[emit_index] = '--emit ' + select_random_elements(['ast-dot', 'cfg', 'llvm-ir', 'llvm-bc', 'object', 'asm'], 1).join('');
   const selected_debug_flags = select_random_elements(debug_flags, random_int(1, debug_flags.length));
   const selected_opt_flags = select_random_elements(opt_flags, random_int(1, opt_flags.length));
   const selected_llvm_flags = [...llvm_flags];
@@ -57,7 +58,7 @@ async function compile_by_solang(file_path : string) : Promise<[string, string]>
       selected_llvm_flags[index] = flag + ' ' + select_random_elements(['0', '1', '2', '3', '4', 's', 'z'], 1).join('');
     }
   });
-  const compile_command = `${config.compiler_path} ${file_path} ${selected_output_flags.join(' ')} ${selected_debug_flags.join(' ')} ${selected_opt_flags.join(' ')} ${selected_llvm_flags.join(' ')}`;
+  const compile_command = `${config.compiler_path} compile ${file_path} ${selected_output_flags.join(' ')} ${selected_debug_flags.join(' ')} ${selected_opt_flags.join(' ')} ${selected_llvm_flags.join(' ')}`;
   const { stdout, stderr } = await execPromise(compile_command);
   return [stdout, stderr];
 }
@@ -352,6 +353,80 @@ export async function test_slither() : Promise<number> {
     };
 
     runSlitherTest().then((result) => {
+      clearTimeout(timeoutId);
+      resolve(result);
+    });
+  });
+}
+
+/**
+ * 
+ * @returns {number} A number indicating the result of the operation:
+ * - 0 if all the generated programs pass the compilation
+ * - 1 if generated program triggers an error
+ * - 2 if the output directory does not exist
+ * - 3 if the time limit is exceeded
+ * - 4 if the compiler path is incorrect
+ */
+export async function test_solang_compiler() : Promise<number> {
+  return new Promise((resolve) => {
+    const timeoutDuration = 5 * 60 * 1000; // 5 minutes in milliseconds
+    const timeoutId = setTimeout(() => {
+      console.error('Time limit exceeded for compiler test');
+      resolve(3);
+    }, timeoutDuration);
+
+    const runCompilerTest = async () : Promise<number> => {
+      try {
+        // Check if the "generated_programs" directory exists
+        const dirPath = config.out_dir;
+        const stats = await stat(dirPath);
+        if (!stats.isDirectory()) {
+          console.error('Output directory does not exist');
+          return 2;
+        }
+
+        // @ts-ignore
+        const { stdout, stderr } = await execPromise(`${config.compiler_path} --version`);
+        if (stderr) {
+          console.error('Compiler path is incorrect');
+          return 4;
+        }
+
+        const files = await readdir(dirPath);
+        for (const file of files) {
+          const filePath = path.join(dirPath, file);
+          const stats = await stat(filePath);
+          if (stats.isFile()) {
+            try {
+              await compile_by_solang(filePath);
+            } catch (error) {
+              const execError = error as ExecException & {
+                stdout : string;
+                stderr : string;
+                signal ?: string;
+              };
+              console.error(`=========Error in file ${filePath}=========`);
+              // Check for segmentation fault first
+              if (execError.signal === 'SIGSEGV') {
+                console.error('Segmentation fault (SIGSEGV) detected in compiler execution');
+              }
+              // If it's not a segmentation fault, check for other errors
+              else if (execError.stderr) {
+                console.error(`Solang compiler error: ${execError.stderr}`);
+              }
+              return 1;
+            }
+          }
+        }
+        return 0;
+      } catch (error) {
+        console.error('Unexpected error:', error);
+        return 1;
+      }
+    };
+
+    runCompilerTest().then((result) => {
       clearTimeout(timeoutId);
       resolve(result);
     });

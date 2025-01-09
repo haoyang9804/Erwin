@@ -62,6 +62,8 @@ For more flags, please refer to `npx erwin generation -h`.
 22. https://github.com/crytic/slither/issues/2619 (hang)
 23. https://github.com/hyperledger-solang/solang/issues/1687 (ICE)
 24. https://github.com/hyperledger-solang/solang/issues/1688 (error handling)
+25. https://github.com/hyperledger-solang/solang/issues/1689 (ICE)
+26. https://github.com/hyperledger-solang/solang/issues/1690 (ICE)
 
 
 ## TODO

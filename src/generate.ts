@@ -25,7 +25,7 @@ import {
   StateVariableVisibility,
   FunctionStateMutability,
 } from "solc-typed-ast"
-import { test_solidity_compiler, test_slither } from "./test";
+import { test_solidity_compiler, test_slither, test_solang_compiler } from "./test";
 const formatter = new PrettyFormatter(2, 0);
 const writer = new ASTWriter(
   DefaultASTWriterMapping,
@@ -471,6 +471,13 @@ export async function generate() {
       }
       else if (config.target === "slither") {
         await test_slither().then((result) => {
+          if (result !== 0) {
+            process.exit(1);
+          }
+        });
+      }
+      else if (config.target === "solang") {
+        await test_solang_compiler().then((result) => {
           if (result !== 0) {
             process.exit(1);
           }
