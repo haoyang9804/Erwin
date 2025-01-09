@@ -1,4 +1,4 @@
-import { assert, pick_random_element, random_int, merge_set, intersection, cartesian_product } from "./utility";
+import { assert, pick_random_element, random_int, merge_set, intersection, cartesian_product, select_random_elements } from "./utility";
 import { IRNode, IRSourceUnit } from "./node";
 import * as expr from "./expression";
 import * as decl from "./declaration";
@@ -731,7 +731,8 @@ abstract class DeclarationGenerator extends Generator {
       inside_modifier_body(cur_scope)) &&
       !inside_array_scope(cur_scope) &&
       !inside_mapping_scope(cur_scope)) && Math.random() < config.in_func_initialization_prob ||
-      cur_scope.kind() === scopeKind.CONTRACT && Math.random() < config.contract_member_initialization_prob;
+      cur_scope.kind() === scopeKind.CONTRACT && Math.random() < config.contract_member_initialization_prob
+      && !decl_db.contains_mapping_decl(this.irnode.id);
   }
 
   abstract generate() : void;
@@ -879,6 +880,37 @@ class MappingDeclarationGenerator extends DeclarationGenerator {
     this.type_range = this.type_range.filter((t) => t.typeName === 'MappingType' && t !== type.TypeProvider.trivial_mapping());
   }
 
+  private generate_initializer() {
+    let initializer : expr.IRExpression | undefined;
+    if (this.initializable()) {
+      let generate_identifier_for_initialziation = () => {
+        const nid = new_global_id();
+        assert(this.irnode !== undefined, `MappingDeclarationGenerator: this.irnode is undefined`);
+        type_dag.insert(nid, type_dag.solution_range_of(this.irnode.id)!);
+        type_dag.connect(nid, this.irnode.id, "super");
+        const identifier_gen = new IdentifierGenerator(nid, false);
+        identifier_gen.generate(0);
+        initializer = identifier_gen.irnode as expr.IRExpression;
+      }
+      if (cur_scope.kind() !== scopeKind.CONTRACT && Math.random() < config.init_with_state_var_prob) {
+        const snapshot = cur_scope.snapshot();
+        while (cur_scope.kind() !== scopeKind.CONTRACT) {
+          roll_back_scope();
+        }
+        Log.log(`${" ".repeat(indent)}MappingDeclarationGenerator: go back to contract scope`)
+        generate_identifier_for_initialziation();
+        relocate_scope(snapshot);
+      }
+      else {
+        generate_identifier_for_initialziation();
+      }
+    }
+    (this.irnode as decl.IRVariableDeclaration).value = initializer;
+    if (initializer !== undefined) {
+      type_dag.solution_range_alignment(expr.tuple_extraction(initializer).id, this.irnode!.id);
+    }
+  }
+
   generate() : void {
     this.distill_type_range();
     const mappingid = new_global_id();
@@ -888,12 +920,13 @@ class MappingDeclarationGenerator extends DeclarationGenerator {
     this.irnode = new decl.IRVariableDeclaration(mappingid, cur_scope.id(), mapping_name);
     const [keyid, valueid] = this.generate_key_value();
     type_dag.insert(mappingid, this.type_range);
-    //haoyang
+    decl_db.add_mapping_decl(mappingid, keyid, valueid);
+    this.generate_initializer();
     decl_db.set_vardecl_as_nonassignable(mappingid);
-    if (config.target === 'solidity') {
+    if (config.target === 'solidity' &&
+      (this.irnode as decl.IRVariableDeclaration).value === undefined) {
       this.mapping_must_be_initialized_if_in_function_return_scope_or_funcbody();
     }
-    decl_db.add_mapping_decl(mappingid, keyid, valueid);
     decl_db.add_vardecl_with_scope(mappingid, cur_scope);
     this.update_storage_location_range(mappingid);
     this.update_vismut_dag(mappingid);
@@ -963,18 +996,27 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
 
   private generate_initializer() {
     let initializer : expr.IRExpression | undefined;
-    //haoyang
-    if (this.initializable() && !decl_db.contains_mapping_decl(this.irnode!.id)) {
+    if (this.initializable()) {
       let generate_identifier_for_initialziation = () => {
         const nid = new_global_id();
         assert(this.irnode !== undefined, `ArrayDeclarationGenerator: this.irnode is undefined`);
         type_dag.insert(nid, type_dag.solution_range_of(this.irnode.id)!);
         type_dag.connect(nid, this.irnode.id, "super");
-        const identifier_gen = new IdentifierGenerator(nid);
+        const identifier_gen = new IdentifierGenerator(nid, false);
         identifier_gen.generate(0);
         initializer = identifier_gen.irnode as expr.IRExpression;
       }
-      if (cur_scope.kind() !== scopeKind.CONTRACT && Math.random() < 0.8) {
+      if (Math.random() < config.new_prob &&
+        !decl_db.contains_mapping_decl(this.irnode!.id) &&
+        this.length === undefined) {
+        const nid = new_global_id();
+        type_dag.insert(nid, type_dag.solution_range_of(this.irnode!.id)!);
+        type_dag.connect(nid, this.irnode!.id, "super");
+        const new_dynamic_array_gen = new NewDynamicArrayGenerator(nid);
+        new_dynamic_array_gen.generate(0);
+        initializer = new_dynamic_array_gen.irnode as expr.IRExpression;
+      }
+      else if (cur_scope.kind() !== scopeKind.CONTRACT && Math.random() < config.init_with_state_var_prob) {
         const snapshot = cur_scope.snapshot();
         while (cur_scope.kind() !== scopeKind.CONTRACT) {
           roll_back_scope();
@@ -988,6 +1030,9 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
       }
     }
     (this.irnode as decl.IRVariableDeclaration).value = initializer;
+    if (initializer !== undefined) {
+      type_dag.solution_range_alignment(expr.tuple_extraction(initializer).id, this.irnode!.id);
+    }
   }
 
   private initialize_array_length() {
@@ -1087,12 +1132,7 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
       assert(storage_location_dag.has_solution_range(this.irnode.id),
         `ArrayDeclarationGenerator: storage_location_dag.has_solution_range(${this.irnode.id}) is false`);
       const initializer_id = expr.tuple_extraction(value).id;
-      if (config.target === "solang") {
-        storage_location_dag.connect(initializer_id, this.irnode.id);
-      }
-      else {
-        storage_location_dag.connect(initializer_id, this.irnode.id, "super");
-      }
+      storage_location_dag.connect(initializer_id, this.irnode.id, "super");
       storage_location_dag.solution_range_alignment(initializer_id, this.irnode.id);
     }
     update_storage_loc_range_for_compound_type(this.irnode.id);
@@ -1143,7 +1183,6 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
     this.update_type_range();
     type_dag.insert(arrayid, this.type_range);
     this.generate_initializer();
-    //haoyang
     if (decl_db.contains_mapping_decl(this.irnode.id)) {
       decl_db.set_vardecl_as_nonassignable(this.irnode.id);
     }
@@ -1151,7 +1190,8 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
     decl_db.add_vardecl_with_scope(arrayid, cur_scope);
     this.update_storage_location_range();
     this.update_vismut_dag(arrayid);
-    if (config.target === "solidity") {
+    if (config.target === "solidity" &&
+      (this.irnode as decl.IRVariableDeclaration).value === undefined) {
       this.array_must_be_initialized_if_in_function_return_scope_or_funcbody();
     }
     this.end_flag(array_name, arrayid);
@@ -1189,15 +1229,14 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
     let initializer : expr.IRExpression | undefined;
     assert(this.irnode !== undefined, `StructInstanceDeclarationGenerator: this.irnode is undefined`);
     assert(this.struct_id !== undefined, `StructInstanceDeclarationGenerator: this.struct_id is undefined`);
-    //haoyang
-    if (this.initializable() && !decl_db.contains_mapping_decl(this.struct_id)) {
+    if (this.initializable()) {
       let generate_identifier_for_initialziation = () => {
         const nid = new_global_id();
         type_dag.insert(nid, type_dag.solution_range_of(this.irnode!.id)!);
         type_dag.connect(nid, this.irnode!.id, "super");
-        const new_struct_gen = new NewStructGenerator(nid);
-        new_struct_gen.generate(0);
-        initializer = new_struct_gen.irnode as expr.IRExpression;
+        const identifier_gen = new IdentifierGenerator(nid, false);
+        identifier_gen.generate(0);
+        initializer = identifier_gen.irnode as expr.IRExpression;
       };
       let generate_new_struct_expression_for_initialization = () => {
         const nid = new_global_id();
@@ -1206,14 +1245,26 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
         new_struct_expr_gen.generate(0);
         initializer = new_struct_expr_gen.irnode as expr.IRExpression;
       }
-      if (Math.random() < config.new_prob) {
+      if (!decl_db.contains_mapping_decl(this.struct_id) && Math.random() < config.new_prob) {
         generate_new_struct_expression_for_initialization();
+      }
+      else if (cur_scope.kind() !== scopeKind.CONTRACT && Math.random() < config.init_with_state_var_prob) {
+        const snapshot = cur_scope.snapshot();
+        while (cur_scope.kind() !== scopeKind.CONTRACT) {
+          roll_back_scope();
+        }
+        Log.log(`${" ".repeat(indent)}StructInstanceDeclarationGenerator: go back to contract scope`)
+        generate_identifier_for_initialziation();
+        relocate_scope(snapshot);
       }
       else {
         generate_identifier_for_initialziation();
       }
     }
     (this.irnode as decl.IRVariableDeclaration).value = initializer;
+    if (initializer !== undefined) {
+      type_dag.solution_range_alignment(expr.tuple_extraction(initializer).id, this.irnode!.id);
+    }
   }
 
   private end_flag(struct_instance_name : string) {
@@ -1326,12 +1377,7 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
       assert(storage_location_dag.non_empty_solution_range_of(this.irnode.id),
         `StructInstanceDeclarationGenerator: storage_location_dag.non_empty_solution_range_of(${this.irnode.id}) is empty`);
       const initializer_id = expr.tuple_extraction(value).id;
-      if (config.target === "solang") {
-        storage_location_dag.connect(initializer_id, this.irnode.id);
-      }
-      else {
-        storage_location_dag.connect(initializer_id, this.irnode.id, "super");
-      }
+      storage_location_dag.connect(initializer_id, this.irnode.id, "super");
       storage_location_dag.solution_range_alignment(initializer_id, this.irnode.id);
     }
   }
@@ -1377,16 +1423,16 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
     this.irnode = new decl.IRVariableDeclaration(thisid, cur_scope.id(), struct_instance_name);
     decl_db.pair_struct_instance_with_struct_decl(this.irnode.id, this.struct_id!);
     decl_db.add_struct_instance_decl(this.irnode.id);
-    decl_db.add_vardecl_with_scope(this.irnode.id, cur_scope);
     type_dag.insert(this.irnode.id, this.type_range);
-    //haoyang
     if (decl_db.contains_mapping_decl(this.struct_id!)) {
       decl_db.set_vardecl_as_nonassignable(this.irnode.id);
     }
     this.generate_initializer();
+    decl_db.add_vardecl_with_scope(this.irnode.id, cur_scope);
     this.assign_storage_location_range();
     this.update_vismut_dag();
-    if (config.target === "solidity") {
+    if (config.target === "solidity" &&
+      (this.irnode as decl.IRVariableDeclaration).value === undefined) {
       this.struct_instance_must_be_initialized_if_in_function_return_scope_or_funcbody();
     }
     this.end_flag(struct_instance_name);
@@ -1404,6 +1450,7 @@ class StringDeclarationGenerator extends DeclarationGenerator {
   }
 
   private generate_initializer() {
+    let initializer : expr.IRExpression | undefined;
     if (this.initializable()) {
       if (Math.random() < config.literal_prob) {
         const literal_id = new_global_id();
@@ -1416,38 +1463,20 @@ class StringDeclarationGenerator extends DeclarationGenerator {
         type_dag.solution_range_alignment(ghost_id, literal_id);
         Log.log(`${" ".repeat(indent)}StringDeclarationGenerator::generate_initializer: ghost_id: ${ghost_id}, literal_id: ${literal_id}, id: ${this.irnode!.id}`);
         literal_gen.generate(0);
-        (this.irnode as decl.IRVariableDeclaration).value = literal_gen.irnode! as expr.IRExpression;
+        initializer = literal_gen.irnode! as expr.IRExpression;
       }
       else {
-        const expr_gen_prototype = get_exprgenerator([type.TypeProvider.string()], 0, [],
-          storage_location_dag.solution_range_of(this.irnode!.id)!);
-        const expr_id = new_global_id();
-        type_dag.insert(expr_id, type_dag.solution_range_of(this.irnode!.id)!);
-        const expr_gen = new expr_gen_prototype(expr_id);
-        expr_gen.generate(0);
-        const extracted_expr = expr.tuple_extraction(expr_gen.irnode! as expr.IRExpression);
-        if (extracted_expr!.typeName === "IRLiteral") {
-          const ghost_id = new_global_id();
-          type_dag.insert(ghost_id, type_dag.solution_range_of(expr_id)!);
-          type_dag.connect(ghost_id, expr_id);
-          type_dag.connect(ghost_id, this.irnode!.id, "super");
-          type_dag.solution_range_alignment(ghost_id, this.irnode!.id);
-          Log.log(`${" ".repeat(indent)}StringDeclarationGenerator::generate_initializer: ghost_id: ${ghost_id}, expr_id: ${expr_id}, id: ${this.irnode!.id}`);
-        }
-        else {
-          type_dag.connect(expr_id, this.irnode!.id, "super");
-          type_dag.solution_range_alignment(expr_id, this.irnode!.id);
-          assert(storage_location_dag.has_solution_range(expr_id),
-            `StringDeclarationGenerator::generate_initializer: storage_location_dag's solution range of ${expr_id} is empty`);
-          if (config.target === "solang") {
-            storage_location_dag.connect(expr_id, this.irnode!.id);
-          }
-          else {
-            storage_location_dag.connect(expr_id, this.irnode!.id, "super");
-          }
-        }
-        (this.irnode as decl.IRVariableDeclaration).value = expr_gen.irnode! as expr.IRExpression;
+        const nid = new_global_id();
+        type_dag.insert(nid, type_dag.solution_range_of(this.irnode!.id)!);
+        type_dag.connect(nid, this.irnode!.id, "super");
+        const identifier_gen = new IdentifierGenerator(nid, false);
+        identifier_gen.generate(0);
+        initializer = identifier_gen.irnode as expr.IRExpression;
       }
+    }
+    (this.irnode as decl.IRVariableDeclaration).value = initializer;
+    if (initializer !== undefined) {
+      type_dag.solution_range_alignment(expr.tuple_extraction(initializer).id, this.irnode!.id);
     }
   }
 
@@ -1566,12 +1595,13 @@ class StringDeclarationGenerator extends DeclarationGenerator {
     const string_name = name_db.generate_name(IDENTIFIER.VAR);
     this.irnode = new decl.IRVariableDeclaration(stringid, cur_scope.id(), string_name);
     this.init_storage_location_range();
-    decl_db.add_vardecl_with_scope(this.irnode.id, cur_scope);
     decl_db.add_stringdecl(stringid);
     type_dag.insert(this.irnode.id, [type.TypeProvider.string()]);
     this.generate_initializer();
+    decl_db.add_vardecl_with_scope(this.irnode.id, cur_scope);
     this.update_vismut_dag();
-    if (config.target === "solidity") {
+    if (config.target === "solidity" &&
+      (this.irnode as decl.IRVariableDeclaration).value === undefined) {
       this.stringdecl_must_be_initialized_if_in_function_return_scope_or_funcbody();
     }
     this.end_flag(string_name);
@@ -1694,6 +1724,9 @@ class ContractInstanceDeclarationGenerator extends DeclarationGenerator {
       type_dag.solution_range_alignment(nid, this.irnode.id);
     }
     (this.irnode as decl.IRVariableDeclaration).value = initializer;
+    if (initializer !== undefined) {
+      type_dag.solution_range_alignment(expr.tuple_extraction(initializer).id, this.irnode!.id);
+    }
   }
 
   private update_vismut_dag() {
@@ -1749,6 +1782,7 @@ class ElementaryTypeVariableDeclarationGenerator extends DeclarationGenerator {
   }
 
   private generate_initializer() {
+    let initializer : expr.IRExpression | undefined;
     if (this.initializable()) {
       if (Math.random() < config.literal_prob) {
         const literal_id = new_global_id();
@@ -1761,29 +1795,20 @@ class ElementaryTypeVariableDeclarationGenerator extends DeclarationGenerator {
         type_dag.solution_range_alignment(ghost_id, literal_id);
         Log.log(`${" ".repeat(indent)}ElementaryTypeVariableDeclarationGenerator::generate_initializer: ghost_id: ${ghost_id}, literal_id: ${literal_id}, id: ${this.irnode!.id}`);
         literal_gen.generate(0);
-        (this.irnode as decl.IRVariableDeclaration).value = literal_gen.irnode! as expr.IRExpression;
+        initializer = literal_gen.irnode! as expr.IRExpression;
       }
       else {
-        const expr_gen_prototype = get_exprgenerator(this.type_range);
-        const expr_id = new_global_id();
-        type_dag.insert(expr_id, type_dag.solution_range_of(this.irnode!.id)!);
-        const expr_gen = new expr_gen_prototype(expr_id);
-        expr_gen.generate(0);
-        const extracted_expr = expr.tuple_extraction(expr_gen.irnode! as expr.IRExpression);
-        if (extracted_expr!.typeName === "IRLiteral") {
-          const ghost_id = new_global_id();
-          type_dag.insert(ghost_id, type_dag.solution_range_of(expr_id)!);
-          type_dag.connect(ghost_id, expr_id);
-          type_dag.connect(ghost_id, this.irnode!.id, "super");
-          type_dag.solution_range_alignment(ghost_id, this.irnode!.id);
-          Log.log(`${" ".repeat(indent)}ElementaryTypeVariableDeclarationGenerator::generate_initializer: ghost_id: ${ghost_id}, expr_id: ${expr_id}, id: ${this.irnode!.id}`);
-        }
-        else {
-          type_dag.connect(expr_id, this.irnode!.id, "super");
-          type_dag.solution_range_alignment(expr_id, this.irnode!.id);
-        }
-        (this.irnode as decl.IRVariableDeclaration).value = expr_gen.irnode! as expr.IRExpression;
+        const nid = new_global_id();
+        type_dag.insert(nid, type_dag.solution_range_of(this.irnode!.id)!);
+        type_dag.connect(nid, this.irnode!.id, "super");
+        const identifier_gen = new IdentifierGenerator(nid, false);
+        identifier_gen.generate(0);
+        initializer = identifier_gen.irnode as expr.IRExpression;
       }
+    }
+    (this.irnode as decl.IRVariableDeclaration).value = initializer;
+    if (initializer !== undefined) {
+      type_dag.solution_range_alignment(expr.tuple_extraction(initializer).id, this.irnode!.id);
     }
   }
 
@@ -1937,7 +1962,6 @@ class ConstructorDeclarationGenerator extends DeclarationGenerator {
   }
 
   private initiaize_state_variables_in_cur_contract_scope() : boolean {
-    // haoyang
     const initializable_state_variables = this.state_variables_in_cur_contract_scope.filter((sid) => !decl_db.is_vardecl_nonassignable(sid));
     if (initializable_state_variables.length > 0 && Math.random() < config.init_state_var_in_constructor_prob) {
       const vardecl = irnodes.get(pick_random_element(initializable_state_variables)!) as decl.IRVariableDeclaration;
@@ -2372,7 +2396,7 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
   }
 
   private generate_func_return_exprs() {
-    if (Math.random() < config.return_prob) {
+    if (Math.random() < config.return_prob || config.target === 'solang') {
       this.return_decls.forEach((return_decl) => {
         if (this.removing_storage_from_parameters_or_returns_leads_to_broken_storage_location_constraint()) {
           // If removing the storage location from the parameters or returns leads to a broken storage location constraint, the function cannot be public or external.
@@ -2999,9 +3023,6 @@ class ContractDeclarationGenerator extends DeclarationGenerator {
   }
 
   private generate_getter_function(variable_decl : decl.IRVariableDeclaration) {
-    if (config.target === 'solang') {
-      return;
-    }
     assert(type_dag.has_solution_range(variable_decl.id),
       `ContractDeclarationGenerator: type_dag.solution_range should have ${variable_decl.id}`);
     const type_range_of_vardecl = type_dag.solution_range_of(variable_decl.id)!;
@@ -3974,14 +3995,8 @@ class AssignmentGenerator extends ExpressionGenerator {
     if (this.op === "=" && this.storage_range.length > 0) {
       storage_location_dag.insert(leftid, loc.range_of_locs(this.storage_range, 'same'));
       storage_location_dag.connect(this.id, leftid);
-      if (config.target === "solang") {
-        storage_location_dag.insert(rightid, loc.range_of_locs(this.storage_range, 'same'));
-        storage_location_dag.connect(this.id, rightid, "same");
-      }
-      else {
-        storage_location_dag.insert(rightid, loc.range_of_locs(this.storage_range, 'sub'));
-        storage_location_dag.connect(this.id, rightid, "sub");
-      }
+      storage_location_dag.insert(rightid, loc.range_of_locs(this.storage_range, 'sub'));
+      storage_location_dag.connect(this.id, rightid, "sub");
     }
     return [leftid, rightid];
   }
@@ -4016,12 +4031,7 @@ class AssignmentGenerator extends ExpressionGenerator {
       }
       storage_location_dag.connect(this.id, leftid);
       storage_location_dag.solution_range_alignment(this.id, leftid);
-      if (config.target === "solang") {
-        storage_location_dag.connect(this.id, rightid);
-      }
-      else {
-        storage_location_dag.connect(this.id, rightid, "sub");
-      }
+      storage_location_dag.connect(this.id, rightid, "sub");
       storage_location_dag.solution_range_alignment(this.id, rightid);
     }
   }
@@ -4039,12 +4049,7 @@ class AssignmentGenerator extends ExpressionGenerator {
     if (right_storage_range.length > 0) {
       assert(this.op === "=", `AssignmentGenerator: op is not =, but is ${this.op}`);
       storage_location_dag.insert(this.id, loc.range_of_locs(right_storage_range, "sub"));
-      if (config.target === "solang") {
-        storage_location_dag.connect(this.id, rightid);
-      }
-      else {
-        storage_location_dag.connect(this.id, rightid, "sub");
-      }
+      storage_location_dag.connect(this.id, rightid, "sub");
       storage_location_dag.insert(leftid, loc.range_of_locs(storage_location_dag.solution_range_of(this.id), 'same'));
       storage_location_dag.connect(this.id, leftid);
       storage_location_dag.update(leftid, loc.range_of_locs(right_storage_range, "sub"));
@@ -4441,14 +4446,8 @@ class ConditionalGenerator extends ExpressionGenerator {
     if (this.storage_range.length > 0) {
       storage_location_dag.insert(e2id, loc.range_of_locs(this.storage_range, 'same'));
       storage_location_dag.connect(this.id, e2id);
-      if (config.target === "solang") {
-        storage_location_dag.insert(e3id, loc.range_of_locs(this.storage_range, 'same'));
-        storage_location_dag.connect(this.id, e3id);
-      }
-      else {
-        storage_location_dag.insert(e3id, loc.range_of_locs(this.storage_range, 'super'));
-        storage_location_dag.connect(this.id, e3id, "sub");
-      }
+      storage_location_dag.insert(e3id, loc.range_of_locs(this.storage_range, 'super'));
+      storage_location_dag.connect(this.id, e3id, "sub");
     }
   }
 
@@ -4492,14 +4491,8 @@ class ConditionalGenerator extends ExpressionGenerator {
     const e3_storage_range = storage_location_dag.has_solution_range(e3id) ?
       storage_location_dag.solution_range_of(e3id)! : [];
     if (e3_storage_range.length > 0) {
-      if (config.target === "solang") {
-        storage_location_dag.insert(this.id, loc.range_of_locs(e3_storage_range, "same"));
-        storage_location_dag.connect(this.id, e3id);
-      }
-      else {
-        storage_location_dag.insert(this.id, loc.range_of_locs(e3_storage_range, "sub"));
-        storage_location_dag.connect(this.id, e3id, "sub");
-      }
+      storage_location_dag.insert(this.id, loc.range_of_locs(e3_storage_range, "sub"));
+      storage_location_dag.connect(this.id, e3id, "sub");
       storage_location_dag.insert(e2id, loc.range_of_locs(storage_location_dag.solution_range_of(this.id), 'same'));
       storage_location_dag.connect(this.id, e2id);
       storage_location_dag.update(e2id, loc.range_of_locs(e3_storage_range, "sub"));
@@ -4527,12 +4520,7 @@ class ConditionalGenerator extends ExpressionGenerator {
         );
       }
       storage_location_dag.connect(this.id, e2id);
-      if (config.target === "solang") {
-        storage_location_dag.connect(this.id, e3id);
-      }
-      else {
-        storage_location_dag.connect(this.id, e3id, "sub");
-      }
+      storage_location_dag.connect(this.id, e3id, "sub");
       storage_location_dag.solution_range_alignment(this.id, e3id);
     }
   }
@@ -5093,6 +5081,73 @@ class NewContractGenerator extends ExpressionGenerator {
   }
 }
 
+class NewDynamicArrayGenerator extends ExpressionGenerator {
+  constructor(id : number) {
+    super(id);
+  }
+  private start_flag() {
+    const type_range_str = generate_type_range_str(this.type_range);
+    Log.log(`${" ".repeat(indent)}>>  Start generating NewDynamicArrayGenerator ${this.id}: ${type_range_str}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
+    increase_indent();
+  }
+
+  private end_flag() {
+    decrease_indent();
+    const type_range_str = generate_type_range_str(type_dag.solution_range_of(this.id)!);
+    Log.log(`${" ".repeat(indent)}${this.irnode!.id}: NewDynamicArrayGenerator, scope: (${cur_scope.kind()}, ${cur_scope.id()}), type_range: ${type_range_str}`)
+  }
+
+  private distill_type_range() : type.ArrayType {
+    this.type_range = this.type_range.filter(t => t.typeName === "ArrayType");
+    assert(this.type_range.length > 0, "NewDynamicArrayGenerator: type_range is empty");
+    const array_type = pick_random_element(this.type_range)! as type.ArrayType;
+    type_dag.update(this.id, [array_type]);
+    return array_type;
+  }
+
+  private update_storage_loc_range() {
+    if (storage_location_dag.has_solution_range(this.id)) {
+      storage_location_dag.update(this.id, [
+        loc.StorageLocationProvider.memory(),
+      ]);
+    }
+    else {
+      storage_location_dag.insert(this.id, [
+        loc.StorageLocationProvider.memory(),
+      ]);
+    }
+  }
+
+  generate(_ : number) : void {
+    this.start_flag();
+    const array_type = this.distill_type_range();
+    const new_expr = new expr.IRNew(new_global_id(), cur_scope.id(), array_type.str());
+    const args : expr.IRExpression[] = [];
+    if (Math.random() < config.literal_prob) {
+      const nid = new_global_id();
+      const uint_type_range = [...type.uinteger_types];
+      type_dag.insert(nid, select_random_elements(uint_type_range, 1));
+      expr_db.add_literal(nid);
+      args.push(new expr.IRLiteral(nid, cur_scope.id(), random_int(1, 1000).toString()));
+    }
+    else {
+      const uint_type_range = [...type.uinteger_types];
+      const expr_gen_prototype = get_exprgenerator(uint_type_range);
+      const nid = new_global_id();
+      type_dag.insert(nid, uint_type_range);
+      const expr_gen = new expr_gen_prototype(nid);
+      expr_gen.generate(0);
+      args.push(expr_gen.irnode! as expr.IRExpression);
+    }
+    const new_function_expr = new expr.IRFunctionCall(this.id, cur_scope.id(), FunctionCallKind.FunctionCall, new_expr, args);
+    this.irnode = new_function_expr;
+    expr_db.add_new_dynamic_array_expr(this.id);
+    this.update_storage_loc_range();
+    this.end_flag();
+    this.wrap_in_a_tuple();
+  }
+}
+
 class EmitExpressionGenerator extends ExpressionGenerator {
   constructor(id : number) {
     super(id);
@@ -5192,16 +5247,6 @@ const nonterminal_expression_generators_for_address_type = [
   AssignmentGenerator,
   ConditionalGenerator,
   FunctionCallGenerator
-];
-
-//@ts-ignore
-const all_expression_generators = [
-  IdentifierGenerator,
-  AssignmentGenerator,
-  BinaryOpGenerator,
-  UnaryOpGenerator,
-  ConditionalGenerator,
-  FunctionCallGenerator,
 ];
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Statement Generator

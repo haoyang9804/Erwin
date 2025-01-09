@@ -30,8 +30,8 @@ program
   // Dominance Constraint Solution
   .option("-max --maximum_solution_count <number>", "The maximum number of solutions Erwin will consider.", `${config.maximum_solution_count}`)
   // Type
-  .option("--int_types_num <number>", "The number of int types Erwin will consider in resolving type constraints.", `${config.int_num}`)
-  .option("--uint_types_num <number>", "The number of uint types Erwin will consider in resolving type constraints.", `${config.uint_num}`)
+  .option("--int_types_num <number>", "The upper limit for the quantity of integer data types that will be incorporated into the created Solidity code. The possible values are 1, 2, 3, 4, 5, or 6.", `${config.int_num}`)
+  .option("--uint_types_num <number>", "The upper limit for the quantity of unsigned integer data types that will be incorporated into the created Solidity code. The possible values are 1, 2, 3, 4, 5, or 6.", `${config.uint_num}`)
   // Function
   .option("--function_body_stmt_cnt_upper_limit <number>", "The upper limit of the number of non-declaration statements of a function. This value is suggested to be bigger than tha value of var_count", `${config.function_body_stmt_cnt_upper_limit}`)
   .option("--function_body_stmt_cnt_lower_limit <number>", "The lower limit of the number of non-declaration statements of a function.", `${config.function_body_stmt_cnt_lower_limit}`)
@@ -90,6 +90,7 @@ program
   .option("--struct_type_prob <float>", "The probability of generating a struct-type variable.", `${config.struct_type_prob}`)
   .option("--in_func_initialization_prob <float>", "The probability of initializing a variable during its declaration inside a function.", `${config.in_func_initialization_prob}`)
   .option("--contract_member_initialization_prob <float>", "The probability of initializing a state variable during its declaration inside a contract.", `${config.contract_member_initialization_prob}`)
+  .option("--init_with_state_var_prob <float>", "The probability of initializing a variable with a state variable.", `${config.init_with_state_var_prob}`)
   .option("--constructor_prob <float>", "The probability of generating a constructor.", `${config.constructor_prob}`)
   .option("--return_prob <float>", "The probability of generating a return statement.", `${config.return_prob}`)
   .option("--reuse_name_prob <float>", "The probability of reusing a name.", `${config.reuse_name_prob}`)
@@ -149,6 +150,7 @@ else if (program.args[0] === "generate") {
   config.struct_type_prob = parseFloat(program.commands[1].opts().struct_type_prob);
   config.in_func_initialization_prob = parseFloat(program.commands[1].opts().in_func_initialization_prob);
   config.contract_member_initialization_prob = parseFloat(program.commands[1].opts().contract_member_initialization_prob);
+  config.init_with_state_var_prob = parseFloat(program.commands[1].opts().init_with_state_var_prob);
   config.constructor_prob = parseFloat(program.commands[1].opts().constructor_prob);
   config.return_prob = parseFloat(program.commands[1].opts().return_prob);
   config.reuse_name_prob = parseFloat(program.commands[1].opts().reuse_name_prob);
@@ -193,8 +195,6 @@ if (program.args[0] === "mutate") {
   assert(config.file !== "", "The file to be mutated is not provided.")
 }
 else if (program.args[0] === "generate") {
-  assert(config.int_num >= 0, "The number of int types must be not less than 0.");
-  assert(config.uint_num >= 0, "The number of uint types must be not less than 0.");
   assert(config.array_length_upperlimit >= 1, "The upper limit of the length of an array must be not less than 0.");
   assert(config.function_body_stmt_cnt_upper_limit >= 0, "The upper limit of the number of statements of a function must be not less than 0.");
   assert(config.function_body_stmt_cnt_lower_limit >= 0, "The lower limit of the number of statements of a function must be not less than 0.");
@@ -222,6 +222,8 @@ else if (program.args[0] === "generate") {
     config.maximum_solution_count = 1;
   }
   assert(["type", "scope", "loc"].includes(config.mode), "The mode is not either 'type', 'scope', 'loc', instead it is " + config.mode);
+  assert(config.uint_num >= 1 && config.uint_num <= 6, "The number of uint types must be in the range [1,6].");
+  assert(config.int_num >= 1 && config.int_num <= 6, "The number of int types must be in the range [1,6].");
   assert(config.vardecl_prob >= 0 && config.vardecl_prob <= 1.0, "The probability of generating a variable declaration must be in the range [0,1].");
   assert(config.new_prob >= 0 && config.new_prob <= 1.0, "The probability of generating a variable declaration in place must be in the range [0,1].");
   assert(config.else_prob >= 0.0 && config.else_prob <= 1.0, "The probability of generating an else statement must be in the range [0,1].");
@@ -265,12 +267,13 @@ else if (program.args[0] === "generate") {
   assert(config.struct_prob >= 0 && config.struct_prob <= 1, "The probability of generating a struct must be in the range [0,1].");
   assert(config.in_func_initialization_prob >= 0 && config.in_func_initialization_prob <= 1, "The probability of generating an initialization statement must be in the range [0,1].");
   assert(config.contract_member_initialization_prob >= 0 && config.contract_member_initialization_prob <= 1, "The probability of generating an initialization statement must be in the range [0,1].");
+  assert(config.init_with_state_var_prob >= 0 && config.init_with_state_var_prob <= 1, "The probability of initializing a variable with a state variable must be in the range [0,1].");
   assert(config.constructor_prob >= 0 && config.constructor_prob <= 1, "The probability of generating a constructor must be in the range [0,1].");
   assert(config.return_prob >= 0 && config.return_prob <= 1, "The probability of generating a return statement must be in the range [0,1].");
   assert(config.reuse_name_prob >= 0 && config.reuse_name_prob < 1, "The probability of reusing a name must be in the range [0,1).");
   assert(config.generation_rounds >= 1, "The number of generation rounds must be not less than 1.");
-  if (config.enable_test) {
-    assert(config.compiler_path !== "", "The path of the compiler path is not provided while enabling the testing mode.");
+  if (config.enable_test && config.target !== "slither") {
+    assert(config.compiler_path !== "", "The path of the compiler path is not provided while enabling the testing mode and the target is a solidity compiler.");
   }
   assert(['solidity', '', 'solang', 'solar', 'slither'].includes(config.target), "The target is not either 'solidity', 'solang', 'solar', or 'slither'.");
 }

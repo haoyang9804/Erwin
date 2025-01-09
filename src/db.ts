@@ -482,6 +482,9 @@ class DeclDB {
   }
 
   insert_yin_contract(fid : number, contractdecl_id : number) : void {
+    if (config.target === "solang") {
+      return;
+    }
     this.contractdecls.add(-contractdecl_id);
     this.contractdecl_id_to_scope.set(-contractdecl_id, fid);
   }
@@ -725,7 +728,8 @@ class DeclDB {
       this.is_struct_instance_decl(id) ||
       expr_db.is_new_struct_expr(id) ||
       this.is_stringdecl(id) ||
-      expr_db.is_string_expr(id);
+      expr_db.is_string_expr(id) ||
+      expr_db.is_new_dynamic_array_expr(id);
   }
 
   contains_mapping_decl(id : number) : boolean {
@@ -900,6 +904,8 @@ class ExprDB {
 
   private string_exprs : Set<number> = new Set<number>();
 
+  private new_dynamic_array_exprs : Set<number> = new Set<number>();
+
   // Records new-contract expressions in function / constructor / modifier declaration.
   private new_contract_exprs : Map<number, Set<number>> = new Map<number, Set<number>>();
 
@@ -925,7 +931,26 @@ class ExprDB {
 
     this.string_exprs.clear();
 
+    this.new_dynamic_array_exprs.clear();
+
     this.new_contract_exprs.clear();
+  }
+
+  //! new dynamic array expr
+  add_new_dynamic_array_expr(expr_id : number) : void {
+    this.new_dynamic_array_exprs.add(expr_id);
+  }
+
+  is_new_dynamic_array_expr(expr_id : number) : boolean {
+    return this.new_dynamic_array_exprs.has(expr_id);
+  }
+
+  remove_new_dynamic_array_expr(expr_id : number) : void {
+    this.new_dynamic_array_exprs.delete(expr_id);
+  }
+
+  new_dynamic_array_exprs_ids() : number[] {
+    return Array.from(this.new_dynamic_array_exprs);
   }
 
   //! new contract expr
