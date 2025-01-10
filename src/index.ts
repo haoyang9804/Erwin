@@ -278,7 +278,7 @@ else if (program.args[0] === "generate") {
   if (config.enable_test && config.target !== "slither") {
     assert(config.compiler_path !== "", "The path of the compiler path is not provided while enabling the testing mode and the target is a solidity compiler.");
   }
-  assert(['solidity', '', 'solang', 'solar', 'slither'].includes(config.target), "The target is not either 'solidity', 'solang', 'solar', or 'slither'.");
+  assert(['solidity', 'solang', 'solar', 'slither'].includes(config.target), "The target is not either 'solidity', 'solang', 'solar', or 'slither'.");
 }
 
 if (program.args[0] === "mutate") {

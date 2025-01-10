@@ -25,6 +25,46 @@ function folderExists(folderPath : string) : boolean {
 // Promisify exec to use it with async/await
 const execPromise = promisify(exec);
 
+async function compile_by_solar(file_path : string) : Promise<[string, string]> {
+  const flags = [
+    '--evm-version',
+    '--emit',
+    '--stop-after'
+  ];
+  const selected_flags = select_random_elements(flags, random_int(1, flags.length));
+  selected_flags.forEach((flag) => {
+    if (flag === '--evm-version') {
+      const index = selected_flags.indexOf(flag);
+      selected_flags[index] = flag + ' ' + select_random_elements([
+        'homestead',
+        'tangerineWhistle',
+        'spuriousDragon',
+        'byzantium',
+        'constantinople',
+        'petersburg',
+        'istanbul',
+        'berlin',
+        'london',
+        'paris',
+        'shanghai',
+        'cancun',
+        'prague'
+      ], 1).join('');
+    }
+    else if (flag === '--emit') {
+      const index = selected_flags.indexOf(flag);
+      selected_flags[index] = flag + ' ' + select_random_elements(['abi', 'hashes'], 1).join('');
+    }
+    else if (flag === '--stop-after') {
+      const index = selected_flags.indexOf(flag);
+      selected_flags[index] = flag + ' ' + select_random_elements(['parsing'], 1).join('');
+    }
+  });
+  const compile_command = `${config.compiler_path} ${file_path} ${selected_flags.join(' ')}`;
+  const { stdout, stderr } = await execPromise(compile_command);
+  return [stdout, stderr];
+}
+
 async function compile_by_solang(file_path : string) : Promise<[string, string]> {
   //! the argument '--emit <EMIT>' cannot be used with '--standard-json'
   const output_flags = [
@@ -578,6 +618,134 @@ export async function test_solang_compiler() : Promise<number> {
                   fs.mkdirSync(other_errors_dir)
                 }
                 // copy the file to `${config.test_out_dir}/solang_compiler/other_errors`
+                const destinationPath = path.join(other_errors_dir, path.basename(filePath));
+                fs.copyFileSync(filePath, destinationPath);
+                // insert the error message as a comment in the copied file
+                const fileContent = fs.readFileSync(destinationPath);
+                const commentedError = `/*${cleanAnsiCodes(execError.stderr)}*/\n${fileContent}`;
+                await fs.writeFileSync(destinationPath, commentedError);
+              }
+              return 1;
+            }
+          }
+        }
+        return 0;
+      } catch (error) {
+        console.error('Unexpected error:', error);
+        return 1;
+      }
+    };
+
+    runCompilerTest().then((result) => {
+      clearTimeout(timeoutId);
+      resolve(result);
+    });
+  });
+}
+
+/**
+ * 
+ * @returns {number} A number indicating the result of the operation:
+ * - 0 if all the generated programs pass the compilation
+ * - 1 if generated program triggers an error
+ * - 2 if the output directory does not exist
+ * - 3 if the time limit is exceeded
+ * - 4 if the compiler path is incorrect
+ */
+export async function test_solar_compiler() : Promise<number> {
+  return new Promise((resolve) => {
+    const timeoutDuration = 5 * 60 * 1000; // 5 minutes in milliseconds
+    let currentFile : string | null = null;
+    const timeoutId = setTimeout(() => {
+      console.error('Time limit exceeded for compiler test');
+      if (!folderExists(config.test_out_dir)) {
+        fs.mkdirSync(config.test_out_dir)
+      }
+      // create folder `${config.test_out_dir}/solar_compiler` if it does not exist
+      const test_dir = path.join(config.test_out_dir, 'solar_compiler');
+      if (!folderExists(test_dir)) {
+        fs.mkdirSync(test_dir)
+      }
+      // create folder `${config.test_out_dir}/solar_compiler/time_limit_exceeded` if it does not exist
+      const time_limit_dir = path.join(test_dir, 'time_limit_exceeded');
+      if (!folderExists(time_limit_dir)) {
+        fs.mkdirSync(time_limit_dir);
+      }
+      // copy the file to `${config.test_out_dir}/solar_compiler/time_limit_exceeded`
+      if (currentFile) {
+        fs.copyFileSync(currentFile, path.join(time_limit_dir, path.basename(currentFile)));
+      }
+      resolve(3);
+    }, timeoutDuration);
+
+    const runCompilerTest = async () : Promise<number> => {
+      try {
+        // Check if the "generated_programs" directory exists
+        const dirPath = config.out_dir;
+        const stats = await stat(dirPath);
+        if (!stats.isDirectory()) {
+          console.error('Output directory does not exist');
+          return 2;
+        }
+
+        // @ts-ignore
+        const { stdout, stderr } = await execPromise(`${config.compiler_path} --version`);
+        if (stderr) {
+          console.error('Compiler path is incorrect');
+          return 4;
+        }
+
+        const files = await readdir(dirPath);
+        for (const file of files) {
+          const filePath = path.join(dirPath, file);
+          const stats = await stat(filePath);
+          if (stats.isFile()) {
+            currentFile = filePath;
+            try {
+              await compile_by_solar(filePath);
+            } catch (error) {
+              const execError = error as ExecException & {
+                stdout : string;
+                stderr : string;
+                signal ?: string;
+              };
+              console.error(`=========Error in file ${filePath}=========`);
+              // Check for segmentation fault first
+              if (execError.signal === 'SIGSEGV') {
+                console.error('Segmentation fault (SIGSEGV) detected in compiler execution');
+                if (!folderExists(config.test_out_dir)) {
+                  fs.mkdirSync(config.test_out_dir)
+                }
+                // create folder `${config.test_out_dir}/solar_compiler` if it does not exist
+                const test_dir = path.join(config.test_out_dir, 'solar_compiler');
+                if (!folderExists(test_dir)) {
+                  fs.mkdirSync(test_dir)
+                }
+                // create folder `${config.test_out_dir}/solar_compiler/segmentation_fault` if it does not exist
+                const seg_fault_dir = path.join(test_dir, 'segmentation_fault');
+                if (!folderExists(seg_fault_dir)) {
+                  fs.mkdirSync(seg_fault_dir)
+                }
+                // copy the file to `${config.test_out_dir}/solar_compiler/segmentation_fault`
+                fs.copyFileSync(filePath, path.join(seg_fault_dir, path.basename(filePath)))
+              }
+              // If it's not a segmentation fault, check for other errors
+              else if (execError.stderr) {
+                console.error(`Solang compiler error: ${execError.stderr}`);
+                if (!folderExists(config.test_out_dir)) {
+                  fs.mkdirSync(config.test_out_dir)
+                }
+                // create folder `${config.test_out_dir}/solar_compiler` if it does not exist
+                const test_dir = path.join(config.test_out_dir, 'solar_compiler');
+                if (!folderExists(test_dir)) {
+                  fs.mkdirSync(test_dir)
+                }
+                // create folder `${config.test_out_dir}/solar_compiler/other_errors` if it does not exist
+                const other_errors_dir = path.join(test_dir, 'other_errors');
+                if (!folderExists(other_errors_dir)) {
+                  fs.mkdirSync(other_errors_dir)
+                }
+                // copy the file to `${config.test_out_dir}/solar_compiler/other_errors`
                 const destinationPath = path.join(other_errors_dir, path.basename(filePath));
                 fs.copyFileSync(filePath, destinationPath);
                 // insert the error message as a comment in the copied file
