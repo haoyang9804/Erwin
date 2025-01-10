@@ -16,26 +16,62 @@
 
 ***Erwin*** is an academic attempt on introducing `bounded exhaustive instantiation` in random program generator to mitigate opportunism. This effort is inspired by [![arXiv](https://img.shields.io/badge/arXiv-2407.05981-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2407.05981).
 
-Different from [Csmith](https://github.com/csmith-project/csmith)-family tools that generate a test program in one go, ***Erwin*** separates the generation process into two sub-steps: 1) randomly generate a type/loc/vis-agnostic IR (i.e., a program without type, storage location, and visibility), and 2) conducts bounded exhaustive instantiation to instantiate the IR into a swarm of real-word test programs.
-By masking out bug-related langauge features, such as type, storage location, and visibility in the IR, ***Erwin*** shrinks the search space into a highly bug-related subspace. This way, ***Erwin*** reduce opportunism in random program generations.
+Different from [Csmith](https://github.com/csmith-project/csmith)-family tools that generate a test program in one go, ***Erwin*** separates the generation process into two sub-steps: 1) randomly generate a type/loc/scope-agnostic IR (i.e., a program without type, storage location, and scope), and 2) conducts bounded exhaustive instantiation to instantiate the IR into a swarm of real-word test programs.
+By masking out bug-related langauge features, such as type, storage location, and scope in the IR, ***Erwin*** shrinks the search space into a highly bug-related subspace. This way, ***Erwin*** reduce opportunism in random program generations.
 
 ***Erwin*** is still under development, any suggestion and collaboration is welcomed.
 
-## How to play it?
+## Install Erwin
 
-The simplest way is `npm install @__haoyang__/erwin` it and `npx erwin generate` with different generation flags. `npx erwin generate` is the trivial generation, in which ***Erwin*** will not explore the search space of the IR, but perform just like Csmith, generate a test program in one go.
-
-To utilize ***Erwin***'s features in program generation, you can use `-m` to specify the bug-related features you want to mask in the IR, and use `-max` to specify the maximum test programs you want to instantiation from the generated IR.
-
-To directly use ***Erwin*** to fuzz the Solidity compiler, you can invoke `--enable_test`, followed by the target you want to test, including, solidity, solang, solar, and slither. The first three are compilers for Solidity programs, while the last is a static analyzer for solidity.
-
-Below is an example command to fuzz the Solidity compiler:
+### Install through NPM
 
 ```
-npx erwin generate -m type -d  --enable_test solidity --compiler_path=../solidity/build/solc/solc --refresh_folder --generation_rounds 10000 -max 100
+npm install @__haoyang__/erwin
 ```
 
-For more flags, please refer to `npx erwin generation -h`.
+### Install through Git
+
+```
+git install git@github.com:haoyang9804/Erwin.git
+cd Erwin
+npm install
+npm run build
+```
+
+## Run Erwin
+
+If you install Erwin through NPM, the `erwin` executable is in `node_modules/.bin`, add it to your PATH, and directly call `erwin`.
+If you install Erwin through Git, go into the folder and type `npx erwin`.
+
+### Use Erwin as a Solidity program generator.
+
+Erwin support various flags to tune the probability distribution of all language features (e.g., `literal_prob`), control the program size (e.g., `function_body_stmt_cnt_upper_limit`), change the generation mode (e.g, `-m`), regulate the upperlimit of the amount of the test programs generated from the IR (e.g., `-max`), etc.
+
+`npx erwin generate` is the trivial generation that generates a test program in a generation round, just like Csmith.
+
+To enable the `bounded exhaustive instantiation` feature, use `-m` to specify the a class of language features you want to exhausitively instantiate from the IR, including `type`, `loc`ation, and `scope`. `-max` helps control the upperlimit of the instantiation.
+
+Since different compilers (Solidity, Solang, Solar) define slightly different Solidity grammar, you can use `--target` to specify the "accent" of Solidity you want to generate. It defaults to solidity.
+
+Below is an example for generating Solidity programs of solang "accent".
+
+```
+npx erwin generate -m type -max 100 --target solang
+```
+
+The generated programs are stored in `generated_programs`, you can change it by `-o`.
+
+### Use Erwin as a generation-based fuzzer.
+
+Erwin integrates four distinct automated testing workflows, each designed to target a specific software tool: the [Solidity](https://github.com/ethereum/solidity), [Solang](https://github.com/hyperledger-solang/solang), [Solar](https://github.com/paradigmxyz/solar), and [Slither](https://github.com/crytic/slither). The first three are compilers for Solidity programs while the last is a static analyzer of Solidity.
+
+Below is an example for enable the testing workflow for Solidity.
+
+```
+npx erwin generate --target solc -m scope --enable_test --compiler_path solc  --refresh_folder --generation_rounds 1000 -max 100
+```
+
+Misbehavior-triggering test programs will be moved to `test_results`.
 
 ## Detected Bugs
 
