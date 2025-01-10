@@ -4,6 +4,23 @@ import { readdir, stat } from 'fs/promises';
 import path from 'path';
 import { config } from './config';
 import { select_random_elements, random_int, pick_random_element } from './utility';
+import * as fs from 'fs';
+
+function cleanAnsiCodes(input : string) : string {
+  // This regex matches ANSI escape codes
+  const ansiRegex = /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g;
+
+  // Replace all ANSI codes with an empty string
+  return input.replace(ansiRegex, '');
+}
+
+function folderExists(folderPath : string) : boolean {
+  try {
+    return fs.statSync(folderPath).isDirectory();
+  } catch (err) {
+    return false;
+  }
+}
 
 // Promisify exec to use it with async/await
 const execPromise = promisify(exec);
@@ -208,59 +225,110 @@ async function compile_by_solidity(file_path : string) : Promise<[string, string
 export async function test_solidity_compiler() : Promise<number> {
   return new Promise((resolve) => {
     const timeoutDuration = 5 * 60 * 1000; // 5 minutes in milliseconds
+    let currentFile : string | null = null;
     const timeoutId = setTimeout(() => {
       console.error('Time limit exceeded for compiler test');
+      if (currentFile) {
+        if (!folderExists(config.test_out_dir)) {
+          fs.mkdirSync(config.test_out_dir)
+        }
+        // create folder `${config.test_out_dir}/solidity_compiler` if it does not exist
+        const test_dir = path.join(config.test_out_dir, 'solidity_compiler');
+        // if test_dir does not exist on the OS, create it
+        if (!folderExists(test_dir)) {
+          fs.mkdirSync(test_dir)
+        }
+        // create folder `${config.test_out_dir}/solidity_compiler/time_limit_exceeded` if it does not exist
+        const time_limit_dir = path.join(test_dir, 'time_limit_exceeded');
+        // if time_limit_dir does not exist on the OS, create it
+        if (!folderExists(time_limit_dir)) {
+          fs.mkdirSync(time_limit_dir)
+        }
+        // copy the file to `${config.test_out_dir}/solidity_compiler/time_limit_exceeded`
+        fs.copyFileSync(currentFile, path.join(time_limit_dir, path.basename(currentFile)));
+      }
       resolve(3);
     }, timeoutDuration);
 
     const runCompilerTest = async () : Promise<number> => {
-      try {
-        // Check if the "generated_programs" directory exists
-        const dirPath = config.out_dir;
-        const stats = await stat(dirPath);
-        if (!stats.isDirectory()) {
-          console.error('Output directory does not exist');
-          return 2;
-        }
+      // Check if the "generated_programs" directory exists
+      const dirPath = config.out_dir;
+      const stats = await stat(dirPath);
+      if (!stats.isDirectory()) {
+        console.error('Output directory does not exist');
+        return 2;
+      }
 
-        // @ts-ignore
-        const { stdout, stderr } = await execPromise(`${config.compiler_path} --version`);
-        if (stderr) {
-          console.error('Compiler path is incorrect');
-          return 4;
-        }
+      // @ts-ignore
+      const { stdout, stderr } = await execPromise(`${config.compiler_path} --version`);
+      if (stderr) {
+        console.error('Compiler path is incorrect');
+        return 4;
+      }
 
-        const files = await readdir(dirPath);
-        for (const file of files) {
-          const filePath = path.join(dirPath, file);
-          const stats = await stat(filePath);
-          if (stats.isFile()) {
-            try {
-              await compile_by_solidity(filePath);
-            } catch (error) {
-              const execError = error as ExecException & {
-                stdout : string;
-                stderr : string;
-                signal ?: string;
-              };
-              console.error(`=========Error in file ${filePath}=========`);
-              // Check for segmentation fault first
-              if (execError.signal === 'SIGSEGV') {
-                console.error('Segmentation fault (SIGSEGV) detected in compiler execution');
+      const files = await readdir(dirPath);
+      for (const file of files) {
+        const filePath = path.join(dirPath, file);
+        const stats = await stat(filePath);
+        if (stats.isFile()) {
+          currentFile = filePath;
+          try {
+            await compile_by_solidity(filePath);
+          } catch (error) {
+            const execError = error as ExecException & {
+              stdout : string;
+              stderr : string;
+              signal ?: string;
+            };
+            console.error(`=========Error in file ${filePath}=========`);
+            // Check for segmentation fault first
+            if (execError.signal === 'SIGSEGV') {
+              console.error('Segmentation fault (SIGSEGV) detected in compiler execution');
+              if (!folderExists(config.test_out_dir)) {
+                fs.mkdirSync(config.test_out_dir)
               }
-              // If it's not a segmentation fault, check for other errors
-              else if (execError.stderr) {
-                console.error(`Solidity compiler error: ${execError.stderr}`);
+              // create folder `${config.test_out_dir}/solidity_compiler` if it does not exist
+              const test_dir = path.join(config.test_out_dir, 'solidity_compiler');
+              if (!folderExists(test_dir)) {
+                fs.mkdirSync(test_dir)
               }
-              return 1;
+              // create folder `${config.test_out_dir}/solidity_compiler/segmentation_fault` if it does not exist
+              const seg_fault_dir = path.join(test_dir, 'segmentation_fault');
+              if (!folderExists(seg_fault_dir)) {
+                fs.mkdirSync(seg_fault_dir)
+              }
+              // copy the file to `${config.test_out_dir}/solidity_compiler/segmentation_fault`
+              fs.copyFileSync(filePath, path.join(seg_fault_dir, path.basename(filePath)))
             }
+            // If it's not a segmentation fault, check for other errors
+            else if (execError.stderr) {
+              console.error(`Solidity compiler error: ${execError.stderr}`);
+              if (!folderExists(config.test_out_dir)) {
+                fs.mkdirSync(config.test_out_dir)
+              }
+              // create folder `${config.test_out_dir}/solidity_compiler` if it does not exist
+              const test_dir = path.join(config.test_out_dir, 'solidity_compiler');
+              if (!folderExists(test_dir)) {
+                fs.mkdirSync(test_dir)
+              }
+              // create folder `${config.test_out_dir}/solidity_compiler/other_errors` if it does not exist
+              const other_errors_dir = path.join(test_dir, 'other_errors');
+              if (!folderExists(other_errors_dir)) {
+                fs.mkdirSync(other_errors_dir)
+              }
+              // copy the file to `${config.test_out_dir}/solidity_compiler/other_errors`
+              const destinationPath = path.join(other_errors_dir, path.basename(filePath));
+              fs.copyFileSync(filePath, destinationPath);
+              // insert the error message as a comment in the copied file
+              const fileContent = fs.readFileSync(destinationPath);
+              const commentedError = `/*${cleanAnsiCodes(execError.stderr)}*/\n${fileContent}`;
+              await fs.writeFileSync(destinationPath, commentedError);
+            }
+            return 1;
           }
         }
-        return 0;
-      } catch (error) {
-        console.error('Unexpected error:', error);
-        return 1;
       }
+      return 0;
     };
 
     runCompilerTest().then((result) => {
@@ -284,72 +352,120 @@ export async function test_solidity_compiler() : Promise<number> {
 export async function test_slither() : Promise<number> {
   return new Promise((resolve) => {
     const timeoutDuration = 5 * 60 * 1000; // 5 minutes in milliseconds
+    let currentFile : string | null = null;
     const timeoutId = setTimeout(() => {
       console.error('Time limit exceeded for slither test');
+      if (!folderExists(config.test_out_dir)) {
+        fs.mkdirSync(config.test_out_dir)
+      }
+      // create folder `${config.test_out_dir}/slither` if it does not exist
+      const test_dir = path.join(config.test_out_dir, 'slither');
+      if (!folderExists(test_dir)) {
+        fs.mkdirSync(test_dir)
+      }
+      // create folder `${config.test_out_dir}/slither/time_limit_exceeded` if it does not exist
+      const time_limit_dir = path.join(test_dir, 'time_limit_exceeded');
+      if (!folderExists(time_limit_dir)) {
+        fs.mkdirSync(time_limit_dir);
+      }
+      // copy the file to `${config.test_out_dir}/slither/time_limit_exceeded`
+      if (currentFile) {
+        fs.copyFileSync(currentFile, path.join(time_limit_dir, path.basename(currentFile)));
+      }
       resolve(3);
     }, timeoutDuration);
 
     const runSlitherTest = async () : Promise<number> => {
-      try {
-        // Check if the "generated_programs" directory exists
-        const dirPath = config.out_dir;
-        const stats = await stat(dirPath);
-        if (!stats.isDirectory()) {
-          console.error('Output directory does not exist');
-          return 2;
-        }
+      // Check if the "generated_programs" directory exists
+      const dirPath = config.out_dir;
+      const stats = await stat(dirPath);
+      if (!stats.isDirectory()) {
+        console.error('Output directory does not exist');
+        return 2;
+      }
 
-        // @ts-ignore
-        const { stdout, stderr } = await execPromise('slither --version');
-        if (stderr) {
-          console.error('Slither is not installed');
-          return 4;
-        }
+      // @ts-ignore
+      const { stdout, stderr } = await execPromise('slither --version');
+      if (stderr) {
+        console.error('Slither is not installed');
+        return 4;
+      }
 
-        // Check if the executable solc is found
-        // @ts-ignore
-        const { stdout_, stderr_ } = await execPromise('solc --version');
-        if (stderr_) {
-          console.error('Executable solc not found, you should install solidity compiler and add `solc` to the PATH');
-          return 5;
-        }
+      // Check if the executable solc is found
+      // @ts-ignore
+      const { stdout_, stderr_ } = await execPromise('solc --version');
+      if (stderr_) {
+        console.error('Executable solc not found, you should install solidity compiler and add `solc` to the PATH');
+        return 5;
+      }
 
-        const files = await readdir(dirPath);
-        for (const file of files) {
-          const filePath = path.join(dirPath, file);
-          const stats = await stat(filePath);
-          if (stats.isFile()) {
-            try {
-              const slither_command = `slither ${filePath}`;
-              await execPromise(slither_command);
-            } catch (error) {
-              const execError = error as ExecException & {
-                stdout : string;
-                stderr : string;
-                signal ?: string;
-              };
-              // Check for segmentation fault first
-              if (execError.signal === 'SIGSEGV') {
-                console.error(`=========Error in file ${filePath}=========`);
-                console.error('Segmentation fault (SIGSEGV) detected in Slither execution');
-                return 1;
-              } else if (
-                execError.stderr &&
-                (execError.stderr.includes('ERROR:') || execError.stderr.includes('Traceback'))
-              ) {
-                console.error(`=========Error in file ${filePath}=========`);
-                console.error(`Slither error: ${execError.stderr}`);
-                return 1;
+      const files = await readdir(dirPath);
+      for (const file of files) {
+        const filePath = path.join(dirPath, file);
+        const stats = await stat(filePath);
+        if (stats.isFile()) {
+          currentFile = filePath;
+          try {
+            const slither_command = `slither ${filePath}`;
+            await execPromise(slither_command);
+          } catch (error) {
+            const execError = error as ExecException & {
+              stdout : string;
+              stderr : string;
+              signal ?: string;
+            };
+            // Check for segmentation fault first
+            if (execError.signal === 'SIGSEGV') {
+              console.error(`=========Error in file ${filePath}=========`);
+              console.error('Segmentation fault (SIGSEGV) detected in Slither execution');
+              if (!folderExists(config.test_out_dir)) {
+                fs.mkdirSync(config.test_out_dir)
               }
+              // create folder `${config.test_out_dir}/slither` if it does not exist
+              const test_dir = path.join(config.test_out_dir, 'slither');
+              if (!folderExists(test_dir)) {
+                fs.mkdirSync(test_dir)
+              }
+              // create folder `${config.test_out_dir}/slither/segmentation_fault` if it does not exist
+              const seg_fault_dir = path.join(test_dir, 'segmentation_fault');
+              if (!folderExists(seg_fault_dir)) {
+                fs.mkdirSync(seg_fault_dir)
+              }
+              // copy the file to `${config.test_out_dir}/slither/segmentation_fault`
+              const destinationPath = path.join(seg_fault_dir, path.basename(filePath));
+              fs.copyFileSync(filePath, destinationPath);
+            } else if (
+              execError.stderr &&
+              (execError.stderr.includes('ERROR:') || execError.stderr.includes('Traceback'))
+            ) {
+              console.error(`=========Error in file ${filePath}=========`);
               console.error(`Slither error: ${execError.stderr}`);
+              if (!folderExists(config.test_out_dir)) {
+                fs.mkdirSync(config.test_out_dir)
+              }
+              // create folder `${config.test_out_dir}/slither` if it does not exist
+              const test_dir = path.join(config.test_out_dir, 'slither');
+              if (!folderExists(test_dir)) {
+                fs.mkdirSync(test_dir)
+              }
+              // create folder `${config.test_out_dir}/slither/other_errors` if it does not exist
+              const other_errors_dir = path.join(test_dir, 'other_errors');
+              if (!folderExists(other_errors_dir)) {
+                fs.mkdirSync(other_errors_dir)
+              }
+              // copy the file to `${config.test_out_dir}/slither/other_errors`
+              const destinationPath = path.join(other_errors_dir, path.basename(filePath));
+              fs.copyFileSync(filePath, destinationPath);
+              // insert the error message as a comment in the copied file
+              const fileContent = fs.readFileSync(destinationPath);
+              const commentedError = `/*${cleanAnsiCodes(execError.stderr)}*/\n${fileContent}`;
+              await fs.writeFileSync(destinationPath, commentedError);
             }
+            return 1;
           }
         }
-        return 0;
-      } catch (error) {
-        console.error('Unexpected error:', error);
-        return 1;
       }
+      return 0;
     };
 
     runSlitherTest().then((result) => {
@@ -371,8 +487,26 @@ export async function test_slither() : Promise<number> {
 export async function test_solang_compiler() : Promise<number> {
   return new Promise((resolve) => {
     const timeoutDuration = 5 * 60 * 1000; // 5 minutes in milliseconds
+    let currentFile : string | null = null;
     const timeoutId = setTimeout(() => {
       console.error('Time limit exceeded for compiler test');
+      if (!folderExists(config.test_out_dir)) {
+        fs.mkdirSync(config.test_out_dir)
+      }
+      // create folder `${config.test_out_dir}/solang_compiler` if it does not exist
+      const test_dir = path.join(config.test_out_dir, 'solang_compiler');
+      if (!folderExists(test_dir)) {
+        fs.mkdirSync(test_dir)
+      }
+      // create folder `${config.test_out_dir}/solang_compiler/time_limit_exceeded` if it does not exist
+      const time_limit_dir = path.join(test_dir, 'time_limit_exceeded');
+      if (!folderExists(time_limit_dir)) {
+        fs.mkdirSync(time_limit_dir);
+      }
+      // copy the file to `${config.test_out_dir}/solang_compiler/time_limit_exceeded`
+      if (currentFile) {
+        fs.copyFileSync(currentFile, path.join(time_limit_dir, path.basename(currentFile)));
+      }
       resolve(3);
     }, timeoutDuration);
 
@@ -398,6 +532,7 @@ export async function test_solang_compiler() : Promise<number> {
           const filePath = path.join(dirPath, file);
           const stats = await stat(filePath);
           if (stats.isFile()) {
+            currentFile = filePath;
             try {
               await compile_by_solang(filePath);
             } catch (error) {
@@ -410,10 +545,45 @@ export async function test_solang_compiler() : Promise<number> {
               // Check for segmentation fault first
               if (execError.signal === 'SIGSEGV') {
                 console.error('Segmentation fault (SIGSEGV) detected in compiler execution');
+                if (!folderExists(config.test_out_dir)) {
+                  fs.mkdirSync(config.test_out_dir)
+                }
+                // create folder `${config.test_out_dir}/solang_compiler` if it does not exist
+                const test_dir = path.join(config.test_out_dir, 'solang_compiler');
+                if (!folderExists(test_dir)) {
+                  fs.mkdirSync(test_dir)
+                }
+                // create folder `${config.test_out_dir}/solang_compiler/segmentation_fault` if it does not exist
+                const seg_fault_dir = path.join(test_dir, 'segmentation_fault');
+                if (!folderExists(seg_fault_dir)) {
+                  fs.mkdirSync(seg_fault_dir)
+                }
+                // copy the file to `${config.test_out_dir}/solang_compiler/segmentation_fault`
+                fs.copyFileSync(filePath, path.join(seg_fault_dir, path.basename(filePath)))
               }
               // If it's not a segmentation fault, check for other errors
               else if (execError.stderr) {
                 console.error(`Solang compiler error: ${execError.stderr}`);
+                if (!folderExists(config.test_out_dir)) {
+                  fs.mkdirSync(config.test_out_dir)
+                }
+                // create folder `${config.test_out_dir}/solang_compiler` if it does not exist
+                const test_dir = path.join(config.test_out_dir, 'solang_compiler');
+                if (!folderExists(test_dir)) {
+                  fs.mkdirSync(test_dir)
+                }
+                // create folder `${config.test_out_dir}/solang_compiler/other_errors` if it does not exist
+                const other_errors_dir = path.join(test_dir, 'other_errors');
+                if (!folderExists(other_errors_dir)) {
+                  fs.mkdirSync(other_errors_dir)
+                }
+                // copy the file to `${config.test_out_dir}/solang_compiler/other_errors`
+                const destinationPath = path.join(other_errors_dir, path.basename(filePath));
+                fs.copyFileSync(filePath, destinationPath);
+                // insert the error message as a comment in the copied file
+                const fileContent = fs.readFileSync(destinationPath);
+                const commentedError = `/*${cleanAnsiCodes(execError.stderr)}*/\n${fileContent}`;
+                await fs.writeFileSync(destinationPath, commentedError);
               }
               return 1;
             }

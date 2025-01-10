@@ -22,7 +22,6 @@ program
 program
   .command("generate")
   .description("Generate random Solidity code.")
-  .option("-e --exprimental", "Enable the exprimental mode.", `${config.experimental}`)
   .option("-m --mode <string>", "The mode of Erwin. The value can be 'type', 'scope', or 'loc'.", `${config.mode}`)
   .option("-d --debug", "Enable the debug mode.", `${config.debug}`)
   .option("-o --out_dir <string>", "The output directory for the generated program. The default is 'generated_programs'", `${config.out_dir}`)
@@ -105,6 +104,8 @@ program
   .option("--enable_test", "Enable the test mode.", `${config.enable_test}`)
   .option("--compiler_path <string>", "The path of the Solidity compiler.", `${config.compiler_path}`)
   .option("--refresh_folder", "Refresh the folder before generating the program.", `${config.refresh_folder}`)
+  .option("--test_out_dir <string>", "The output directory for the generated test program. The default is 'test_results'", `${config.test_out_dir}`)
+  .option("--terminate_on_failure", "Terminate the program when a failure occurs during testing the target software under the test mode", `${config.terminate_on_failure}`)
 program.parse(process.argv);
 // Set the configuration
 if (program.args[0] === "mutate") {
@@ -112,7 +113,6 @@ if (program.args[0] === "mutate") {
   config.out_dir = program.commands[0].opts().out_dir;
 }
 else if (program.args[0] === "generate") {
-  if (program.commands[1].opts().experimental === true) config.experimental = true;
   config.out_dir = program.commands[1].opts().out_dir;
   config.int_num = parseInt(program.commands[1].opts().int_types_num);
   config.uint_num = parseInt(program.commands[1].opts().uint_types_num);
@@ -181,9 +181,11 @@ else if (program.args[0] === "generate") {
   config.generation_rounds = parseInt(program.commands[1].opts().generation_rounds);
   config.compiler_path = program.commands[1].opts().compiler_path;
   config.target = program.commands[1].opts().target;
+  config.test_out_dir = program.commands[1].opts().test_out_dir;
   if (program.commands[1].opts().refresh_folder === true) config.refresh_folder = true;
   if (program.commands[1].opts().debug === true) config.debug = true;
   if (program.commands[1].opts().enable_test === true) config.enable_test = true;
+  if (program.commands[1].opts().terminate_on_failure === true) config.terminate_on_failure = true;
   if (config.mode == "scope") {
     config.int_num = 1;
     config.uint_num = 1;
@@ -272,6 +274,7 @@ else if (program.args[0] === "generate") {
   assert(config.return_prob >= 0 && config.return_prob <= 1, "The probability of generating a return statement must be in the range [0,1].");
   assert(config.reuse_name_prob >= 0 && config.reuse_name_prob < 1, "The probability of reusing a name must be in the range [0,1).");
   assert(config.generation_rounds >= 1, "The number of generation rounds must be not less than 1.");
+  assert(config.test_out_dir !== "", "The output directory for the generated test program is not provided.");
   if (config.enable_test && config.target !== "slither") {
     assert(config.compiler_path !== "", "The path of the compiler path is not provided while enabling the testing mode and the target is a solidity compiler.");
   }

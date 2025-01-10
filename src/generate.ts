@@ -464,22 +464,37 @@ export async function generate() {
     if (config.enable_test) {
       if (config.target === "solidity") {
         await test_solidity_compiler().then((result) => {
-          if (result !== 0) {
+          if (result === 2 || result === 4) {
             process.exit(1);
+          }
+          else if (result !== 0) {
+            if (config.terminate_on_failure) {
+              process.exit(1);
+            }
           }
         });
       }
       else if (config.target === "slither") {
         await test_slither().then((result) => {
-          if (result !== 0) {
+          if (result === 5 || result === 4 || result === 2) {
             process.exit(1);
+          }
+          else if (result !== 0) {
+            if (config.terminate_on_failure) {
+              process.exit(1);
+            }
           }
         });
       }
       else if (config.target === "solang") {
         await test_solang_compiler().then((result) => {
-          if (result !== 0) {
+          if (result === 2 || result === 4) {
             process.exit(1);
+          }
+          else if (result !== 0) {
+            if (config.terminate_on_failure) {
+              process.exit(1);
+            }
           }
         });
       }

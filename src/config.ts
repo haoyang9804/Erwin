@@ -2,7 +2,6 @@ export const config = {
   file: "",
   out_dir: "./generated_programs",
 
-  experimental: false,
   mode: "",
   debug: false,
 
@@ -106,6 +105,8 @@ export const config = {
   target: 'solidity',
   compiler_path: "",
   enable_test: false,
+  test_out_dir: "./test_results",
+  terminate_on_failure: false,
   // Refresh the folder of the generated programs before generating new programs
   refresh_folder: false,
 }
