@@ -25,7 +25,7 @@ import {
   StateVariableVisibility,
   FunctionStateMutability,
 } from "solc-typed-ast"
-import { test_solidity_compiler, test_slither, test_solang_compiler } from "./test";
+import { test_solidity_compiler, test_slither, test_solang_compiler, test_solar_compiler } from "./test";
 const formatter = new PrettyFormatter(2, 0);
 const writer = new ASTWriter(
   DefaultASTWriterMapping,
@@ -488,6 +488,18 @@ export async function generate() {
       }
       else if (config.target === "solang") {
         await test_solang_compiler().then((result) => {
+          if (result === 2 || result === 4) {
+            process.exit(1);
+          }
+          else if (result !== 0) {
+            if (config.terminate_on_failure) {
+              process.exit(1);
+            }
+          }
+        });
+      }
+      else if (config.target === "solar") {
+        await test_solar_compiler().then((result) => {
           if (result === 2 || result === 4) {
             process.exit(1);
           }

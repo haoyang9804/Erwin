@@ -1190,7 +1190,7 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
     decl_db.add_vardecl_with_scope(arrayid, cur_scope);
     this.update_storage_location_range();
     this.update_vismut_dag(arrayid);
-    if (config.target === "solidity" &&
+    if ((config.target === "solidity" || config.target === "solar") &&
       (this.irnode as decl.IRVariableDeclaration).value === undefined) {
       this.array_must_be_initialized_if_in_function_return_scope_or_funcbody();
     }
@@ -1431,7 +1431,7 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
     decl_db.add_vardecl_with_scope(this.irnode.id, cur_scope);
     this.assign_storage_location_range();
     this.update_vismut_dag();
-    if (config.target === "solidity" &&
+    if ((config.target === "solidity" || config.target === "solar") &&
       (this.irnode as decl.IRVariableDeclaration).value === undefined) {
       this.struct_instance_must_be_initialized_if_in_function_return_scope_or_funcbody();
     }
@@ -1600,7 +1600,7 @@ class StringDeclarationGenerator extends DeclarationGenerator {
     this.generate_initializer();
     decl_db.add_vardecl_with_scope(this.irnode.id, cur_scope);
     this.update_vismut_dag();
-    if (config.target === "solidity" &&
+    if ((config.target === "solidity" || config.target === "solar") &&
       (this.irnode as decl.IRVariableDeclaration).value === undefined) {
       this.stringdecl_must_be_initialized_if_in_function_return_scope_or_funcbody();
     }
@@ -2005,7 +2005,7 @@ class ConstructorDeclarationGenerator extends DeclarationGenerator {
     const stmt_gen_prototype = get_stmtgenerator();
     const stmt_gen = new stmt_gen_prototype();
     stmt_gen.generate(0);
-    if (config.target === "solidity") {
+    if ((config.target === "solidity" || config.target === "solar")) {
       stmt_db.initialize_the_vardecls_that_must_be_initialized_later(cur_scope.id());
     }
     this.body = this.body.concat(stmt_db.unexpected_extra_stmts_of_scope(cur_scope.id()));
@@ -2206,7 +2206,7 @@ class ModifierDeclarationGenerator extends DeclarationGenerator {
       const stmt_gen_prototype = get_stmtgenerator();
       const stmt_gen = new stmt_gen_prototype();
       stmt_gen.generate(0);
-      if (config.target === "solidity") {
+      if ((config.target === "solidity" || config.target === "solar")) {
         stmt_db.initialize_the_vardecls_that_must_be_initialized_later(cur_scope.id());
       }
       this.body = this.body.concat(stmt_db.unexpected_extra_stmts_of_scope(cur_scope.id()));
@@ -2386,7 +2386,7 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
       const stmt_gen_prototype = get_stmtgenerator();
       const stmt_gen = new stmt_gen_prototype();
       stmt_gen.generate(0);
-      if (config.target === "solidity") {
+      if ((config.target === "solidity" || config.target === "solar")) {
         stmt_db.initialize_the_vardecls_that_must_be_initialized_later(cur_scope.id());
       }
       this.body = this.body.concat(stmt_db.unexpected_extra_stmts_of_scope(cur_scope.id()));
@@ -2418,7 +2418,7 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
         expr_gen.generate(0);
         const exp = expr_gen.irnode! as expr.IRExpression;
         this.return_values.push(exp);
-        if (config.target === "solidity") {
+        if ((config.target === "solidity" || config.target === "solar")) {
           stmt_db.initialize_the_vardecls_that_must_be_initialized_later(cur_scope.id());
         }
         this.body = this.body.concat(stmt_db.unexpected_extra_stmts_of_scope(cur_scope.id()));
@@ -2651,7 +2651,7 @@ class FunctionDeclarationGenerator extends DeclarationGenerator {
     sig.forbid_external_call = this.forbid_external_call;
     this.throw_no_state_variable_signal_at_random();
     this.start_flag_of_func_body();
-    if (config.target === "solidity") {
+    if ((config.target === "solidity" || config.target === "solar")) {
       stmt_db.initialize_the_vardecls_that_must_be_initialized_later(cur_scope.id());
     }
     this.generate_func_body_stmts();
@@ -3326,13 +3326,13 @@ class IdentifierGenerator extends ExpressionGenerator {
     if (decl_db.is_mapping_decl(this.variable_decl.id)) {
       const scope_id = decl_db.scope_of_irnode(this.variable_decl.id);
       stmt_db.add_unexpected_extra_stmt(scope_id, variable_decl_stmt);
-      if (config.target === "solidity") {
+      if ((config.target === "solidity" || config.target === "solar")) {
         stmt_db.initialize_the_vardecls_that_must_be_initialized_later(scope_id);
       }
     }
     else {
       stmt_db.add_unexpected_extra_stmt(cur_scope.id(), variable_decl_stmt);
-      if (config.target === "solidity") {
+      if ((config.target === "solidity" || config.target === "solar")) {
         stmt_db.initialize_the_vardecls_that_must_be_initialized_later(cur_scope.id());
       }
     }
@@ -3682,7 +3682,7 @@ class IdentifierGenerator extends ExpressionGenerator {
     }
     (struct_instance_gen.irnode as decl.IRVariableDeclaration).value = undefined;
     stmt_db.add_unexpected_extra_stmt(cur_scope.id(), vardeclstmt);
-    if (config.target === "solidity") {
+    if ((config.target === "solidity" || config.target === "solar")) {
       stmt_db.initialize_the_vardecls_that_must_be_initialized_later(cur_scope.id());
     }
     if (rollback > 0) {
@@ -5572,7 +5572,7 @@ class IfStatementGenerator extends NonExpressionStatementGenerator {
       const then_stmt_gen_prototype = get_stmtgenerator(cur_stmt_complex_level + 1);
       const then_stmt_gen = new then_stmt_gen_prototype();
       then_stmt_gen.generate(cur_stmt_complex_level + 1);
-      if (config.target === "solidity") {
+      if ((config.target === "solidity" || config.target === "solar")) {
         stmt_db.initialize_the_vardecls_that_must_be_initialized_later(cur_scope.id());
       }
       true_body = true_body.concat(stmt_db.unexpected_extra_stmts_of_scope(cur_scope.id()));
@@ -5600,7 +5600,7 @@ class IfStatementGenerator extends NonExpressionStatementGenerator {
       const else_stmt_gen_prototype = get_stmtgenerator(cur_stmt_complex_level + 1);
       const else_stmt_gen = new else_stmt_gen_prototype();
       else_stmt_gen.generate(cur_stmt_complex_level + 1);
-      if (config.target === "solidity") {
+      if ((config.target === "solidity" || config.target === "solar")) {
         stmt_db.initialize_the_vardecls_that_must_be_initialized_later(cur_scope.id());
       }
       false_body = false_body.concat(stmt_db.unexpected_extra_stmts_of_scope(cur_scope.id()));
@@ -5712,7 +5712,7 @@ class ForStatementGenerator extends NonExpressionStatementGenerator {
       const body_stmt_gen_prototype = get_stmtgenerator(cur_stmt_complex_level + 1);
       const body_stmt_gen = new body_stmt_gen_prototype();
       body_stmt_gen.generate(cur_stmt_complex_level + 1);
-      if (config.target === "solidity") {
+      if ((config.target === "solidity" || config.target === "solar")) {
         stmt_db.initialize_the_vardecls_that_must_be_initialized_later(cur_scope.id());
       }
       body = body.concat(stmt_db.unexpected_extra_stmts_of_scope(cur_scope.id()));
@@ -5781,7 +5781,7 @@ class WhileStatementGenerator extends NonExpressionStatementGenerator {
           [expr.tuple_extraction(body_stmt_gen.expr!)] :
           body_stmt_gen.exprs
       );
-      if (config.target === "solidity") {
+      if ((config.target === "solidity" || config.target === "solar")) {
         stmt_db.initialize_the_vardecls_that_must_be_initialized_later(cur_scope.id());
       }
       body = body.concat(stmt_db.unexpected_extra_stmts_of_scope(cur_scope.id()));
@@ -5840,7 +5840,7 @@ class DoWhileStatementGenerator extends NonExpressionStatementGenerator {
           [expr.tuple_extraction(body_stmt_gen.expr!)] :
           body_stmt_gen.exprs
       );
-      if (config.target === "solidity") {
+      if ((config.target === "solidity" || config.target === "solar")) {
         stmt_db.initialize_the_vardecls_that_must_be_initialized_later(cur_scope.id());
       }
       body = body.concat(stmt_db.unexpected_extra_stmts_of_scope(cur_scope.id()));
