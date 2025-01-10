@@ -1,7 +1,6 @@
 node_modules
 *.js
 *.d.ts
-*.sol
 dist
 coverage
 *.svg
@@ -14,5 +13,4 @@ docs/
 coverage_report/
 __pycache__
 ISSTA24-Solidity-Study/*
-test_programs
 package-lock.json
