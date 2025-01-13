@@ -1,11 +1,11 @@
 import {
   LiteralKind,
   Expression,
-  FunctionCallKind
+  FunctionCallKind,
 } from "solc-typed-ast"
 
 import { assert, generate_random_string, str2hex, random_bigInt } from "./utility";
-import { TypeKind, Type, ElementaryType } from "./type";
+import { TypeKind, Type, ElementaryType, ContractType, StructType, MappingType, ArrayType, StringType } from "./type";
 import { IRNode, factory } from "./node";
 import { IRModifier, IRVariableDeclaration } from "./declaration";
 import { config } from "./config";
@@ -370,5 +370,50 @@ export class IRModifierInvoker extends IRNode {
   lower() {
     const modifier_identifier = factory.makeIdentifier("", this.modifier_decl.name, this.modifier_decl.id);
     return factory.makeModifierInvocation(modifier_identifier, this.arguments.map((arg) => arg.lower() as Expression));
+  }
+}
+
+export class IRNewDynamicArray extends IRExpression {
+  base_type : Type | undefined;
+  length : IRExpression;
+  base_id : number;
+  constructor(id : number, scope : number, length : IRExpression, base_id : number) {
+    super(id, scope);
+    this.length = length;
+    this.base_id = base_id;
+  }
+  type_to_str() : string {
+    assert(this.base_type !== undefined, `IRNewDynamicArray ${this.id}: base_type is not generated`);
+    if (this.base_type.kind === TypeKind.ElementaryType) {
+      const base_type = this.base_type as ElementaryType;
+      return base_type.str();
+    }
+    if (this.base_type.kind === TypeKind.ContractType) {
+      const base_type = this.base_type as ContractType;
+      return base_type.name;
+    }
+    if (this.base_type.kind === TypeKind.StructType) {
+      const base_type = this.base_type as StructType;
+      return base_type.name;
+    }
+    if (this.base_type.kind === TypeKind.MappingType) {
+      const base_type = this.base_type as MappingType;
+      return base_type.str();
+    }
+    if (this.base_type.kind === TypeKind.ArrayType) {
+      const base_type = this.base_type as ArrayType;
+      return base_type.str();
+    }
+    if (this.base_type.kind === TypeKind.StringType) {
+      const base_type = this.base_type as StringType;
+      return base_type.str();
+    }
+    else {
+      throw new Error(`IRVariableDeclaration: base_type ${this.base_type.kind} is not supported`);
+    }
+  }
+  lower() {
+    const new_expr = factory.makeNewExpression("", factory.makeUserDefinedTypeName("", this.type_to_str() + "[]", -1));
+    return factory.makeFunctionCall("", FunctionCallKind.FunctionCall, new_expr, [this.length.lower() as Expression]);
   }
 }

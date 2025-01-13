@@ -1,5 +1,5 @@
 import { type_dag, storage_location_dag, TypeConstraintDAG } from "../src/constraint";
-import { Type, uinteger_types } from "../src/type";
+import { ArrayType, Type, TypeProvider, uinteger_types } from "../src/type";
 import { config } from "../src/config";
 import { StorageLocationProvider} from "../src/loc";
 config.unit_test_mode = true;
@@ -435,3 +435,42 @@ class TestStorageLocationDominanceDAG extends TypeConstraintDAG {
     return super.dominator_solution_range_should_be_shrinked(dominator_id, dominatee_id);
   }
 }
+
+test("test solution_range_alignment 1",
+async () => {
+  const nid1 = 1;
+  const nid2 = 2;
+  type_dag.insert(nid1, [TypeProvider.trivial_array()]);
+  const array_type = new ArrayType(TypeProvider.address());
+  type_dag.insert(nid2, [array_type]);
+  type_dag.connect(nid1, nid2);
+  type_dag.solution_range_alignment(nid1, nid2);
+  expect(type_dag.solution_range_of(nid1).length).toEqual(1);
+  expect(type_dag.solution_range_of(nid1)[0]).toEqual(array_type);
+});
+
+test("test solution_range_alignment 2",
+async () => {
+  const nid1 = 1;
+  const nid2 = 2;
+  const array_type1 = new ArrayType(TypeProvider.address());
+  const array_type2 = new ArrayType(TypeProvider.int128());
+  type_dag.insert(nid1, [array_type1, array_type2]);
+  type_dag.insert(nid2, [array_type1]);
+  type_dag.connect(nid1, nid2);
+  type_dag.solution_range_alignment(nid1, nid2);
+  expect(type_dag.solution_range_of(nid1).length).toEqual(1);
+  expect(type_dag.solution_range_of(nid1)[0]).toEqual(array_type1);
+});
+
+test("test solution_range_alignment 3",
+async () => {
+  const nid1 = 1;
+  const nid2 = 2;
+  storage_location_dag.insert(nid1, [StorageLocationProvider.memory()]);
+  storage_location_dag.insert(nid2, [StorageLocationProvider.memory(), StorageLocationProvider.storage_pointer()]);
+  storage_location_dag.connect(nid1, nid2, "super");
+  storage_location_dag.solution_range_alignment(nid1, nid2);
+  // storage pointer is the "same" as storage ref and storage ref is a super of memory
+  expect(storage_location_dag.solution_range_of(nid2).length).toEqual(2);
+});

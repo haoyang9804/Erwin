@@ -1,5 +1,5 @@
 import { assert, intersection, merge_set } from "./utility";
-import { Type, TypeKind, MappingType, ArrayType } from "./type"
+import { Type, TypeKind, MappingType, ArrayType, TypeProvider } from "./type"
 import * as dot from 'ts-graphviz';
 import { config } from './config'
 import { new_global_id } from "./genContext";
@@ -1830,6 +1830,42 @@ export class TypeConstraintDAG extends ConstraintDAG<TypeKind, Type> {
 
   solution_range_alignment(dominator_id : number, dominatee_id : number,
     direction : "inside_out" | "outside_in" | "bidirectional" = "bidirectional") : void {
+    const dominator_is_of_mapping_type = this.solution_range_of(dominator_id).every(t => t.kind === TypeKind.MappingType);
+    if (dominator_is_of_mapping_type) {
+      assert(this.solution_range_of(dominatee_id).every(t => t.kind === TypeKind.MappingType),
+        `solution_range_alignment: ${dominatee_id} is not mapping type`);
+      const dominator_is_of_trivial_mapping_type = this.solution_range_of(dominator_id).length === 1 &&
+        this.solution_range_of(dominator_id)[0] === TypeProvider.trivial_mapping();
+      const dominatee_is_of_trivial_mapping_type = this.solution_range_of(dominatee_id).length === 1 &&
+        this.solution_range_of(dominatee_id)[0] === TypeProvider.trivial_mapping();
+      if (dominatee_is_of_trivial_mapping_type && !dominator_is_of_trivial_mapping_type) {
+        this.solution_range.set(dominatee_id, this.solution_range.get(dominator_id)!);
+      }
+      else if (!dominatee_is_of_trivial_mapping_type && dominator_is_of_trivial_mapping_type) {
+        this.solution_range.set(dominator_id, this.solution_range.get(dominatee_id)!);
+      }
+      else if (dominatee_is_of_trivial_mapping_type && dominator_is_of_trivial_mapping_type) {
+        throw new Error(`dominator ${dominator_id} and dominatee ${dominatee_id} are both trivial mapping type`);
+      }
+    }
+    const dominator_is_of_array_type = this.solution_range_of(dominator_id).every(t => t.kind === TypeKind.ArrayType);
+    if (dominator_is_of_array_type) {
+      assert(this.solution_range_of(dominatee_id).every(t => t.kind === TypeKind.ArrayType),
+        `solution_range_alignment: ${dominatee_id} is not array type`);
+      const dominator_is_of_trivial_array_type = this.solution_range_of(dominator_id).length === 1 &&
+        this.solution_range_of(dominator_id)[0] === TypeProvider.trivial_array();
+      const dominatee_is_of_trivial_array_type = this.solution_range_of(dominatee_id).length === 1 &&
+        this.solution_range_of(dominatee_id)[0] === TypeProvider.trivial_array();
+      if (dominatee_is_of_trivial_array_type && !dominator_is_of_trivial_array_type) {
+        this.solution_range.set(dominatee_id, this.solution_range.get(dominator_id)!);
+      }
+      else if (!dominatee_is_of_trivial_array_type && dominator_is_of_trivial_array_type) {
+        this.solution_range.set(dominator_id, this.solution_range.get(dominatee_id)!);
+      }
+      else if (dominatee_is_of_trivial_array_type && dominator_is_of_trivial_array_type) {
+        throw new Error(`dominator ${dominator_id} and dominatee ${dominatee_id} are both trivial array type`);
+      }
+    }
     super.solution_range_alignment(dominator_id, dominatee_id);
     if (direction === "bidirectional" || direction === "outside_in") {
       this.align_kv_solution_range_from_mapping(dominator_id, dominatee_id);
@@ -1856,7 +1892,10 @@ export class TypeConstraintDAG extends ConstraintDAG<TypeKind, Type> {
   protected remove_irrelevant_leaves() : void {
     this.leaves.forEach(leaf => {
       if (decl_db.is_mapping_decl(leaf) || decl_db.is_array_decl(leaf) ||
-        !decl_db.is_vardecl(leaf) && !expr_db.is_literal(leaf)) {
+        expr_db.is_new_dynamic_array_expr(leaf) ||
+        !decl_db.is_vardecl(leaf) && !expr_db.is_literal(leaf) &&
+        !expr_db.is_new_struct_expr(leaf) && !expr_db.is_new_contract_expr(leaf) &&
+        !expr_db.is_base_expr(leaf)) {
         this.leaves.delete(leaf);
         for (const edge of this.leaves_same) {
           const [leaf1, leaf2] = edge.split(" ");

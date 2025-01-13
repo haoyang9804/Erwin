@@ -963,11 +963,8 @@ class ExprDB {
     }
   }
 
-  is_new_contract_expr(expr_id : number, fid : number) : boolean {
-    if (!this.new_contract_exprs.has(fid)) {
-      return false;
-    }
-    return this.new_contract_exprs.get(fid)!.has(expr_id);
+  is_new_contract_expr(expr_id : number) : boolean {
+    return Array.from(this.new_contract_exprs.values()).some(x => x.has(expr_id));
   }
 
   has_new_contract_exprs(fid : number) : boolean {

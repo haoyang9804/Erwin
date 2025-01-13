@@ -102,6 +102,12 @@ function funcstat2functionstatemutability(fs : FuncStat) : FunctionStateMutabili
   }
 }
 
+function assign_newDynamicArray_type(new_dynamic_array_id : number, type_solutions : Map<number, Type>) : void {
+  const base_id = (irnodes.get(new_dynamic_array_id)! as expr.IRNewDynamicArray).base_id;
+  assert(type_solutions.has(base_id), `The type solution does not have the base id ${base_id}.`);
+  (irnodes.get(new_dynamic_array_id)! as expr.IRNewDynamicArray).base_type = type_solutions.get(base_id)!;
+}
+
 function assign_mapping_type(mapping_decl_id : number, type_solutions : Map<number, Type>) : void {
   const [key_id, value_id] = db.decl_db.kvpair_of_mapping(mapping_decl_id);
   assert(type_solutions.has(key_id), `The type solution does not have the key id ${key_id}.`);
@@ -209,8 +215,12 @@ function generate_type_mode(source_unit_gen : gen.SourceUnitGenerator) {
     for (let type_solutions of type_dag.solutions_collection) {
       if (type_solutions.size === 0) continue;
       for (let [key, value] of type_solutions) {
-        if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
+        if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration) {
           (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
+        }
+      }
+      for (const new_dynamic_array_id of db.expr_db.new_dynamic_array_exprs_ids()) {
+        assign_newDynamicArray_type(new_dynamic_array_id, type_solutions);
       }
       for (const mapping_decl_id of db.decl_db.mapping_decls_ids()) {
         assign_mapping_type(mapping_decl_id, type_solutions);
@@ -245,8 +255,12 @@ function generate_scope_mode(source_unit_gen : gen.SourceUnitGenerator) {
   if (type_dag.solutions_collection.length > 0) {
     const type_solutions = pick_random_element(type_dag.solutions_collection)!;
     for (let [key, value] of type_solutions) {
-      if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
+      if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration) {
         (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
+      }
+    }
+    for (const new_dynamic_array_id of db.expr_db.new_dynamic_array_exprs_ids()) {
+      assign_newDynamicArray_type(new_dynamic_array_id, type_solutions);
     }
     for (const mapping_decl_id of db.decl_db.mapping_decls_ids()) {
       assign_mapping_type(mapping_decl_id, type_solutions);
@@ -329,8 +343,12 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
   //! Select one type solution
   const type_solutions = pick_random_element(type_dag.solutions_collection)!;
   for (const [key, value] of type_solutions) {
-    if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration)
+    if (irnodes.get(key)! instanceof expr.IRLiteral || irnodes.get(key)! instanceof decl.IRVariableDeclaration) {
       (irnodes.get(key)! as expr.IRLiteral | decl.IRVariableDeclaration).type = value;
+    }
+  }
+  for (const new_dynamic_array_id of db.expr_db.new_dynamic_array_exprs_ids()) {
+    assign_newDynamicArray_type(new_dynamic_array_id, type_solutions);
   }
   for (const mapping_decl_id of db.decl_db.mapping_decls_ids()) {
     assign_mapping_type(mapping_decl_id, type_solutions);
