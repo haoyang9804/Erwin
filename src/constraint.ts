@@ -236,11 +236,13 @@ export class ConstraintDAG<T, V extends Value<T>> {
       throw new Error(`dominator_solution_range_should_be_shrinked: rank ${rank} is not supported`);
     }
     const intersection = this.solution_range.get(dominator_id)!.filter(t => minimum_solution_range_of_dominator.some(g => g.same(t)));
-    assert(intersection.length > 0,
-      `dominator_solution_range_should_be_shrinked: intersection is empty
+    if (intersection.length === 0) {
+      this.draw_for_debug();
+      throw new Error(`dominator_solution_range_should_be_shrinked: intersection is empty
        dominator_id: ${dominator_id}, solution_range is ${this.solution_range.get(dominator_id)!.map(t => t.str())}
        dominatee_id: ${dominatee_id}, solution_range is ${this.solution_range.get(dominatee_id)!.map(t => t.str())}
        minimum_solution_range_of_dominator: ${minimum_solution_range_of_dominator.map(t => t.str())}`);
+    }
     if (is_super_range(this.solution_range.get(dominator_id)!, intersection) && !is_equal_range(this.solution_range.get(dominator_id)!, intersection)) {
       return intersection;
     }
@@ -270,11 +272,13 @@ export class ConstraintDAG<T, V extends Value<T>> {
       throw new Error(`dominatee_solution_range_should_be_shrinked: rank ${rank} is not supported`);
     }
     const intersection = this.solution_range.get(dominatee_id)!.filter(t => minimum_solution_range_of_dominatee.some(g => g.same(t)));
-    assert(intersection.length > 0,
-      `dominatee_solution_range_should_be_shrinked: intersection is empty
+    if (intersection.length === 0) {
+      this.draw_for_debug();
+      throw new Error(`dominatee_solution_range_should_be_shrinked: intersection is empty
        dominator_id: ${dominator_id}, solution_range is ${this.solution_range.get(dominator_id)!.map(t => t.str())}
        dominatee_id: ${dominatee_id}, solution_range is ${this.solution_range.get(dominatee_id)!.map(t => t.str())}
-       minimum_solution_range_of_dominatee: ${minimum_solution_range_of_dominatee.map(t => t.str())}`);
+       minimum_solution_range_of_dominatee: ${minimum_solution_range_of_dominatee.map(t => t.str())}`)
+    }
     if (is_super_range(this.solution_range.get(dominatee_id)!, intersection) && !is_equal_range(this.solution_range.get(dominatee_id)!, intersection)) {
       return intersection;
     }

@@ -903,6 +903,7 @@ class MappingDeclarationGenerator extends DeclarationGenerator {
   }
 
   private generate_initializer() {
+    Log.log(`${" ".repeat(indent)}MappingDeclarationGenerator: generate_initializer`)
     let initializer : expr.IRExpression | undefined;
     if (this.initializable()) {
       let generate_identifier_for_initialziation = () => {
@@ -1015,6 +1016,7 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
   }
 
   private generate_initializer() {
+    Log.log(`${" ".repeat(indent)}ArrayDeclarationGenerator: generate_initializer`)
     let initializer : expr.IRExpression | undefined;
     if (this.initializable()) {
       let generate_identifier_for_initialziation = () => {
@@ -1235,6 +1237,7 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
   }
 
   private generate_initializer() {
+    Log.log(`${" ".repeat(indent)}StructInstanceDeclarationGenerator: generate_initializer`)
     let initializer : expr.IRExpression | undefined;
     assert(this.irnode !== undefined, `StructInstanceDeclarationGenerator: this.irnode is undefined`);
     assert(this.struct_id !== undefined, `StructInstanceDeclarationGenerator: this.struct_id is undefined`);
@@ -1454,6 +1457,7 @@ class StringDeclarationGenerator extends DeclarationGenerator {
   }
 
   private generate_initializer() {
+    Log.log(`${" ".repeat(indent)}StringDeclarationGenerator::generate_initializer`);
     let initializer : expr.IRExpression | undefined;
     if (this.initializable()) {
       if (Math.random() < config.literal_prob) {
@@ -1740,6 +1744,7 @@ class ContractInstanceDeclarationGenerator extends DeclarationGenerator {
   }
 
   private generate_initializer() {
+    Log.log(`${" ".repeat(indent)}ContractInstanceDeclarationGenerator::generate_initializer`);
     assert(this.irnode !== undefined, `ContractInstanceDeclarationGenerator: this.irnode is undefined`);
     let initializer : expr.IRExpression | undefined;
     if (this.initializable()) {
@@ -1810,6 +1815,7 @@ class ElementaryTypeVariableDeclarationGenerator extends DeclarationGenerator {
   }
 
   private generate_initializer() {
+    Log.log(`${" ".repeat(indent)}ElementaryTypeVariableDeclarationGenerator::generate_initializer`);
     let initializer : expr.IRExpression | undefined;
     if (this.initializable()) {
       if (Math.random() < config.literal_prob) {
@@ -3508,6 +3514,7 @@ class IdentifierGenerator extends ExpressionGenerator {
   Returns: the access expresstion to the vardecl and the ID of outermost variable declaration.
   */
   private generate_expr_when_selected_vardecl_is_a_mapping_value(id : number) : [expr.IRExpression, number | undefined] {
+    Log.log(`${" ".repeat(indent)}>>  Start generating expr when the selected vardecl is a mapping value: ${id}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     let index_access;
     let cur_id = id;
     let this_outermost_vardecl_id;
@@ -3535,10 +3542,12 @@ class IdentifierGenerator extends ExpressionGenerator {
         type_dag.insert(ghost_id, type_range);
         type_dag.connect(ghost_id, key_id, "super");
         type_dag.connect(ghost_id, expr_id);
+        type_dag.solution_range_alignment(ghost_id, expr_id);
         Log.log(`${" ".repeat(indent)}IdentifierGenerator::generate_expr_when_selected_vardecl_is_a_mapping_value: ghost_id: ${ghost_id}, expr_id: ${expr_id}, key_id: ${key_id}`);
       }
       else {
         type_dag.connect(expr_id, key_id, "super");
+        type_dag.solution_range_alignment(expr_id, key_id);
       }
       expr_gen.generate(this.cur_expression_complexity_level + 1);
       expr_db.transfer_read_variables(this.id, expr_id);
@@ -3605,6 +3614,7 @@ class IdentifierGenerator extends ExpressionGenerator {
   Returns: the access expresstion to the vardecl and the ID of outermost variable declaration.
   */
   private generate_expr_when_selected_vardecl_is_an_array_element(id : number) : [expr.IRExpression, number | undefined] {
+    Log.log(`${" ".repeat(indent)}>>  Start generating expr when the selected vardecl is an array element: ${id}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     let cur_id = id;
     let index_access : expr.IRExpression | undefined;
     let this_outermost_vardecl_id;
@@ -3723,6 +3733,7 @@ class IdentifierGenerator extends ExpressionGenerator {
   //! decl struct
   //! struct.member
   private generate_a_member_access_using_a_struct_declaration(struct_decl_id : number, member : decl.IRVariableDeclaration) : [expr.IRExpression, number | undefined] {
+    Log.log(`${" ".repeat(indent)}IdentifierGenerator::generate_a_member_access_using_a_struct_declaration: struct_decl_id: ${struct_decl_id}, member: ${member.id}`);
     const struct_instance_decl = this.generate_struct_instance_declaration_stmt(struct_decl_id);
     this.struct_instantiation_id = struct_instance_decl.id;
     assert(storage_location_dag.has_solution_range(struct_instance_decl.id),
@@ -3734,6 +3745,7 @@ class IdentifierGenerator extends ExpressionGenerator {
 
   //! struct(arg1, arg2, ...).member
   private generate_a_member_access_using_a_temporary_struct_instantiation(struct_decl_id : number, member : decl.IRVariableDeclaration) {
+    Log.log(`${" ".repeat(indent)}IdentifierGenerator::generate_a_member_access_using_a_temporary_struct_instantiation: struct_decl_id: ${struct_decl_id}, member: ${member.id}`);
     const nsid = new_global_id();
     type_dag.insert(nsid, type_db.get_struct_type(struct_decl_id));
     const struct_instance_gen = new NewStructGenerator(nsid);
@@ -5440,9 +5452,13 @@ class MultipleVariableDeclareStatementGenerator extends NonExpressionStatementGe
   generate(_ : number) : void {
     this.start_flag();
     this.generate_vardecls();
+    const initializers = this.vardecls.map(v => v.value!);
+    this.vardecls.forEach(v => {
+      v.value = undefined;
+    });
     this.irnode = new stmt.IRVariableDeclarationStatement(new_global_id(), cur_scope.id(),
-      this.vardecls, new expr.IRTuple(new_global_id(), cur_scope.id(), this.vardecls.map(v => v.value!)));
-    this.exprs = this.vardecls.map(v => v.value!);
+      this.vardecls, new expr.IRTuple(new_global_id(), cur_scope.id(), initializers));
+    this.exprs = initializers;
     (this.irnode as stmt.IRStatement).exprs = this.exprs;
     this.end_flag();
   }

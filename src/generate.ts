@@ -470,14 +470,22 @@ export async function generate() {
     type_dag.verify();
     vismut_dag.verify();
     storage_location_dag.verify();
-    if (config.mode === "type") {
-      generate_type_mode(source_unit);
+    try {
+      if (config.mode === "type") {
+        generate_type_mode(source_unit);
+      }
+      else if (config.mode === "scope") {
+        generate_scope_mode(source_unit);
+      }
+      else if (config.mode === "loc") {
+        generate_loc_mode(source_unit);
+      }
     }
-    else if (config.mode === "scope") {
-      generate_scope_mode(source_unit);
-    }
-    else if (config.mode === "loc") {
-      generate_loc_mode(source_unit);
+    catch (err) {
+      console.error(err);
+      if (config.terminate_on_failure) {
+        process.exit(1);
+      }
     }
     if (config.enable_test) {
       if (config.target === "solidity") {
