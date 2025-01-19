@@ -97,8 +97,8 @@ Misbehavior-triggering test programs will be moved to `test_results`.
 18. https://github.com/ethereum/solidity/issues/15646 (error handling) ✅
 19. https://github.com/ethereum/solidity/issues/15647 (ICE, smt) ✅
 20. https://github.com/ethereum/solidity/issues/15649 (ICE)
-21. https://github.com/ethereum/solidity/issues/15651 (ICE)
-22. https://github.com/crytic/slither/issues/2619 (hang)
+21. https://github.com/ethereum/solidity/issues/15651 (ICE) ✅
+22. https://github.com/crytic/slither/issues/2619 (hang) ✅
 23. https://github.com/hyperledger-solang/solang/issues/1687 (ICE)
 24. https://github.com/hyperledger-solang/solang/issues/1688 (error handling)
 25. https://github.com/hyperledger-solang/solang/issues/1689 (ICE)
