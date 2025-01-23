@@ -1,4 +1,4 @@
-import { assert, pick_random_element, random_int, merge_set, intersection, cartesian_product, select_random_elements } from "./utility";
+import { assert, pick_random_element, random_int, merge_set, cartesian_product, select_random_elements } from "./utility";
 import { IRNode, IRSourceUnit } from "./node";
 import * as expr from "./expression";
 import * as decl from "./declaration";
@@ -764,13 +764,16 @@ class MappingDeclarationGenerator extends DeclarationGenerator {
   type_range : type.Type[];
   must_be_in_contract_scope : boolean;
   cur_type_complexity_level : number;
+  varid : number | undefined;
 
   constructor(cur_type_complexity_level : number, type_range : type.Type[],
-    must_be_in_contract_scope : boolean = false, must_be_initialized : boolean = false) {
+    must_be_in_contract_scope : boolean = false, must_be_initialized : boolean = false,
+    varid ?: number) {
     super(must_be_initialized);
     this.cur_type_complexity_level = cur_type_complexity_level;
     this.type_range = type_range;
     this.must_be_in_contract_scope = must_be_in_contract_scope;
+    this.varid = varid;
   }
 
   private extract_key_value_type_range_from_mapping_type_range(type_range : type.Type[]) {
@@ -839,7 +842,8 @@ class MappingDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag(mappingid : number) {
-    Log.log(`${" ".repeat(indent)}>>  Start generating Mapping Declaration, scope: (${cur_scope.kind()}, ${cur_scope.id()}), id: ${mappingid}`)
+    const type_range_str = generate_type_range_str(this.type_range);
+    Log.log(`${" ".repeat(indent)}>>  Start generating Mapping Declaration, scope: (${cur_scope.kind()}, ${cur_scope.id()}), id: ${mappingid}, type range: ${type_range_str}, storage loc range: ${storage_location_dag.has_solution_range(mappingid) ? storage_location_dag.solution_range_of(mappingid).map(s => s.str()) : ''}`)
     increase_indent();
   }
 
@@ -878,12 +882,12 @@ class MappingDeclarationGenerator extends DeclarationGenerator {
     if (cur_scope.kind() === scopeKind.CONTRACT ||
       inside_mapping_scope(cur_scope) ||
       inside_array_scope(cur_scope)) {
-      storage_location_dag.insert(mappingid, [
+      storage_location_dag.insert_or_update(mappingid, [
         loc.StorageLocationProvider.storage_ref()
       ]);
     }
     else {
-      storage_location_dag.insert(mappingid, [
+      storage_location_dag.insert_or_update(mappingid, [
         loc.StorageLocationProvider.storage_pointer()
       ]);
     }
@@ -897,13 +901,20 @@ class MappingDeclarationGenerator extends DeclarationGenerator {
   }
 
   private distill_type_range() {
+    if (this.varid) {
+      assert(type_dag.has_solution_range(this.varid),
+        `MappingDeclarationGenerator: node ${this.varid} doesn't have a type solution range`);
+      this.type_range = type_dag.solution_range_of(this.varid)!;
+    }
     assert(this.type_range.some((t) => t.typeName === 'MappingType'),
       `MappingDeclarationGenerator: type_range should contain mapping types, but is ${this.type_range.map(t => t.str())}`);
     this.type_range = this.type_range.filter((t) => t.typeName === 'MappingType' && t !== type.TypeProvider.trivial_mapping());
+    if (this.type_range.length === 0 && this.varid) {
+      type_dag.remove(this.varid);
+    }
   }
 
   private generate_initializer() {
-    Log.log(`${" ".repeat(indent)}MappingDeclarationGenerator: generate_initializer`)
     let initializer : expr.IRExpression | undefined;
     if (this.initializable()) {
       let generate_identifier_for_initialziation = () => {
@@ -921,11 +932,12 @@ class MappingDeclarationGenerator extends DeclarationGenerator {
         while (cur_scope.kind() !== scopeKind.CONTRACT) {
           roll_back_scope();
         }
-        Log.log(`${" ".repeat(indent)}MappingDeclarationGenerator: go back to contract scope`)
+        Log.log(`${" ".repeat(indent)}MappingDeclarationGenerator: go back to contract scope, generate identifier for initialization`)
         generate_identifier_for_initialziation();
         relocate_scope(snapshot);
       }
       else {
+        Log.log(`${" ".repeat(indent)}MappingDeclarationGenerator: generate identifier for initialization`);
         generate_identifier_for_initialziation();
       }
     }
@@ -934,13 +946,13 @@ class MappingDeclarationGenerator extends DeclarationGenerator {
 
   generate() : void {
     this.distill_type_range();
-    const mappingid = new_global_id();
+    const mappingid = this.varid === undefined ? new_global_id() : this.varid;
     const [rollback, scope_snapshot] = this.go_back_to_contract_scope_if_required();
     this.start_flag(mappingid);
     const mapping_name = name_db.generate_name(IDENTIFIER.MAPPING);
     this.irnode = new decl.IRVariableDeclaration(mappingid, cur_scope.id(), mapping_name);
     const [keyid, valueid] = this.generate_key_value();
-    type_dag.insert(mappingid, this.type_range);
+    type_dag.insert_or_update(mappingid, this.type_range);
     decl_db.add_mapping_decl(mappingid, keyid, valueid);
     this.generate_initializer();
     decl_db.set_vardecl_as_nonassignable(mappingid);
@@ -961,16 +973,27 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
   cur_type_complexity_level : number;
   base : IRNode | undefined;
   length : number | undefined;
-  constructor(cur_type_complexity_level : number, type_range : type.Type[], must_be_initialized : boolean = false) {
+  varid : number | undefined;
+  constructor(cur_type_complexity_level : number, type_range : type.Type[],
+    must_be_initialized : boolean = false, varid ?: number) {
     super(must_be_initialized);
     this.type_range = type_range;
     this.cur_type_complexity_level = cur_type_complexity_level;
+    this.varid = varid;
   }
 
   private distill_type_range() {
+    if (this.varid) {
+      assert(type_dag.has_solution_range(this.varid),
+        `ArrayDeclarationGenerator: node ${this.varid} doesn't have a type solution range`);
+      this.type_range = type_dag.solution_range_of(this.varid)!;
+    }
     assert(this.type_range.some((t) => t.typeName === 'ArrayType'),
       `MappingDeclarationGenerator: type_range should contain array types, but is ${this.type_range.map(t => t.str())}`);
     this.type_range = this.type_range.filter((t) => t.typeName === 'ArrayType' && t !== type.TypeProvider.trivial_array());
+    if (this.type_range.length === 0 && this.varid) {
+      type_dag.remove(this.varid);
+    }
   }
 
   private start_flag() {
@@ -1016,7 +1039,6 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
   }
 
   private generate_initializer() {
-    Log.log(`${" ".repeat(indent)}ArrayDeclarationGenerator: generate_initializer`)
     let initializer : expr.IRExpression | undefined;
     if (this.initializable()) {
       let generate_identifier_for_initialziation = () => {
@@ -1024,6 +1046,7 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
         assert(this.irnode !== undefined, `ArrayDeclarationGenerator: this.irnode is undefined`);
         type_dag.insert(nid, type_dag.solution_range_of(this.irnode.id)!);
         type_dag.connect(nid, this.irnode.id, "super");
+        Log.log(`${" ".repeat(indent)}ArrayDeclarationGenerator: generate identifier for initialization`)
         const identifier_gen = new IdentifierGenerator(nid, false);
         identifier_gen.generate(0);
         type_dag.solution_range_alignment(nid, this.irnode.id);
@@ -1040,6 +1063,7 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
         type_dag.insert(ghost_id, type_dag.solution_range_of(this.irnode!.id)!);
         type_dag.connect(ghost_id, this.irnode!.id, "super");
         type_dag.connect(ghost_id, nid);
+        Log.log(`${" ".repeat(indent)}ArrayDeclarationGenerator: generate new dynamic array`)
         const new_dynamic_array_gen = new NewDynamicArrayGenerator(nid);
         new_dynamic_array_gen.generate(0);
         type_dag.solution_range_alignment(ghost_id, nid);
@@ -1078,17 +1102,17 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
     if (inside_struct_decl_scope(cur_scope)) return;
     assert(this.irnode !== undefined, `ArrayDeclarationGenerator: this.irnode is undefined`);
     if (cur_scope.kind() === scopeKind.CONTRACT) {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.storage_ref()
       ]);
     }
     else if (inside_mapping_scope(cur_scope)) {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.storage_ref()
       ]);
     }
     else if (cur_scope.kind() === scopeKind.ARRAY) {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.storage_ref(),
         loc.StorageLocationProvider.storage_pointer(),
         loc.StorageLocationProvider.memory(),
@@ -1096,14 +1120,14 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
       ]);
     }
     else if (cur_scope.kind() === scopeKind.FUNC_PARAMETER) {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.calldata(),
         loc.StorageLocationProvider.memory(),
         loc.StorageLocationProvider.storage_pointer()
       ]);
     }
     else if (cur_scope.kind() === scopeKind.MODIFIER_PARAMETER) {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.calldata(),
         loc.StorageLocationProvider.memory(),
         loc.StorageLocationProvider.storage_pointer()
@@ -1112,7 +1136,7 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
     // External calls turns calldata ret decl into memory,
     // which may lead to troubles. Therefore, Erwin bans it.
     else if (cur_scope.kind() === scopeKind.FUNC_RETURNS) {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.memory(),
         loc.StorageLocationProvider.storage_pointer()
       ]);
@@ -1121,7 +1145,7 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
     }
     else if (cur_scope.kind() === scopeKind.EVENT ||
       cur_scope.kind() === scopeKind.ERROR) {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.memory(),
         loc.StorageLocationProvider.storage_pointer(),
         loc.StorageLocationProvider.storage_ref(),
@@ -1130,12 +1154,12 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
       (this.irnode as decl.IRVariableDeclaration).state = true;
     }
     else if (cur_scope.kind() === scopeKind.CONSTRUCTOR_PARAMETERS) {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.memory()
       ]);
     }
     else {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.calldata(),
         loc.StorageLocationProvider.memory(),
         loc.StorageLocationProvider.storage_pointer()
@@ -1184,7 +1208,7 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
   generate() : void {
     this.distill_type_range();
     this.start_flag();
-    const arrayid = new_global_id();
+    const arrayid = this.varid === undefined ? new_global_id() : this.varid;
     const array_name = name_db.generate_name(IDENTIFIER.ARRAY);
     this.irnode = new decl.IRVariableDeclaration(arrayid, cur_scope.id(), array_name);
     this.generate_length();
@@ -1192,7 +1216,7 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
     this.init_storage_location_range();
     decl_db.add_array_decl(arrayid, this.base!.id);
     this.update_type_range();
-    type_dag.insert(arrayid, this.type_range);
+    type_dag.insert_or_update(arrayid, this.type_range);
     this.generate_initializer();
     if (decl_db.contains_mapping_decl(this.irnode.id)) {
       decl_db.set_vardecl_as_nonassignable(this.irnode.id);
@@ -1212,13 +1236,20 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
 class StructInstanceDeclarationGenerator extends DeclarationGenerator {
   struct_id ? : number;
   type_range : type.Type[];
-  constructor(type_range : type.Type[], struct_id ?: number, must_be_initialized : boolean = false) {
+  varid : number | undefined;
+  constructor(type_range : type.Type[], struct_id ?: number, must_be_initialized : boolean = false, varid ?: number) {
     super(must_be_initialized);
     this.struct_id = struct_id;
     this.type_range = type_range;
+    this.varid = varid;
   }
 
   private distill_type_range() {
+    if (this.varid) {
+      assert(type_dag.has_solution_range(this.varid),
+        `StructInstanceDeclarationGenerator: node ${this.varid} doesn't have a type solution range`);
+      this.type_range = type_dag.solution_range_of(this.varid)!;
+    }
     assert(this.type_range.some((t) => t.typeName === 'StructType'),
       `StructInstanceDeclarationGenerator: type_range should contain struct types, but is ${this.type_range.map(t => t.str())}`);
     this.type_range = this.type_range.filter(t => t.typeName === 'StructType' && type_db.has_type(t));
@@ -1237,7 +1268,6 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
   }
 
   private generate_initializer() {
-    Log.log(`${" ".repeat(indent)}StructInstanceDeclarationGenerator: generate_initializer`)
     let initializer : expr.IRExpression | undefined;
     assert(this.irnode !== undefined, `StructInstanceDeclarationGenerator: this.irnode is undefined`);
     assert(this.struct_id !== undefined, `StructInstanceDeclarationGenerator: this.struct_id is undefined`);
@@ -1270,6 +1300,7 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
         initializer = new_struct_expr_gen.irnode as expr.IRExpression;
       }
       if (!decl_db.contains_mapping_decl(this.struct_id) && Math.random() < config.new_prob) {
+        Log.log(`${" ".repeat(indent)}StructInstanceDeclarationGenerator: generate new struct expression for initialization`);
         generate_new_struct_expression_for_initialization();
       }
       else if (cur_scope.kind() !== scopeKind.CONTRACT && Math.random() < config.init_with_state_var_prob) {
@@ -1277,7 +1308,7 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
         while (cur_scope.kind() !== scopeKind.CONTRACT) {
           roll_back_scope();
         }
-        Log.log(`${" ".repeat(indent)}StructInstanceDeclarationGenerator: go back to contract scope`)
+        Log.log(`${" ".repeat(indent)}StructInstanceDeclarationGenerator: go back to contract scope, generate identifier for initialization`);
         generate_identifier_for_initialziation();
         relocate_scope(snapshot);
       }
@@ -1301,17 +1332,17 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
     if (inside_struct_decl_scope(cur_scope)) return;
     assert(this.irnode !== undefined, `StructInstanceDeclarationGenerator: this.irnode is undefined`);
     if (cur_scope.kind() === scopeKind.CONTRACT) {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.storage_ref()
       ]);
     }
     else if (inside_mapping_scope(cur_scope)) {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.storage_ref()
       ]);
     }
     else if (cur_scope.kind() === scopeKind.ARRAY) {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.storage_ref(),
         loc.StorageLocationProvider.storage_pointer(),
         loc.StorageLocationProvider.memory(),
@@ -1319,21 +1350,21 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
       ]);
     }
     else if (cur_scope.kind() === scopeKind.FUNC_PARAMETER) {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.calldata(),
         loc.StorageLocationProvider.memory(),
         loc.StorageLocationProvider.storage_pointer()
       ]);
     }
     else if (cur_scope.kind() === scopeKind.MODIFIER_PARAMETER) {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.calldata(),
         loc.StorageLocationProvider.memory(),
         loc.StorageLocationProvider.storage_pointer()
       ]);
     }
     else if (cur_scope.kind() === scopeKind.FUNC_RETURNS) {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.memory(),
         loc.StorageLocationProvider.storage_pointer()
       ]);
@@ -1342,7 +1373,7 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
     }
     else if (cur_scope.kind() === scopeKind.EVENT ||
       cur_scope.kind() === scopeKind.ERROR) {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.memory(),
         loc.StorageLocationProvider.storage_pointer(),
         loc.StorageLocationProvider.storage_ref(),
@@ -1351,12 +1382,12 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
       (this.irnode as decl.IRVariableDeclaration).state = true;
     }
     else if (cur_scope.kind() === scopeKind.CONSTRUCTOR_PARAMETERS) {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.memory()
       ]);
     }
     else {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.calldata(),
         loc.StorageLocationProvider.memory(),
         loc.StorageLocationProvider.storage_pointer()
@@ -1418,13 +1449,13 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
 
   generate() : void {
     this.distill_type_range();
-    const thisid = new_global_id();
+    const thisid = this.varid ? this.varid : new_global_id();
     this.start_flag(thisid);
     const struct_instance_name = name_db.generate_name(IDENTIFIER.STRUCT_INSTANCE);
     this.irnode = new decl.IRVariableDeclaration(thisid, cur_scope.id(), struct_instance_name);
     decl_db.pair_struct_instance_with_struct_decl(this.irnode.id, this.struct_id!);
     decl_db.add_struct_instance_decl(this.irnode.id);
-    type_dag.insert(this.irnode.id, this.type_range);
+    type_dag.insert_or_update(this.irnode.id, this.type_range);
     if (decl_db.contains_mapping_decl(this.struct_id!)) {
       decl_db.set_vardecl_as_nonassignable(this.irnode.id);
     }
@@ -1447,8 +1478,10 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
 }
 
 class StringDeclarationGenerator extends DeclarationGenerator {
-  constructor(must_be_initialized : boolean = false) {
+  varid : number | undefined;
+  constructor(must_be_initialized : boolean = false, varid ?: number) {
     super(must_be_initialized);
+    this.varid = varid;
   }
 
   private start_flag() {
@@ -1457,7 +1490,6 @@ class StringDeclarationGenerator extends DeclarationGenerator {
   }
 
   private generate_initializer() {
-    Log.log(`${" ".repeat(indent)}StringDeclarationGenerator::generate_initializer`);
     let initializer : expr.IRExpression | undefined;
     if (this.initializable()) {
       if (Math.random() < config.literal_prob) {
@@ -1482,6 +1514,7 @@ class StringDeclarationGenerator extends DeclarationGenerator {
         type_dag.insert(nid, type_dag.solution_range_of(this.irnode!.id)!);
         type_dag.connect(nid, this.irnode!.id, "super");
         const identifier_gen = new IdentifierGenerator(nid, false);
+        Log.log(`${" ".repeat(indent)}StringDeclarationGenerator: generate identifier for initialization`);
         identifier_gen.generate(0);
         type_dag.solution_range_alignment(nid, this.irnode!.id);
         storage_location_dag.connect(nid, this.irnode!.id, "super");
@@ -1510,17 +1543,17 @@ class StringDeclarationGenerator extends DeclarationGenerator {
     if (inside_struct_decl_scope(cur_scope)) return;
     assert(this.irnode !== undefined, `StringDeclarationGenerator: this.irnode is undefined`);
     if (cur_scope.kind() === scopeKind.CONTRACT) {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.storage_ref()
       ]);
     }
     else if (inside_mapping_scope(cur_scope)) {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.storage_ref()
       ]);
     }
     else if (cur_scope.kind() === scopeKind.ARRAY) {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.storage_ref(),
         loc.StorageLocationProvider.storage_pointer(),
         loc.StorageLocationProvider.memory(),
@@ -1528,14 +1561,14 @@ class StringDeclarationGenerator extends DeclarationGenerator {
       ]);
     }
     else if (cur_scope.kind() === scopeKind.FUNC_PARAMETER) {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.calldata(),
         loc.StorageLocationProvider.memory(),
         loc.StorageLocationProvider.storage_pointer()
       ]);
     }
     else if (cur_scope.kind() === scopeKind.MODIFIER_PARAMETER) {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.calldata(),
         loc.StorageLocationProvider.memory(),
         loc.StorageLocationProvider.storage_pointer()
@@ -1544,7 +1577,7 @@ class StringDeclarationGenerator extends DeclarationGenerator {
     // External calls turns calldata ret decl into memory,
     // which may lead to troubles. Therefore, Erwin bans it.
     else if (cur_scope.kind() === scopeKind.FUNC_RETURNS) {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.memory(),
         loc.StorageLocationProvider.storage_pointer()
       ]);
@@ -1553,7 +1586,7 @@ class StringDeclarationGenerator extends DeclarationGenerator {
     }
     else if (cur_scope.kind() === scopeKind.EVENT ||
       cur_scope.kind() === scopeKind.ERROR) {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.memory(),
         loc.StorageLocationProvider.storage_pointer(),
         loc.StorageLocationProvider.storage_ref(),
@@ -1562,12 +1595,12 @@ class StringDeclarationGenerator extends DeclarationGenerator {
       (this.irnode as decl.IRVariableDeclaration).state = true;
     }
     else if (cur_scope.kind() === scopeKind.CONSTRUCTOR_PARAMETERS) {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.memory()
       ]);
     }
     else {
-      storage_location_dag.insert(this.irnode.id, [
+      storage_location_dag.insert_or_update(this.irnode.id, [
         loc.StorageLocationProvider.calldata(),
         loc.StorageLocationProvider.memory(),
         loc.StorageLocationProvider.storage_pointer()
@@ -1622,12 +1655,12 @@ class StringDeclarationGenerator extends DeclarationGenerator {
 
   generate() : void {
     this.start_flag();
-    const stringid = new_global_id();
+    const stringid = this.varid === undefined ? new_global_id() : this.varid;
     const string_name = name_db.generate_name(IDENTIFIER.VAR);
     this.irnode = new decl.IRVariableDeclaration(stringid, cur_scope.id(), string_name);
     this.init_storage_location_range();
     decl_db.add_stringdecl(stringid);
-    type_dag.insert(this.irnode.id, [type.TypeProvider.string()]);
+    type_dag.insert_or_update(this.irnode.id, [type.TypeProvider.string()]);
     this.generate_initializer();
     decl_db.add_vardecl_with_scope(this.irnode.id, cur_scope);
     this.update_storage_location_range();
@@ -1726,12 +1759,19 @@ class ErrorDeclarationGenerator extends DeclarationGenerator {
 
 class ContractInstanceDeclarationGenerator extends DeclarationGenerator {
   type_range : type.Type[];
-  constructor(type_range : type.Type[], must_be_initialized : boolean = false) {
+  varid : number | undefined;
+  constructor(type_range : type.Type[], must_be_initialized : boolean = false, varid ?: number) {
     super(must_be_initialized);
     this.type_range = type_range;
+    this.varid = varid;
   }
 
   private distill_type_range() {
+    if (this.varid) {
+      assert(type_dag.has_solution_range(this.varid),
+        `ContractInstanceDeclarationGenerator: node ${this.varid} doesn't have type solution range`);
+      this.type_range = type_dag.solution_range_of(this.varid)!;
+    }
     assert(this.type_range.some((t) => t.typeName == 'ContractType'),
       `ContractInstanceDeclarationGenerator: type_range should contain contract types, but is ${this.type_range.map(t => t.str())}`);
     this.type_range = this.type_range.filter((t) => t.typeName == 'ContractType');
@@ -1744,7 +1784,6 @@ class ContractInstanceDeclarationGenerator extends DeclarationGenerator {
   }
 
   private generate_initializer() {
-    Log.log(`${" ".repeat(indent)}ContractInstanceDeclarationGenerator::generate_initializer`);
     assert(this.irnode !== undefined, `ContractInstanceDeclarationGenerator: this.irnode is undefined`);
     let initializer : expr.IRExpression | undefined;
     if (this.initializable()) {
@@ -1754,6 +1793,7 @@ class ContractInstanceDeclarationGenerator extends DeclarationGenerator {
       type_dag.insert(ghost_id, type_dag.solution_range_of(this.irnode!.id)!);
       type_dag.connect(ghost_id, this.irnode!.id, "super");
       type_dag.connect(ghost_id, nid);
+      Log.log(`${" ".repeat(indent)}ContractInstanceDeclarationGenerator::generate_initializer: ghost_id: ${ghost_id}, nid: ${nid}, id: ${this.irnode!.id}`);
       const new_contract_gen = new NewContractGenerator(nid);
       new_contract_gen.generate(0);
       initializer = new_contract_gen.irnode as expr.IRExpression;
@@ -1778,8 +1818,9 @@ class ContractInstanceDeclarationGenerator extends DeclarationGenerator {
     this.distill_type_range();
     this.start_flag();
     const contract_instance_name = name_db.generate_name(IDENTIFIER.CONTRACT_INSTANCE);
-    this.irnode = new decl.IRVariableDeclaration(new_global_id(), cur_scope.id(), contract_instance_name);
-    type_dag.insert(this.irnode.id, this.type_range);
+    const thisid = this.varid === undefined ? new_global_id() : this.varid;
+    this.irnode = new decl.IRVariableDeclaration(thisid, cur_scope.id(), contract_instance_name);
+    type_dag.insert_or_update(this.irnode.id, this.type_range);
     this.generate_initializer();
     this.update_vismut_dag();
     decl_db.add_vardecl_with_scope(this.irnode.id, cur_scope);
@@ -1793,13 +1834,21 @@ class ContractInstanceDeclarationGenerator extends DeclarationGenerator {
 class ElementaryTypeVariableDeclarationGenerator extends DeclarationGenerator {
   type_range : type.Type[];
   name : string | undefined;
-  constructor(type_range : type.Type[], name ?: string, must_be_initialized : boolean = false) {
+  varid : number | undefined;
+  constructor(type_range : type.Type[], name ?: string,
+    must_be_initialized : boolean = false, varid ?: number) {
     super(must_be_initialized);
     this.type_range = type_range;
     this.name = name;
+    this.varid = varid;
   }
 
   private distill_type_range() {
+    if (this.varid) {
+      assert(type_dag.has_solution_range(this.varid),
+        `StructInstanceDeclarationGenerator: node ${this.varid} doesn't have a type solution range`);
+      this.type_range = type_dag.solution_range_of(this.varid)!;
+    }
     this.type_range = this.type_range.filter((t) => t.typeName === 'ElementaryType');
   }
 
@@ -1815,7 +1864,6 @@ class ElementaryTypeVariableDeclarationGenerator extends DeclarationGenerator {
   }
 
   private generate_initializer() {
-    Log.log(`${" ".repeat(indent)}ElementaryTypeVariableDeclarationGenerator::generate_initializer`);
     let initializer : expr.IRExpression | undefined;
     if (this.initializable()) {
       if (Math.random() < config.literal_prob) {
@@ -1832,6 +1880,7 @@ class ElementaryTypeVariableDeclarationGenerator extends DeclarationGenerator {
         initializer = literal_gen.irnode! as expr.IRExpression;
       }
       else {
+        Log.log(`${" ".repeat(indent)}ElementaryTypeVariableDeclarationGenerator::generate_initializer: generate_identifier_for_initialziation`);
         const nid = new_global_id();
         type_dag.insert(nid, type_dag.solution_range_of(this.irnode!.id)!);
         type_dag.connect(nid, this.irnode!.id, "super");
@@ -1853,11 +1902,12 @@ class ElementaryTypeVariableDeclarationGenerator extends DeclarationGenerator {
     this.distill_type_range();
     this.start_flag();
     this.name = name_db.generate_name(IDENTIFIER.VAR);
-    this.irnode = new decl.IRVariableDeclaration(new_global_id(), cur_scope.id(), this.name, undefined, StateVariableVisibility.Default);
+    const thisid = this.varid === undefined ? new_global_id() : this.varid;
+    this.irnode = new decl.IRVariableDeclaration(thisid, cur_scope.id(), this.name, undefined, StateVariableVisibility.Default);
     if (cur_scope.kind() === scopeKind.CONTRACT) {
       (this.irnode as decl.IRVariableDeclaration).state = true;
     }
-    type_dag.insert(this.irnode.id, this.type_range);
+    type_dag.insert_or_update(this.irnode.id, this.type_range);
     this.update_vismut_dag();
     //! First generate initializer, then add the variable declaration to the database
     //! Otherwise, assignment before declaration will be generated.
@@ -1872,14 +1922,17 @@ class VariableDeclarationGenerator extends DeclarationGenerator {
   type_range : type.Type[];
   cur_type_complexity_level : number;
   must_be_initialized : boolean;
+  varid : number | undefined;
   constructor(cur_type_complexity_level : number, type_range : type.Type[],
     must_be_in_contract_scope_if_mapping : boolean = false,
-    must_be_initialized : boolean = false) {
+    must_be_initialized : boolean = false,
+    varid ?: number) {
     super();
     this.cur_type_complexity_level = cur_type_complexity_level;
     this.type_range = type_range;
     this.must_be_in_contract_scope_if_mapping = must_be_in_contract_scope_if_mapping
     this.must_be_initialized = must_be_initialized;
+    this.varid = varid;
   }
 
   private distill_type_range() {
@@ -1924,36 +1977,36 @@ class VariableDeclarationGenerator extends DeclarationGenerator {
     string_type_prob /= prob_sum;
     //! Generate a contract-type variable
     if (can_be_contract && Math.random() < contract_type_prob) {
-      const contract_instance_gen = new ContractInstanceDeclarationGenerator(this.type_range, this.must_be_initialized);
+      const contract_instance_gen = new ContractInstanceDeclarationGenerator(this.type_range, this.must_be_initialized, this.varid);
       contract_instance_gen.generate();
       this.irnode = contract_instance_gen.irnode;
     }
     //! Generate a struct-type variable
     else if (can_be_struct && Math.random() < contract_type_prob + struct_type_prob) {
-      const struct_instance_gen = new StructInstanceDeclarationGenerator(this.type_range, undefined, this.must_be_initialized);
+      const struct_instance_gen = new StructInstanceDeclarationGenerator(this.type_range, undefined, this.must_be_initialized, this.varid);
       struct_instance_gen.generate();
       this.irnode = struct_instance_gen.irnode;
     }
     //! Generate a mapping-type variable
     else if (contain_mapping_types && Math.random() < contract_type_prob + struct_type_prob + mapping_type_prob) {
-      const mapping_gen = new MappingDeclarationGenerator(this.cur_type_complexity_level, this.type_range, this.must_be_in_contract_scope_if_mapping, this.must_be_initialized);
+      const mapping_gen = new MappingDeclarationGenerator(this.cur_type_complexity_level, this.type_range, this.must_be_in_contract_scope_if_mapping, this.must_be_initialized, this.varid);
       mapping_gen.generate();
       this.irnode = mapping_gen.irnode;
     }
     //! Generate a array-type variable
     else if (can_be_array && Math.random() < contract_type_prob + struct_type_prob + mapping_type_prob + array_type_prob) {
-      const array_gen = new ArrayDeclarationGenerator(this.cur_type_complexity_level, this.type_range, this.must_be_initialized);
+      const array_gen = new ArrayDeclarationGenerator(this.cur_type_complexity_level, this.type_range, this.must_be_initialized, this.varid);
       array_gen.generate();
       this.irnode = array_gen.irnode;
     }
     //! Generate a string-type variable
     else if (Math.random() < contract_type_prob + struct_type_prob + mapping_type_prob + array_type_prob + string_type_prob) {
-      const string_gen = new StringDeclarationGenerator(this.must_be_initialized);
+      const string_gen = new StringDeclarationGenerator(this.must_be_initialized, this.varid);
       string_gen.generate(); ``
       this.irnode = string_gen.irnode;
     }
     else {
-      const variable_gen = new ElementaryTypeVariableDeclarationGenerator(this.type_range, undefined, this.must_be_initialized);
+      const variable_gen = new ElementaryTypeVariableDeclarationGenerator(this.type_range, undefined, this.must_be_initialized, this.varid);
       variable_gen.generate();
       this.irnode = variable_gen.irnode;
     }
@@ -3319,6 +3372,7 @@ class IdentifierGenerator extends ExpressionGenerator {
   variable_decl : decl.IRVariableDeclaration | undefined;
   available_vardecl : decl.IRVariableDeclaration[] = [];
   cur_expression_complexity_level : number = 0;
+  generate_new_vardecl : boolean = false;
   //! Since the selected variable may be a struct member, we need to store the instance id of the struct.
   //! In this situation, the identifier is actually a member access from the struct instance.
   //! The instantiation can be a struct instance or a temporary struct expression.
@@ -3341,13 +3395,20 @@ class IdentifierGenerator extends ExpressionGenerator {
   }
 
   private generate_var_decl() : void {
+    this.generate_new_vardecl = true;
     let roll_back = 0;
     let snapshot_scope = cur_scope.snapshot();
     while (unexpected_extra_stmt_belong_to_the_parent_scope(cur_scope)) {
       roll_back += 1;
       roll_back_scope();
     }
-    const variable_decl_gen = new VariableDeclarationGenerator(0, this.type_range, true);
+    const varid = new_global_id();
+    type_dag.insert(varid, this.type_range);
+    type_dag.connect(this.id, varid);
+    if (storage_location_dag.has_solution_range(this.id)) {
+      storage_location_dag.insert(varid, loc.range_of_locs(storage_location_dag.solution_range_of(this.id)!, 'same'));
+    }
+    const variable_decl_gen = new VariableDeclarationGenerator(0, this.type_range, true, false, varid);
     variable_decl_gen.generate();
     this.variable_decl = variable_decl_gen.irnode! as decl.IRVariableDeclaration;
     const variable_decl_stmt = new stmt.IRVariableDeclarationStatement(
@@ -3817,6 +3878,8 @@ class IdentifierGenerator extends ExpressionGenerator {
     let variable_in_struct_decl =
       inside_struct_decl_scope(get_scope_from_scope_id(decl_db.scope_of_irnode(this.variable_decl!.id)));
     if (variable_in_struct_decl && decl_db.qualifed_by_storage_qualifier(this.variable_decl!.id)) {
+      assert(this.generate_new_vardecl === false,
+        `IdentifierGenerator: this.generate_a_new_var_decl is true when the variable is qualified by storage`);
       assert(this.struct_instantiation_id !== undefined, `IdentifierGenerator: this.struct_instantiation_id is undefined`);
       assert(!storage_location_dag.has_solution_range(this.variable_decl!.id),
         `IdentifierGenerator: storage_location_dag.solution_range has ${this.variable_decl!.id}`);
@@ -3834,6 +3897,9 @@ class IdentifierGenerator extends ExpressionGenerator {
       storage_location_dag.connect(this.id, ghost_member_id);
     }
     else if (storage_location_dag.has_solution_range(this.variable_decl!.id)) {
+      if (!this.generate_new_vardecl && storage_location_dag.has_solution_range(this.id)) {
+        storage_location_dag.connect(this.id, this.variable_decl!.id);
+      }
       if (storage_location_dag.has_solution_range(this.id)) {
         storage_location_dag.update(this.id,
           loc.range_of_locs(storage_location_dag.solution_range.get(this.variable_decl!.id)!, 'same')
@@ -3844,7 +3910,6 @@ class IdentifierGenerator extends ExpressionGenerator {
           loc.range_of_locs(storage_location_dag.solution_range.get(this.variable_decl!.id)!, 'same')
         );
       }
-      storage_location_dag.connect(this.id, this.variable_decl!.id);
     }
   }
 
@@ -3853,7 +3918,9 @@ class IdentifierGenerator extends ExpressionGenerator {
     //! if the type range only contains struct/contract types.
     //! In this branch, variable_decl is undefined.
     if (this.variable_decl !== undefined) {
-      type_dag.connect(this.id, this.variable_decl.id);
+      if (!this.generate_new_vardecl) {
+        type_dag.connect(this.id, this.variable_decl.id);
+      }
       if ((decl_db.is_mapping_decl(this.variable_decl.id) ||
         decl_db.is_array_decl(this.variable_decl.id)) &&
         (type.contains_trivial_mapping(type_dag.solution_range_of(this.id)!) ||
@@ -4009,7 +4076,7 @@ class AssignmentGenerator extends ExpressionGenerator {
       this.type_range = this.type_range.filter(t => !type.contain_mapping_type(t));
     }
     else {
-      this.type_range = [...intersection(new Set<type.Type>(this.type_range), new Set<type.Type>(type.all_integer_types))];
+      this.type_range = intersection_range(this.type_range, type.all_integer_types);
       assert(this.type_range.length > 0, "AssignmentGenerator: type_range is empty");
     }
     if (this.op !== "=") {
@@ -4164,7 +4231,7 @@ class BinaryOpGenerator extends ExpressionGenerator {
 
   private distill_type_range() {
     if (["+", "-", "*", "/", "%", "<<", ">>", "&", "^", "|"].filter((op) => op === this.op).length === 1) {
-      this.type_range = [...intersection(new Set<type.Type>(this.type_range), new Set<type.Type>(type.all_integer_types))]
+      this.type_range = intersection_range(this.type_range, type.all_integer_types);
       assert(this.type_range.length > 0, "BinaryOpGenerator: type_range is empty");
     }
     else if (["<", ">", "<=", ">=", "==", "!="].filter((op) => op === this.op).length === 1) {
@@ -4427,10 +4494,10 @@ class UnaryOpGenerator extends ExpressionGenerator {
       this.type_range = type.bool_types;
     }
     else if (this.op === "~" || this.op === "++" || this.op === "--") {
-      this.type_range = [...intersection(new Set<type.Type>(this.type_range), new Set<type.Type>(type.all_integer_types))]
+      this.type_range = intersection_range(this.type_range, type.all_integer_types);
     }
     else if (this.op === "-") {
-      this.type_range = this.type_range = [...intersection(new Set<type.Type>(this.type_range), new Set<type.Type>(type.integer_types))]
+      this.type_range = intersection_range(this.type_range, type.integer_types);
     }
     else {
       throw new Error(`UnaryOpGenerator constructor: type_range ${this.type_range.map(t => t.str())} is invalid`);

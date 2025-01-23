@@ -1,4 +1,4 @@
-import { assert, intersection, merge_set } from "./utility";
+import { assert, merge_set } from "./utility";
 import { Type, TypeKind, MappingType, ArrayType, TypeProvider } from "./type"
 import * as dot from 'ts-graphviz';
 import { config } from './config'
@@ -10,7 +10,7 @@ import { StorageLocation } from "./loc";
 import { VisMut, VisMutKind } from "./vismut";
 import { LinkedListNode } from "./dataStructor";
 import { decl_db, expr_db } from "./db";
-import { Value, is_equal_range, is_super_range } from "./value";
+import { Value, intersection_range, is_equal_range, is_super_range } from "./value";
 
 /**
  * Stores how a non-leaf constraint node restrains a leaf node.
@@ -153,7 +153,7 @@ export class ConstraintDAG<T, V extends Value<T>> {
   update(nodeid : number, range : V[]) : void {
     assert(this.dag_nodes.has(nodeid), `ConstraintDAG: node ${nodeid} is not in the graph`);
     assert(this.solution_range.has(nodeid), `ConstraintDAG: node ${nodeid} is not in the solution_range`);
-    const intersected_range = [...intersection(new Set<V>(this.solution_range.get(nodeid)), new Set<V>(range))];
+    const intersected_range = intersection_range(this.solution_range.get(nodeid)!, range) as V[];
     assert(intersected_range.length > 0,
       `ConstraintDAG: node ${nodeid} has empty solution range.
        solution_range of ${nodeid} is ${this.solution_range.get(nodeid)!.map(t => t.str())}
@@ -161,6 +161,15 @@ export class ConstraintDAG<T, V extends Value<T>> {
     this.solution_range.set(nodeid, intersected_range);
     if (!is_equal_range(this.solution_range.get(nodeid)!, intersected_range)) {
       this.tighten_solution_range_middle_out(nodeid);
+    }
+  }
+
+  insert_or_update(node : number, range : V[]) : void {
+    if (this.solution_range.has(node)) {
+      this.update(node, range);
+    }
+    else {
+      this.insert(node, range);
     }
   }
 
@@ -236,13 +245,10 @@ export class ConstraintDAG<T, V extends Value<T>> {
       throw new Error(`dominator_solution_range_should_be_shrinked: rank ${rank} is not supported`);
     }
     const intersection = this.solution_range.get(dominator_id)!.filter(t => minimum_solution_range_of_dominator.some(g => g.same(t)));
-    if (intersection.length === 0) {
-      this.draw_for_debug();
-      throw new Error(`dominator_solution_range_should_be_shrinked: intersection is empty
+    assert(intersection.length > 0, `dominator_solution_range_should_be_shrinked: intersection is empty
        dominator_id: ${dominator_id}, solution_range is ${this.solution_range.get(dominator_id)!.map(t => t.str())}
        dominatee_id: ${dominatee_id}, solution_range is ${this.solution_range.get(dominatee_id)!.map(t => t.str())}
        minimum_solution_range_of_dominator: ${minimum_solution_range_of_dominator.map(t => t.str())}`);
-    }
     if (is_super_range(this.solution_range.get(dominator_id)!, intersection) && !is_equal_range(this.solution_range.get(dominator_id)!, intersection)) {
       return intersection;
     }
@@ -272,13 +278,10 @@ export class ConstraintDAG<T, V extends Value<T>> {
       throw new Error(`dominatee_solution_range_should_be_shrinked: rank ${rank} is not supported`);
     }
     const intersection = this.solution_range.get(dominatee_id)!.filter(t => minimum_solution_range_of_dominatee.some(g => g.same(t)));
-    if (intersection.length === 0) {
-      this.draw_for_debug();
-      throw new Error(`dominatee_solution_range_should_be_shrinked: intersection is empty
+    assert(intersection.length > 0, `dominatee_solution_range_should_be_shrinked: intersection is empty
        dominator_id: ${dominator_id}, solution_range is ${this.solution_range.get(dominator_id)!.map(t => t.str())}
        dominatee_id: ${dominatee_id}, solution_range is ${this.solution_range.get(dominatee_id)!.map(t => t.str())}
-       minimum_solution_range_of_dominatee: ${minimum_solution_range_of_dominatee.map(t => t.str())}`)
-    }
+       minimum_solution_range_of_dominatee: ${minimum_solution_range_of_dominatee.map(t => t.str())}`);
     if (is_super_range(this.solution_range.get(dominatee_id)!, intersection) && !is_equal_range(this.solution_range.get(dominatee_id)!, intersection)) {
       return intersection;
     }
@@ -1931,6 +1934,7 @@ export class TypeConstraintDAG extends ConstraintDAG<TypeKind, Type> {
   }
 }
 export class StorageLocationConstraintDAG extends ConstraintDAG<DataLocation, StorageLocation> {
+
   protected async draw_for_debug() : Promise<void> {
     await this.draw("./storage_constraint.svg");
   }
