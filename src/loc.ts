@@ -26,6 +26,9 @@ export class StoragePointer extends StorageLocation {
   same(t : StorageLocation) : boolean {
     return t instanceof StoragePointer || t instanceof StorageRef;
   }
+  exactly_same(t : Value<DataLocation>) : boolean {
+    return t instanceof StoragePointer;
+  }
   copy() : StorageLocation {
     return new StoragePointer();
   }
@@ -55,6 +58,9 @@ export class StorageRef extends StorageLocation {
   }
   same(t : StorageLocation) : boolean {
     return t instanceof StorageRef || t instanceof StoragePointer;
+  }
+  exactly_same(t : Value<DataLocation>) : boolean {
+    return t instanceof StorageRef;
   }
   copy() : StorageLocation {
     return new StorageRef();

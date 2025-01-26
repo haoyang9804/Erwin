@@ -182,9 +182,9 @@ export class ConstraintDAG<T, V extends Value<T>> {
   }
 
   connect(from : number, to : number, rank ?: string) : void {
-    if (this.check_connection(from, to)) return;
     assert(this.dag_nodes.has(from), `ConstraintDAG: node ${from} is not in the graph`);
     assert(this.dag_nodes.has(to), `ConstraintDAG: node ${to} is not in the graph`);
+    if (this.check_connection(from, to)) return;
     if (from === to) return;
     this.dag_nodes.get(to)!.ins.push(from);
     this.dag_nodes.get(from)!.outs.push(to);
@@ -751,10 +751,10 @@ export class ConstraintDAG<T, V extends Value<T>> {
           if (this.leaves_sub.has(j2i) && !jnode.is_super_of(inode)) {
             return false;
           }
-          if (this.leaves_same.has(i2j) && !inode.is_the_same_as(jnode)) {
+          if (this.leaves_same.has(i2j) && !inode.same(jnode)) {
             return false;
           }
-          if (this.leaves_same.has(j2i) && !jnode.is_the_same_as(inode)) {
+          if (this.leaves_same.has(j2i) && !jnode.same(inode)) {
             return false;
           }
           if (this.leaves_equal.has(i2j) && !inode.is_equivalent_of(jnode)) {
@@ -825,7 +825,7 @@ export class ConstraintDAG<T, V extends Value<T>> {
           else {
             let leave_solution_range_node = narrowed_solution_range.get(leave_array[j])!;
             const leave_solution_range = leave_solution_range_node.value().filter(
-              t => solution.is_the_same_as(t)
+              t => solution.same(t)
             );
             leave_solution_range_node = leave_solution_range_node.new(leave_solution_range);
             narrowed_solution_range.set(leave_array[j], leave_solution_range_node);
@@ -1221,7 +1221,7 @@ export class ConstraintDAG<T, V extends Value<T>> {
         if (!solutions.has(parseInt(leaf1)) || !solutions.has(parseInt(leaf2))) continue;
         const node1 = solutions.get(parseInt(leaf1))!;
         const node2 = solutions.get(parseInt(leaf2))!;
-        assert(node1.is_the_same_as(node2),
+        assert(node1.same(node2),
           `ConstraintDAG::Verify: same constraint is not satisfied: ${leaf1} of ${node1.str()} --> ${leaf2} of ${node2.str()}.
           Here are solutions to all nodes:\n${[...solutions].sort((a, b) => a[0] - b[0]).map(([id, t]) => `${id}: ${t.str()}`).join("\n")}`);
       }
@@ -1948,7 +1948,7 @@ export class StorageLocationConstraintDAG extends ConstraintDAG<DataLocation, St
 
   protected remove_irrelevant_leaves() : void {
     this.leaves.forEach(leaf => {
-      if (expr_db.is_literal(leaf)) {
+      if (expr_db.is_literal(leaf) && !expr_db.is_string_expr(leaf)) {
         this.leaves.delete(leaf);
         for (const edge of this.leaves_same) {
           const [leaf1, leaf2] = edge.split(" ");

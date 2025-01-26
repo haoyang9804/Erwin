@@ -121,13 +121,13 @@ function update_storage_loc_range_for_compound_type(id : number, struct_instanti
   }
   else if (decl_db.is_struct_instance_decl(id)) {
     const members = decl_db.members_of_struct_instance(id);
+    const bridge_id = new_global_id();
     members.forEach((member) => {
       if (decl_db.qualifed_by_storage_qualifier(member)) {
         if (ghost_id === -1) {
           const member_ghost_id = new_global_id();
           storage_location_dag.insert(member_ghost_id,
             loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'same'));
-          const bridge_id = new_global_id();
           storage_location_dag.insert(bridge_id,
             loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'same'));
           storage_location_dag.connect(bridge_id, id);
@@ -142,7 +142,6 @@ function update_storage_loc_range_for_compound_type(id : number, struct_instanti
           assert(struct_instantiation_id !== -1,
             `update_storage_loc_range_for_compound_type: struct_instantiation_id is -1 but ghost_id is not -1`);
           const member_ghost_id = new_global_id();
-          const bridge_id = new_global_id();
           storage_location_dag.insert(member_ghost_id,
             loc.range_of_locs(storage_location_dag.solution_range_of(ghost_id)!, 'same'));
           storage_location_dag.insert(bridge_id,
@@ -158,14 +157,18 @@ function update_storage_loc_range_for_compound_type(id : number, struct_instanti
   }
   else if (expr_db.is_new_struct_expr(id)) {
     const members = expr_db.members_of_new_struct_expr(id);
+    const bridge_id = new_global_id();
     members.forEach((member) => {
       if (decl_db.qualifed_by_storage_qualifier(member)) {
         const member_ghost_id = new_global_id();
         storage_location_dag.insert(member_ghost_id,
           loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'same'));
-        storage_location_dag.connect(id, member_ghost_id);
+        storage_location_dag.insert(bridge_id,
+          loc.range_of_locs(storage_location_dag.solution_range_of(id)!, 'same'));
+        storage_location_dag.connect(bridge_id, id);
+        storage_location_dag.connect(bridge_id, member_ghost_id);
         update_ghost_members_of_struct_instantiation(id, member, member_ghost_id);
-        Log.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: member id: ${member}, struct expr id: ${id}, member ghost id: ${member_ghost_id}`);
+        Log.log(`${" ".repeat(indent)}update_storage_loc_range_for_compound_type: bridge id: ${bridge_id}, member id: ${member}, struct expr id: ${id}, member ghost id: ${member_ghost_id}`);
         update_storage_loc_range_for_compound_type(member, id, member_ghost_id);
       }
     });
@@ -997,7 +1000,7 @@ class ArrayDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag() {
-    Log.log(`${" ".repeat(indent)}>>  Start generating Array Declaration, scope: (${cur_scope.kind()}, ${cur_scope.id()}), type range: ${generate_type_range_str(this.type_range)}`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating Array Declaration, scope: (${cur_scope.kind()}, ${cur_scope.id()}), type range: ${generate_type_range_str(this.type_range)}, storage loc range: ${this.varid === undefined ? "" : storage_location_dag.has_solution_range(this.varid) ? storage_location_dag.solution_range_of(this.varid).map(t => t.str()) : ""}`)
     increase_indent();
   }
 
@@ -1263,7 +1266,7 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag(id : number) {
-    Log.log(`${" ".repeat(indent)}>>  Start generating Struct Instance Declaration ${id}, type_range: ${this.type_range.map(t => t.str())}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating Struct Instance Declaration ${id}, type range: ${generate_type_range_str(this.type_range)}, storage loc range: ${this.varid === undefined ? "" : storage_location_dag.has_solution_range(this.varid) ? storage_location_dag.solution_range_of(this.varid).map(t => t.str()) : ""}, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
     increase_indent();
   }
 
@@ -1279,8 +1282,17 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
         const identifier_gen = new IdentifierGenerator(nid, false);
         identifier_gen.generate(0);
         type_dag.solution_range_alignment(nid, this.irnode!.id);
-        storage_location_dag.connect(nid, this.irnode!.id, "super");
-        storage_location_dag.solution_range_alignment(nid, this.irnode!.id);
+        if (expr_db.is_new_struct_expr(nid)) {
+          const ghost_id = new_global_id();
+          storage_location_dag.insert(ghost_id, storage_location_dag.solution_range_of(this.irnode!.id)!);
+          storage_location_dag.connect(ghost_id, this.irnode!.id, "super");
+          storage_location_dag.connect(ghost_id, nid);
+          storage_location_dag.solution_range_alignment(ghost_id, nid);
+        }
+        else {
+          storage_location_dag.connect(nid, this.irnode!.id, "super");
+          storage_location_dag.solution_range_alignment(nid, this.irnode!.id);
+        }
         initializer = identifier_gen.irnode as expr.IRExpression;
       };
       let generate_new_struct_expression_for_initialization = () => {
@@ -1322,7 +1334,7 @@ class StructInstanceDeclarationGenerator extends DeclarationGenerator {
   private end_flag(struct_instance_name : string) {
     assert(this.irnode !== undefined, `StructInstanceDeclarationGenerator: this.irnode is undefined`);
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}${this.irnode.id}: Struct Instance Declaration, name: ${struct_instance_name} scope: (${cur_scope.kind()}, ${cur_scope.id()}), type: ${type_dag.solution_range_of(this.irnode.id)!.map(t => t.str())}, storage loc range: ${storage_location_dag.has_solution_range(this.irnode.id) ? storage_location_dag.solution_range_of(this.irnode.id).map(s => s.str()) : ""}`)
+    Log.log(`${" ".repeat(indent)}${this.irnode.id}: Struct Instance Declaration, name: ${struct_instance_name} scope: (${cur_scope.kind()}, ${cur_scope.id()}), type range: ${generate_type_range_str(type_dag.solution_range_of(this.irnode.id)!)}, storage loc range: ${storage_location_dag.has_solution_range(this.irnode.id) ? storage_location_dag.solution_range_of(this.irnode.id).map(s => s.str()) : ""}`)
   }
 
   private init_storage_location_range() {
@@ -1485,7 +1497,7 @@ class StringDeclarationGenerator extends DeclarationGenerator {
   }
 
   private start_flag() {
-    Log.log(`${" ".repeat(indent)}>>  Start generating String Declaration, scope: (${cur_scope.kind()}, ${cur_scope.id()})`)
+    Log.log(`${" ".repeat(indent)}>>  Start generating String Declaration, scope: (${cur_scope.kind()}, ${cur_scope.id()}), storage loc range: ${this.varid === undefined ? "" : storage_location_dag.has_solution_range(this.varid) ? storage_location_dag.solution_range_of(this.varid).map(t => t.str()) : ""}`)
     increase_indent();
   }
 
@@ -1533,7 +1545,7 @@ class StringDeclarationGenerator extends DeclarationGenerator {
 
   private end_flag(name : string) {
     decrease_indent();
-    Log.log(`${" ".repeat(indent)}${this.irnode!.id}: String Declaration, name: ${name}, scope: (${cur_scope.kind()}, ${cur_scope.id()}), type: ${type_dag.solution_range_of(this.irnode!.id)!.map(t => t.str())}, storage loc range: ${storage_location_dag.has_solution_range(this.irnode!.id) ? storage_location_dag.solution_range_of(this.irnode!.id).map(s => s.str()) : ""}`)
+    Log.log(`${" ".repeat(indent)}${this.irnode!.id}: String Declaration, name: ${name}, scope: (${cur_scope.kind()}, ${cur_scope.id()}), type range: ${type_dag.solution_range_of(this.irnode!.id)!.map(t => t.str())}, storage loc range: ${storage_location_dag.has_solution_range(this.irnode!.id) ? storage_location_dag.solution_range_of(this.irnode!.id).map(s => s.str()) : ""}`)
   }
 
   private init_storage_location_range() {
@@ -1622,7 +1634,6 @@ class StringDeclarationGenerator extends DeclarationGenerator {
       assert(storage_location_dag.has_solution_range(this.irnode.id),
         `StringDeclarationGenerator: storage_location_dag.has_solution_range(${this.irnode.id}) is false`);
       const initializer_id = expr.tuple_extraction((this.irnode as decl.IRVariableDeclaration).value!).id;
-      storage_location_dag.connect(initializer_id, this.irnode.id, "super");
       storage_location_dag.solution_range_alignment(initializer_id, this.irnode.id);
     }
   }
@@ -1899,6 +1910,9 @@ class ElementaryTypeVariableDeclarationGenerator extends DeclarationGenerator {
   }
 
   generate() : void {
+    if (this.varid && storage_location_dag.has_solution_range(this.varid)) {
+      storage_location_dag.remove(this.varid!);
+    }
     this.distill_type_range();
     this.start_flag();
     this.name = name_db.generate_name(IDENTIFIER.VAR);
@@ -3407,6 +3421,7 @@ class IdentifierGenerator extends ExpressionGenerator {
     type_dag.connect(this.id, varid);
     if (storage_location_dag.has_solution_range(this.id)) {
       storage_location_dag.insert(varid, loc.range_of_locs(storage_location_dag.solution_range_of(this.id)!, 'same'));
+      storage_location_dag.connect(this.id, varid);
     }
     const variable_decl_gen = new VariableDeclarationGenerator(0, this.type_range, true, false, varid);
     variable_decl_gen.generate();
@@ -3897,19 +3912,13 @@ class IdentifierGenerator extends ExpressionGenerator {
       storage_location_dag.connect(this.id, ghost_member_id);
     }
     else if (storage_location_dag.has_solution_range(this.variable_decl!.id)) {
-      if (!this.generate_new_vardecl && storage_location_dag.has_solution_range(this.id)) {
-        storage_location_dag.connect(this.id, this.variable_decl!.id);
-      }
-      if (storage_location_dag.has_solution_range(this.id)) {
-        storage_location_dag.update(this.id,
-          loc.range_of_locs(storage_location_dag.solution_range.get(this.variable_decl!.id)!, 'same')
-        );
-      }
-      else {
+      if (!storage_location_dag.has_solution_range(this.id)) {
         storage_location_dag.insert(this.id,
           loc.range_of_locs(storage_location_dag.solution_range.get(this.variable_decl!.id)!, 'same')
         );
       }
+      storage_location_dag.connect(this.id, this.variable_decl!.id);
+      storage_location_dag.solution_range_alignment(this.id, this.variable_decl!.id);
     }
   }
 
@@ -4599,11 +4608,10 @@ class ConditionalGenerator extends ExpressionGenerator {
     const e3_storage_range = storage_location_dag.has_solution_range(e3id) ?
       storage_location_dag.solution_range_of(e3id)! : [];
     if (e3_storage_range.length > 0) {
-      storage_location_dag.insert(this.id, loc.range_of_locs(e3_storage_range, "sub"));
+      storage_location_dag.insert_or_update(this.id, loc.range_of_locs(e3_storage_range, "sub"));
       storage_location_dag.connect(this.id, e3id, "sub");
-      storage_location_dag.insert(e2id, loc.range_of_locs(storage_location_dag.solution_range_of(this.id), 'same'));
+      storage_location_dag.insert_or_update(e2id, loc.range_of_locs(storage_location_dag.solution_range_of(this.id), 'same'));
       storage_location_dag.connect(this.id, e2id);
-      storage_location_dag.update(e2id, loc.range_of_locs(e3_storage_range, "sub"));
       storage_location_dag.solution_range_alignment(this.id, e3id);
     }
     const e2_gen_prototype = get_exprgenerator(type_dag.solution_range_of(e2id)!,
