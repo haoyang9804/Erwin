@@ -1375,7 +1375,7 @@ class TypeDB {
     this.contract_types.clear();
     this.internal_struct_types.clear();
     this.internal_struct_type_to_external_struct_type.clear();
-    this.user_defined_types = []
+    this.user_defined_types = [];
   }
 
   public remove_internal_struct_types() : void {

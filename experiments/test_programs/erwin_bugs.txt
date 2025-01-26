@@ -12,3 +12,4 @@ Bug 11341 -> Formal Verification Error
 Bug 9134 -> Type System Error
 Bug 8971 -> Formal Verification Error
 Bug 8947 -> Memory-Related Error
+Bug 8210 -> Code Generation Error

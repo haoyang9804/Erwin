@@ -2014,7 +2014,7 @@ class VariableDeclarationGenerator extends DeclarationGenerator {
       this.irnode = array_gen.irnode;
     }
     //! Generate a string-type variable
-    else if (Math.random() < contract_type_prob + struct_type_prob + mapping_type_prob + array_type_prob + string_type_prob) {
+    else if (can_be_string && Math.random() < contract_type_prob + struct_type_prob + mapping_type_prob + array_type_prob + string_type_prob) {
       const string_gen = new StringDeclarationGenerator(this.must_be_initialized, this.varid);
       string_gen.generate(); ``
       this.irnode = string_gen.irnode;
