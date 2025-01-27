@@ -549,7 +549,7 @@ function get_stmtgenerator(cur_stmt_complex_level : number = -1) : any {
   if (get_eventdecls().length === 0) {
     generator_candidates.delete(EmitStatementGenerator);
   }
-  if (get_errordecls().length === 0) {
+  if (get_errordecls().length === 0 && !type_db.has_type(type.TypeProvider.string())) {
     generator_candidates.delete(RevertStatementGenerator);
   }
   let generator_candidates_array = Array.from(generator_candidates);
@@ -5320,25 +5320,37 @@ class RevertExpressionGenerator extends ExpressionGenerator {
   generate(cur_expression_complexity_level : number) : void {
     this.start_flag();
     const contractdecl_id_plus_errordecl_id = get_errordecls();
-    let [contractdecl_id, errordecl_id] = pick_random_element(contractdecl_id_plus_errordecl_id)!;
-    if (contractdecl_id < 0) {
-      contractdecl_id = -contractdecl_id;
+    if (contractdecl_id_plus_errordecl_id.length === 0) {
+      const arg_type_range = [type.TypeProvider.string()];
+      const expr_gen_prototype = get_exprgenerator(arg_type_range);
+      const eid = new_global_id();
+      type_dag.insert(eid, arg_type_range);
+      const expr_gen = new expr_gen_prototype(eid);
+      expr_gen.generate(0);
+      const error_identifier = new expr.IRIdentifier(new_global_id(), cur_scope.id(), "", -1);
+      this.irnode = new expr.IRFunctionCall(this.id, cur_scope.id(), FunctionCallKind.FunctionCall, error_identifier, [expr_gen.irnode! as expr.IRExpression]);
     }
-    const cur_contract_id = decl_db.get_current_contractdecl_id(cur_scope);
-    const error_decl = irnodes.get(errordecl_id)! as decl.IRErrorDefinition;
-    const contract_decl = irnodes.get(contractdecl_id)! as decl.IRContractDefinition;
-    const name = cur_contract_id === contractdecl_id ?
-      Math.random() < 0.5 ? error_decl.name : contract_decl.name + "." + error_decl.name :
-      contract_decl.name + "." + error_decl.name;
-    const args_ids = generate_argument_from_parameters(cur_expression_complexity_level + 1, error_decl.parameters);
-    const args = args_ids.map(i => irnodes.get(i)! as expr.IRExpression);
-    const error_identifier = new expr.IRIdentifier(new_global_id(), cur_scope.id(), name, errordecl_id);
-    expr_db.expr_reads_variable(this.id, errordecl_id);
-    expr_db.expr_writes_variable(this.id, errordecl_id);
-    args_ids.forEach(arg_id => {
-      expr_db.transfer_read_variables(this.id, arg_id);
-    });
-    this.irnode = new expr.IRFunctionCall(this.id, cur_scope.id(), FunctionCallKind.FunctionCall, error_identifier, args);
+    else { 
+      let [contractdecl_id, errordecl_id] = pick_random_element(contractdecl_id_plus_errordecl_id)!;
+      if (contractdecl_id < 0) {
+        contractdecl_id = -contractdecl_id;
+      }
+      const cur_contract_id = decl_db.get_current_contractdecl_id(cur_scope);
+      const error_decl = irnodes.get(errordecl_id)! as decl.IRErrorDefinition;
+      const contract_decl = irnodes.get(contractdecl_id)! as decl.IRContractDefinition;
+      const name = cur_contract_id === contractdecl_id ?
+        Math.random() < 0.5 ? error_decl.name : contract_decl.name + "." + error_decl.name :
+        contract_decl.name + "." + error_decl.name;
+      const args_ids = generate_argument_from_parameters(cur_expression_complexity_level + 1, error_decl.parameters);
+      const args = args_ids.map(i => irnodes.get(i)! as expr.IRExpression);
+      const error_identifier = new expr.IRIdentifier(new_global_id(), cur_scope.id(), name, errordecl_id);
+      expr_db.expr_reads_variable(this.id, errordecl_id);
+      expr_db.expr_writes_variable(this.id, errordecl_id);
+      args_ids.forEach(arg_id => {
+        expr_db.transfer_read_variables(this.id, arg_id);
+      });
+      this.irnode = new expr.IRFunctionCall(this.id, cur_scope.id(), FunctionCallKind.FunctionCall, error_identifier, args);
+    }
     this.end_flag();
   }
 }

@@ -13,3 +13,5 @@ Bug 9134 -> Type System Error
 Bug 8971 -> Formal Verification Error
 Bug 8947 -> Memory-Related Error
 Bug 8210 -> Code Generation Error
+Bug 3414 -> Semantic Analysis Error
+Bug 5501 -> Memory-Related Error

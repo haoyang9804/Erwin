@@ -58,8 +58,8 @@ plt.text(0.5, -0.1, f"Total Unique Lines Covered: {total_lines}",
 plt.tight_layout()
 
 # Save figures
-plt.savefig('./coverages/linecov_difference_erwin_unittest.pdf', format='pdf', dpi=300, bbox_inches='tight')
-plt.savefig('./coverages/linecov_difference_erwin_unittest.svg', format='svg', dpi=300, bbox_inches='tight')
+plt.savefig('./diagrams/linecov_difference_erwin_unittest.pdf', format='pdf', dpi=300, bbox_inches='tight')
+plt.savefig('./diagrams/linecov_difference_erwin_unittest.svg', format='svg', dpi=300, bbox_inches='tight')
 
 plt = plt.figure(figsize=(10, 7))
 
@@ -92,5 +92,5 @@ total_lines = len(lines_unittest.union(lines_gen50_0).union(lines_acf))
 plt.text(0.5, -0.1, f"Total Unique Lines Covered: {total_lines}", 
          ha='center', va='center', transform=plt.gca().transAxes, fontsize=14)
 plt.tight_layout()
-plt.savefig('./coverages/linecov_difference_erwin_unittest_acf.pdf', format='pdf', dpi=300, bbox_inches='tight')
-plt.savefig('./coverages/linecov_difference_erwin_unittest_acf.svg', format='svg', dpi=300, bbox_inches='tight')
+plt.savefig('./diagrams/linecov_difference_erwin_unittest_acf.pdf', format='pdf', dpi=300, bbox_inches='tight')
+plt.savefig('./diagrams/linecov_difference_erwin_unittest_acf.svg', format='svg', dpi=300, bbox_inches='tight')

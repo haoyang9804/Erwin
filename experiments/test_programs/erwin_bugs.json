@@ -2,11 +2,15 @@
   "0.4.14": {},
   "0.4.17": {},
   "0.4.19": {},
-  "0.4.20": {},
+  "0.4.20": {
+    "program_2025-1-17_12:8:4:405_0.sol": "Internal compiler error during compilation:\n/solidity/libsolidity/codegen/CompilerUtils.cpp(726): Throw in function void dev::solidity::CompilerUtils::convertType(const dev::solidity::Type&, const dev::solidity::Type&, bool, bool, bool)\nDynamic exception type: boost::exception_detail::clone_impl<dev::solidity::InternalCompilerError>\nstd::exception::what:\n[dev::tag_comment*] ="
+  },
   "0.4.21": {
     "program_2025-1-4_9:34:12:657_1.sol": "Error: This type is only supported in the new experimental ABI encoder. Use \"pragma experimental ABIEncoderV2;\" to enable the feature."
   },
-  "0.4.23": {},
+  "0.4.23": {
+    "program_2025-1-18_4:38:13:76_0.sol": "Internal compiler error during compilation:\n/solidity/libsolidity/codegen/ContractCompiler.cpp(53): Throw in function void {anonymous}::StackHeightChecker::check()\nDynamic exception type: boost::exception_detail::clone_impl<dev::solidity::InternalCompilerError>\nstd::exception::what: I sense a disturbance in the stack: 8 vs 7\n[dev::tag_comment*] = I sense a disturbance in the stack: 8 vs 7"
+  },
   "0.4.24": {},
   "0.5.0": {},
   "0.5.1": {},
