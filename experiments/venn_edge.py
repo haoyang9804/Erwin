@@ -64,7 +64,7 @@ plt.savefig('./diagrams/edgecov_difference_erwin_unittest.svg', format='svg', dp
 plt = plt.figure(figsize=(10, 7))
 
 v = venn3([edges_unittest, edges_gen50_0, edges_acf], ('Unittest', 'Erwin', 'ACF'))
-for i, id in enumerate(['100', '010', '001', '110', '101', '011', '111']):
+for i, id in enumerate(['101', '010', '001', '110', '100', '011', '111']):
     if v.get_patch_by_id(id):
         patch = v.get_patch_by_id(id)
         if id != '111':  # Not intersection
@@ -85,7 +85,7 @@ for text in v.subset_labels:
 
 unittest_patch = patches.Patch(facecolor=colors[0], hatch=hatches[0], label='Unittest', alpha=0.6, edgecolor='black')
 erwin_patch = patches.Patch(facecolor=colors[1], hatch=hatches[1], label='Erwin', alpha=0.6, edgecolor='black')
-acf_patch = patches.Patch(facecolor=colors[2], label='ACF', hatch=hatches[2], alpha=0.6, edgecolor='black')
+acf_patch = patches.Patch(facecolor=colors[4], hatch=hatches[4], label='ACF', alpha=0.6, edgecolor='black')
 intersection_patch = patches.Patch(facecolor='white', label='Intersection', alpha=0.6, edgecolor='black')
 plt.legend(handles=[unittest_patch, erwin_patch, acf_patch, intersection_patch], loc=(0.8, 0), fontsize=14)
 total_edges = len(edges_unittest.union(edges_gen50_0).union(edges_acf))

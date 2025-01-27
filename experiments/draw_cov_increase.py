@@ -76,8 +76,8 @@ def store_fig_experiment1(ax, fig, name, ylabel, ylim):
   ax.legend(fontsize=11, loc=(0.6, 0.1))
   
   # Save the figures
-  fig.savefig(f'experiments/coverages/{name}.pdf', format='pdf', dpi=300, bbox_inches='tight')
-  fig.savefig(f'experiments/coverages/{name}.svg', format='svg', dpi=300, bbox_inches='tight')
+  fig.savefig(f'experiments/diagrams/{name}.pdf', format='pdf', dpi=300, bbox_inches='tight')
+  fig.savefig(f'experiments/diagrams/{name}.svg', format='svg', dpi=300, bbox_inches='tight')
 
   # Optionally, close the figures to free up memory
   plt.close(fig)
