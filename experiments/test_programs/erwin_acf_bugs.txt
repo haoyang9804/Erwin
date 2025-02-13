@@ -1,3 +1,0 @@
-Bug 6783 -> Code Generation Error
-Bug 7305 -> Formal Verification Error
-Bug 3293 -> Code Generation Error

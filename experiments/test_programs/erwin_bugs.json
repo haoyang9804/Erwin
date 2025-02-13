@@ -5,9 +5,6 @@
   "0.4.20": {
     "program_2025-1-17_12:8:4:405_0.sol": "Internal compiler error during compilation:\n/solidity/libsolidity/codegen/CompilerUtils.cpp(726): Throw in function void dev::solidity::CompilerUtils::convertType(const dev::solidity::Type&, const dev::solidity::Type&, bool, bool, bool)\nDynamic exception type: boost::exception_detail::clone_impl<dev::solidity::InternalCompilerError>\nstd::exception::what:\n[dev::tag_comment*] ="
   },
-  "0.4.21": {
-    "program_2025-1-4_9:34:12:657_1.sol": "Error: This type is only supported in the new experimental ABI encoder. Use \"pragma experimental ABIEncoderV2;\" to enable the feature."
-  },
   "0.4.23": {
     "program_2025-1-18_4:38:13:76_0.sol": "Internal compiler error during compilation:\n/solidity/libsolidity/codegen/ContractCompiler.cpp(53): Throw in function void {anonymous}::StackHeightChecker::check()\nDynamic exception type: boost::exception_detail::clone_impl<dev::solidity::InternalCompilerError>\nstd::exception::what: I sense a disturbance in the stack: 8 vs 7\n[dev::tag_comment*] = I sense a disturbance in the stack: 8 vs 7"
   },
@@ -26,13 +23,13 @@
     "program_2025-1-4_9:36:25:15_0.sol": "Internal compiler error during compilation:\n/solidity/libsolidity/formal/SMTChecker.cpp(437): Throw in function virtual void dev::solidity::SMTChecker::endVisit(const dev::solidity::TupleExpression&)\nDynamic exception type: boost::exception_detail::clone_impl<langutil::InternalCompilerError>\nstd::exception::what: \n[dev::tag_comment*] ="
   },
   "0.6.11": {
-    "program_2025-1-4_8:42:44:333_0.sol": "Internal compiler error during compilation:\n/solidity/libsolidity/formal/SMTEncoder.cpp(1712): Throw in function void solidity::frontend::SMTEncoder::mergeVariables(const std::set<const solidity::frontend::VariableDeclaration*>&, const solidity::smtutil::Expression&, const VariableIndices&, const VariableIndices&)\nDynamic exception type: boost::wrapexcept<solidity::langutil::InternalCompilerError>\nstd::exception::what: \n[solidity::util::tag_comment*] ="
+    "program_2025-1-4_18:12:37:333_12.sol": "Internal compiler error during compilation:\n/solidity/libsolidity/formal/SMTEncoder.cpp(1712): Throw in function void solidity::frontend::SMTEncoder::mergeVariables(const std::set<const solidity::frontend::VariableDeclaration*>&, const solidity::smtutil::Expression&, const VariableIndices&, const VariableIndices&)\nDynamic exception type: boost::wrapexcept<solidity::langutil::InternalCompilerError>\nstd::exception::what: \n[solidity::util::tag_comment*] ="
   },
   "0.6.2": {
     "program_2025-1-17_0:23:20:634_0.sol": "Internal compiler error during compilation:\n/solidity/libsolidity/codegen/CompilerUtils.cpp(1264): Throw in function void solidity::frontend::CompilerUtils::moveToStackVariable(const solidity::frontend::VariableDeclaration&)\nDynamic exception type: boost::wrapexcept<solidity::langutil::InternalCompilerError>\nstd::exception::what: Variable size and position mismatch.\n[solidity::util::tag_comment*] = Variable size and position mismatch."
   },
   "0.6.3": {
-    "program_2025-1-6_16:10:24:312_0.sol": "Internal compiler error during compilation:\n/solidity/libsolidity/formal/SMTEncoder.cpp(411): Throw in function virtual void solidity::frontend::SMTEncoder::endVisit(const solidity::frontend::TupleExpression&)\nDynamic exception type: boost::wrapexcept<solidity::langutil::InternalCompilerError>\nstd::exception::what: \n[solidity::util::tag_comment*] ="
+    "program_2025-1-6_16:10:24:312_2.sol": "Internal compiler error during compilation:\n/solidity/libsolidity/formal/SMTEncoder.cpp(411): Throw in function virtual void solidity::frontend::SMTEncoder::endVisit(const solidity::frontend::TupleExpression&)\nDynamic exception type: boost::wrapexcept<solidity::langutil::InternalCompilerError>\nstd::exception::what: \n[solidity::util::tag_comment*] ="
   },
   "0.6.5": {},
   "0.6.8": {
@@ -46,13 +43,13 @@
   },
   "0.7.0": {},
   "0.7.1": {
-    "program_2025-1-15_16:4:8:756_0.sol": "SMT logic error during analysis:\n/solidity/libsmtutil/SolverInterface.h(114): Throw in function static solidity::smtutil::Expression solidity::smtutil::Expression::ite(solidity::smtutil::Expression, solidity::smtutil::Expression, solidity::smtutil::Expression)\nDynamic exception type: boost::wrapexcept<solidity::smtutil::SMTLogicError>\nstd::exception::what:\n[solidity::util::tag_comment*] ="
+    "program_2025-1-15_16:4:8:756_67.sol": "SMT logic error during analysis:\n/solidity/libsmtutil/SolverInterface.h(114): Throw in function static solidity::smtutil::Expression solidity::smtutil::Expression::ite(solidity::smtutil::Expression, solidity::smtutil::Expression, solidity::smtutil::Expression)\nDynamic exception type: boost::wrapexcept<solidity::smtutil::SMTLogicError>\nstd::exception::what:\n[solidity::util::tag_comment*] ="
   },
   "0.7.3": {
-    "program_2025-1-14_23:58:29:345_0.sol": "Unimplemented feature:\n/solidity/libsolidity/codegen/YulUtilFunctions.cpp(1664): Throw in function solidity::frontend::YulUtilFunctions::updateStorageValueFunction(const solidity::frontend::Type&, const solidity::frontend::Type&, const std::optional<unsigned int>&)::<lambda()>\nDynamic exception type: boost::wrapexcept<solidity::langutil::UnimplementedFeatureError>\nstd::exception::what:\n[solidity::util::tag_comment*] ="
+    "program_2025-1-14_23:58:29:345_234.sol": "Unimplemented feature:\n/solidity/libsolidity/codegen/YulUtilFunctions.cpp(1664): Throw in function solidity::frontend::YulUtilFunctions::updateStorageValueFunction(const solidity::frontend::Type&, const solidity::frontend::Type&, const std::optional<unsigned int>&)::<lambda()>\nDynamic exception type: boost::wrapexcept<solidity::langutil::UnimplementedFeatureError>\nstd::exception::what:\n[solidity::util::tag_comment*] ="
   },
   "0.7.5": {
-    "program_2025-1-4_8:8:44:678_0.sol": "segfault"
+    "program_2025-1-4_8:8:44:678_0.sol (extra)": "segfault"
   },
   "0.8.0": {},
   "0.8.1": {},

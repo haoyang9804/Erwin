@@ -61,18 +61,18 @@ contract contract0 {
   }
 }
 
-contract contract51 {
-  int32 internal var52;
-  string internal var60;
+// contract contract51 {
+//   int32 internal var52;
+//   string internal var60;
 
-  modifier modifier53(string memory var54) {
-    ((var52) % var52);
-    _;
-  }
+//   modifier modifier53(string memory var54) {
+//     ((var52) % var52);
+//     _;
+//   }
 
-  function func55() internal modifier53(var60) modifier53(var60) returns (mapping(int32 => int32)[2] storage array56) {
-    array56 = array56;
-    bool var61;
-    do {} while(!var61);
-  }
-}
+//   function func55() internal modifier53(var60) modifier53(var60) returns (mapping(int32 => int32)[2] storage array56) {
+//     array56 = array56;
+//     bool var61;
+//     do {} while(!var61);
+//   }
+// }

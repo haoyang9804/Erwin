@@ -1,0 +1,58 @@
+{
+  "0.4.14": {},
+  "0.4.17": {},
+  "0.4.19": {},
+  "0.4.20": {
+    "program_2025-2-2_1:59:2:746_0.sol": "Internal compiler error during compilation:\n/solidity/libsolidity/codegen/CompilerUtils.cpp(726): Throw in function void dev::solidity::CompilerUtils::convertType(const dev::solidity::Type&, const dev::solidity::Type&, bool, bool, bool)\nDynamic exception type: boost::exception_detail::clone_impl<dev::solidity::InternalCompilerError>\nstd::exception::what:\n[dev::tag_comment*] ="
+  },
+  "0.4.21": {},
+  "0.4.23": {
+    "program_2025-2-1_12:14:1:205_0.sol":"Internal compiler error during compilation:\n/solidity/libsolidity/codegen/ContractCompiler.cpp(53): Throw in function void {anonymous}::StackHeightChecker::check()\nDynamic exception type: boost::exception_detail::clone_impl<dev::solidity::InternalCompilerError>\nstd::exception::what: I sense a disturbance in the stack: 4 vs 3\n[dev::tag_comment*] = I sense a disturbance in the stack: 4 vs 3"
+  },
+  "0.4.24": {},
+  "0.5.0": {},
+  "0.5.1": {},
+  "0.5.10": {
+    "program_2025-1-25_16:49:41:611_0.sol": "Internal compiler error during compilation:\n/solidity/libsolidity/formal/SMTChecker.cpp(1703): Throw in function void dev::solidity::SMTChecker::mergeVariables(const std::set<const dev::solidity::VariableDeclaration*>&, const dev::solidity::smt::Expression&, const VariableIndices&, const VariableIndices&)\nDynamic exception type: boost::wrapexcept<langutil::InternalCompilerError>\nstd::exception::what:\n[dev::tag_comment*] ="
+  },
+  "0.5.11": {},
+  "0.5.12": {},
+  "0.5.2": {},
+  "0.5.7": {},
+  "0.5.8": {},
+  "0.5.9": {},
+  "0.6.11": {
+    "program_2025-1-25_22:28:45:650_0.sol": "Internal compiler error during compilation:\n/solidity/libsolidity/formal/SMTEncoder.cpp(1712): Throw in function void solidity::frontend::SMTEncoder::mergeVariables(const std::set<const solidity::frontend::VariableDeclaration*>&, const solidity::smtutil::Expression&, const VariableIndices&, const VariableIndices&)\nDynamic exception type: boost::wrapexcept<solidity::langutil::InternalCompilerError>\nstd::exception::what:\n[solidity::util::tag_comment*] ="
+  },
+  "0.6.2": {},
+  "0.6.3": {
+    "program_2025-1-26_1:51:29:981_0.sol": "Internal compiler error during compilation:\n/solidity/libsolidity/formal/SMTEncoder.cpp(411): Throw in function virtual void solidity::frontend::SMTEncoder::endVisit(const solidity::frontend::TupleExpression&)\nDynamic exception type: boost::wrapexcept<solidity::langutil::InternalCompilerError>\nstd::exception::what:\n[solidity::util::tag_comment*] ="
+  },
+  "0.6.5": {},
+  "0.6.8": {
+    "program_2025-1-26_10:35:43:176_0.sol": "Internal compiler error during compilation:\n/solidity/libsolidity/formal/SMTEncoder.cpp(1481): Throw in function void solidity::frontend::SMTEncoder::mergeVariables(const std::set<const solidity::frontend::VariableDeclaration*>&, const solidity::frontend::smt::Expression&, const VariableIndices&, const VariableIndices&)\nDynamic exception type: boost::wrapexcept<solidity::langutil::InternalCompilerError>\nstd::exception::what:\n[solidity::util::tag_comment*] =",
+    "program_2025-2-1_1:37:15:687_0.sol": "Internal compiler error during compilation:\n/solidity/libsolidity/formal/SMTEncoder.cpp(1291): Throw in function void solidity::frontend::SMTEncoder::assignment(const solidity::frontend::Expression&, const std::vector<solidity::frontend::smt::Expression>&, const solidity::frontend::Type* const&, const solidity::langutil::SourceLocation&)\nDynamic exception type: boost::wrapexcept<solidity::langutil::InternalCompilerError>\nstd::exception::what:\n[solidity::util::tag_comment*] =",
+    "program_2025-2-1_23:49:44:264_0.sol": "Internal compiler error during compilation:\n/solidity/libsolidity/formal/SMTEncoder.cpp(1646): Throw in function std::set<const solidity::frontend::VariableDeclaration*> solidity::frontend::SMTEncoder::touchedVariables(const solidity::frontend::ASTNode&)\nDynamic exception type: boost::wrapexcept<solidity::langutil::InternalCompilerError>\nstd::exception::what:\n[solidity::util::tag_comment*] ="
+  },
+  "0.6.9": {
+    "program_2025-1-27_0:6:19:309_0.sol": "Internal compiler error during compilation:\n/solidity/libsolidity/formal/SMTEncoder.cpp(1457): Throw in function void solidity::frontend::SMTEncoder::assignment(const solidity::frontend::Expression&, const std::vector<solidity::smtutil::Expression>&, const solidity::frontend::Type* const&, const solidity::langutil::SourceLocation&)\nDynamic exception type: boost::wrapexcept<solidity::langutil::InternalCompilerError>\nstd::exception::what:\n[solidity::util::tag_comment*] ="
+  },
+  "0.7.0": {},
+  "0.7.1": {
+    "program_2025-1-29_2:17:39:658_0.sol": "SMT logic error during analysis:\n/solidity/libsmtutil/SolverInterface.h(114): Throw in function static solidity::smtutil::Expression solidity::smtutil::Expression::ite(solidity::smtutil::Expression, solidity::smtutil::Expression, solidity::smtutil::Expression)\nDynamic exception type: boost::wrapexcept<solidity::smtutil::SMTLogicError>\nstd::exception::what:\n[solidity::util::tag_comment*] ="
+  },
+  "0.7.3": {},
+  "0.7.5": {},
+  "0.8.0": {},
+  "0.8.1": {},
+  "0.8.10": {},
+  "0.8.12": {},
+  "0.8.14": {},
+  "0.8.17": {},
+  "0.8.20": {},
+  "0.8.4": {
+    "program_2025-1-29_4:12:46:436_0.sol": "Internal compiler error during compilation:\n/solidity/libsolidity/formal/CHC.cpp(762): Throw in function void solidity::frontend::CHC::externalFunctionCall(const solidity::frontend::FunctionCall&)\nDynamic exception type: boost::wrapexcept<solidity::langutil::InternalCompilerError>\nstd::exception::what:\n[solidity::util::tag_comment*] ="
+  },
+  "0.8.7": {},
+  "0.8.9": {}
+}
