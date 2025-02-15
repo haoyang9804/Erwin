@@ -1,0 +1,8 @@
+Bug 3414,Semantic Analysis Error,acf1.sol
+Bug 4051,Memory-Related Error,acf2.sol
+Bug 5501,Memory-Related Error,acf3.sol
+Bug 8368,Syntax Analysis Error,acf4.sol
+Bug 10433,Memory-Related Error,acf5.sol
+Bug 10526,Formal Verification Error,acf6.sol
+Bug 10667,Code Generation Error,acf7.sol
+Bug 12159,Memory-Related Error,acf8.sol

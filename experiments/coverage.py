@@ -392,52 +392,6 @@ def experiment1():
     print('Setting 4: Generate at most 150 programs from an IR')
     run_experiment1('gen150', parser_args.executions, parser_args.time_limit, '', f'-max 150 {command_suffix}', parser_args.solc_path, parser_args.generated_programs_folder_path, parser_args.gcov_folder_path)
 
-'''
-Experiment 2.
-Compare edge/line coverages between Erwin-generated test programs and Solidity compiler unit test cases.
-'''
-def experiment2(collected_edges1, collected_edges2):
-  coverage_json_path1 = input("Enter the path to the first coverage JSON file: ")
-  coverage_json_path2 = input("Enter the path to the second coverage JSON file: ")
-
-  # Example usage
-  with open(coverage_json_path1, 'r') as f:
-    coverage_data = json.load(f)
-
-  collected_edges1 = extract_collected_edges(coverage_data)
-
-  with open(coverage_json_path2, 'r') as f:
-    coverage_data = json.load(f)
-
-  collected_edges2 = extract_collected_edges(coverage_data)
-
-  # Print the collected edges
-  for edge in collected_edges1:
-    assert edge in collected_edges2
-    if (collected_edges1[edge] > 0) != (collected_edges2[edge] > 0):
-      print(f"Edge {edge} has different counts: {collected_edges1[edge]} vs {collected_edges2[edge]}")
-
-'''
-Experiment 3.
-Compare line coverage increase speed over different generation setting.
-'''
-# def experiment3(gcovfolder1, gcovfolder2):
-#   collected_lines1 = extract_collected_lines(gcovfolder1)
-#   collected_lines2 = extract_collected_lines(gcovfolder2)
-#   # Output the number of lines covered by collected_lines1 but not collected_lines2
-#   print(f'collected_lines1 - collected_lines2 = {len(collected_lines1 - collected_lines2)}')
-#   # Output the number of lines covered by collected_lines2 but not collected_lines1
-#   print(f'collected_lines2 - collected_lines1 = {len(collected_lines2 - collected_lines1)}')
-#   # Output the number of lines covered by both collected_lines1 and collected_lines2
-#   print(f'collected_lines1 & collected_lines2 = {len(collected_lines1 & collected_lines2)}')
-#   # Output the first ten elements in collected_lines1
-#   print(f'collected_lines1: {list(collected_lines1)[:10]}')
-#   # Output the first ten elements in collected_lines2
-#   print(f'collected_lines2: {list(collected_lines2)[:10]}')
-#   venn2([collected_lines1, collected_lines2], ('1', '2'))
-#   plt.show()
-  
-
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(
                     prog='coverage',

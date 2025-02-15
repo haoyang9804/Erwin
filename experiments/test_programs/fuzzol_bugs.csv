@@ -1,0 +1,5 @@
+Bug 9506,Formal Verification Error,fuzzol1.sol
+Bug 8419,Formal Verification Error,fuzzol2.sol
+Bug 8817,Formal Verification Error,fuzzol3.sol
+Bug 10058,Formal Verification Error,fuzzol4.sol
+Bug 11929,Memory-Related Error,fuzzol5.sol

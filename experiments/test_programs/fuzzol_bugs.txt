@@ -1,5 +1,0 @@
-Bug 9506 -> Formal Verification Error
-Bug 8419 -> Formal Verification Error
-Bug 8817 -> Formal Verification Error
-Bug 10058 -> Formal Verification Error
-Bug 11929 -> Memory-Related Error

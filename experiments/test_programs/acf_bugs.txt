@@ -1,8 +1,0 @@
-Bug 3414 -> Semantic Analysis Error
-Bug 4051 -> Memory-Related Error
-Bug 5501 -> Memory-Related Error
-Bug 8368 -> Syntax Analysis Error
-Bug 10433 -> Memory-Related Error
-Bug 10526 -> Formal Verification Error
-Bug 10667 -> Code Generation Error
-Bug 12159 -> Memory-Related Error
