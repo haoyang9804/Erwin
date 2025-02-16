@@ -106,6 +106,7 @@ program
   .option("--refresh_folder", "Refresh the folder before generating the program.", `${config.refresh_folder}`)
   .option("--test_out_dir <string>", "The output directory for the generated test program. The default is 'test_results'", `${config.test_out_dir}`)
   .option("--terminate_on_failure", "Terminate the program when a failure occurs during testing the target software under the test mode", `${config.terminate_on_failure}`)
+  .option("--enable_search_space_cmp", "Enable the search space comparison record.", `${config.enable_search_space_cmp}`)
 program.parse(process.argv);
 // Set the configuration
 if (program.args[0] === "mutate") {
@@ -186,6 +187,7 @@ else if (program.args[0] === "generate") {
   if (program.commands[1].opts().debug === true) config.debug = true;
   if (program.commands[1].opts().enable_test === true) config.enable_test = true;
   if (program.commands[1].opts().terminate_on_failure === true) config.terminate_on_failure = true;
+  if (program.commands[1].opts().enable_search_space_cmp === true) config.enable_search_space_cmp = true;
   if (config.mode == "scope") {
     config.int_num = 1;
     config.uint_num = 1;

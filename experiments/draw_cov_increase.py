@@ -46,7 +46,7 @@ def draw_experiment1(name, ax, color, data, covered, overall, marker, texty, lin
   upper_coverage = np.max(interpolated_coverages, axis=0)
   lower_coverage = np.min(interpolated_coverages, axis=0)
   timestamps = [pd.Timestamp(t, unit='s') for t in common_times]
-  ax.plot(timestamps, median_coverage, color = color, linestyle=linestyle, label = name)
+  ax.plot(timestamps, median_coverage, color = color, linestyle=linestyle, label = name, linewidth=2.5)
   f = interpolate.interp1d(common_times, median_coverage, kind='linear', fill_value='extrapolate')
   # ax.plot([pd.Timestamp(t, unit='s') for t in marker_times], f(marker_times), color=color, marker=marker, markersize=6, linestyle='None', label = name)
   
@@ -62,22 +62,23 @@ def draw_experiment1(name, ax, color, data, covered, overall, marker, texty, lin
   ax.xaxis.set_major_formatter(plt.FuncFormatter(hour_formatter))
   annotation_text = f'{name}:{percentage(covered, overall)}'
   bbox_props = dict(boxstyle="round,pad=0.3", fc="white", ec="black", lw=1)
-  ax.text(0.8, texty, annotation_text, transform=ax.transAxes, fontsize=10,
+  ax.text(0.7, texty, annotation_text, transform=ax.transAxes, fontsize=15,
           verticalalignment='top', bbox=bbox_props)
   plt.gcf().autofmt_xdate()
 
 def store_fig_experiment1(ax, fig, name, ylabel, ylim):
-  ax.set_xlabel('Hour', fontsize = 25)
-  ax.set_ylabel(ylabel, fontsize = 25)
+  ax.set_xlabel('Hour', fontsize = 20)
+  ax.set_ylabel(ylabel, fontsize = 20)
   ax.set_ylim(ylim)
   ax.set_xlim()
+  ax.tick_params(axis='x', labelsize=20)  # Set x-axis tick label size to 14
+  ax.tick_params(axis='y', labelsize=20)  # Set y-axis tick label size to 14
   ax.spines['right'].set_visible(False)
   ax.spines['top'].set_visible(False)
-  ax.legend(fontsize=11, loc=(0.6, 0.1))
+  ax.legend(fontsize=15, loc=(0.4, 0.1))
   
   # Save the figures
-  fig.savefig(f'experiments/diagrams/{name}.pdf', format='pdf', dpi=300, bbox_inches='tight')
-  fig.savefig(f'experiments/diagrams/{name}.svg', format='svg', dpi=300, bbox_inches='tight')
+  fig.savefig(f'diagrams/{name}.pdf', format='pdf', dpi=300, bbox_inches='tight')
 
   # Optionally, close the figures to free up memory
   plt.close(fig)
@@ -87,7 +88,7 @@ def draw_experiment1_with_setting(cov, setting, color, marker, ax, texty, linest
   data = []
   overall = 0
   covered = 0
-  for file in glob.glob(f'experiments/coverages/{cov}_{setting}_*.txt'):
+  for file in glob.glob(f'coverages/{cov}_{setting}_*.txt'):
     with open(file, 'r') as f:
       lines = f.readlines()
     coverages = [float(line.strip().split(': ')[1].strip().split('/')[0]) for line in lines]
@@ -95,7 +96,7 @@ def draw_experiment1_with_setting(cov, setting, color, marker, ax, texty, linest
     data.append([timestaps, coverages])
     overall += float(lines[-1].strip().split(': ')[1].strip().split('/')[1])
     covered += float(lines[-1].strip().split(': ')[1].strip().split('/')[0])
-  if glob.glob(f'experiments/coverages/{cov}_{setting}_*.txt') != []:
+  if glob.glob(f'coverages/{cov}_{setting}_*.txt') != []:
     draw_experiment1(setting, ax, color, data, covered, overall, marker, texty, linestyle)
 
 def draw_from_experiment1(cov, ylabel, ylim):
@@ -106,5 +107,5 @@ def draw_from_experiment1(cov, ylabel, ylim):
   draw_experiment1_with_setting(cov, 'gen150', 'black', 'o', ax, 0.15, ':')
   store_fig_experiment1(ax, fig, f"{cov}_increase_plot", ylabel, ylim)
 
-draw_from_experiment1('edgecov', 'Edge Coverage', (6400, 6790))
+draw_from_experiment1('edgecov', 'Edge Coverage', (6400, 6800))
 draw_from_experiment1('linecov', 'Line Coverage', (23000, 24000))

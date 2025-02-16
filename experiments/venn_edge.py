@@ -29,12 +29,7 @@ fig.savefig(
     dpi=300,
     bbox_inches='tight'
 )
-fig.savefig(
-    './diagrams/edgecov_difference_erwin_unittest_venn.svg',
-    format='svg',
-    dpi=300,
-    bbox_inches='tight'
-)
+
 # Modify legend properties and move it below the chart
 # plt.legend(
 #     loc='lower center',        # Positions legend below the diagram

@@ -11,7 +11,7 @@ import { VisMut, VisMutKind } from "./vismut";
 import { LinkedListNode } from "./dataStructor";
 import { decl_db, expr_db } from "./db";
 import { Value, intersection_range, is_equal_range, is_super_range } from "./value";
-
+import fs from 'fs';
 /**
  * Stores how a non-leaf constraint node restrains a leaf node.
  */
@@ -1124,13 +1124,22 @@ export class ConstraintDAG<T, V extends Value<T>> {
     await this.check_property();
     // !Get roots and leaves
     this.get_roots_and_leaves(false);
-    let mul = 1n;
-    for (let id of this.solution_range.keys()) {
-      if (!this.leaves.has(id)) continue;
-      if (this.solution_range.get(id)!.length === 0) continue;
-      mul *= BigInt(this.solution_range.get(id)!.length)
+    if (config.enable_search_space_cmp) {
+      let mul = 1n, all_mul = 1n;
+      for (let id of this.solution_range.keys()) {
+        if (!this.leaves.has(id)) continue;
+        if (this.solution_range.get(id)!.length === 0) continue;
+        mul *= BigInt(this.solution_range.get(id)!.length)
+      }
+      for (let id of this.solution_range.keys()) {
+        if (this.solution_range.get(id)!.length === 0) continue;
+        all_mul *= BigInt(this.solution_range.get(id)!.length)
+      }
+      if (!fs.existsSync("search_space.csv")) {
+        fs.writeFileSync(`search_space.csv`, '', 'utf8');
+      }
+      fs.writeFileSync(`search_space.csv`, mul.toString() + "," + all_mul.toString() + "\n", { flag: 'a' });
     }
-    Log.log(`The size of solution candidate of ${this.name} is ${mul}`);
     // !Map nodes to their leaves, recording if there exists a path from the node to leaf with leaf_id on which sub/super domination does not holds.
     // If there are multiple paths from node to leaf, then the sub does not hold as long as there exists a path on which sub domination does not hold.
     // leaf_ids are not in this.node2leaf

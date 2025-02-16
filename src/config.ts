@@ -109,4 +109,7 @@ export const config = {
   terminate_on_failure: false,
   // Refresh the folder of the generated programs before generating new programs
   refresh_folder: false,
+
+  // Experiment
+  enable_search_space_cmp: false,
 }

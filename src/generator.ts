@@ -538,8 +538,7 @@ function get_stmtgenerator(cur_stmt_complex_level : number = -1) : any {
   let complex = () : boolean => {
     return cur_stmt_complex_level >= config.statement_complexity__level || Math.random() < config.nonstructured_statement_prob;
   }
-  let generator_candidates = cur_stmt_complex_level === -1 ?
-    new Set<any>(statement_generators) :
+  let generator_candidates =
     complex() ?
       new Set<any>(non_structured_statement_generators) :
       new Set<any>(statement_generators);
@@ -5330,7 +5329,7 @@ class RevertExpressionGenerator extends ExpressionGenerator {
       const error_identifier = new expr.IRIdentifier(new_global_id(), cur_scope.id(), "", -1);
       this.irnode = new expr.IRFunctionCall(this.id, cur_scope.id(), FunctionCallKind.FunctionCall, error_identifier, [expr_gen.irnode! as expr.IRExpression]);
     }
-    else { 
+    else {
       let [contractdecl_id, errordecl_id] = pick_random_element(contractdecl_id_plus_errordecl_id)!;
       if (contractdecl_id < 0) {
         contractdecl_id = -contractdecl_id;

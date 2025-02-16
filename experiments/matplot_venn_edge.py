@@ -60,7 +60,6 @@ plt.tight_layout()
 
 # Save figures
 plt.savefig('./diagrams/edgecov_difference_erwin_unittest.pdf', format='pdf', dpi=300, bbox_inches='tight')
-plt.savefig('./diagrams/edgecov_difference_erwin_unittest.svg', format='svg', dpi=300, bbox_inches='tight')
 
 plt = plt.figure(figsize=(10, 7))
 
@@ -94,7 +93,6 @@ plt.text(0.5, -0.1, f"Total Unique Edges Covered: {total_edges}",
          ha='center', va='center', transform=plt.gca().transAxes, fontsize=14)
 plt.tight_layout()
 plt.savefig('./diagrams/edgecov_difference_erwin_unittest_acf.pdf', format='pdf', dpi=300, bbox_inches='tight')
-plt.savefig('./diagrams/edgecov_difference_erwin_unittest_acf.svg', format='svg', dpi=300, bbox_inches='tight')
 
 fig, ax = plt.subplots(figsize=(10, 7))
 
@@ -113,12 +111,6 @@ fig.tight_layout()
 fig.savefig(
     './diagrams/edgecov_difference_erwin_unittest_acf_venn.pdf',
     format='pdf',
-    dpi=300,
-    bbox_inches='tight'
-)
-fig.savefig(
-    './diagrams/edgecov_difference_erwin_unittest_acf_venn.svg',
-    format='svg',
     dpi=300,
     bbox_inches='tight'
 )

@@ -29,12 +29,7 @@ fig.savefig(
     dpi=300,
     bbox_inches='tight'
 )
-fig.savefig(
-    './diagrams/linecov_difference_erwin_acf_fuzzol_venn.svg',
-    format='svg',
-    dpi=300,
-    bbox_inches='tight'
-)
+
 
 # Close the figure to free memory
 plt.close(fig)
