@@ -72,3 +72,11 @@ with open('./coverages/edgecovmap_fuzzol.txt', 'w') as f:
   for edge, count in collected_edges2.items():
     if count > 0:
       f.write(f'{edge}\n')
+
+with open('./coverages/coverage_data_acffuzzolerwin.json', 'r') as f:
+  coverage_data = json.load(f)  
+collected_edges2 = extract_collected_edges(coverage_data)
+with open('./coverages/edgecovmap_acffuzzolerwin.txt', 'w') as f:
+  for edge, count in collected_edges2.items():
+    if count > 0:
+      f.write(f'{edge}\n')

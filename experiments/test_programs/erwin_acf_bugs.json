@@ -1,9 +1,7 @@
 {
   "0.4.14": {},
   "0.4.17": {},
-  "0.4.19": {
-    "acf-erwin4.sol": "Internal compiler error during compilation:\n/solidity/libsolidity/codegen/ABIFunctions.cpp(1188): Throw in function std::__cxx11::string dev::solidity::ABIFunctions::abiDecodingFunctionCalldataArray(const dev::solidity::ArrayType&)\nDynamic exception type: boost::exception_detail::clone_impl<dev::solidity::InternalCompilerError>\nstd::exception::what:\n[dev::tag_comment*] ="
-  },
+  "0.4.19": {},
   "0.4.20": {},
   "0.4.21": {},
   "0.4.23": {},
@@ -11,10 +9,7 @@
   "0.5.0": {},
   "0.5.1": {},
   "0.5.10": {},
-  "0.5.11": {
-    "acf-erwin2.sol": "segfault",
-    "acf-erwin3.sol (extra)": "Internal compiler error during compilation:\n/solidity/libsolidity/formal/SolverInterface.h(175): Throw in function static dev::solidity::smt::Expression dev::solidity::smt::Expression::select(dev::solidity::smt::Expression, dev::solidity::smt::Expression)\nDynamic exception type: boost::wrapexcept<langutil::InternalCompilerError>\nstd::exception::what:\n[dev::tag_comment*] ="
-  },
+  "0.5.11": {},
   "0.5.12": {},
   "0.5.2": {},
   "0.5.7": {},
