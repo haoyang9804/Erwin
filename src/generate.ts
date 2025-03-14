@@ -401,8 +401,8 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
         if (irnodes.get(key)!.typeName !== "IRVariableDeclaration") {
           continue;
         }
-        if ((irnodes.get(key)! as decl.IRVariableDeclaration).loc === undefined)
-          (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
+        // if ((irnodes.get(key)! as decl.IRVariableDeclaration).loc === undefined)
+        (irnodes.get(key)! as decl.IRVariableDeclaration).loc = storageLocation2loc(value);
       }
       let program = writer.write(source_unit_gen.irnode!.lower());
       if (program === pre_program) continue;

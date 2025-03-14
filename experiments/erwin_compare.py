@@ -131,8 +131,8 @@ for bug, points in f1_bug_groups.items():
 
 # Legend setup
 legend_elements = [
-    plt.Line2D([], [], color='blue', linestyle='-.', label='Erwin'),
-    plt.Line2D([], [], color='red', linestyle='--', label='Erwin Trivial'),
+    plt.Line2D([], [], color='blue', linestyle='--', label='Erwin'),
+    plt.Line2D([], [], color='red', linestyle='-.', label='Erwin Trivial'),
     plt.Line2D([], [], marker='o', markersize=15, markeredgecolor='red',
                markerfacecolor='none', linestyle='None', markeredgewidth=2,
                label='Unique to Erwin (Encircled)')
