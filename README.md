@@ -1,20 +1,3 @@
-<p align="center">
-<img src="https://raw.githubusercontent.com/haoyang9804/haoyang9804.github.io/master/Erwin_icon.png" alt="erwin" width="200"/>
-</p>
-<p align="center">
-  <a href="https://www.npmjs.com/package/@__haoyang__/erwin">
-    <img alt="NPM Version" src="https://img.shields.io/npm/v/%40__haoyang__%2Ferwin">
-  </a>
-  <img alt="NPM License" src="https://img.shields.io/npm/l/%40__haoyang__%2Ferwin">
-  <a href="https://haoyang9804.github.io/Erwin">
-    <img alt="Static Badge" src="https://img.shields.io/badge/Erwin-doc-pink">
-  </a>
-  <img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/haoyang9804/Erwin/npm.yml">
-  <!-- <a href = "https://npm-stat.com/charts.html?package=%40__haoyang__%2Ferwin">
-    <img alt="NPM Downloads" src="https://img.shields.io/npm/d18m/%40__haoyang__%2Ferwin">
-  </a> -->
-</p>
-
 
 ***Erwin*** is an academic attempt on introducing `bounded exhaustive instantiation` in random program generator to mitigate opportunism. This effort is inspired by [![arXiv](https://img.shields.io/badge/arXiv-2407.05981-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2407.05981).
 
