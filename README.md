@@ -60,50 +60,5 @@ Misbehavior-triggering test programs will be moved to `test_results`.
 
 ## Detected Bugs
 
-1. https://github.com/ethereum/solidity/issues/14719 (type error, segmentation fault) ✅🔨
-2. https://github.com/ethereum/solidity/issues/14720 (duplicate of 14719) 🤡🔨
-3. https://github.com/ethereum/solidity/issues/15223 (error handling, segmentation fault) ✅
-4. https://github.com/ethereum/solidity/issues/15236 (type error, reject valid program) ✅🔨
-5. https://github.com/ethereum/solidity/issues/15219 (version control, incorrect output) ✅
-6. https://github.com/ethereum/solidity/issues/15468 (low effort, low impact, confirmed, duplicate of https://github.com/ethereum/solidity/issues/15427) 🤡
-7. https://github.com/ethereum/solidity/issues/15469 (smt, incorrect output) ✅
-8. https://github.com/ethereum/solidity/issues/15469 (smt, incorrect output, two bugs in a thread) ✅
-9. https://github.com/ethereum/solidity/issues/15483
-10. https://github.com/ethereum/solidity/issues/15525 (documentation error, reject valid program) ✅🔨
-11. https://github.com/ethereum/solidity/issues/15483 (documentation error, reject valid program) ✅🔨
-12. https://github.com/ethereum/solidity/issues/15565 (error handling)
-13. https://github.com/ethereum/solidity/issues/15564 (error handling)
-14. https://github.com/ethereum/solidity/issues/15567 (error handling)
-15. https://github.com/ethereum/solidity/pull/15566 (documentation error)
-16. https://github.com/ethereum/solidity/issues/15583 (error handling, reject valid program) ✅
-17. https://github.com/ethereum/solidity/issues/15645 (ICE, duplicate) 🤡🔨
-18. https://github.com/ethereum/solidity/issues/15646 (error handling, incorrect output) ✅
-19. https://github.com/ethereum/solidity/issues/15647 (smt, ICE) ✅🔨
-20. https://github.com/ethereum/solidity/issues/15649 (ICE)
-21. https://github.com/ethereum/solidity/issues/15651 (smt, ICE) ✅🔨
-22. https://github.com/crytic/slither/issues/2619 (analysis error, hang) ✅🔨
-23. https://github.com/hyperledger-solang/solang/issues/1687 (ICE)
-24. https://github.com/hyperledger-solang/solang/issues/1688 (error handling)
-25. https://github.com/hyperledger-solang/solang/issues/1689 (ICE)
-26. https://github.com/hyperledger-solang/solang/issues/1690 (ICE)
+Since the GitHub Issue links might reveal authors' personal information and compromise the double-blind review process, we have chosen not to include bug links here. All links will be updated if the paper is accepted.
 
-
-## TODO
-
-- 🔨 Support Solar testing workflow
-- 🔨 Support fixed
-- 🔨 Support .push .pop for arrays
-- 🔨 Support byte
-- 🔨 Support type definition (for instance, `type T is bool;`)
-- 🔨 Support enum type
-- 🔨 Support assertion
-- 🔨 Support using for
-- 🔨 Support inherent keywords, such as `msg.sender`, `abi.encode`, etc
-- 🔨 Support bytes
-- 🔨 Support contract inheritance
-- 🔨 Support global constant variable, functions, and structs
-- 🔨 Support variable shallowing
-- 🔨 Support function type
-- 🔨 Support inline assembly
-- 🔨 Support try catch
-- 🔨 Mutate Solidity programs
