@@ -1,5 +1,5 @@
 
-***Erwin*** is an academic attempt on introducing `bounded exhaustive instantiation` in random program generator to mitigate opportunism. This effort is inspired by [![arXiv](https://img.shields.io/badge/arXiv-2407.05981-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2407.05981).
+***Erwin*** is an academic attempt on introducing `bounded exhaustive instantiation` in random program generator to mitigate opportunism.
 
 Different from [Csmith](https://github.com/csmith-project/csmith)-family tools that generate a test program in one go, ***Erwin*** separates the generation process into two sub-steps: 1) randomly generate a type/loc/scope-agnostic IR (i.e., a program without type, storage location, and scope), and 2) conducts bounded exhaustive instantiation to instantiate the IR into a swarm of real-word test programs.
 By masking out bug-related langauge features, such as type, storage location, and scope in the IR, ***Erwin*** shrinks the search space into a highly bug-related subspace. This way, ***Erwin*** reduce opportunism in random program generations.
