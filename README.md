@@ -6,27 +6,9 @@ By masking out bug-related langauge features, such as type, storage location, an
 
 ***Erwin*** is still under development, any suggestion and collaboration is welcomed.
 
-## Install Erwin
-
-### Install through NPM
-
-```
-npm install @__haoyang__/erwin
-```
-
-### Install through Git
-
-```
-git install git@github.com:haoyang9804/Erwin.git
-cd Erwin
-npm install
-npm run build
-```
-
 ## Run Erwin
 
-If you install Erwin through NPM, the `erwin` executable is in `node_modules/.bin`, add it to your PATH, and directly call `erwin`.
-If you install Erwin through Git, go into the folder and type `npx erwin`.
+Please go into the folder and type `npx erwin`.
 
 ### Use Erwin as a Solidity program generator.
 
