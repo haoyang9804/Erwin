@@ -93,7 +93,7 @@ class DeclDB {
   /*
   In Solidity, there exists a workaround to initialize a variable later.
   For instance,
-  ```solidity
+  ```
   function f() public {
     int[] memory arr;
     arr = arr;

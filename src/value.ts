@@ -3,16 +3,16 @@ import { merge_set } from "./utility";
 /**
  * Value is an abstract class that is used to instantiate placeholders
  * in the generated IR.
- * 
+ *
  * Take the following code snippet as an example of the IR:
- * ```solidity
+ * ```
  * mapping(T1 => T2) M V m;
  * ```
  * In which `T1`, `T2`, `M` and `V` are all placeholders.
  * In the solving process, the solver will replace these placeholders
  * with actual values, which are type, type, storage location and
  * visibility respectively.
- * 
+ *
  * @template T The type of the kind of the Value.
  * @param kind The kind of the Value.
  */
@@ -24,33 +24,33 @@ export abstract class Value<T> {
     this.typeName = this.constructor.name;
   }
   /**
-   * @description Get the string representation of the Value.
+   * @remarks Get the string representation of the Value.
    * @returns The string representation of the Value.
    */
   abstract str() : string;
   /**
-   * @description Get the sub-Values of the Value.
+   * @remarks Get the sub-Values of the Value.
    * @returns The sub-Values of the Value.
    */
   abstract subs() : Value<T>[];
   /**
-   * @description Get the super-Values of the Value.
+   * @remarks Get the super-Values of the Value.
    * @returns The super-Values of the Value
   */
   abstract supers() : Value<T>[];
   /**
-   * @description Create a copy of the Value.
+   * @remarks Create a copy of the Value.
    * @returns The copy of the Value.
   */
   abstract copy() : Value<T>;
   /**
-   * @description Check if two Values are the same.
+   * @remarks Check if two Values are the same.
    * @param t The Value to compare with.
    * @returns Whether the two Values are the same.
    */
   abstract same(t : Value<T>) : boolean;
   /**
-   * @description Check if two Values are exactly the same.
+   * @remarks Check if two Values are exactly the same.
    * Sometimes, two Values are the same but not exactly the same.
    * For example, `StoragePointer` and `StorageRef` are the same
    * but not exactly the same. 
@@ -61,7 +61,7 @@ export abstract class Value<T> {
     return this.same(t) && t.same(this);
   }
   /**
-   * @description Get the sub-Values of the Value with a lower bound.
+   * @remarks Get the sub-Values of the Value with a lower bound.
    * @param lower_bound The lower bound of the sub-Values.
    * @returns The sub-Values of the Value with a lower bound.
    */
@@ -69,7 +69,7 @@ export abstract class Value<T> {
     return this.subs().filter(x => x.is_super_of(lower_bound));
   }
   /**
-   * @description Get the super-Values of the Value with an upper bound.
+   * @remarks Get the super-Values of the Value with an upper bound.
    * @param upper_bound The upper bound of the super-Values.
    * @returns The super-Values of the Value with an upper bound.
    */
@@ -77,7 +77,7 @@ export abstract class Value<T> {
     return this.supers().filter(x => x.is_sub_of(upper_bound));
   }
   /**
-   * @description Get the values that are in the same range as the Value.
+   * @remarks Get the values that are in the same range as the Value.
    * The value `v` is in the same range as the Value `u` if and only if
    * `u` is a super-Value of `v` or `u` is a sub-Value of `v`.
    */
@@ -85,7 +85,7 @@ export abstract class Value<T> {
     return [...merge_set(new Set(this.supers()), new Set(this.subs()))];
   }
   /**
-   * @description Check if the Value is a sub-Value of another Value.
+   * @remarks Check if the Value is a sub-Value of another Value.
    * @param t The Value to compare with.
    * @returns Whether the Value is a sub-Value of the Value `t`.
    */
@@ -93,7 +93,7 @@ export abstract class Value<T> {
     return this.supers().some(g => g.same(t));
   }
   /**
-   * @description Get the sub-Values of the Value that are in the same range.
+   * @remarks Get the sub-Values of the Value that are in the same range.
    * @param t The Value to compare with.
    * @returns The sub-Values of the Value that are in the same range.
    */
@@ -101,7 +101,7 @@ export abstract class Value<T> {
     return this.subs().some(g => g.same(t));
   }
   /**
-   * @description Get the equivalents of the Value.
+   * @remarks Get the equivalents of the Value.
    * The equivalents of the Value `v` are the Values that are both the
    * sub-Values and the super-Values of `v`.
    * @returns The equivalents of the Value.
@@ -110,7 +110,7 @@ export abstract class Value<T> {
     return this.subs().filter(t => this.supers().some(g => g.same(t)));
   }
   /**
-   * @description Check if the Value is the equivalent of another Value.
+   * @remarks Check if the Value is the equivalent of another Value.
    * @param t The Value to compare with.
    * @returns Whether the Value is the equivalent of the Value `t`.
    */
