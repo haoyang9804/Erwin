@@ -99,6 +99,10 @@ export const config = {
   // The number of generation rounds
   generation_rounds: 1,
 
+  // generation time
+  time: false,
+  time_limit: 86400, // 86400 seconds = 24 hours
+
   // Log file path
   log_file_path: "./log.txt",
 

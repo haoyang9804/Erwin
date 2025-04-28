@@ -63,6 +63,8 @@ npx erwin generate -m type -max 100 --target solang
 
 The generated programs are stored in `generated_programs`, you can change it by `-o`.
 
+Erwin can generate for multiple rounds until the round count reaches `generation_rounds` or the time consumed in generation reaches `time_limit` if `time` is enabled.
+
 ### Use Erwin as a generation-based fuzzer.
 
 Erwin integrates four distinct automated testing workflows, each designed to target a specific software tool: the [Solidity](https://github.com/ethereum/solidity), [Solang](https://github.com/hyperledger-solang/solang), [Solar](https://github.com/paradigmxyz/solar), and [Slither](https://github.com/crytic/slither). The first three are compilers for Solidity programs while the last is a static analyzer of Solidity.

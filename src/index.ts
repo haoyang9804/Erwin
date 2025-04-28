@@ -101,6 +101,8 @@ program
   .option("--event_prob <float>", "The probability of generating an event.", `${config.event_prob}`)
   .option("--error_prob <float>", "The probability of generating an error.", `${config.error_prob}`)
   .option("--generation_rounds <number>", "The number of rounds Erwin will generate.", `${config.generation_rounds}`)
+  .option("--time", "Enable the time limit.", `${config.time}`)
+  .option("--time_limit <number>", "The time limit of the generation.", `${config.time_limit}`)
   .option("--log_file_path <string>", "The path of the log file.", `${config.log_file_path}`)
   .option("--enable_test", "Enable the test mode.", `${config.enable_test}`)
   .option("--compiler_path <string>", "The path of the Solidity compiler.", `${config.compiler_path}`)
@@ -181,6 +183,8 @@ else if (program.args[0] === "generate") {
   config.error_decl_per_contract_upperlimit = parseInt(program.commands[1].opts().error_decl_per_contract_upperlimit);
   config.error_decl_per_contract_lowerlimit = parseInt(program.commands[1].opts().error_decl_per_contract_lowerlimit);
   config.generation_rounds = parseInt(program.commands[1].opts().generation_rounds);
+  if (program.commands[1].opts().time) config.time = true;
+  config.time_limit = parseInt(program.commands[1].opts().time_limit);
   config.compiler_path = program.commands[1].opts().compiler_path;
   config.target = program.commands[1].opts().target;
   config.test_out_dir = program.commands[1].opts().test_out_dir;

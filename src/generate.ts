@@ -428,174 +428,344 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
  * Generate programs
  */
 export async function generate() {
-  for (let i = 0; i < config.generation_rounds; i++) {
-    Log.initialize();
-    init_generation();
-    if (config.refresh_folder) {
-      fs.rmSync(`${config.out_dir}`, { recursive: true, force: true });
-      fs.mkdirSync(`${config.out_dir}`);
-    }
-    if (config.target === "solang") {
-      config.error_prob = 0.0;
-      config.in_func_initialization_prob = 1.0;
-      config.literal_prob = 0.9;
-      config.new_prob = 0.9;
-      config.contract_type_prob = 0.0;
-      config.modifier_count_per_contract_lower_limit = 0;
-      config.modifier_count_per_contract_upper_limit = 0;
-    }
-    const source_unit = new gen.SourceUnitGenerator();
-    try {
-      source_unit.generate();
-    }
-    catch (err) {
-      if (config.stop_on_erwin_bug) {
-        console.error(err);
-        process.exit(1);
+  if (config.time) {
+    const beginTime = performance.now();
+    while (performance.now() - beginTime < config.time_limit * 1000) {
+      Log.initialize();
+      init_generation();
+      if (config.refresh_folder) {
+        fs.rmSync(`${config.out_dir}`, { recursive: true, force: true });
+        fs.mkdirSync(`${config.out_dir}`);
       }
-      else {
+      if (config.target === "solang") {
+        config.error_prob = 0.0;
+        config.in_func_initialization_prob = 1.0;
+        config.literal_prob = 0.9;
+        config.new_prob = 0.9;
+        config.contract_type_prob = 0.0;
+        config.modifier_count_per_contract_lower_limit = 0;
+        config.modifier_count_per_contract_upper_limit = 0;
+      }
+      const source_unit = new gen.SourceUnitGenerator();
+      try {
+        source_unit.generate();
+      }
+      catch (err) {
+        if (config.stop_on_erwin_bug) {
+          console.error(err);
+          process.exit(1);
+        }
+        else {
+          continue;
+        }
+      }
+      let startTime = performance.now();
+      let type_resolved = true;
+      await type_dag.resolve().catch((err) => {
+        if (config.stop_on_erwin_bug) {
+          console.error(err);
+          process.exit(1);
+        }
+        else {
+          type_resolved = false;
+        }
+      });
+      if (!type_resolved) {
+        continue;
+      }
+      let endTime = performance.now();
+      console.log(`Time cost of resolving type constraints: ${endTime - startTime} ms`);
+      startTime = performance.now();
+      let vismut_resolved = true;
+      await vismut_dag.resolve().catch((err) => {
+        if (config.stop_on_erwin_bug) {
+          console.error(err);
+          process.exit(1);
+        }
+        else {
+          vismut_resolved = false;
+        }
+      });
+      if (!vismut_resolved) {
+        continue;
+      }
+      endTime = performance.now();
+      console.log(`Time cost of resolving visibility and state mutability constraints: ${endTime - startTime} ms`);
+      startTime = performance.now();
+      let storage_location_resolved = true;
+      await storage_location_dag.resolve().catch((err) => {
+        if (config.stop_on_erwin_bug) {
+          console.error(err);
+          process.exit(1);
+        }
+        else {
+          storage_location_resolved = false;
+        }
+      });
+      if (!storage_location_resolved) {
+        continue;
+      }
+      endTime = performance.now();
+      console.log(`Time cost of resolving storage location constraints: ${endTime - startTime} ms`);
+      try {
+        type_dag.verify();
+        vismut_dag.verify();
+        storage_location_dag.verify();
+      }
+      catch (err) {
+        if (config.stop_on_erwin_bug) {
+          console.error(err);
+          process.exit(1);
+        }
+        else {
+          continue;
+        }
+      }
+      try {
+        if (config.mode === "type") {
+          generate_type_mode(source_unit);
+        }
+        else if (config.mode === "scope") {
+          generate_scope_mode(source_unit);
+        }
+        else if (config.mode === "loc") {
+          generate_loc_mode(source_unit);
+        }
+      }
+      catch (err) {
+        console.error(err);
+        if (config.stop_on_erwin_bug) {
+          process.exit(1);
+        }
+        else {
+          continue;
+        }
+      }
+      if (config.enable_test) {
+        if (config.target === "solidity") {
+          await test_solidity_compiler().then((result) => {
+            if (result === 2 || result === 4) {
+              process.exit(1);
+            }
+            else if (result !== 0) {
+              if (config.terminate_on_compiler_crash) {
+                process.exit(1);
+              }
+            }
+          });
+        }
+        else if (config.target === "slither") {
+          await test_slither().then((result) => {
+            if (result === 5 || result === 4 || result === 2) {
+              process.exit(1);
+            }
+            else if (result !== 0) {
+              if (config.terminate_on_compiler_crash) {
+                process.exit(1);
+              }
+            }
+          });
+        }
+        else if (config.target === "solang") {
+          await test_solang_compiler().then((result) => {
+            if (result === 2 || result === 4) {
+              process.exit(1);
+            }
+            else if (result !== 0) {
+              if (config.terminate_on_compiler_crash) {
+                process.exit(1);
+              }
+            }
+          });
+        }
+        else if (config.target === "solar") {
+          await test_solar_compiler().then((result) => {
+            if (result === 2 || result === 4) {
+              process.exit(1);
+            }
+            else if (result !== 0) {
+              if (config.terminate_on_compiler_crash) {
+                process.exit(1);
+              }
+            }
+          });
+        }
+        else {
+          throw new Error(`The testing target ${config.target} is not supported.`);
+        }
+      }
+    }
+  }
+  else {
+    for (let i = 0; i < config.generation_rounds; i++) {
+      Log.initialize();
+      init_generation();
+      if (config.refresh_folder) {
+        fs.rmSync(`${config.out_dir}`, { recursive: true, force: true });
+        fs.mkdirSync(`${config.out_dir}`);
+      }
+      if (config.target === "solang") {
+        config.error_prob = 0.0;
+        config.in_func_initialization_prob = 1.0;
+        config.literal_prob = 0.9;
+        config.new_prob = 0.9;
+        config.contract_type_prob = 0.0;
+        config.modifier_count_per_contract_lower_limit = 0;
+        config.modifier_count_per_contract_upper_limit = 0;
+      }
+      const source_unit = new gen.SourceUnitGenerator();
+      try {
+        source_unit.generate();
+      }
+      catch (err) {
+        if (config.stop_on_erwin_bug) {
+          console.error(err);
+          process.exit(1);
+        }
+        else {
+          i--;
+          continue;
+        }
+      }
+      let startTime = performance.now();
+      let type_resolved = true;
+      await type_dag.resolve().catch((err) => {
+        if (config.stop_on_erwin_bug) {
+          console.error(err);
+          process.exit(1);
+        }
+        else {
+          type_resolved = false;
+        }
+      });
+      if (!type_resolved) {
         i--;
         continue;
       }
-    }
-    let startTime = performance.now();
-    let type_resolved = true;
-    await type_dag.resolve().catch((err) => {
-      if (config.stop_on_erwin_bug) {
-        console.error(err);
-        process.exit(1);
-      }
-      else {
-        type_resolved = false;
-      }
-    });
-    if (!type_resolved) {
-      i--;
-      continue;
-    }
-    let endTime = performance.now();
-    console.log(`Time cost of resolving type constraints: ${endTime - startTime} ms`);
-    startTime = performance.now();
-    let vismut_resolved = true;
-    await vismut_dag.resolve().catch((err) => {
-      if (config.stop_on_erwin_bug) {
-        console.error(err);
-        process.exit(1);
-      }
-      else {
-        vismut_resolved = false;
-      }
-    });
-    if (!vismut_resolved) {
-      i--;
-      continue;
-    }
-    endTime = performance.now();
-    console.log(`Time cost of resolving visibility and state mutability constraints: ${endTime - startTime} ms`);
-    startTime = performance.now();
-    let storage_location_resolved = true;
-    await storage_location_dag.resolve().catch((err) => {
-      if (config.stop_on_erwin_bug) {
-        console.error(err);
-        process.exit(1);
-      }
-      else {
-        storage_location_resolved = false;
-      }
-    });
-    if (!storage_location_resolved) {
-      i--;
-      continue;
-    }
-    endTime = performance.now();
-    console.log(`Time cost of resolving storage location constraints: ${endTime - startTime} ms`);
-    try {
-      type_dag.verify();
-      vismut_dag.verify();
-      storage_location_dag.verify();
-    }
-    catch (err) {
-      if (config.stop_on_erwin_bug) {
-        console.error(err);
-        process.exit(1);
-      }
-      else {
+      let endTime = performance.now();
+      console.log(`Time cost of resolving type constraints: ${endTime - startTime} ms`);
+      startTime = performance.now();
+      let vismut_resolved = true;
+      await vismut_dag.resolve().catch((err) => {
+        if (config.stop_on_erwin_bug) {
+          console.error(err);
+          process.exit(1);
+        }
+        else {
+          vismut_resolved = false;
+        }
+      });
+      if (!vismut_resolved) {
         i--;
         continue;
       }
-    }
-    try {
-      if (config.mode === "type") {
-        generate_type_mode(source_unit);
-      }
-      else if (config.mode === "scope") {
-        generate_scope_mode(source_unit);
-      }
-      else if (config.mode === "loc") {
-        generate_loc_mode(source_unit);
-      }
-    }
-    catch (err) {
-      console.error(err);
-      if (config.stop_on_erwin_bug) {
-        process.exit(1);
-      }
-      else {
+      endTime = performance.now();
+      console.log(`Time cost of resolving visibility and state mutability constraints: ${endTime - startTime} ms`);
+      startTime = performance.now();
+      let storage_location_resolved = true;
+      await storage_location_dag.resolve().catch((err) => {
+        if (config.stop_on_erwin_bug) {
+          console.error(err);
+          process.exit(1);
+        }
+        else {
+          storage_location_resolved = false;
+        }
+      });
+      if (!storage_location_resolved) {
         i--;
         continue;
       }
-    }
-    if (config.enable_test) {
-      if (config.target === "solidity") {
-        await test_solidity_compiler().then((result) => {
-          if (result === 2 || result === 4) {
-            process.exit(1);
-          }
-          else if (result !== 0) {
-            if (config.terminate_on_compiler_crash) {
+      endTime = performance.now();
+      console.log(`Time cost of resolving storage location constraints: ${endTime - startTime} ms`);
+      try {
+        type_dag.verify();
+        vismut_dag.verify();
+        storage_location_dag.verify();
+      }
+      catch (err) {
+        if (config.stop_on_erwin_bug) {
+          console.error(err);
+          process.exit(1);
+        }
+        else {
+          i--;
+          continue;
+        }
+      }
+      try {
+        if (config.mode === "type") {
+          generate_type_mode(source_unit);
+        }
+        else if (config.mode === "scope") {
+          generate_scope_mode(source_unit);
+        }
+        else if (config.mode === "loc") {
+          generate_loc_mode(source_unit);
+        }
+      }
+      catch (err) {
+        console.error(err);
+        if (config.stop_on_erwin_bug) {
+          process.exit(1);
+        }
+        else {
+          i--;
+          continue;
+        }
+      }
+      if (config.enable_test) {
+        if (config.target === "solidity") {
+          await test_solidity_compiler().then((result) => {
+            if (result === 2 || result === 4) {
               process.exit(1);
             }
-          }
-        });
-      }
-      else if (config.target === "slither") {
-        await test_slither().then((result) => {
-          if (result === 5 || result === 4 || result === 2) {
-            process.exit(1);
-          }
-          else if (result !== 0) {
-            if (config.terminate_on_compiler_crash) {
+            else if (result !== 0) {
+              if (config.terminate_on_compiler_crash) {
+                process.exit(1);
+              }
+            }
+          });
+        }
+        else if (config.target === "slither") {
+          await test_slither().then((result) => {
+            if (result === 5 || result === 4 || result === 2) {
               process.exit(1);
             }
-          }
-        });
-      }
-      else if (config.target === "solang") {
-        await test_solang_compiler().then((result) => {
-          if (result === 2 || result === 4) {
-            process.exit(1);
-          }
-          else if (result !== 0) {
-            if (config.terminate_on_compiler_crash) {
+            else if (result !== 0) {
+              if (config.terminate_on_compiler_crash) {
+                process.exit(1);
+              }
+            }
+          });
+        }
+        else if (config.target === "solang") {
+          await test_solang_compiler().then((result) => {
+            if (result === 2 || result === 4) {
               process.exit(1);
             }
-          }
-        });
-      }
-      else if (config.target === "solar") {
-        await test_solar_compiler().then((result) => {
-          if (result === 2 || result === 4) {
-            process.exit(1);
-          }
-          else if (result !== 0) {
-            if (config.terminate_on_compiler_crash) {
+            else if (result !== 0) {
+              if (config.terminate_on_compiler_crash) {
+                process.exit(1);
+              }
+            }
+          });
+        }
+        else if (config.target === "solar") {
+          await test_solar_compiler().then((result) => {
+            if (result === 2 || result === 4) {
               process.exit(1);
             }
-          }
-        });
-      }
-      else {
-        throw new Error(`The testing target ${config.target} is not supported.`);
+            else if (result !== 0) {
+              if (config.terminate_on_compiler_crash) {
+                process.exit(1);
+              }
+            }
+          });
+        }
+        else {
+          throw new Error(`The testing target ${config.target} is not supported.`);
+        }
       }
     }
   }
