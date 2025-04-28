@@ -445,31 +445,85 @@ export async function generate() {
       config.modifier_count_per_contract_upper_limit = 0;
     }
     const source_unit = new gen.SourceUnitGenerator();
-    source_unit.generate();
+    try {
+      source_unit.generate();
+    }
+    catch (err) {
+      if (config.stop_on_erwin_bug) {
+        console.error(err);
+        process.exit(1);
+      }
+      else {
+        i--;
+        continue;
+      }
+    }
     let startTime = performance.now();
+    let type_resolved = true;
     await type_dag.resolve().catch((err) => {
-      console.error(err);
-      process.exit(1);
+      if (config.stop_on_erwin_bug) {
+        console.error(err);
+        process.exit(1);
+      }
+      else {
+        type_resolved = false;
+      }
     });
+    if (!type_resolved) {
+      i--;
+      continue;
+    }
     let endTime = performance.now();
     console.log(`Time cost of resolving type constraints: ${endTime - startTime} ms`);
     startTime = performance.now();
+    let vismut_resolved = true;
     await vismut_dag.resolve().catch((err) => {
-      console.error(err);
-      process.exit(1);
+      if (config.stop_on_erwin_bug) {
+        console.error(err);
+        process.exit(1);
+      }
+      else {
+        vismut_resolved = false;
+      }
     });
+    if (!vismut_resolved) {
+      i--;
+      continue;
+    }
     endTime = performance.now();
     console.log(`Time cost of resolving visibility and state mutability constraints: ${endTime - startTime} ms`);
     startTime = performance.now();
+    let storage_location_resolved = true;
     await storage_location_dag.resolve().catch((err) => {
-      console.error(err);
-      process.exit(1);
+      if (config.stop_on_erwin_bug) {
+        console.error(err);
+        process.exit(1);
+      }
+      else {
+        storage_location_resolved = false;
+      }
     });
+    if (!storage_location_resolved) {
+      i--;
+      continue;
+    }
     endTime = performance.now();
     console.log(`Time cost of resolving storage location constraints: ${endTime - startTime} ms`);
-    type_dag.verify();
-    vismut_dag.verify();
-    storage_location_dag.verify();
+    try {
+      type_dag.verify();
+      vismut_dag.verify();
+      storage_location_dag.verify();
+    }
+    catch (err) {
+      if (config.stop_on_erwin_bug) {
+        console.error(err);
+        process.exit(1);
+      }
+      else {
+        i--;
+        continue;
+      }
+    }
     try {
       if (config.mode === "type") {
         generate_type_mode(source_unit);
@@ -483,8 +537,12 @@ export async function generate() {
     }
     catch (err) {
       console.error(err);
-      if (config.terminate_on_failure) {
+      if (config.stop_on_erwin_bug) {
         process.exit(1);
+      }
+      else {
+        i--;
+        continue;
       }
     }
     if (config.enable_test) {
@@ -494,7 +552,7 @@ export async function generate() {
             process.exit(1);
           }
           else if (result !== 0) {
-            if (config.terminate_on_failure) {
+            if (config.terminate_on_compiler_crash) {
               process.exit(1);
             }
           }
@@ -506,7 +564,7 @@ export async function generate() {
             process.exit(1);
           }
           else if (result !== 0) {
-            if (config.terminate_on_failure) {
+            if (config.terminate_on_compiler_crash) {
               process.exit(1);
             }
           }
@@ -518,7 +576,7 @@ export async function generate() {
             process.exit(1);
           }
           else if (result !== 0) {
-            if (config.terminate_on_failure) {
+            if (config.terminate_on_compiler_crash) {
               process.exit(1);
             }
           }
@@ -530,7 +588,7 @@ export async function generate() {
             process.exit(1);
           }
           else if (result !== 0) {
-            if (config.terminate_on_failure) {
+            if (config.terminate_on_compiler_crash) {
               process.exit(1);
             }
           }

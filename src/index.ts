@@ -24,6 +24,7 @@ program
   .description("Generate random Solidity code.")
   .option("-m --mode <string>", "The mode of Erwin. The value can be 'type', 'scope', or 'loc'.", `${config.mode}`)
   .option("-d --debug", "Enable the debug mode.", `${config.debug}`)
+  .option("-b --stop_on_erwin_bug", "Stop the program when a bug occurs during generating the program.", `${config.stop_on_erwin_bug}`)
   .option("-o --out_dir <string>", "The output directory for the generated program. The default is 'generated_programs'", `${config.out_dir}`)
   .option('-t --target <string>', 'The testing target. The value can be "solidity", "solang", "solar", and "slither". Default to solidity', `${config.target}`)
   // Dominance Constraint Solution
@@ -105,7 +106,7 @@ program
   .option("--compiler_path <string>", "The path of the Solidity compiler.", `${config.compiler_path}`)
   .option("--refresh_folder", "Refresh the folder before generating the program.", `${config.refresh_folder}`)
   .option("--test_out_dir <string>", "The output directory for the generated test program. The default is 'test_results'", `${config.test_out_dir}`)
-  .option("--terminate_on_failure", "Terminate the program when a failure occurs during testing the target software under the test mode", `${config.terminate_on_failure}`)
+  .option("--terminate_on_compiler_crash", "Terminate the program when a failure occurs during testing the target software under the test mode", `${config.terminate_on_compiler_crash}`)
   .option("--enable_search_space_cmp", "Enable the search space comparison record.", `${config.enable_search_space_cmp}`)
 program.parse(process.argv);
 // Set the configuration
@@ -185,9 +186,13 @@ else if (program.args[0] === "generate") {
   config.test_out_dir = program.commands[1].opts().test_out_dir;
   if (program.commands[1].opts().refresh_folder === true) config.refresh_folder = true;
   if (program.commands[1].opts().debug === true) config.debug = true;
+  if (program.commands[1].opts().stop_on_erwin_bug === true) config.stop_on_erwin_bug = true;
   if (program.commands[1].opts().enable_test === true) config.enable_test = true;
-  if (program.commands[1].opts().terminate_on_failure === true) config.terminate_on_failure = true;
+  if (program.commands[1].opts().terminate_on_compiler_crash === true) config.terminate_on_compiler_crash = true;
   if (program.commands[1].opts().enable_search_space_cmp === true) config.enable_search_space_cmp = true;
+  if (config.debug) {
+    config.stop_on_erwin_bug = true;
+  }
   if (config.mode == "scope") {
     config.int_num = 1;
     config.uint_num = 1;

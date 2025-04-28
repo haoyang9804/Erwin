@@ -4,8 +4,9 @@ export const config = {
 
   mode: "",
   debug: false,
+  stop_on_erwin_bug: false,
 
-  // Type 
+  // Type
   uint_num: 2,
   int_num: 2,
 
@@ -106,7 +107,7 @@ export const config = {
   compiler_path: "",
   enable_test: false,
   test_out_dir: "./test_results",
-  terminate_on_failure: false,
+  terminate_on_compiler_crash: false,
   // Refresh the folder of the generated programs before generating new programs
   refresh_folder: false,
 
