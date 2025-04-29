@@ -15,19 +15,19 @@ export class Log {
     }
   }
 
-  static info(message: string) {
+  static info(message : string) {
     const formattedMessage = `[INFO] ${message}`;
     console.log(formattedMessage);
     this.log(formattedMessage);
   }
 
-  static warn(message: string) {
+  static warn(message : string) {
     const formattedMessage = `[WARN] ${message}`;
     console.warn(formattedMessage);
     this.log(formattedMessage);
   }
 
-  static error(message: string) {
+  static error(message : string) {
     const formattedMessage = `[ERROR] ${message}`;
     console.error(formattedMessage);
     this.log(formattedMessage);

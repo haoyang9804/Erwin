@@ -1,6 +1,6 @@
 import * as gen from "./generator"
 import { vismut_dag, storage_location_dag, type_dag } from "./constraint";
-import { irnodes } from "./node";
+import { irnodes, resetFactory } from "./node";
 import * as expr from "./expression";
 import * as decl from "./declaration";
 import { config } from "./config";
@@ -33,6 +33,15 @@ let writer = new ASTWriter(
   LatestCompilerVersion
 );
 
+function resetASTWriter() {
+  writer = new ASTWriter(
+    DefaultASTWriterMapping,
+    formatter,
+    LatestCompilerVersion
+  );
+}
+
+
 function init_generation() {
   db.init();
   type_dag.clear();
@@ -43,6 +52,8 @@ function init_generation() {
   init_global_id();
   init_indent();
   Log.initialize();
+  resetASTWriter();
+  resetFactory();
 }
 
 function storageLocation2loc(sl : StorageLocation) : DataLocation {
@@ -425,14 +436,6 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
   }
 }
 
-function resetASTWriter() {
-  writer = new ASTWriter(
-    DefaultASTWriterMapping,
-    formatter,
-    LatestCompilerVersion
-  );
-}
-
 /**
  * Generate programs
  */
@@ -440,8 +443,6 @@ export async function generate() {
   if (config.time) {
     const beginTime = performance.now();
     while (performance.now() - beginTime < config.time_limit * 1000) {
-      resetASTWriter();
-      Log.initialize();
       init_generation();
       if (config.refresh_folder) {
         fs.rmSync(`${config.out_dir}`, { recursive: true, force: true });
@@ -608,8 +609,6 @@ export async function generate() {
   }
   else {
     for (let i = 0; i < config.generation_rounds; i++) {
-      resetASTWriter();
-      Log.initialize();
       init_generation();
       if (config.refresh_folder) {
         fs.rmSync(`${config.out_dir}`, { recursive: true, force: true });
