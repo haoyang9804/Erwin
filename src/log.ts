@@ -14,4 +14,22 @@ export class Log {
       fs.writeFileSync(`${config.log_file_path}`, message + "\n", { flag: 'a' });
     }
   }
+
+  static info(message: string) {
+    const formattedMessage = `[INFO] ${message}`;
+    console.log(formattedMessage);
+    this.log(formattedMessage);
+  }
+
+  static warn(message: string) {
+    const formattedMessage = `[WARN] ${message}`;
+    console.warn(formattedMessage);
+    this.log(formattedMessage);
+  }
+
+  static error(message: string) {
+    const formattedMessage = `[ERROR] ${message}`;
+    console.error(formattedMessage);
+    this.log(formattedMessage);
+  }
 }

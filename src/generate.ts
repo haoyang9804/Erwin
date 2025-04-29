@@ -27,7 +27,7 @@ import {
 } from "solc-typed-ast"
 import { test_solidity_compiler, test_slither, test_solang_compiler, test_solar_compiler } from "./test";
 const formatter = new PrettyFormatter(2, 0);
-const writer = new ASTWriter(
+let writer = new ASTWriter(
   DefaultASTWriterMapping,
   formatter,
   LatestCompilerVersion
@@ -424,6 +424,15 @@ function generate_loc_mode(source_unit_gen : gen.SourceUnitGenerator) {
     }
   }
 }
+
+function resetASTWriter() {
+  writer = new ASTWriter(
+    DefaultASTWriterMapping,
+    formatter,
+    LatestCompilerVersion
+  );
+}
+
 /**
  * Generate programs
  */
@@ -431,6 +440,7 @@ export async function generate() {
   if (config.time) {
     const beginTime = performance.now();
     while (performance.now() - beginTime < config.time_limit * 1000) {
+      resetASTWriter();
       Log.initialize();
       init_generation();
       if (config.refresh_folder) {
@@ -598,6 +608,7 @@ export async function generate() {
   }
   else {
     for (let i = 0; i < config.generation_rounds; i++) {
+      resetASTWriter();
       Log.initialize();
       init_generation();
       if (config.refresh_folder) {
