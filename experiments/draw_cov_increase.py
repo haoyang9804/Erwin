@@ -61,6 +61,7 @@ def draw_experiment1(name, ax, color, data, covered, overall, marker, texty, lin
   # ax.xaxis.set_major_formatter(DateFormatter('%H:%M'))  # Format as HH:MM
   ax.xaxis.set_major_formatter(plt.FuncFormatter(hour_formatter))
   annotation_text = f'{name}:{percentage(covered, overall)}'
+  annotation_text = f'{name}:{int(covered/5)}'
   bbox_props = dict(boxstyle="round,pad=0.3", fc="white", ec="black", lw=1)
   ax.text(0.7, texty, annotation_text, transform=ax.transAxes, fontsize=15,
           verticalalignment='top', bbox=bbox_props)
@@ -75,7 +76,7 @@ def store_fig_experiment1(ax, fig, name, ylabel, ylim):
   ax.tick_params(axis='y', labelsize=20)  # Set y-axis tick label size to 14
   ax.spines['right'].set_visible(False)
   ax.spines['top'].set_visible(False)
-  ax.legend(fontsize=15, loc=(0.4, 0.1))
+  ax.legend(fontsize=15, loc=(0.3, 0.05))
   
   # Save the figures
   fig.savefig(f'diagrams/{name}.pdf', format='pdf', dpi=300, bbox_inches='tight')
@@ -101,11 +102,14 @@ def draw_experiment1_with_setting(cov, setting, color, marker, ax, texty, linest
 
 def draw_from_experiment1(cov, ylabel, ylim):
   fig, ax = plt.subplots(figsize = (8,5))
-  draw_experiment1_with_setting(cov, 'trivial', 'blue', 'D', ax, 0.45, '-')
-  draw_experiment1_with_setting(cov, 'gen50', 'red', '^', ax, 0.35, '--')
-  draw_experiment1_with_setting(cov, 'gen100', 'green', 'p', ax, 0.25, '-.')
-  draw_experiment1_with_setting(cov, 'gen150', 'black', 'o', ax, 0.15, ':')
+  draw_experiment1_with_setting(cov, 'SoliditySmith', 'blue', 'D', ax, 0.7, '-')
+  draw_experiment1_with_setting(cov, 'gen50', 'red', '^', ax, 0.6, '--')
+  draw_experiment1_with_setting(cov, 'gen100', 'green', 'p', ax, 0.5, '-.')
+  draw_experiment1_with_setting(cov, 'gen150', 'black', 'o', ax, 0.4, (0, (3, 1, 1, 1)))
+  draw_experiment1_with_setting(cov, 'gen200', 'purple', 's', ax, 0.3, (0, (5, 2)))
+  draw_experiment1_with_setting(cov, 'gen250', 'brown', 'v', ax, 0.2, (0, (1, 1)))
+  draw_experiment1_with_setting(cov, 'gen300', 'pink', 'x', ax, 0.1, (0, (2, 2, 10, 2)))
   store_fig_experiment1(ax, fig, f"{cov}_increase_plot", ylabel, ylim)
 
-draw_from_experiment1('edgecov', 'Edge Coverage', (6400, 6800))
-draw_from_experiment1('linecov', 'Line Coverage', (23000, 24000))
+draw_from_experiment1('edgecov', 'Edge Coverage', (5000, 7100))
+draw_from_experiment1('linecov', 'Line Coverage', (21000, 24000))

@@ -104,7 +104,7 @@ plt.figure(figsize=(20, 8))
 
 # Step lines for cumulative trends (now in days)
 plt.step(f1_times, f1_counts, where='post', color='blue', label='Erwin', alpha=0.4, linestyle='--', linewidth=4)
-plt.step(f2_times, f2_counts, where='post', color='red', label='Erwin Trivial', alpha=0.4, linestyle='-.', linewidth=4)
+plt.step(f2_times, f2_counts, where='post', color='red', label='SoliditySmith', alpha=0.4, linestyle='-.', linewidth=4)
 
 # Plot markers for Fuzzer 1 bugs (already in days)
 for bug, points in f1_bug_groups.items():
@@ -132,7 +132,7 @@ for bug, points in f1_bug_groups.items():
 # Legend setup
 legend_elements = [
     plt.Line2D([], [], color='blue', linestyle='--', label='Erwin'),
-    plt.Line2D([], [], color='red', linestyle='-.', label='Erwin Trivial'),
+    plt.Line2D([], [], color='red', linestyle='-.', label='SoliditySmith'),
     plt.Line2D([], [], marker='o', markersize=15, markeredgecolor='red',
                markerfacecolor='none', linestyle='None', markeredgewidth=2,
                label='Unique to Erwin (Encircled)')

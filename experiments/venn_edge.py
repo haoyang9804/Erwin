@@ -4,8 +4,8 @@ from venn import venn
 # Read the data
 with open('./coverages/edgecovmap_unittest.txt', 'r') as f:
     edges_unittest = set(f.read().splitlines())
-with open('./coverages/edgecovmap_gen50.txt', 'r') as f:
-    edges_gen50_0 = set(f.read().splitlines())
+with open('./coverages/edgecovmap_erwin.txt', 'r') as f:
+    edges_erwin = set(f.read().splitlines())
 with open('./coverages/edgecovmap_acf.txt', 'r') as f:
     edges_acf = set(f.read().splitlines())
 
@@ -14,7 +14,7 @@ fig, ax = plt.subplots(figsize=(10, 7))
 bugs = {
     'unittest': edges_unittest,
     # 'ACF': edges_acf,
-    'Erwin': edges_gen50_0,
+    'Erwin': edges_erwin,
     # 'Erwin & ACF': bugs_erwin_acf
 }
 

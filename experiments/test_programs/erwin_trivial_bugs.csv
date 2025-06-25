@@ -9,3 +9,4 @@ Bug 8971,Formal Verification Error,program_2025-2-1_1:37:15:687_0.sol
 Bug 4051,Memory-Related Error,program_2025-2-1_12:14:1:205_0.sol
 Bug 8947,Memory-Related Error,program_2025-2-1_23:49:44:264_0.sol
 Bug 3414,Semantic Analysis Error,program_2025-2-2_1:59:2:746_0.sol
+Bug 5518,Semantic Analysis Error,program_2025-2-4_22:2:22:524_0.sol

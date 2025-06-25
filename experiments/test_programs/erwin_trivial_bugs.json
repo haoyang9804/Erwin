@@ -10,7 +10,9 @@
     "program_2025-2-1_12:14:1:205_0.sol":"Internal compiler error during compilation:\n/solidity/libsolidity/codegen/ContractCompiler.cpp(53): Throw in function void {anonymous}::StackHeightChecker::check()\nDynamic exception type: boost::exception_detail::clone_impl<dev::solidity::InternalCompilerError>\nstd::exception::what: I sense a disturbance in the stack: 4 vs 3\n[dev::tag_comment*] = I sense a disturbance in the stack: 4 vs 3"
   },
   "0.4.24": {},
-  "0.5.0": {},
+  "0.5.0": {
+    "program_2025-1-35_22:2:22:524_0.sol": "Internal compiler error during compilation:\n/solidity/libsolidity/codegen/CompilerUtils.cpp(184): Throw in function void dev::solidity::CompilerUtils::storeInMemoryDynamic(const dev::solidity::Type&, bool)\nDynamic exception type: boost::exception_detail::clone_impl<dev::solidity::InternalCompilerError>\nstd::exception::what: Memory store of type mapping(int8 => int256) not allowed.\n[dev::tag_comment*] = Memory store of type mapping(int8 => int256) not allowed."
+  },
   "0.5.1": {},
   "0.5.10": {
     "program_2025-1-25_16:49:41:611_0.sol": "Internal compiler error during compilation:\n/solidity/libsolidity/formal/SMTChecker.cpp(1703): Throw in function void dev::solidity::SMTChecker::mergeVariables(const std::set<const dev::solidity::VariableDeclaration*>&, const dev::solidity::smt::Expression&, const VariableIndices&, const VariableIndices&)\nDynamic exception type: boost::wrapexcept<langutil::InternalCompilerError>\nstd::exception::what:\n[dev::tag_comment*] ="

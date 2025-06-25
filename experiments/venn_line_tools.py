@@ -4,15 +4,15 @@ from venn import venn
 # Read the data
 with open('./coverages/linecovmap_acf.txt', 'r') as f:
     lines_acf = set(f.read().splitlines())
-with open('./coverages/linecovmap_gen50_0.txt', 'r') as f:
-    lines_gen50_0 = set(f.read().splitlines())
+with open('./coverages/linecovmap_erwin.txt', 'r') as f:
+    lines_erwin = set(f.read().splitlines())
 with open('./coverages/linecovmap_fuzzol.txt', 'r') as f:
     lines_fuzzol = set(f.read().splitlines())
 
 fig, ax = plt.subplots(figsize=(10, 7))
 
 bugs = {
-    'Erwin': lines_gen50_0,
+    'Erwin': lines_erwin,
     'Fuzzol': lines_fuzzol,
     'ACF': lines_acf,
     # 'Erwin & ACF': bugs_erwin_acf
