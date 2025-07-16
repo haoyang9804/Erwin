@@ -93,12 +93,12 @@ Misbehavior-triggering test programs will be moved to `test_results`.
 12. https://github.com/ethereum/solidity/issues/15565 (error handling)
 13. https://github.com/ethereum/solidity/issues/15564 (error handling)
 14. https://github.com/ethereum/solidity/issues/15567 (error handling)
-15. https://github.com/ethereum/solidity/pull/15566 (documentation error)
+15. https://github.com/ethereum/solidity/pull/15566 (documentation error) ✅🔨
 16. https://github.com/ethereum/solidity/issues/15583 (error handling, reject valid program) ✅
 17. https://github.com/ethereum/solidity/issues/15645 (ICE, duplicate) 🤡🔨
 18. https://github.com/ethereum/solidity/issues/15646 (error handling, incorrect output) ✅
 19. https://github.com/ethereum/solidity/issues/15647 (smt, ICE) ✅🔨
-20. https://github.com/ethereum/solidity/issues/15649 (ICE)
+20. https://github.com/ethereum/solidity/issues/15649 (ICE) ✅
 21. https://github.com/ethereum/solidity/issues/15651 (smt, ICE) ✅🔨
 22. https://github.com/crytic/slither/issues/2619 (analysis error, hang) ✅🔨
 23. https://github.com/hyperledger-solang/solang/issues/1687 (ICE)
