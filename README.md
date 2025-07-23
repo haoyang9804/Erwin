@@ -6,9 +6,25 @@ By masking out bug-related langauge features, such as type, storage location, an
 
 ***Erwin*** is still under development, any suggestion and collaboration is welcomed.
 
+## Install Erwin
+
+After downloading this repo, run the following commands:
+
+```
+cd Erwin
+npm install
+npm run build
+```
+
+The `npm install` may raise vulnerabilities due to version issue. In that case, run `npm audit fix` to fix them.
+
+The installation has been tested workable on the following configurations:
+
+1. Apple M2 macOS Sequoia version 15.5 node version v23.10.0
+
 ## Run Erwin
 
-Please go into the folder and type `npx erwin`.
+Please go into the folder and type `npx erwin generate`.
 
 ### Use Erwin as a Solidity program generator.
 
