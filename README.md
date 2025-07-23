@@ -20,7 +20,8 @@ The `npm install` may raise vulnerabilities due to version issue. In that case, 
 
 The installation has been tested workable on the following configurations:
 
-1. Apple M2 macOS Sequoia version 15.5 node version v23.10.0
+1. macOS Sequoia version 15.5 node version v23.10.0
+2. AlmaLinux 9.5 node version v22.12.0
 
 ## Run Erwin
 
