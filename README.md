@@ -72,7 +72,7 @@ Erwin integrates four distinct automated testing workflows, each designed to tar
 Below is an example for enable the testing workflow for Solidity.
 
 ```
-npx erwin generate --target solc -m scope --enable_test --compiler_path solc  --refresh_folder --generation_rounds 1000 -max 100
+npx erwin generate --target solc -m scope --enable_test --compiler_path solidity  --refresh_folder --generation_rounds 1000 -max 100
 ```
 
 Misbehavior-triggering test programs will be moved to `test_results`.
